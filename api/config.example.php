@@ -13,6 +13,25 @@ return [
     // Assina os links temporarios do painel.
     'segredo_links' => '',
 
+    'twitch' => [
+        // Publico, pode ficar no codigo.
+        'client_id'     => 'zl7mv5lvq7kafaz2sphw2t4x7lvd5k',
+
+        // SECRETO. Pegue em dev.twitch.tv/console/apps e cole aqui.
+        // Se vazar, gere outro la — nao da para "desvazar".
+        'client_secret' => '',
+
+        // Tem que bater EXATAMENTE com o cadastrado no app da Twitch.
+        'redirect_uri'  => 'https://zocahop.com/zocacontroller/api/entrar.php',
+    ],
+
+    // Os overlays moram noutro dominio, entao o navegador exige liberacao
+    // explicita. Nada de "*": estes endpoints recebem chave em cabecalho.
+    'origens' => [
+        'https://mods.zocahop.com',
+        'https://zocahop.com',
+    ],
+
     'mercadopago' => [
         'access_token'   => '',   // credencial de producao
         'webhook_secret' => '',   // "Assinatura secreta" no painel de webhooks
