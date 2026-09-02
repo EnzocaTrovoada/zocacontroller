@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Criar meu link — ZocaController</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --fundo:  #101A20;
+    --caixa:  #17222A;
+    --caixa2: #1E2B34;
+    --linha:  #2C3B45;
+    --tinta:  #DCE6EA;
+    --fraco:  #93A5B0;
+    --apagado:#6D8290;
+    --sinal:  #45B8BF;
+    --sinal2: #17383C;
+    --alerta: #E4735A;
+    --ambar:  #D3A244;
+    --disp:   "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --mono:   "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 20px 80px;
+    background: var(--fundo); color: var(--tinta);
+    font: 16px/1.6 var(--disp);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  header { padding: 48px 0 26px; border-bottom: 2px solid var(--tinta); margin-bottom: 34px; }
+  .tag {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--sinal); margin: 0 0 12px;
+  }
+  h1 { font-size: clamp(30px,6vw,46px); line-height: 1.02; letter-spacing: -.02em; margin: 0 0 14px; font-weight: 700; }
+  header p { margin: 0; color: var(--fraco); font-size: 18px; max-width: 52ch; }
+
+  .etapa { border: 1px solid var(--linha); background: var(--caixa); margin-bottom: 18px; }
+  .etapa[data-travada="1"] { opacity: .45; pointer-events: none; }
+  .etapa > h2 {
+    margin: 0; padding: 15px 20px; font-size: 15px; font-weight: 600;
+    border-bottom: 1px solid var(--linha); display: flex; align-items: center; gap: 11px;
+  }
+  .n {
+    font-family: var(--mono); font-size: 12px; width: 23px; height: 23px; flex: none;
+    display: grid; place-items: center; border: 1px solid var(--sinal); color: var(--sinal); border-radius: 50%;
+  }
+  .corpo { padding: 20px; }
+  .corpo > :first-child { margin-top: 0; }
+  .corpo > :last-child { margin-bottom: 0; }
+
+  label { display: block; font-size: 13px; color: var(--fraco); margin: 18px 0 6px; }
+  label:first-of-type { margin-top: 0; }
+  .dica { font-size: 12.5px; color: var(--apagado); margin: 5px 0 0; }
+
+  input[type=text], input[type=password], input[type=number], select {
+    width: 100%; font: 14px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha);
+    padding: 10px 12px; border-radius: 2px;
+  }
+  input:focus, select:focus, button:focus-visible { outline: 2px solid var(--sinal); outline-offset: 1px; }
+  select[multiple] { min-height: 120px; }
+
+  .dupla { display: grid; grid-template-columns: 1fr 130px; gap: 12px; align-items: end; }
+
+  button {
+    font: 600 14px var(--disp); cursor: pointer; border-radius: 2px;
+    background: var(--sinal2); color: var(--sinal); border: 1px solid var(--sinal);
+    padding: 11px 20px;
+  }
+  button:hover { background: #1d474c; }
+  button.fraco { background: transparent; color: var(--fraco); border-color: var(--linha); }
+  button:disabled { opacity: .4; cursor: default; }
+
+  .caixinhas { display: flex; flex-wrap: wrap; gap: 8px; }
+  .caixinhas label {
+    margin: 0; display: flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 13px; color: var(--tinta);
+    background: var(--caixa2); border: 1px solid var(--linha);
+    padding: 7px 11px; border-radius: 2px; cursor: pointer;
+  }
+  .caixinhas label:has(input:checked) { border-color: var(--sinal); color: var(--sinal); }
+  .caixinhas input { accent-color: var(--sinal); margin: 0; }
+
+  .recado { font-family: var(--mono); font-size: 13px; margin: 14px 0 0; }
+  .recado.ruim { color: var(--alerta); }
+  .recado.bom  { color: var(--sinal); }
+
+  .nota {
+    border-left: 3px solid var(--ambar); background: var(--caixa2);
+    padding: 13px 16px; margin: 18px 0; font-size: 14px; color: var(--fraco);
+  }
+  .nota b { color: var(--tinta); }
+
+  #saida {
+    font-family: var(--mono); font-size: 12.5px; word-break: break-all;
+    background: var(--fundo); border: 1px solid var(--sinal);
+    padding: 14px; margin-bottom: 14px; color: var(--sinal); user-select: all;
+    max-height: 160px; overflow-y: auto;
+  }
+  ol.passos { margin: 0; padding-left: 22px; color: var(--fraco); font-size: 15px; }
+  ol.passos li { margin-bottom: 9px; }
+  ol.passos b { color: var(--tinta); }
+  .escondido { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="tag">ZocaController</p>
+    <h1>Criar meu link</h1>
+    <p>Esta página monta o endereço que você cola no OBS. Ela lê as suas cenas sozinha — você não precisa digitar o nome de nada.</p>
+  </header>
+
+  <!-- 1 -->
+  <section class="etapa" id="e1">
+    <h2><span class="n">1</span> Conectar no seu OBS</h2>
+    <div class="corpo">
+      <p class="dica" style="margin-bottom:16px">
+        No OBS: <b>Ferramentas → Configurações do Servidor WebSocket</b> → marque
+        <b>Ativar Servidor WebSocket</b>. Se estiver com senha, clique em
+        <b>Mostrar Informações de Conexão</b> e cole a senha aqui.
+      </p>
+      <div class="dupla">
+        <div>
+          <label for="senha">Senha do WebSocket <span style="color:var(--apagado)">(deixe vazio se não tiver)</span></label>
+          <input id="senha" type="password" autocomplete="off" placeholder="opcional">
+        </div>
+        <div>
+          <label for="porta">Porta</label>
+          <input id="porta" type="number" value="4455">
+        </div>
+      </div>
+      <p style="margin:16px 0 0"><button id="btConectar">Conectar</button></p>
+      <p class="recado" id="r1"></p>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="etapa" id="e2" data-travada="1">
+    <h2><span class="n">2</span> O básico</h2>
+    <div class="corpo">
+      <label for="canal">Seu canal na Twitch</label>
+      <input id="canal" type="text" placeholder="enzocatrovoada" autocomplete="off">
+      <p class="dica">Só o nome, do jeito que aparece no endereço do seu canal.</p>
+
+      <label for="mic">Qual é o seu microfone</label>
+      <select id="mic"></select>
+
+      <label for="cenaPanico">Cena de espera (para onde o <code>!panico</code> corta)</label>
+      <select id="cenaPanico"></select>
+
+      <label>Cenas que os mods podem trocar com <code>!cena</code></label>
+      <div class="caixinhas" id="cenasPermitidas"></div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="etapa" id="e3" data-travada="1">
+    <h2><span class="n">3</span> Trocar de cena quando você sair de quadro</h2>
+    <div class="corpo">
+      <div class="caixinhas" style="margin-bottom:4px">
+        <label><input type="checkbox" id="ausencia"> Quero ligar isso</label>
+      </div>
+
+      <div id="blocoAusencia" class="escondido">
+        <label for="camera">Qual é a sua câmera</label>
+        <select id="camera"></select>
+
+        <label for="cenaAusente">Para qual cena ir quando você sumir</label>
+        <select id="cenaAusente"></select>
+
+        <label>Em quais cenas isso vale <span style="color:var(--apagado)">(as que mostram você)</span></label>
+        <div class="caixinhas" id="cenasComCamera"></div>
+
+        <label for="segundos">Segundos sem você antes de trocar</label>
+        <input id="segundos" type="number" value="12" min="4" max="120">
+
+        <div class="nota">
+          Nas propriedades da sua câmera no OBS, deixe
+          <b>“Desativar quando não estiver visível”</b> DESMARCADO. Marcado, o OBS solta a
+          câmera quando troca de cena e ela nunca vê você voltar.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="etapa" id="e4" data-travada="1">
+    <h2><span class="n">4</span> Seu link</h2>
+    <div class="corpo">
+      <div id="saida">preencha os campos acima</div>
+      <p>
+        <button id="btCopiar">Copiar link</button>
+        <button class="fraco" id="btTestar">Abrir para testar</button>
+      </p>
+      <p class="recado" id="r4"></p>
+
+      <p style="margin:22px 0 10px; font-size:14px; color:var(--fraco)">Agora no OBS:</p>
+      <ol class="passos">
+        <li>Na caixa <b>Fontes</b>, clique no <b>+</b> e escolha <b>Navegador</b>.</li>
+        <li>Dê o nome <b>ZocaController</b> e clique OK.</li>
+        <li>No campo <b>URL</b>, apague tudo e cole o link copiado.</li>
+        <li>Largura <b>1920</b>, Altura <b>1080</b>.</li>
+        <li><b>DESMARQUE</b> “Desligar a fonte quando não estiver visível”. Isso é importante: marcado, a ponte morre toda vez que você troca de cena.</li>
+        <li>Clique OK. Um painelzinho aparece no canto de baixo à esquerda.</li>
+      </ol>
+    </div>
+  </section>
+
+</div>
+
+<script>
+"use strict";
+
+/* ---------- SHA-256 (o mesmo da ponte: crypto.subtle não existe em http) ---------- */
+const K256 = [
+  0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+  0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+  0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+  0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+  0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+  0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+  0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+  0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
+];
+function sha256b64Puro(txt) {
+  const gira = (x, n) => (x >>> n) | (x << (32 - n));
+  const bytes = new TextEncoder().encode(txt), n = bytes.length;
+  const bloco = new Uint8Array((((n + 8) >> 6) + 1) << 6);
+  bloco.set(bytes); bloco[n] = 0x80;
+  const dv = new DataView(bloco.buffer), bits = n * 8;
+  dv.setUint32(bloco.length - 8, Math.floor(bits / 4294967296));
+  dv.setUint32(bloco.length - 4, bits >>> 0);
+  let H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w = new Uint32Array(64);
+  for (let i = 0; i < bloco.length; i += 64) {
+    for (let j = 0; j < 16; j++) w[j] = dv.getUint32(i + j * 4);
+    for (let j = 16; j < 64; j++) {
+      const s0 = gira(w[j-15],7) ^ gira(w[j-15],18) ^ (w[j-15] >>> 3);
+      const s1 = gira(w[j-2],17) ^ gira(w[j-2],19) ^ (w[j-2] >>> 10);
+      w[j] = (w[j-16] + s0 + w[j-7] + s1) >>> 0;
+    }
+    let [a,b,c,d,e,f,g,h] = H;
+    for (let j = 0; j < 64; j++) {
+      const S1 = gira(e,6) ^ gira(e,11) ^ gira(e,25);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + K256[j] + w[j]) >>> 0;
+      const S0 = gira(a,2) ^ gira(a,13) ^ gira(a,22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) >>> 0;
+      h=g; g=f; f=e; e=(d+t1)>>>0; d=c; c=b; b=a; a=(t1+t2)>>>0;
+    }
+    const soma = [a,b,c,d,e,f,g,h];
+    H = H.map((v,k) => (v + soma[k]) >>> 0);
+  }
+  let cru = '';
+  for (const v of H) cru += String.fromCharCode((v>>>24)&255,(v>>>16)&255,(v>>>8)&255,v&255);
+  return btoa(cru);
+}
+async function sha256b64(txt) {
+  if (typeof crypto !== 'undefined' && crypto.subtle) {
+    try {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
+      return btoa(String.fromCharCode(...new Uint8Array(buf)));
+    } catch (e) {}
+  }
+  return sha256b64Puro(txt);
+}
+
+/* ---------- utilidades ---------- */
+const el = (id) => document.getElementById(id);
+const recado = (id, txt, tipo) => { const n = el(id); n.textContent = txt; n.className = 'recado ' + (tipo || ''); };
+const destravar = (id) => el(id).dataset.travada = '0';
+
+function opcoes(select, lista, marcado) {
+  select.innerHTML = '';
+  for (const v of lista) {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = v;
+    if (v === marcado) o.selected = true;
+    select.appendChild(o);
+  }
+  if (!lista.length) {
+    const o = document.createElement('option');
+    o.value = ''; o.textContent = '(nada encontrado)';
+    select.appendChild(o);
+  }
+}
+
+function caixinhas(container, lista, marcadas) {
+  container.innerHTML = '';
+  for (const v of lista) {
+    const l = document.createElement('label');
+    const i = document.createElement('input');
+    i.type = 'checkbox'; i.value = v;
+    i.checked = !marcadas || marcadas.includes(v);
+    i.addEventListener('change', montar);
+    l.append(i, document.createTextNode(v));
+    container.appendChild(l);
+  }
+}
+const marcadasDe = (container) =>
+  [...container.querySelectorAll('input:checked')].map(i => i.value);
+
+/* ---------- conversa com o OBS ---------- */
+let ws = null, pend = new Map(), seq = 0;
+let cenas = [], entradas = [], especiais = {};
+
+function pedir(tipo, dados) {
+  const id = 'g' + (++seq);
+  ws.send(JSON.stringify({ op: 6, d: { requestType: tipo, requestId: id, requestData: dados || {} } }));
+  return new Promise((ok, falha) => {
+    pend.set(id, { ok, falha });
+    setTimeout(() => { if (pend.has(id)) { pend.delete(id); falha(new Error('sem resposta')); } }, 6000);
+  });
+}
+
+el('btConectar').addEventListener('click', () => {
+  const senha = el('senha').value;
+  const porta = el('porta').value.trim() || '4455';
+  recado('r1', 'Conectando…');
+
+  try { ws = new WebSocket('ws://localhost:' + porta); }
+  catch (err) { return recado('r1', 'Não consegui nem tentar: ' + err.message, 'ruim'); }
+
+  const limite = setTimeout(() => {
+    if (!ws || ws.readyState !== 1) {
+      recado('r1', 'O OBS não respondeu. Ele está aberto? O servidor WebSocket está ativado?', 'ruim');
+      try { ws.close(); } catch (e) {}
+    }
+  }, 6000);
+
+  ws.onerror = () => recado('r1', 'Não consegui falar com o OBS. Confira se ele está aberto.', 'ruim');
+
+  ws.onclose = (ev) => {
+    clearTimeout(limite);
+    if (ev.code === 4009) recado('r1', 'A senha não confere. Copie de novo em Mostrar Informações de Conexão.', 'ruim');
+  };
+
+  ws.onmessage = async (ev) => {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.op === 0) {
+      clearTimeout(limite);
+      const ident = { rpcVersion: 1 };
+      if (msg.d.authentication) {
+        if (!senha) return recado('r1', 'Seu OBS pede senha e o campo está vazio.', 'ruim');
+        const seg = await sha256b64(senha + msg.d.authentication.salt);
+        ident.authentication = await sha256b64(seg + msg.d.authentication.challenge);
+      } else {
+        recado('r1', 'Conectado — mas seu WebSocket está SEM SENHA. Veja o aviso abaixo.', 'bom');
+      }
+      ws.send(JSON.stringify({ op: 1, d: ident }));
+      return;
+    }
+
+    if (msg.op === 2) { await carregar(!!msg.d.negotiatedRpcVersion); return; }
+
+    if (msg.op === 7) {
+      const p = pend.get(msg.d.requestId); if (!p) return;
+      pend.delete(msg.d.requestId);
+      msg.d.requestStatus.result ? p.ok(msg.d.responseData || {})
+                                 : p.falha(new Error(msg.d.requestStatus.comment || 'erro'));
+    }
+  };
+});
+
+const ehAudio = (k) => /wasapi|coreaudio|pulse|alsa|sndio|audio/i.test(k || '');
+const ehVideo = (k) => /dshow|av_capture|v4l2|video_capture|ndi/i.test(k || '');
+
+async function carregar(temSenha) {
+  try {
+    const l = await pedir('GetSceneList');
+    cenas = (l.scenes || []).map(s => s.sceneName).reverse();
+    entradas = (await pedir('GetInputList')).inputs || [];
+    try { especiais = await pedir('GetSpecialInputs'); } catch (e) { especiais = {}; }
+  } catch (err) {
+    return recado('r1', 'Conectei, mas não consegui ler suas cenas: ' + err.message, 'ruim');
+  }
+
+  const audios = entradas.filter(i => ehAudio(i.inputKind)).map(i => i.inputName);
+  const videos = entradas.filter(i => ehVideo(i.inputKind)).map(i => i.inputName);
+  const todas  = entradas.map(i => i.inputName);
+
+  const listaMic = [...new Set([especiais.mic1, especiais.mic2, ...audios, ...todas].filter(Boolean))];
+  const listaCam = [...new Set([...videos, ...todas])];
+
+  opcoes(el('mic'), listaMic, especiais.mic1 || audios[0]);
+  opcoes(el('camera'), listaCam, videos[0]);
+
+  const espera = cenas.find(n => /volt|brb|espera|pausa|ja volto/i.test(n)) || cenas[0];
+  opcoes(el('cenaPanico'), cenas, espera);
+  opcoes(el('cenaAusente'), cenas, espera);
+  caixinhas(el('cenasPermitidas'), cenas);
+  caixinhas(el('cenasComCamera'), cenas, cenas.filter(n => n !== espera));
+
+  recado('r1', 'Conectado. Achei ' + cenas.length + ' cenas e ' + entradas.length + ' fontes.', 'bom');
+  destravar('e2'); destravar('e3'); destravar('e4');
+  montar();
+}
+
+/* ---------- monta o link ---------- */
+function montar() {
+  const canal = el('canal').value.trim().toLowerCase().replace(/^#/, '');
+  if (!canal) { el('saida').textContent = 'falta o nome do seu canal na Twitch'; return; }
+
+  const p = new URLSearchParams();
+  p.set('canal', canal);
+  if (el('mic').value) p.set('mic', el('mic').value);
+  if (el('cenaPanico').value) p.set('cenaPanico', el('cenaPanico').value);
+
+  const permitidas = marcadasDe(el('cenasPermitidas'));
+  if (permitidas.length && permitidas.length !== cenas.length) p.set('cenas', permitidas.join(','));
+
+  if (el('ausencia').checked) {
+    p.set('ausencia', '1');
+    if (el('camera').value) p.set('camera', el('camera').value);
+    if (el('cenaAusente').value) p.set('cenaAusente', el('cenaAusente').value);
+    const comCamera = marcadasDe(el('cenasComCamera'));
+    if (comCamera.length) p.set('cenasComCamera', comCamera.join(','));
+    p.set('segundosAusente', el('segundos').value || '12');
+  }
+
+  const senha = el('senha').value;
+  if (senha) p.set('senha', senha);
+
+  el('saida').textContent = new URL('ponte.html', location.href).href + '?' + p.toString();
+}
+
+for (const id of ['canal','mic','cenaPanico','camera','cenaAusente','segundos','senha']) {
+  el(id).addEventListener('input', montar);
+  el(id).addEventListener('change', montar);
+}
+
+el('ausencia').addEventListener('change', () => {
+  el('blocoAusencia').classList.toggle('escondido', !el('ausencia').checked);
+  montar();
+});
+
+el('btCopiar').addEventListener('click', async () => {
+  const txt = el('saida').textContent;
+  if (!txt.startsWith('http')) return recado('r4', 'Preencha o nome do canal primeiro.', 'ruim');
+  try {
+    await navigator.clipboard.writeText(txt);
+    recado('r4', 'Copiado. Agora é só colar no OBS.', 'bom');
+  } catch (e) {
+    recado('r4', 'Não consegui copiar sozinho — selecione o texto acima e use Ctrl+C.', 'ruim');
+  }
+});
+
+el('btTestar').addEventListener('click', () => {
+  const txt = el('saida').textContent;
+  if (txt.startsWith('http')) window.open(txt, '_blank', 'width=960,height=560');
+});
+</script>
+</body>
+</html>

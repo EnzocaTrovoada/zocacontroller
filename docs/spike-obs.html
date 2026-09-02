@@ -44,6 +44,7 @@
 
 <script>
 const passos = document.getElementById('passos');
+const abertos = [];
 const veredito = document.getElementById('veredito');
 
 function passo(nome) {
@@ -51,20 +52,95 @@ function passo(nome) {
   el.className = 'linha';
   el.innerHTML = '<span class="marca indo">·</span><span>' + nome + '</span><span class="det"></span>';
   passos.appendChild(el);
-  return {
-    ok:   (d) => { el.children[0].className = 'marca ok';   el.children[0].textContent = '✓'; el.children[2].textContent = d || ''; },
-    ruim: (d) => { el.children[0].className = 'marca ruim'; el.children[0].textContent = '✕'; el.children[2].textContent = d || ''; },
+  const p = {
+    resolvido: false,
+    ok:   (d) => { p.resolvido = true; el.children[0].className = 'marca ok';   el.children[0].textContent = '✓'; el.children[2].textContent = d || ''; },
+    ruim: (d) => { p.resolvido = true; el.children[0].className = 'marca ruim'; el.children[0].textContent = '✕'; el.children[2].textContent = d || ''; },
   };
+  abertos.push(p);
+  return p;
+}
+
+/*
+ * SHA-256 em JS puro.
+ *
+ * Existe porque crypto.subtle só é oferecido em contexto seguro — https ou
+ * localhost. Numa página http comum ele não está lá, e sem isso a conta da
+ * autenticação do obs-websocket não teria como ser feita.
+ */
+const K256 = [
+  0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+  0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+  0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+  0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+  0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+  0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+  0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+  0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
+];
+
+function sha256b64Puro(txt) {
+  const gira = (x, n) => (x >>> n) | (x << (32 - n));
+  const bytes = new TextEncoder().encode(txt);
+  const n = bytes.length;
+
+  const bloco = new Uint8Array((((n + 8) >> 6) + 1) << 6);
+  bloco.set(bytes);
+  bloco[n] = 0x80;
+
+  const dv = new DataView(bloco.buffer);
+  const bits = n * 8;
+  dv.setUint32(bloco.length - 8, Math.floor(bits / 4294967296));
+  dv.setUint32(bloco.length - 4, bits >>> 0);
+
+  let H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w = new Uint32Array(64);
+
+  for (let i = 0; i < bloco.length; i += 64) {
+    for (let j = 0; j < 16; j++) w[j] = dv.getUint32(i + j * 4);
+    for (let j = 16; j < 64; j++) {
+      const s0 = gira(w[j-15], 7) ^ gira(w[j-15], 18) ^ (w[j-15] >>> 3);
+      const s1 = gira(w[j-2], 17) ^ gira(w[j-2], 19) ^ (w[j-2] >>> 10);
+      w[j] = (w[j-16] + s0 + w[j-7] + s1) >>> 0;
+    }
+
+    let [a,b,c,d,e,f,g,h] = H;
+    for (let j = 0; j < 64; j++) {
+      const S1  = gira(e, 6) ^ gira(e, 11) ^ gira(e, 25);
+      const ch  = (e & f) ^ (~e & g);
+      const t1  = (h + S1 + ch + K256[j] + w[j]) >>> 0;
+      const S0  = gira(a, 2) ^ gira(a, 13) ^ gira(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2  = (S0 + maj) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0;
+      d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+
+    const soma = [a,b,c,d,e,f,g,h];
+    H = H.map((v, k) => (v + soma[k]) >>> 0);
+  }
+
+  let cru = '';
+  for (const v of H) {
+    cru += String.fromCharCode((v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255);
+  }
+  return btoa(cru);
 }
 
 async function sha256b64(txt) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
-  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+  if (typeof crypto !== 'undefined' && crypto.subtle) {
+    try {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
+      return btoa(String.fromCharCode(...new Uint8Array(buf)));
+    } catch (e) { /* contexto inseguro: cai para o de cima */ }
+  }
+  return sha256b64Puro(txt);
 }
 
 document.getElementById('f').addEventListener('submit', (e) => {
   e.preventDefault();
   passos.innerHTML = '';
+  abertos.length = 0;
   veredito.textContent = 'Testando…';
   testar(document.getElementById('senha').value, document.getElementById('porta').value.trim() || '4455');
 });
@@ -75,6 +151,14 @@ function testar(senha, porta) {
   const pAuth   = passo('3. Autenticar');
   const pVersao = passo('4. Perguntar a versão do OBS');
   const pMic    = passo('5. Descobrir o microfone');
+
+  // Passo amarelo para sempre e sem explicação é pior que erro vermelho.
+  setTimeout(() => {
+    const parados = abertos.filter(p => !p.resolvido);
+    if (!parados.length) return;
+    parados.forEach(p => p.ruim('nunca respondeu'));
+    concluir(false, 'Alguns passos travaram sem dar erro. Amarelo aqui quer dizer "não respondeu", não "deu errado".');
+  }, 12000);
 
   let ws;
   try {
@@ -116,12 +200,17 @@ function testar(senha, porta) {
 
     if (msg.op === 0) {
       pOla.ok('obs-websocket ' + msg.d.obsWebSocketVersion + ' · rpc ' + msg.d.rpcVersion);
-      const ident = { rpcVersion: 1 };
-      if (msg.d.authentication) {
-        const seg = await sha256b64(senha + msg.d.authentication.salt);
-        ident.authentication = await sha256b64(seg + msg.d.authentication.challenge);
+      try {
+        const ident = { rpcVersion: 1 };
+        if (msg.d.authentication) {
+          const seg = await sha256b64(senha + msg.d.authentication.salt);
+          ident.authentication = await sha256b64(seg + msg.d.authentication.challenge);
+        }
+        ws.send(JSON.stringify({ op: 1, d: ident }));
+      } catch (err) {
+        pAuth.ruim('erro ao calcular: ' + err.message);
+        concluir(false, 'A conexão abriu e o OBS respondeu — só a conta da senha falhou: ' + err.message);
       }
-      ws.send(JSON.stringify({ op: 1, d: ident }));
       return;
     }
 
