@@ -139,7 +139,14 @@ const cfg = {
   segundosAusente: Math.max(4, parseFloat(q.get('segundosAusente')) || 12),
   segundosVolta:   Math.max(1, parseFloat(q.get('segundosVolta')) || 2),
   intervaloOlho:   Math.max(500, parseFloat(q.get('intervaloOlho')) || 1500),
+
+  // Relé: só liga se você der a chave do painel. Sem ela, a ponte segue
+  // funcionando 100% offline — o relé é para os mods enxergarem de fora.
+  api:   (q.get('api') || 'https://api.zocahop.com').replace(/\/$/, ''),
+  chave:  q.get('chave') || guardado('zocacontroller:chave') || '',
 };
+
+if (q.get('chave')) guardar('zocacontroller:chave', q.get('chave'));
 
 if (q.get('senha')) guardar('zocacontroller:senha', q.get('senha'));
 
@@ -164,6 +171,7 @@ const estado = {
   panico: false,
   mudoDesde: 0,          // performance.now() de quando começou a falar mudo
   cenasConhecidas: [],
+  sons: [],                // fontes com áudio, para os mods poderem mutar
 };
 
 let recadoAte = 0;
@@ -350,6 +358,8 @@ function evento(tipo, d) {
     olho.esperado = '';
     pintar();
   } else if (tipo === 'InputMuteStateChanged') {
+    const s = estado.sons.find(x => x.nome === d.inputName);
+    if (s) s.mudo = d.inputMuted;
     if (d.inputName === estado.mic) { estado.micMudo = d.inputMuted; estado.mudoDesde = 0; pintar(); }
   } else if (tipo === 'InputVolumeMeters') {
     for (const inp of (d.inputs || [])) {
@@ -389,6 +399,20 @@ async function descobrir() {
     if (!cfg.cenaPanico) {
       cfg.cenaPanico = estado.cenasConhecidas.find(n => /volt|brb|espera|pausa|ja volto/i.test(n)) || '';
     }
+  } catch (e) {}
+
+  // O que tem áudio não dá para adivinhar pelo tipo: caixa de alerta é fonte
+  // de navegador. Então pergunta — quem responde a GetInputMute tem áudio.
+  try {
+    const lista = (await pedir('GetInputList')).inputs || [];
+    const achados = [];
+    for (const i of lista) {
+      try {
+        const r = await pedir('GetInputMute', { inputName: i.inputName });
+        achados.push({ nome: i.inputName, mudo: r.inputMuted });
+      } catch (e) {}
+    }
+    estado.sons = achados;
   } catch (e) {}
 
   if (estado.mic) {
@@ -494,6 +518,24 @@ ACOES.camera = {
     if (!olho.ligado) olho.euQueSai = false;
     recado('Troca automática por câmera: ' + (olho.ligado ? 'ligada' : 'desligada') + ' — ' + quem);
     pintar();
+  },
+};
+
+// Mutar uma fonte específica pelo nome — é assim que o mod cala a caixa de
+// alertas ou a música sem precisar mexer no seu mixer.
+ACOES.som = {
+  minimo: 'mod', espera: 3000,
+  async fazer(quem, arg) {
+    if (!arg) return recado('Use: ' + cfg.prefixo + 'som NOME DA FONTE');
+    const alvo = estado.sons.find(s => s.nome.toLowerCase() === arg.toLowerCase())
+              || estado.sons.find(s => s.nome.toLowerCase().includes(arg.toLowerCase()));
+    if (!alvo) return recado('Não achei uma fonte de áudio chamada "' + arg + '".');
+    if (estado.panico && alvo.nome === estado.mic && alvo.mudo) {
+      return recado('Em pânico o áudio não volta. Só ' + cfg.prefixo + 'voltar.');
+    }
+    const r = await pedir('ToggleInputMute', { inputName: alvo.nome });
+    alvo.mudo = r.inputMuted;
+    recado(alvo.nome + ': ' + (r.inputMuted ? 'mudo' : 'no ar') + ' — ' + quem);
   },
 };
 
@@ -831,6 +873,54 @@ async function buscarComando() {
   } catch (e) {}
 }
 setInterval(buscarComando, 600);
+
+/* ------------------------------------------------------------------ *
+ *  Relé — o caminho até os moderadores.
+ *
+ *  A ponte EMPURRA o estado e PUXA os comandos. O servidor nunca inicia
+ *  conversa, e por isso tudo isso cabe em hospedagem compartilhada, sem
+ *  WebSocket do lado de lá.
+ * ------------------------------------------------------------------ */
+
+let releQuieto = 0;      // depois de erro, espaça as tentativas
+
+async function subirEstado() {
+  if (!cfg.chave || !estado.obs || Date.now() < releQuieto) return;
+  try {
+    const r = await fetch(cfg.api + '/estado.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Chave': cfg.chave },
+      body: JSON.stringify({
+        cena: estado.cena, mudo: estado.micMudo, mic: estado.mic,
+        nivel: Math.round(estado.nivel * 1000) / 1000,
+        panico: estado.panico, chat: estado.chat,
+        olho: cfg.ausencia
+          ? { ligado: olho.ligado, pronto: olho.pronto, quebrado: olho.quebrado, vendo: olho.vendo }
+          : null,
+        cenas: cfg.cenas.length ? cfg.cenas : estado.cenasConhecidas,
+        sons: estado.sons,
+      }),
+    });
+    if (r.status === 401) { recado('A chave do relé não vale. Gere outra.', 60000); releQuieto = Date.now() + 300000; }
+  } catch (e) { releQuieto = Date.now() + 15000; }
+}
+
+async function buscarDoRele() {
+  if (!cfg.chave || !estado.obs || Date.now() < releQuieto) return;
+  try {
+    const r = await fetch(cfg.api + '/comando.php', { headers: { 'X-Chave': cfg.chave } });
+    if (!r.ok) return;
+    const d = await r.json();
+    for (const c of (d.comandos || [])) {
+      await doPainel({ zc: 'comando', acao: c.acao, arg: c.argumento || '', quem: c.quem || 'mod' });
+    }
+  } catch (e) { releQuieto = Date.now() + 15000; }
+}
+
+if (cfg.chave) {
+  setInterval(subirEstado, 3000);
+  setInterval(buscarDoRele, 2500);
+}
 
 ligarObs();
 ligarChat();

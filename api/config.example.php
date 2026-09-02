@@ -22,7 +22,9 @@ return [
         'client_secret' => '',
 
         // Tem que bater EXATAMENTE com o cadastrado no app da Twitch.
-        'redirect_uri'  => 'https://zocahop.com/zocacontroller/api/entrar.php',
+        // api.zocahop.com e o subdominio da Hostinger; mods.zocahop.com nao
+        // serve, porque aquele aponta para o GitHub Pages.
+        'redirect_uri'  => 'https://api.zocahop.com/entrar.php',
     ],
 
     // Os overlays moram noutro dominio, entao o navegador exige liberacao

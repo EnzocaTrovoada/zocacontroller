@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Painel do mod — ZocaController</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --fundo:#0F171C; --caixa:#17222A; --linha:#2C3B45;
+    --tinta:#DCE6EA; --fraco:#8FA2AD;
+    --sinal:#45B8BF; --sinal2:#17383C;
+    --perigo:#E4735A; --perigo2:#3A211B; --ambar:#D3A244;
+    --disp:"Archivo",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; padding: 14px 14px calc(28px + env(safe-area-inset-bottom));
+    background: var(--fundo); color: var(--tinta);
+    font: 15px/1.5 var(--mono); -webkit-font-smoothing: antialiased;
+  }
+  .w { max-width: 520px; margin: 0 auto; }
+
+  header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+  header h1 { font: 700 15px var(--disp); margin: 0; letter-spacing: .04em; }
+  header span { font-size: 12px; color: var(--fraco); margin-left: auto; }
+
+  /* estado grande: mod olha isso de relance, no celular, com uma mão */
+  .mic { border: 2px solid var(--linha); background: var(--caixa); padding: 20px 14px; text-align: center; margin-bottom: 12px; }
+  .mic b { display: block; font: 700 clamp(22px,7.5vw,32px)/1.05 var(--disp); }
+  .mic small { color: var(--fraco); font-size: 12px; }
+  .mic.aberto { border-color: var(--sinal); } .mic.aberto b { color: var(--sinal); }
+  .mic.mudo { border-color: var(--perigo); background: var(--perigo2); } .mic.mudo b { color: var(--perigo); }
+  .mic.morto { border-color: var(--linha); } .mic.morto b { color: var(--fraco); }
+  #vu { height: 5px; background: rgba(128,128,128,.25); margin-top: 12px; position: relative; }
+  #vu i { position: absolute; inset: 0 100% 0 0; background: var(--sinal); transition: right .12s linear; }
+  .mic.mudo #vu i { background: var(--perigo); }
+
+  button {
+    font: 600 15px var(--disp); width: 100%; cursor: pointer; border-radius: 3px;
+    background: var(--caixa); color: var(--tinta); border: 1px solid var(--linha);
+    padding: 15px 10px; touch-action: manipulation;
+  }
+  button:active:not(:disabled) { transform: scale(.985); }
+  button:disabled { opacity: .3; }
+  button:focus-visible { outline: 2px solid var(--sinal); outline-offset: 2px; }
+  button.perigo { background: var(--perigo2); color: var(--perigo); border-color: var(--perigo); }
+  button.ativo { background: var(--sinal2); color: var(--sinal); border-color: var(--sinal); }
+  .par { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+
+  h2 { font: 600 10px var(--disp); letter-spacing: .18em; text-transform: uppercase; color: var(--fraco); margin: 20px 0 8px; }
+
+  .som, .cena { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+  .som span { flex: 1; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .som button { width: auto; flex: none; padding: 10px 16px; font-size: 13px; }
+  .som button.mudo { background: var(--perigo2); color: var(--perigo); border-color: var(--perigo); }
+  .cena button { text-align: left; padding: 13px 14px; font-size: 14px; }
+  .cena button.atual { background: var(--sinal2); color: var(--sinal); border-color: var(--sinal); }
+
+  .fila { display: flex; justify-content: space-between; padding: 8px 2px; border-bottom: 1px solid var(--linha); font-size: 13px; }
+  .fila b { color: var(--fraco); font-weight: 400; }
+  .on { color: var(--sinal); } .off { color: var(--perigo); } .meh { color: var(--ambar); }
+
+  #recado {
+    position: sticky; bottom: 0; margin-top: 16px; padding: 12px 14px;
+    background: var(--caixa); border: 1px solid var(--linha);
+    font-size: 13px; color: var(--fraco); min-height: 44px;
+  }
+  #recado.bom { border-color: var(--sinal); color: var(--sinal); }
+  #recado.ruim { border-color: var(--perigo); color: var(--perigo); }
+
+  #porta { text-align: center; padding: 12vh 0; }
+  #porta h1 { font: 700 22px var(--disp); margin: 0 0 12px; }
+  #porta p { color: var(--fraco); font-size: 14px; margin: 0 auto; max-width: 34ch; }
+  .escondido { display: none !important; }
+</style>
+</head>
+<body>
+<div class="w">
+
+  <div id="porta">
+    <h1>Link inválido</h1>
+    <p>Peça ao streamer um link de moderador. Ele é pessoal — cada mod tem o seu, e ele pode ser derrubado a qualquer momento.</p>
+  </div>
+
+  <div id="app" class="escondido">
+    <header>
+      <h1>PAINEL DO MOD</h1>
+      <span id="euSou">—</span>
+    </header>
+
+    <div class="mic" id="cxMic">
+      <b id="txMic">carregando…</b>
+      <small id="nmMic">—</small>
+      <div id="vu"><i></i></div>
+    </div>
+
+    <div class="par" id="botoesTopo">
+      <button id="btMute">Mutar / Desmutar</button>
+      <button id="btPanico" class="perigo">PÂNICO</button>
+    </div>
+
+    <div class="fila"><b>Cena</b><span id="vCena">—</span></div>
+    <div class="fila"><b>Câmera</b><span id="vOlho">—</span></div>
+    <div class="fila"><b>Ponte</b><span id="vPonte">—</span></div>
+
+    <div id="secaoAudio"><h2>Áudio</h2><div id="sons"></div></div>
+    <div id="secaoCena"><h2>Cenas</h2><div id="cenas"></div></div>
+
+    <div id="recado">Tudo certo.</div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+const API = 'https://api.zocahop.com';
+const el = (id) => document.getElementById(id);
+
+/* O token chega no # do link. Tiramos ele da barra de endereço na hora:
+   assim não fica em print, nem no histórico, nem no que o navegador
+   compartilha. Fica só no aparelho do mod. */
+let token = '';
+try {
+  const doHash = location.hash.replace(/^#/, '').trim();
+  if (doHash) {
+    localStorage.setItem('zc:mod', doHash);
+    history.replaceState(null, '', location.pathname);
+  }
+  token = localStorage.getItem('zc:mod') || '';
+} catch (e) {
+  token = location.hash.replace(/^#/, '').trim();
+}
+
+if (!token) {
+  el('porta').classList.remove('escondido');
+} else {
+  el('porta').classList.add('escondido');
+  el('app').classList.remove('escondido');
+  puxar();
+  setInterval(puxar, 3000);
+}
+
+let pode = {}, sons = [], cenas = [], cenaAtual = '', mudo = false, micNome = '', panico = false, olho = null;
+let recadoAte = 0;
+
+function recado(txt, tipo) {
+  const n = el('recado');
+  n.textContent = txt;
+  n.className = tipo || '';
+  recadoAte = Date.now() + 6000;
+}
+
+async function puxar() {
+  try {
+    const r = await fetch(API + '/estado.php', { headers: { 'X-Mod': token } });
+
+    if (r.status === 401) {
+      el('app').classList.add('escondido');
+      el('porta').classList.remove('escondido');
+      el('porta').querySelector('h1').textContent = 'Este link não vale mais';
+      el('porta').querySelector('p').textContent = 'O streamer revogou o seu acesso. Peça um novo se precisar.';
+      try { localStorage.removeItem('zc:mod'); } catch (e) {}
+      return;
+    }
+    if (!r.ok) return;
+
+    const d = await r.json();
+    pode = (d.eu && d.eu.pode) || {};
+    el('euSou').textContent = (d.eu && d.eu.nome) || '';
+
+    aplicar(d);
+  } catch (e) {
+    el('vPonte').textContent = 'sem internet';
+    el('vPonte').className = 'off';
+  }
+}
+
+function aplicar(d) {
+  const viva = !!d.ligada;
+  const e = d.estado || {};
+
+  micNome  = e.mic || '';
+  mudo     = !!e.mudo;
+  panico   = !!e.panico;
+  olho     = e.olho || null;
+  cenaAtual = e.cena || '';
+  sons     = Array.isArray(e.sons) ? e.sons : [];
+  cenas    = Array.isArray(e.cenas) ? e.cenas : [];
+
+  const cx = el('cxMic');
+  if (!viva) {
+    cx.className = 'mic morto';
+    el('txMic').textContent = 'OBS DESLIGADO';
+    el('nmMic').textContent = d.idade ? ('sem sinal há ' + d.idade + ' s') : (d.motivo || '');
+  } else {
+    cx.className = 'mic ' + (mudo ? 'mudo' : 'aberto');
+    el('txMic').textContent = mudo ? 'MICROFONE MUDO' : 'MICROFONE ABERTO';
+    el('nmMic').textContent = micNome || '';
+  }
+  el('vu').firstElementChild.style.right = (100 - Math.min(100, (e.nivel || 0) * 320)) + '%';
+
+  el('vCena').textContent = panico ? 'EM PÂNICO' : (cenaAtual || '—');
+  el('vCena').className = panico ? 'meh' : '';
+
+  el('vPonte').textContent = viva ? 'ligada' : 'não encontrada';
+  el('vPonte').className = viva ? 'on' : 'off';
+
+  if (!olho) {
+    el('vOlho').textContent = 'não ativada';
+    el('vOlho').className = '';
+  } else {
+    el('vOlho').textContent = olho.quebrado ? olho.quebrado
+      : !olho.ligado ? 'desligada'
+      : !olho.pronto ? 'carregando…'
+      : olho.vendo ? 'ele está aí' : 'sem ninguém';
+    el('vOlho').className = olho.quebrado ? 'off' : !olho.ligado ? 'meh' : olho.vendo ? 'on' : 'meh';
+  }
+
+  el('btMute').disabled   = !viva || !pode.audio;
+  el('btPanico').disabled = !viva || !pode.audio || panico;
+  el('btPanico').textContent = panico ? 'JÁ EM PÂNICO' : 'PÂNICO';
+
+  el('secaoAudio').classList.toggle('escondido', !pode.audio || !sons.length);
+  el('secaoCena').classList.toggle('escondido', !pode.cena || !cenas.length);
+  desenharSons();
+  desenharCenas();
+
+  if (recadoAte && Date.now() > recadoAte) { el('recado').textContent = 'Tudo certo.'; el('recado').className = ''; recadoAte = 0; }
+}
+
+function desenharSons() {
+  const cx = el('sons');
+  if (cx.dataset.assinatura === JSON.stringify(sons)) return;   // não redesenha à toa
+  cx.dataset.assinatura = JSON.stringify(sons);
+  cx.innerHTML = '';
+  for (const s of sons) {
+    const l = document.createElement('div'); l.className = 'som';
+    const n = document.createElement('span'); n.textContent = s.nome;
+    const b = document.createElement('button');
+    b.textContent = s.mudo ? 'mudo' : 'no ar';
+    if (s.mudo) b.className = 'mudo';
+    b.addEventListener('click', () => enviar('som', s.nome, (s.mudo ? 'Abrindo ' : 'Mutando ') + s.nome));
+    l.append(n, b); cx.appendChild(l);
+  }
+}
+
+function desenharCenas() {
+  const cx = el('cenas');
+  const assinatura = JSON.stringify([cenas, cenaAtual]);
+  if (cx.dataset.assinatura === assinatura) return;
+  cx.dataset.assinatura = assinatura;
+  cx.innerHTML = '';
+  for (const n of cenas) {
+    const l = document.createElement('div'); l.className = 'cena';
+    const b = document.createElement('button');
+    b.textContent = n;
+    if (n === cenaAtual) b.className = 'atual';
+    b.addEventListener('click', () => enviar('cena', n, 'Trocando para ' + n));
+    l.appendChild(b); cx.appendChild(l);
+  }
+}
+
+async function enviar(acao, argumento, aviso) {
+  recado(aviso + '…');
+  try {
+    const r = await fetch(API + '/comando.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Mod': token },
+      body: JSON.stringify({ acao, argumento }),
+    });
+    const d = await r.json();
+    if (!r.ok) return recado(d.erro || 'Não deu certo.', 'ruim');
+    // O OBS não é nosso: a ponte busca o pedido e só então a tela muda.
+    recado('Pedido enviado. A tela atualiza em alguns segundos.', 'bom');
+  } catch (e) {
+    recado('Sem internet.', 'ruim');
+  }
+}
+
+el('btMute').addEventListener('click', () => enviar('mute', '', mudo ? 'Abrindo o microfone' : 'Mutando'));
+el('btPanico').addEventListener('click', () => {
+  if (!confirm('Isso muta tudo e corta para a cena de espera. Só o streamer consegue voltar.\n\nConfirma?')) return;
+  enviar('panico', '', 'Ativando pânico');
+});
+</script>
+</body>
+</html>
