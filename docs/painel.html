@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel — ZocaController</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --fundo:  #0F171C;
+    --caixa:  #17222A;
+    --linha:  #2C3B45;
+    --tinta:  #DCE6EA;
+    --fraco:  #8FA2AD;
+    --sinal:  #45B8BF;
+    --sinal2: #17383C;
+    --perigo: #E4735A;
+    --perigo2:#3A211B;
+    --ambar:  #D3A244;
+    --disp: "Archivo", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 10px;
+    background: var(--fundo); color: var(--tinta);
+    font: 13px/1.45 var(--mono);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- estado grande: dá pra ler de longe, com o olho no jogo ---- */
+  .mic {
+    border: 2px solid var(--linha); background: var(--caixa);
+    padding: 14px 12px; text-align: center; margin-bottom: 8px;
+  }
+  .mic b {
+    display: block; font-family: var(--disp); font-weight: 700;
+    font-size: clamp(20px, 7vw, 30px); letter-spacing: -.01em; line-height: 1.05;
+  }
+  .mic small { color: var(--fraco); font-size: 11px; }
+  .mic.aberto { border-color: var(--sinal); }
+  .mic.aberto b { color: var(--sinal); }
+  .mic.mudo   { border-color: var(--perigo); background: var(--perigo2); }
+  .mic.mudo b { color: var(--perigo); }
+
+  #vu { height: 4px; background: rgba(255,255,255,.1); margin-top: 9px; position: relative; }
+  #vu i { position: absolute; inset: 0 100% 0 0; background: var(--sinal); transition: right .08s linear; }
+  .mic.mudo #vu i { background: var(--perigo); }
+
+  .grade { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .grade.um { grid-template-columns: 1fr; }
+
+  button {
+    font: 600 12px var(--disp); cursor: pointer; border-radius: 2px;
+    background: var(--caixa); color: var(--tinta); border: 1px solid var(--linha);
+    padding: 11px 8px; width: 100%;
+  }
+  button:hover:not(:disabled) { border-color: var(--sinal); color: var(--sinal); }
+  button:disabled { opacity: .35; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--sinal); outline-offset: 1px; }
+  button.perigo { background: var(--perigo2); color: var(--perigo); border-color: var(--perigo); }
+  button.perigo:hover:not(:disabled) { background: #4a2a22; color: var(--perigo); border-color: var(--perigo); }
+  button.ativo { background: var(--sinal2); color: var(--sinal); border-color: var(--sinal); }
+
+  .fila { display: flex; justify-content: space-between; gap: 8px; padding: 6px 2px; border-bottom: 1px solid var(--linha); font-size: 11.5px; }
+  .fila b { color: var(--fraco); font-weight: 400; }
+  .fila span { text-align: right; }
+  .on  { color: var(--sinal); }
+  .off { color: var(--perigo); }
+  .meh { color: var(--ambar); }
+
+  h2 {
+    font: 600 10px var(--disp); letter-spacing: .16em; text-transform: uppercase;
+    color: var(--fraco); margin: 14px 0 7px;
+  }
+  select {
+    width: 100%; font: 12px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); padding: 8px; border-radius: 2px;
+  }
+
+  #log { margin-top: 6px; max-height: 118px; overflow-y: auto; }
+  #log div { color: var(--fraco); font-size: 11px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+  #log time { color: var(--sinal); margin-right: 6px; }
+
+  #entrar { padding: 4px 0; }
+  #entrar input {
+    width: 100%; font: 12px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); padding: 9px; margin-bottom: 6px; border-radius: 2px;
+  }
+  #entrar p { color: var(--fraco); font-size: 11.5px; margin: 0 0 10px; line-height: 1.5; }
+  #aviso { color: var(--perigo); font-size: 11.5px; min-height: 1.4em; margin-top: 6px; }
+  .escondido { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="entrar">
+  <p>Cole a senha do WebSocket do OBS. Ela fica guardada aqui e você não precisa digitar de novo.</p>
+  <input id="senha" type="password" placeholder="senha (vazio se não tiver)" autocomplete="off">
+  <input id="porta" type="text" value="4455" inputmode="numeric">
+  <button id="btEntrar">Conectar</button>
+  <div id="aviso"></div>
+</div>
+
+<div id="app" class="escondido">
+
+  <div class="mic" id="cxMic">
+    <b id="txMic">—</b>
+    <small id="nmMic">—</small>
+    <div id="vu"><i></i></div>
+  </div>
+
+  <div class="grade um">
+    <button id="btMute">Mutar / Desmutar</button>
+  </div>
+
+  <div class="grade">
+    <button id="btPanico" class="perigo">PÂNICO</button>
+    <button id="btVoltar" disabled>Sair do pânico</button>
+  </div>
+
+  <h2>Estado</h2>
+  <div class="fila"><b>Cena</b><span id="vCena">—</span></div>
+  <div class="fila"><b>Chat</b><span id="vChat">—</span></div>
+  <div class="fila"><b>Ponte</b><span id="vPonte">—</span></div>
+  <div class="fila"><b>Câmera</b><span id="vOlho">—</span></div>
+
+  <div class="grade um" style="margin-top:8px">
+    <button id="btCamera" disabled>Troca por câmera</button>
+  </div>
+
+  <h2>Trocar de cena</h2>
+  <select id="cenas"></select>
+
+  <h2>Últimas ações</h2>
+  <div id="log"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- SHA-256 (crypto.subtle não existe em página http) ---------- */
+const K256=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+function sha256b64Puro(txt){
+  const gira=(x,n)=>(x>>>n)|(x<<(32-n));
+  const bytes=new TextEncoder().encode(txt),n=bytes.length;
+  const bloco=new Uint8Array((((n+8)>>6)+1)<<6); bloco.set(bytes); bloco[n]=0x80;
+  const dv=new DataView(bloco.buffer),bits=n*8;
+  dv.setUint32(bloco.length-8,Math.floor(bits/4294967296)); dv.setUint32(bloco.length-4,bits>>>0);
+  let H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w=new Uint32Array(64);
+  for(let i=0;i<bloco.length;i+=64){
+    for(let j=0;j<16;j++) w[j]=dv.getUint32(i+j*4);
+    for(let j=16;j<64;j++){
+      const s0=gira(w[j-15],7)^gira(w[j-15],18)^(w[j-15]>>>3);
+      const s1=gira(w[j-2],17)^gira(w[j-2],19)^(w[j-2]>>>10);
+      w[j]=(w[j-16]+s0+w[j-7]+s1)>>>0;
+    }
+    let [a,b,c,d,e,f,g,h]=H;
+    for(let j=0;j<64;j++){
+      const S1=gira(e,6)^gira(e,11)^gira(e,25), ch=(e&f)^(~e&g);
+      const t1=(h+S1+ch+K256[j]+w[j])>>>0;
+      const S0=gira(a,2)^gira(a,13)^gira(a,22), maj=(a&b)^(a&c)^(b&c);
+      const t2=(S0+maj)>>>0;
+      h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0;
+    }
+    const s=[a,b,c,d,e,f,g,h]; H=H.map((v,k)=>(v+s[k])>>>0);
+  }
+  let cru=''; for(const v of H) cru+=String.fromCharCode((v>>>24)&255,(v>>>16)&255,(v>>>8)&255,v&255);
+  return btoa(cru);
+}
+async function sha256b64(txt){
+  if(typeof crypto!=='undefined'&&crypto.subtle){
+    try{ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(txt));
+      return btoa(String.fromCharCode(...new Uint8Array(b))); }catch(e){}
+  }
+  return sha256b64Puro(txt);
+}
+
+/* ---------- básico ---------- */
+const el = (id) => document.getElementById(id);
+const guardar = (c,v) => { try { localStorage.setItem(c,v); } catch(e){} };
+const guardado = (c) => { try { return localStorage.getItem(c); } catch(e){ return null; } };
+
+let ws = null, pend = new Map(), seq = 0, espera = 1000;
+let cenas = [], micNome = '', mudo = false, panico = false, temPonte = 0, ultimoOlho = null;
+
+function pedir(tipo, dados) {
+  if (!ws || ws.readyState !== 1) return Promise.reject(new Error('OBS desligado'));
+  const id = 'x' + (++seq);
+  ws.send(JSON.stringify({ op: 6, d: { requestType: tipo, requestId: id, requestData: dados || {} } }));
+  return new Promise((ok, falha) => {
+    pend.set(id, { ok, falha });
+    setTimeout(() => { if (pend.has(id)) { pend.delete(id); falha(new Error('sem resposta')); } }, 6000);
+  });
+}
+
+const mandar = (acao, extra) =>
+  pedir('BroadcastCustomEvent', { eventData: Object.assign({ zc: 'comando', acao, quem: 'painel' }, extra || {}) })
+    .catch(() => anotar('a ponte não respondeu'));
+
+function anotar(txt) {
+  const d = document.createElement('div');
+  const h = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  d.innerHTML = '<time>' + h + '</time>' + txt;
+  el('log').prepend(d);
+  while (el('log').children.length > 40) el('log').lastChild.remove();
+}
+
+/* ---------- conectar ---------- */
+function conectar(senha, porta) {
+  el('aviso').textContent = 'Conectando…';
+  try { ws = new WebSocket('ws://localhost:' + porta); }
+  catch (e) { return void (el('aviso').textContent = 'Não consegui abrir a conexão.'); }
+
+  const limite = setTimeout(() => {
+    if (!ws || ws.readyState !== 1) el('aviso').textContent = 'O OBS não respondeu. Ele está aberto e com o WebSocket ativado?';
+  }, 6000);
+
+  ws.onclose = (ev) => {
+    clearTimeout(limite);
+    if (ev.code === 4009) { el('aviso').textContent = 'Senha incorreta.'; mostrarEntrada(); return; }
+    el('vPonte').textContent = 'OBS caiu'; el('vPonte').className = 'off';
+    setTimeout(() => conectar(senha, porta), espera);
+    espera = Math.min(espera * 1.7, 15000);
+  };
+
+  ws.onerror = () => {};
+
+  ws.onmessage = async (ev) => {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.op === 0) {
+      clearTimeout(limite);
+      const ident = { rpcVersion: 1, eventSubscriptions: 1 | 4 | 8 };  // General, Scenes, Inputs
+      if (msg.d.authentication) {
+        if (!senha) { el('aviso').textContent = 'Seu OBS pede senha e o campo está vazio.'; return; }
+        const s = await sha256b64(senha + msg.d.authentication.salt);
+        ident.authentication = await sha256b64(s + msg.d.authentication.challenge);
+      }
+      ws.send(JSON.stringify({ op: 1, d: ident }));
+      return;
+    }
+
+    if (msg.op === 2) {
+      espera = 1000;
+      guardar('zc:senha', senha); guardar('zc:porta', porta);
+      el('entrar').classList.add('escondido');
+      el('app').classList.remove('escondido');
+      anotar('conectado ao OBS');
+      await inicial();
+      return;
+    }
+
+    if (msg.op === 7) {
+      const p = pend.get(msg.d.requestId); if (!p) return;
+      pend.delete(msg.d.requestId);
+      msg.d.requestStatus.result ? p.ok(msg.d.responseData || {})
+                                 : p.falha(new Error(msg.d.requestStatus.comment || 'erro'));
+      return;
+    }
+
+    if (msg.op === 5) recebido(msg.d.eventType, msg.d.eventData);
+  };
+}
+
+function mostrarEntrada() {
+  el('app').classList.add('escondido');
+  el('entrar').classList.remove('escondido');
+}
+
+async function inicial() {
+  try {
+    const l = await pedir('GetSceneList');
+    cenas = (l.scenes || []).map(s => s.sceneName).reverse();
+    el('cenas').innerHTML = '<option value="">— escolher —</option>' +
+      cenas.map(n => '<option>' + n.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</option>').join('');
+    el('vCena').textContent = l.currentProgramSceneName || '—';
+  } catch (e) {}
+
+  try {
+    const esp = await pedir('GetSpecialInputs');
+    micNome = esp.mic1 || esp.mic2 || '';
+    if (micNome) mudo = (await pedir('GetInputMute', { inputName: micNome })).inputMuted;
+  } catch (e) {}
+  pintar();
+}
+
+/* ---------- eventos ---------- */
+function recebido(tipo, d) {
+  if (tipo === 'CustomEvent') {
+    if (!d || d.zc !== 'estado') return;
+    temPonte = Date.now();
+    micNome = d.mic || micNome;
+    mudo = !!d.mudo;
+    panico = !!d.panico;
+    ultimoOlho = d.olho;
+    el('vCena').textContent = d.cena || '—';
+    el('vChat').textContent = d.chat ? '#' + d.canal : 'desligado';
+    el('vChat').className = d.chat ? 'on' : 'off';
+    el('vu').firstElementChild.style.right = (100 - Math.min(100, (d.nivel || 0) * 320)) + '%';
+    if (d.recado && d.recado !== recebido.ultimo) { recebido.ultimo = d.recado; anotar(d.recado); }
+    pintar();
+    return;
+  }
+  if (tipo === 'CurrentProgramSceneChanged') { el('vCena').textContent = d.sceneName; }
+  if (tipo === 'InputMuteStateChanged' && d.inputName === micNome) { mudo = d.inputMuted; pintar(); }
+}
+
+function pintar() {
+  const cx = el('cxMic');
+  cx.className = 'mic ' + (mudo ? 'mudo' : 'aberto');
+  el('txMic').textContent = mudo ? 'MICROFONE MUDO' : 'MICROFONE ABERTO';
+  el('nmMic').textContent = micNome || 'sem microfone identificado';
+
+  el('btVoltar').disabled = !panico;
+  el('btPanico').disabled = panico;
+
+  const viva = temPonte && (Date.now() - temPonte < 4000);
+  el('vPonte').textContent = viva ? (panico ? 'EM PÂNICO' : 'ligada') : 'não encontrada';
+  el('vPonte').className = viva ? (panico ? 'meh' : 'on') : 'off';
+
+  const b = el('btCamera');
+  b.disabled = !viva || !ultimoOlho;
+  if (!ultimoOlho) {
+    el('vOlho').textContent = viva ? 'desativada no link' : '—';
+    el('vOlho').className = '';
+    b.classList.remove('ativo');
+    b.textContent = 'Troca por câmera';
+  } else {
+    const o = ultimoOlho;
+    el('vOlho').textContent = o.quebrado ? o.quebrado
+      : !o.ligado ? 'desligada'
+      : !o.pronto ? 'carregando…'
+      : o.vendo ? 'você aí' : 'sem ninguém';
+    el('vOlho').className = o.quebrado ? 'off' : !o.ligado ? 'meh' : o.vendo ? 'on' : 'meh';
+    b.classList.toggle('ativo', !!o.ligado);
+    b.textContent = o.ligado ? 'Troca por câmera: LIGADA' : 'Troca por câmera: DESLIGADA';
+  }
+}
+setInterval(pintar, 1000);
+
+/* ---------- botões ---------- */
+el('btEntrar').addEventListener('click', () =>
+  conectar(el('senha').value, el('porta').value.trim() || '4455'));
+
+el('senha').addEventListener('keydown', (e) => { if (e.key === 'Enter') el('btEntrar').click(); });
+
+// Mutar o painel faz direto no OBS: não depende da ponte estar viva.
+el('btMute').addEventListener('click', async () => {
+  if (!micNome) return anotar('não sei qual é o microfone');
+  if (panico && mudo) return anotar('em pânico o mute não desmuta — use Sair do pânico');
+  try {
+    const r = await pedir('ToggleInputMute', { inputName: micNome });
+    mudo = r.inputMuted; pintar();
+    anotar(mudo ? 'microfone mudado' : 'microfone aberto');
+  } catch (e) { anotar('falhou: ' + e.message); }
+});
+
+el('btPanico').addEventListener('click', () => { mandar('panico'); anotar('pânico pedido'); });
+el('btVoltar').addEventListener('click', () => { mandar('voltar'); anotar('saindo do pânico'); });
+
+el('btCamera').addEventListener('click', () => {
+  const ligar = !(ultimoOlho && ultimoOlho.ligado);
+  mandar('camera', { ligar });
+  anotar('troca por câmera: ' + (ligar ? 'ligando' : 'desligando'));
+});
+
+el('cenas').addEventListener('change', async (e) => {
+  const nome = e.target.value; if (!nome) return;
+  try { await pedir('SetCurrentProgramScene', { sceneName: nome }); anotar('cena: ' + nome); }
+  catch (err) { anotar('falhou: ' + err.message); }
+  e.target.value = '';
+});
+
+/* ---------- entra sozinho se já tem senha guardada ---------- */
+const sGuardada = guardado('zc:senha'), pGuardada = guardado('zc:porta') || '4455';
+el('porta').value = pGuardada;
+if (sGuardada !== null) { el('senha').value = sGuardada; conectar(sGuardada, pGuardada); }
+</script>
+</body>
+</html>

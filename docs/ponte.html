@@ -341,6 +341,7 @@ function religarObs() {
 }
 
 function evento(tipo, d) {
+  if (tipo === 'CustomEvent') { doPainel(d); return; }
   if (tipo === 'CurrentProgramSceneChanged') {
     estado.cena = d.sceneName;
     // Trocou de cena e não fui eu? Então quem manda agora é o humano:
@@ -755,6 +756,53 @@ document.addEventListener('visibilitychange', () => {
   if (!ws  || ws.readyState  > 1) esperaObs  = 500;
   if (!irc || irc.readyState > 1) esperaChat = 500;
 });
+
+/* ------------------------------------------------------------------ *
+ *  Conversa com o painel (a doca do OBS).
+ *
+ *  O caminho é o próprio obs-websocket: BroadcastCustomEvent manda um
+ *  recado para todos os outros clientes conectados. Some a necessidade de
+ *  servidor, e some a aposta de que localStorage é compartilhado entre a
+ *  fonte de navegador e a doca — que são contextos diferentes.
+ * ------------------------------------------------------------------ */
+
+const EU = 'p' + Math.random().toString(36).slice(2, 8);
+
+async function doPainel(d) {
+  if (!d || d.zc !== 'comando') return;
+
+  if (d.acao === 'camera') {
+    olho.ligado = (d.ligar === undefined) ? !olho.ligado : !!d.ligar;
+    if (!olho.ligado) olho.euQueSai = false;
+    recado('Troca por câmera: ' + (olho.ligado ? 'ligada' : 'desligada') + ' — painel');
+    pintar();
+    return;
+  }
+
+  // O painel roda na máquina do streamer e já passou pela senha do OBS:
+  // aqui não vale cargo nem cooldown, isso é coisa de chat.
+  const acao = ACOES[d.acao];
+  if (!acao) return;
+  try { await acao.fazer(d.quem || 'painel', d.arg || ''); }
+  catch (err) { recado('Falhou: ' + err.message); }
+}
+
+async function anunciar() {
+  if (!estado.obs) return;
+  try {
+    await pedir('BroadcastCustomEvent', { eventData: {
+      zc: 'estado', de: EU, canal: cfg.canal,
+      mic: estado.mic, mudo: estado.micMudo,
+      nivel: Math.round(estado.nivel * 1000) / 1000,
+      cena: estado.cena, panico: estado.panico, chat: estado.chat,
+      olho: cfg.ausencia
+        ? { ligado: olho.ligado, pronto: olho.pronto, quebrado: olho.quebrado, vendo: olho.vendo }
+        : null,
+      recado: el('recado').textContent,
+    }});
+  } catch (e) { /* OBS caiu; a reconexão cuida */ }
+}
+setInterval(anunciar, 1000);
 
 ligarObs();
 ligarChat();
