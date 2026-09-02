@@ -23,6 +23,17 @@
     --disp: "Archivo", Arial, sans-serif;
     --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
   }
+  /* Temas: ?tema=claro | ?tema=roxo — o OBS não conta qual skin está usando. */
+  :root[data-tema="claro"] {
+    color-scheme: light;
+    --fundo:#F0F3F5; --caixa:#FFFFFF; --linha:#CBD5DA; --tinta:#16212B;
+    --fraco:#5C6C78; --sinal:#0E7C86; --sinal2:#D8ECEE; --perigo:#B93F28; --perigo2:#F6E0DA; --ambar:#8A6210;
+  }
+  :root[data-tema="roxo"] {
+    --fundo:#14101C; --caixa:#1E1830; --linha:#39305A; --tinta:#E6E0F5;
+    --fraco:#9E93BE; --sinal:#B490FF; --sinal2:#2C2148; --perigo:#FF7A8A; --perigo2:#3A1B26; --ambar:#E0B15C;
+  }
+
   * { box-sizing: border-box; }
   body {
     margin: 0; padding: 10px;
@@ -31,22 +42,14 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* ---- estado grande: dá pra ler de longe, com o olho no jogo ---- */
-  .mic {
-    border: 2px solid var(--linha); background: var(--caixa);
-    padding: 14px 12px; text-align: center; margin-bottom: 8px;
-  }
-  .mic b {
-    display: block; font-family: var(--disp); font-weight: 700;
-    font-size: clamp(20px, 7vw, 30px); letter-spacing: -.01em; line-height: 1.05;
-  }
+  .mic { border: 2px solid var(--linha); background: var(--caixa); padding: 13px 12px; text-align: center; margin-bottom: 8px; }
+  .mic b { display: block; font-family: var(--disp); font-weight: 700; font-size: clamp(19px,6.5vw,28px); line-height: 1.05; }
   .mic small { color: var(--fraco); font-size: 11px; }
   .mic.aberto { border-color: var(--sinal); }
   .mic.aberto b { color: var(--sinal); }
-  .mic.mudo   { border-color: var(--perigo); background: var(--perigo2); }
+  .mic.mudo { border-color: var(--perigo); background: var(--perigo2); }
   .mic.mudo b { color: var(--perigo); }
-
-  #vu { height: 4px; background: rgba(255,255,255,.1); margin-top: 9px; position: relative; }
+  #vu { height: 4px; background: rgba(128,128,128,.25); margin-top: 9px; position: relative; }
   #vu i { position: absolute; inset: 0 100% 0 0; background: var(--sinal); transition: right .08s linear; }
   .mic.mudo #vu i { background: var(--perigo); }
 
@@ -62,34 +65,28 @@
   button:disabled { opacity: .35; cursor: default; }
   button:focus-visible { outline: 2px solid var(--sinal); outline-offset: 1px; }
   button.perigo { background: var(--perigo2); color: var(--perigo); border-color: var(--perigo); }
-  button.perigo:hover:not(:disabled) { background: #4a2a22; color: var(--perigo); border-color: var(--perigo); }
   button.ativo { background: var(--sinal2); color: var(--sinal); border-color: var(--sinal); }
 
   .fila { display: flex; justify-content: space-between; gap: 8px; padding: 6px 2px; border-bottom: 1px solid var(--linha); font-size: 11.5px; }
   .fila b { color: var(--fraco); font-weight: 400; }
   .fila span { text-align: right; }
-  .on  { color: var(--sinal); }
-  .off { color: var(--perigo); }
-  .meh { color: var(--ambar); }
+  .on { color: var(--sinal); } .off { color: var(--perigo); } .meh { color: var(--ambar); }
 
-  h2 {
-    font: 600 10px var(--disp); letter-spacing: .16em; text-transform: uppercase;
-    color: var(--fraco); margin: 14px 0 7px;
-  }
-  select {
-    width: 100%; font: 12px var(--mono); color: var(--tinta);
-    background: var(--fundo); border: 1px solid var(--linha); padding: 8px; border-radius: 2px;
-  }
+  h2 { font: 600 10px var(--disp); letter-spacing: .16em; text-transform: uppercase; color: var(--fraco); margin: 14px 0 7px; }
+  select { width: 100%; font: 12px var(--mono); color: var(--tinta); background: var(--fundo); border: 1px solid var(--linha); padding: 8px; border-radius: 2px; }
 
-  #log { margin-top: 6px; max-height: 118px; overflow-y: auto; }
-  #log div { color: var(--fraco); font-size: 11px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+  /* mixer */
+  .som { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--linha); }
+  .som span { flex: 1; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .som button { width: auto; flex: none; padding: 6px 11px; font-size: 11px; }
+  .som button.mudo { background: var(--perigo2); color: var(--perigo); border-color: var(--perigo); }
+
+  #log { margin-top: 6px; max-height: 120px; overflow-y: auto; }
+  #log div { color: var(--fraco); font-size: 11px; padding: 3px 0; border-bottom: 1px solid rgba(128,128,128,.12); }
   #log time { color: var(--sinal); margin-right: 6px; }
 
   #entrar { padding: 4px 0; }
-  #entrar input {
-    width: 100%; font: 12px var(--mono); color: var(--tinta);
-    background: var(--fundo); border: 1px solid var(--linha); padding: 9px; margin-bottom: 6px; border-radius: 2px;
-  }
+  #entrar input { width: 100%; font: 12px var(--mono); color: var(--tinta); background: var(--fundo); border: 1px solid var(--linha); padding: 9px; margin-bottom: 6px; border-radius: 2px; }
   #entrar p { color: var(--fraco); font-size: 11.5px; margin: 0 0 10px; line-height: 1.5; }
   #aviso { color: var(--perigo); font-size: 11.5px; min-height: 1.4em; margin-top: 6px; }
   .escondido { display: none !important; }
@@ -98,7 +95,7 @@
 <body>
 
 <div id="entrar">
-  <p>Cole a senha do WebSocket do OBS. Ela fica guardada aqui e você não precisa digitar de novo.</p>
+  <p>Cole a senha do WebSocket do OBS. Fica guardada aqui e você não digita de novo.</p>
   <input id="senha" type="password" placeholder="senha (vazio se não tiver)" autocomplete="off">
   <input id="porta" type="text" value="4455" inputmode="numeric">
   <button id="btEntrar">Conectar</button>
@@ -113,14 +110,13 @@
     <div id="vu"><i></i></div>
   </div>
 
-  <div class="grade um">
-    <button id="btMute">Mutar / Desmutar</button>
-  </div>
-
   <div class="grade">
     <button id="btPanico" class="perigo">PÂNICO</button>
     <button id="btVoltar" disabled>Sair do pânico</button>
   </div>
+
+  <h2>Áudio</h2>
+  <div id="mixer"></div>
 
   <h2>Estado</h2>
   <div class="fila"><b>Cena</b><span id="vCena">—</span></div>
@@ -192,8 +188,16 @@ const el = (id) => document.getElementById(id);
 const guardar = (c,v) => { try { localStorage.setItem(c,v); } catch(e){} };
 const guardado = (c) => { try { return localStorage.getItem(c); } catch(e){ return null; } };
 
+const CAIXA = 'OBS_WEBSOCKET_DATA_REALM_GLOBAL';
+const GAVETA = 'zocacontroller_estado';
+const GAVETA_CMD = 'zocacontroller_comando';
+
 let ws = null, pend = new Map(), seq = 0, espera = 1000;
-let cenas = [], micNome = '', mudo = false, panico = false, temPonte = 0, ultimoOlho = null;
+let cenas = [], sons = [], micNome = '', mudo = false, panico = false;
+let temPonte = 0, ultimoOlho = null, viaAvisada = '';
+
+const tema = new URLSearchParams(location.search).get('tema');
+if (tema) document.documentElement.dataset.tema = tema;
 
 function pedir(tipo, dados) {
   if (!ws || ws.readyState !== 1) return Promise.reject(new Error('OBS desligado'));
@@ -205,23 +209,31 @@ function pedir(tipo, dados) {
   });
 }
 
-const mandar = (acao, extra) =>
-  pedir('BroadcastCustomEvent', { eventData: Object.assign({ zc: 'comando', acao, quem: 'painel' }, extra || {}) })
-    .catch(() => anotar('a ponte não respondeu'));
-
 function anotar(txt) {
   const d = document.createElement('div');
   const h = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  d.innerHTML = '<time>' + h + '</time>' + txt;
+  d.innerHTML = '<time>' + h + '</time>' + txt.replace(/&/g,'&amp;').replace(/</g,'&lt;');
   el('log').prepend(d);
   while (el('log').children.length > 40) el('log').lastChild.remove();
+}
+
+/* Manda o pedido pelos dois caminhos: o evento é instantâneo, a gaveta é a
+   que sempre chega. A ponte ignora o repetido pelo id. */
+async function mandar(acao, extra) {
+  const cmd = Object.assign({ zc: 'comando', acao, quem: 'painel',
+                              id: 'c' + Date.now() + Math.random().toString(36).slice(2,5),
+                              t: Date.now() }, extra || {});
+  let foi = false;
+  try { await pedir('BroadcastCustomEvent', { eventData: cmd }); foi = true; } catch (e) {}
+  try { await pedir('SetPersistentData', { realm: CAIXA, slotName: GAVETA_CMD, slotValue: cmd }); foi = true; } catch (e) {}
+  if (!foi) anotar('não consegui falar com a ponte');
 }
 
 /* ---------- conectar ---------- */
 function conectar(senha, porta) {
   el('aviso').textContent = 'Conectando…';
   try { ws = new WebSocket('ws://localhost:' + porta); }
-  catch (e) { return void (el('aviso').textContent = 'Não consegui abrir a conexão.'); }
+  catch (e) { el('aviso').textContent = 'Não consegui abrir a conexão.'; return; }
 
   const limite = setTimeout(() => {
     if (!ws || ws.readyState !== 1) el('aviso').textContent = 'O OBS não respondeu. Ele está aberto e com o WebSocket ativado?';
@@ -234,7 +246,6 @@ function conectar(senha, porta) {
     setTimeout(() => conectar(senha, porta), espera);
     espera = Math.min(espera * 1.7, 15000);
   };
-
   ws.onerror = () => {};
 
   ws.onmessage = async (ev) => {
@@ -242,7 +253,7 @@ function conectar(senha, porta) {
 
     if (msg.op === 0) {
       clearTimeout(limite);
-      const ident = { rpcVersion: 1, eventSubscriptions: 1 | 4 | 8 };  // General, Scenes, Inputs
+      const ident = { rpcVersion: 1, eventSubscriptions: 1 | 4 | 8 };
       if (msg.d.authentication) {
         if (!senha) { el('aviso').textContent = 'Seu OBS pede senha e o campo está vazio.'; return; }
         const s = await sha256b64(senha + msg.d.authentication.salt);
@@ -270,7 +281,7 @@ function conectar(senha, porta) {
       return;
     }
 
-    if (msg.op === 5) recebido(msg.d.eventType, msg.d.eventData);
+    if (msg.op === 5) evento(msg.d.eventType, msg.d.eventData);
   };
 }
 
@@ -288,34 +299,99 @@ async function inicial() {
     el('vCena').textContent = l.currentProgramSceneName || '—';
   } catch (e) {}
 
-  try {
-    const esp = await pedir('GetSpecialInputs');
-    micNome = esp.mic1 || esp.mic2 || '';
-    if (micNome) mudo = (await pedir('GetInputMute', { inputName: micNome })).inputMuted;
-  } catch (e) {}
+  try { const esp = await pedir('GetSpecialInputs'); micNome = esp.mic1 || esp.mic2 || ''; } catch (e) {}
+  await carregarMixer();
   pintar();
 }
 
-/* ---------- eventos ---------- */
-function recebido(tipo, d) {
-  if (tipo === 'CustomEvent') {
-    if (!d || d.zc !== 'estado') return;
-    temPonte = Date.now();
-    micNome = d.mic || micNome;
-    mudo = !!d.mudo;
-    panico = !!d.panico;
-    ultimoOlho = d.olho;
-    el('vCena').textContent = d.cena || '—';
-    el('vChat').textContent = d.chat ? '#' + d.canal : 'desligado';
-    el('vChat').className = d.chat ? 'on' : 'off';
-    el('vu').firstElementChild.style.right = (100 - Math.min(100, (d.nivel || 0) * 320)) + '%';
-    if (d.recado && d.recado !== recebido.ultimo) { recebido.ultimo = d.recado; anotar(d.recado); }
-    pintar();
+/* O que tem áudio não dá pra adivinhar pelo tipo — caixa de alerta é fonte de
+   navegador. Então pergunta: quem responde a GetInputMute tem áudio. */
+async function carregarMixer() {
+  let lista = [];
+  try { lista = (await pedir('GetInputList')).inputs || []; } catch (e) { return; }
+
+  sons = [];
+  for (const i of lista) {
+    try {
+      const r = await pedir('GetInputMute', { inputName: i.inputName });
+      sons.push({ nome: i.inputName, mudo: r.inputMuted });
+    } catch (e) { /* sem áudio, fora do mixer */ }
+  }
+  if (micNome) {
+    const m = sons.find(s => s.nome === micNome);
+    if (m) mudo = m.mudo;
+  }
+  desenharMixer();
+}
+
+function desenharMixer() {
+  const cx = el('mixer');
+  cx.innerHTML = '';
+  for (const s of sons) {
+    const linha = document.createElement('div');
+    linha.className = 'som';
+    const nome = document.createElement('span');
+    nome.textContent = s.nome;
+    const b = document.createElement('button');
+    b.textContent = s.mudo ? 'mudo' : 'no ar';
+    b.className = s.mudo ? 'mudo' : '';
+    b.addEventListener('click', async () => {
+      if (panico && s.nome === micNome && s.mudo) return anotar('em pânico o mute não desmuta — use Sair do pânico');
+      try {
+        const r = await pedir('ToggleInputMute', { inputName: s.nome });
+        s.mudo = r.inputMuted;
+        if (s.nome === micNome) { mudo = s.mudo; pintar(); }
+        desenharMixer();
+        anotar(s.nome + ': ' + (s.mudo ? 'mudo' : 'no ar'));
+      } catch (err) { anotar('falhou: ' + err.message); }
+    });
+    linha.append(nome, b);
+    cx.appendChild(linha);
+  }
+  if (!sons.length) cx.innerHTML = '<div class="fila"><b>nenhuma fonte com áudio</b></div>';
+}
+
+/* ---------- estado que vem da ponte ---------- */
+function aplicar(d, via) {
+  if (!d || d.zc !== 'estado') return;
+  if (d.t && Date.now() - d.t > 6000) return;      // gaveta velha: a ponte morreu
+  if (via && via !== viaAvisada) { viaAvisada = via; anotar('ponte encontrada (' + via + ')'); }
+
+  temPonte = Date.now();
+  micNome = d.mic || micNome;
+  mudo = !!d.mudo;
+  panico = !!d.panico;
+  ultimoOlho = d.olho;
+  el('vCena').textContent = d.cena || '—';
+  el('vChat').textContent = d.chat ? '#' + d.canal : 'desligado';
+  el('vChat').className = d.chat ? 'on' : 'off';
+  el('vu').firstElementChild.style.right = (100 - Math.min(100, (d.nivel || 0) * 320)) + '%';
+  if (d.recado && d.recado !== aplicar.ultimo) { aplicar.ultimo = d.recado; anotar(d.recado); }
+  pintar();
+}
+
+function evento(tipo, d) {
+  if (tipo === 'CustomEvent') { aplicar(d, 'evento'); return; }
+  if (tipo === 'CurrentProgramSceneChanged') { el('vCena').textContent = d.sceneName; return; }
+  if (tipo === 'InputMuteStateChanged') {
+    const s = sons.find(x => x.nome === d.inputName);
+    if (s) { s.mudo = d.inputMuted; desenharMixer(); }
+    if (d.inputName === micNome) { mudo = d.inputMuted; pintar(); }
     return;
   }
-  if (tipo === 'CurrentProgramSceneChanged') { el('vCena').textContent = d.sceneName; }
-  if (tipo === 'InputMuteStateChanged' && d.inputName === micNome) { mudo = d.inputMuted; pintar(); }
+  if (tipo === 'InputCreated' || tipo === 'InputRemoved' || tipo === 'InputNameChanged') carregarMixer();
 }
+
+// Se o evento não chega, olha na gaveta.
+async function espiar() {
+  if (!ws || ws.readyState !== 1) return;
+  if (temPonte && Date.now() - temPonte < 3000) return;
+  try {
+    const r = await pedir('GetPersistentData', { realm: CAIXA, slotName: GAVETA });
+    if (r && r.slotValue) aplicar(r.slotValue, 'gaveta');
+  } catch (e) {}
+}
+setInterval(espiar, 1500);
 
 function pintar() {
   const cx = el('cxMic');
@@ -326,22 +402,22 @@ function pintar() {
   el('btVoltar').disabled = !panico;
   el('btPanico').disabled = panico;
 
-  const viva = temPonte && (Date.now() - temPonte < 4000);
+  const viva = temPonte && (Date.now() - temPonte < 5000);
   el('vPonte').textContent = viva ? (panico ? 'EM PÂNICO' : 'ligada') : 'não encontrada';
   el('vPonte').className = viva ? (panico ? 'meh' : 'on') : 'off';
 
   const b = el('btCamera');
   b.disabled = !viva || !ultimoOlho;
-  if (!ultimoOlho) {
-    el('vOlho').textContent = viva ? 'desativada no link' : '—';
-    el('vOlho').className = '';
-    b.classList.remove('ativo');
-    b.textContent = 'Troca por câmera';
+  if (!viva) {
+    el('vOlho').textContent = '—'; el('vOlho').className = '';
+    b.classList.remove('ativo'); b.textContent = 'Troca por câmera';
+  } else if (!ultimoOlho) {
+    el('vOlho').textContent = 'desativada no link'; el('vOlho').className = '';
+    b.classList.remove('ativo'); b.textContent = 'Troca por câmera';
   } else {
     const o = ultimoOlho;
     el('vOlho').textContent = o.quebrado ? o.quebrado
-      : !o.ligado ? 'desligada'
-      : !o.pronto ? 'carregando…'
+      : !o.ligado ? 'desligada' : !o.pronto ? 'carregando…'
       : o.vendo ? 'você aí' : 'sem ninguém';
     el('vOlho').className = o.quebrado ? 'off' : !o.ligado ? 'meh' : o.vendo ? 'on' : 'meh';
     b.classList.toggle('ativo', !!o.ligado);
@@ -351,21 +427,8 @@ function pintar() {
 setInterval(pintar, 1000);
 
 /* ---------- botões ---------- */
-el('btEntrar').addEventListener('click', () =>
-  conectar(el('senha').value, el('porta').value.trim() || '4455'));
-
+el('btEntrar').addEventListener('click', () => conectar(el('senha').value, el('porta').value.trim() || '4455'));
 el('senha').addEventListener('keydown', (e) => { if (e.key === 'Enter') el('btEntrar').click(); });
-
-// Mutar o painel faz direto no OBS: não depende da ponte estar viva.
-el('btMute').addEventListener('click', async () => {
-  if (!micNome) return anotar('não sei qual é o microfone');
-  if (panico && mudo) return anotar('em pânico o mute não desmuta — use Sair do pânico');
-  try {
-    const r = await pedir('ToggleInputMute', { inputName: micNome });
-    mudo = r.inputMuted; pintar();
-    anotar(mudo ? 'microfone mudado' : 'microfone aberto');
-  } catch (e) { anotar('falhou: ' + e.message); }
-});
 
 el('btPanico').addEventListener('click', () => { mandar('panico'); anotar('pânico pedido'); });
 el('btVoltar').addEventListener('click', () => { mandar('voltar'); anotar('saindo do pânico'); });

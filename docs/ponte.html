@@ -787,22 +787,50 @@ async function doPainel(d) {
   catch (err) { recado('Falhou: ' + err.message); }
 }
 
+const CAIXA  = 'OBS_WEBSOCKET_DATA_REALM_GLOBAL';
+const GAVETA = 'zocacontroller_estado';
+const GAVETA_CMD = 'zocacontroller_comando';
+
+/*
+ * Dois caminhos de propósito. BroadcastCustomEvent é instantâneo, mas depende
+ * de o outro lado estar inscrito na categoria certa de eventos. A gaveta do
+ * SetPersistentData é só requisição comum — mais lenta, porém não tem como
+ * não funcionar. Se um falhar, o painel enxerga pelo outro.
+ */
 async function anunciar() {
   if (!estado.obs) return;
-  try {
-    await pedir('BroadcastCustomEvent', { eventData: {
-      zc: 'estado', de: EU, canal: cfg.canal,
-      mic: estado.mic, mudo: estado.micMudo,
-      nivel: Math.round(estado.nivel * 1000) / 1000,
-      cena: estado.cena, panico: estado.panico, chat: estado.chat,
-      olho: cfg.ausencia
-        ? { ligado: olho.ligado, pronto: olho.pronto, quebrado: olho.quebrado, vendo: olho.vendo }
-        : null,
-      recado: el('recado').textContent,
-    }});
-  } catch (e) { /* OBS caiu; a reconexão cuida */ }
+
+  const dados = {
+    zc: 'estado', de: EU, t: Date.now(), canal: cfg.canal,
+    mic: estado.mic, mudo: estado.micMudo,
+    nivel: Math.round(estado.nivel * 1000) / 1000,
+    cena: estado.cena, panico: estado.panico, chat: estado.chat,
+    olho: cfg.ausencia
+      ? { ligado: olho.ligado, pronto: olho.pronto, quebrado: olho.quebrado, vendo: olho.vendo }
+      : null,
+    recado: el('recado').textContent,
+  };
+
+  try { await pedir('BroadcastCustomEvent', { eventData: dados }); } catch (e) {}
+  try { await pedir('SetPersistentData', { realm: CAIXA, slotName: GAVETA, slotValue: dados }); } catch (e) {}
 }
 setInterval(anunciar, 1000);
+
+// O mesmo vale para o sentido contrário: se o evento não chega, o comando
+// espera na gaveta. O id evita executar duas vezes o mesmo pedido.
+let ultimoComando = '';
+async function buscarComando() {
+  if (!estado.obs) return;
+  try {
+    const r = await pedir('GetPersistentData', { realm: CAIXA, slotName: GAVETA_CMD });
+    const c = r && r.slotValue;
+    if (!c || !c.id || c.id === ultimoComando) return;
+    if (Date.now() - (c.t || 0) > 15000) return;   // pedido velho, ignora
+    ultimoComando = c.id;
+    doPainel(c);
+  } catch (e) {}
+}
+setInterval(buscarComando, 600);
 
 ligarObs();
 ligarChat();
