@@ -1,0 +1,4 @@
+# config.php guarda credenciais: ninguém abre pelo navegador.
+<FilesMatch "^config\.php$">
+    Require all denied
+</FilesMatch>

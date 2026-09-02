@@ -1,0 +1,14 @@
+# Credenciais — nunca versionar. O repositório é público.
+api/config.php
+*.local.php
+*.env
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp

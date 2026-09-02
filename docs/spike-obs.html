@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Spike 1 — o OBS alcança o localhost?</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 28px;
+    background: #101A20; color: #DCE6EA;
+    font: 14px/1.6 "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  }
+  h1 { font-size: 17px; margin: 0 0 4px; letter-spacing: .04em; }
+  .sub { color: #6D8290; margin: 0 0 22px; font-size: 12.5px; }
+  .linha { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid #22303A; align-items: baseline; }
+  .marca { width: 18px; flex: none; font-weight: 700; }
+  .ok   { color: #45B8BF; }
+  .ruim { color: #E4735A; }
+  .indo { color: #D3A244; }
+  .det  { color: #6D8290; margin-left: auto; text-align: right; font-size: 12px; max-width: 55%; word-break: break-word; }
+  form { display: flex; gap: 8px; margin: 0 0 22px; flex-wrap: wrap; }
+  input, button {
+    font: inherit; background: #17222A; color: #DCE6EA;
+    border: 1px solid #2C3B45; padding: 8px 12px; border-radius: 2px;
+  }
+  button { background: #17383C; border-color: #45B8BF; color: #45B8BF; cursor: pointer; }
+  button:hover { background: #1d474c; }
+  #veredito { margin-top: 24px; padding: 16px 18px; border-left: 3px solid #2C3B45; background: #17222A; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>SPIKE 1 — o browser source alcança o obs-websocket?</h1>
+<p class="sub">Abra este arquivo como browser source no OBS. Se todos os passos ficarem verdes, a arquitetura inteira do ZocaController está de pé.</p>
+
+<form id="f">
+  <input id="senha" type="password" placeholder="senha do obs-websocket" size="28" autocomplete="off">
+  <input id="porta" value="4455" size="6" inputmode="numeric">
+  <button type="submit">Testar</button>
+</form>
+
+<div id="passos"></div>
+<div id="veredito">Preencha a senha (OBS → Ferramentas → Configurações do WebSocket → Mostrar informações de conexão) e clique em Testar.</div>
+
+<script>
+const passos = document.getElementById('passos');
+const veredito = document.getElementById('veredito');
+
+function passo(nome) {
+  const el = document.createElement('div');
+  el.className = 'linha';
+  el.innerHTML = '<span class="marca indo">·</span><span>' + nome + '</span><span class="det"></span>';
+  passos.appendChild(el);
+  return {
+    ok:   (d) => { el.children[0].className = 'marca ok';   el.children[0].textContent = '✓'; el.children[2].textContent = d || ''; },
+    ruim: (d) => { el.children[0].className = 'marca ruim'; el.children[0].textContent = '✕'; el.children[2].textContent = d || ''; },
+  };
+}
+
+async function sha256b64(txt) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+
+document.getElementById('f').addEventListener('submit', (e) => {
+  e.preventDefault();
+  passos.innerHTML = '';
+  veredito.textContent = 'Testando…';
+  testar(document.getElementById('senha').value, document.getElementById('porta').value.trim() || '4455');
+});
+
+function testar(senha, porta) {
+  const pAbrir  = passo('1. Abrir ws://localhost:' + porta);
+  const pOla    = passo('2. Receber Hello do obs-websocket');
+  const pAuth   = passo('3. Autenticar');
+  const pVersao = passo('4. Perguntar a versão do OBS');
+  const pMic    = passo('5. Descobrir o microfone');
+
+  let ws;
+  try {
+    ws = new WebSocket('ws://localhost:' + porta);
+  } catch (err) {
+    pAbrir.ruim(String(err));
+    return concluir(false, 'O navegador recusou abrir a conexão. É este o ponto que o spike existe para descobrir.');
+  }
+
+  const pendentes = new Map();
+  let n = 0;
+  function pedir(tipo, dados) {
+    const id = 'r' + (++n);
+    ws.send(JSON.stringify({ op: 6, d: { requestType: tipo, requestId: id, requestData: dados || {} } }));
+    return new Promise((res, rej) => {
+      pendentes.set(id, { res, rej });
+      setTimeout(() => pendentes.has(id) && (pendentes.delete(id), rej(new Error('sem resposta'))), 5000);
+    });
+  }
+
+  const limite = setTimeout(() => {
+    if (ws.readyState !== 1) {
+      pAbrir.ruim('não abriu em 6 s');
+      concluir(false, 'A conexão nem chegou a abrir. Ou o OBS está fechado, ou o WebSocket está desligado, ou o CEF do OBS bloqueia ws://localhost a partir de uma página https — que é a dúvida do spike.');
+      try { ws.close(); } catch (e) {}
+    }
+  }, 6000);
+
+  ws.onerror = () => { pAbrir.ruim('erro de conexão'); };
+
+  ws.onopen = () => { clearTimeout(limite); pAbrir.ok('aberto'); };
+
+  ws.onclose = (ev) => {
+    if (ev.code !== 1000) pAuth.ruim('fechou: código ' + ev.code);
+  };
+
+  ws.onmessage = async (ev) => {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.op === 0) {
+      pOla.ok('obs-websocket ' + msg.d.obsWebSocketVersion + ' · rpc ' + msg.d.rpcVersion);
+      const ident = { rpcVersion: 1 };
+      if (msg.d.authentication) {
+        const seg = await sha256b64(senha + msg.d.authentication.salt);
+        ident.authentication = await sha256b64(seg + msg.d.authentication.challenge);
+      }
+      ws.send(JSON.stringify({ op: 1, d: ident }));
+      return;
+    }
+
+    if (msg.op === 2) {
+      pAuth.ok('identificado');
+      try {
+        const v = await pedir('GetVersion');
+        pVersao.ok('OBS ' + v.obsVersion + ' · ' + v.platformDescription);
+      } catch (err) { pVersao.ruim(String(err.message)); }
+
+      try {
+        const esp = await pedir('GetSpecialInputs');
+        pMic.ok(esp.mic1 || esp.mic2 || '(nenhum microfone global configurado)');
+      } catch (err) { pMic.ruim(String(err.message)); }
+
+      concluir(true, 'Funciona. O browser source alcança o obs-websocket — o ZocaController pode ser 100% sem instalação.');
+      ws.close(1000);
+      return;
+    }
+
+    if (msg.op === 7) {
+      const p = pendentes.get(msg.d.requestId);
+      if (!p) return;
+      pendentes.delete(msg.d.requestId);
+      msg.d.requestStatus.result
+        ? p.res(msg.d.responseData || {})
+        : p.rej(new Error(msg.d.requestStatus.comment || ('código ' + msg.d.requestStatus.code)));
+    }
+  };
+}
+
+function concluir(bom, texto) {
+  veredito.style.borderLeftColor = bom ? '#45B8BF' : '#E4735A';
+  veredito.textContent = texto;
+}
+
+// Senha pela URL: assim o teste é "cola o endereço e olha as cores",
+// sem precisar do Interagir do OBS para digitar dentro da fonte.
+const q = new URLSearchParams(location.search);
+if (q.get('porta')) document.getElementById('porta').value = q.get('porta');
+if (q.get('senha')) {
+  document.getElementById('senha').value = q.get('senha');
+  testar(q.get('senha'), document.getElementById('porta').value.trim() || '4455');
+}
+</script>
+</body>
+</html>
