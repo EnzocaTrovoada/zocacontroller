@@ -108,6 +108,10 @@
     <div class="fila"><b>Câmera</b><span id="vOlho">—</span></div>
     <div class="fila"><b>Ponte</b><span id="vPonte">—</span></div>
 
+    <div class="par" id="secaoCamera" style="grid-template-columns:1fr;margin-top:12px">
+      <button id="btCamera">Troca por câmera</button>
+    </div>
+
     <div id="secaoAudio"><h2>Áudio</h2><div id="sons"></div></div>
     <div id="secaoCena"><h2>Cenas</h2><div id="cenas"></div></div>
 
@@ -148,6 +152,12 @@ if (!token) {
 
 let pode = {}, sons = [], cenas = [], cenaAtual = '', mudo = false, micNome = '', panico = false, olho = null;
 let recadoAte = 0;
+
+/* Depois de apertar um botão, a gente pergunta rápido por alguns segundos.
+   É o único momento em que a demora incomoda — no resto do tempo, de três em
+   três segundos está de bom tamanho. */
+let rajadaAte = 0;
+setInterval(() => { if (Date.now() < rajadaAte) puxar(); }, 800);
 
 function recado(txt, tipo) {
   const n = el('recado');
@@ -226,6 +236,16 @@ function aplicar(d) {
   el('btPanico').disabled = !viva || !pode.audio || panico;
   el('btPanico').textContent = panico ? 'JÁ EM PÂNICO' : 'PÂNICO';
 
+  const b = el('btCamera');
+  el('secaoCamera').classList.toggle('escondido', !pode.cena || !olho);
+  if (olho) {
+    b.disabled = !viva || !!olho.quebrado;
+    b.className = olho.ligado ? 'ativo' : '';
+    b.textContent = olho.quebrado ? 'Troca por câmera: com problema'
+                  : olho.ligado  ? 'Troca por câmera: LIGADA'
+                                 : 'Troca por câmera: DESLIGADA';
+  }
+
   el('secaoAudio').classList.toggle('escondido', !pode.audio || !sons.length);
   el('secaoCena').classList.toggle('escondido', !pode.cena || !cenas.length);
   desenharSons();
@@ -277,13 +297,19 @@ async function enviar(acao, argumento, aviso) {
     const d = await r.json();
     if (!r.ok) return recado(d.erro || 'Não deu certo.', 'ruim');
     // O OBS não é nosso: a ponte busca o pedido e só então a tela muda.
-    recado('Pedido enviado. A tela atualiza em alguns segundos.', 'bom');
+    rajadaAte = Date.now() + 9000;
+    recado('Feito. Confirmando…', 'bom');
   } catch (e) {
     recado('Sem internet.', 'ruim');
   }
 }
 
 el('btMute').addEventListener('click', () => enviar('mute', '', mudo ? 'Abrindo o microfone' : 'Mutando'));
+el('btCamera').addEventListener('click', () => {
+  const ligando = !(olho && olho.ligado);
+  enviar('camera', '', ligando ? 'Ligando a troca por câmera' : 'Desligando a troca por câmera');
+});
+
 el('btPanico').addEventListener('click', () => {
   if (!confirm('Isso muta tudo e corta para a cena de espera. Só o streamer consegue voltar.\n\nConfirma?')) return;
   enviar('panico', '', 'Ativando pânico');

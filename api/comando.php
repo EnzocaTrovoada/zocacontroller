@@ -65,8 +65,28 @@ $st = $pdo->prepare(
         AND criado_em > DATE_SUB(NOW(), INTERVAL 2 MINUTE)
       ORDER BY id LIMIT 20'
 );
-$st->execute([$quem['usuario_id']]);
-$lista = $st->fetchAll();
+
+/*
+ * Espera longa: em vez de a ponte perguntar de tempo em tempo, ela pergunta
+ * uma vez e a gente segura a resposta até aparecer comando. O mod aperta o
+ * botão e a coisa acontece em menos de um segundo, e ainda dá MENOS
+ * requisição do que perguntar a cada dois segundos.
+ *
+ * O teto é baixo de propósito: cada espera segura um processo PHP, e em
+ * hospedagem compartilhada isso é recurso contado.
+ */
+$espera = min(20, max(0, (int) ($_GET['esperar'] ?? 0)));
+$ate    = microtime(true) + $espera;
+set_time_limit($espera + 15);
+
+do {
+    $st->execute([$quem['usuario_id']]);
+    $lista = $st->fetchAll();
+    if ($lista || microtime(true) >= $ate) {
+        break;
+    }
+    usleep(350000);
+} while (true);
 
 if ($lista) {
     $ids = array_column($lista, 'id');

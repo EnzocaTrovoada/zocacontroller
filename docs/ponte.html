@@ -882,44 +882,85 @@ setInterval(buscarComando, 600);
  *  WebSocket do lado de lá.
  * ------------------------------------------------------------------ */
 
-let releQuieto = 0;      // depois de erro, espaça as tentativas
+const dorme = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function subirEstado() {
+let releQuieto = 0;          // depois de erro, espaça as tentativas
+let ultimaAssinatura = '';
+let ultimoEnvio = 0;
+
+/*
+ * Publica quando MUDA, não por relógio.
+ *
+ * O nível do medidor fica oscilando o tempo todo e não entra na conta —
+ * senão toda respiração virava requisição. Fora isso, um batimento a cada
+ * 5 s serve para o outro lado saber que a ponte continua viva.
+ */
+async function subirEstado(forcar) {
   if (!cfg.chave || !estado.obs || Date.now() < releQuieto) return;
+
+  const corpo = {
+    cena: estado.cena, mudo: estado.micMudo, mic: estado.mic,
+    nivel: Math.round(estado.nivel * 1000) / 1000,
+    panico: estado.panico, chat: estado.chat,
+    olho: cfg.ausencia
+      ? { ligado: olho.ligado, pronto: olho.pronto, quebrado: olho.quebrado, vendo: olho.vendo }
+      : null,
+    cenas: cfg.cenas.length ? cfg.cenas : estado.cenasConhecidas,
+    sons: estado.sons,
+  };
+
+  const assinatura = JSON.stringify([corpo.cena, corpo.mudo, corpo.mic, corpo.panico,
+                                     corpo.chat, corpo.olho, corpo.cenas, corpo.sons]);
+  const agora = Date.now();
+  if (!forcar && assinatura === ultimaAssinatura && agora - ultimoEnvio < 5000) return;
+
+  ultimaAssinatura = assinatura;
+  ultimoEnvio = agora;
+
   try {
     const r = await fetch(cfg.api + '/estado.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Chave': cfg.chave },
-      body: JSON.stringify({
-        cena: estado.cena, mudo: estado.micMudo, mic: estado.mic,
-        nivel: Math.round(estado.nivel * 1000) / 1000,
-        panico: estado.panico, chat: estado.chat,
-        olho: cfg.ausencia
-          ? { ligado: olho.ligado, pronto: olho.pronto, quebrado: olho.quebrado, vendo: olho.vendo }
-          : null,
-        cenas: cfg.cenas.length ? cfg.cenas : estado.cenasConhecidas,
-        sons: estado.sons,
-      }),
+      body: JSON.stringify(corpo),
     });
-    if (r.status === 401) { recado('A chave do relé não vale. Gere outra.', 60000); releQuieto = Date.now() + 300000; }
-  } catch (e) { releQuieto = Date.now() + 15000; }
+    if (r.status === 401) {
+      recado('A chave do relé não vale. Gere outra.', 60000);
+      releQuieto = Date.now() + 300000;
+    }
+  } catch (e) {
+    releQuieto = Date.now() + 5000;
+    ultimaAssinatura = '';        // falhou: tenta de novo na próxima
+  }
 }
 
-async function buscarDoRele() {
-  if (!cfg.chave || !estado.obs || Date.now() < releQuieto) return;
-  try {
-    const r = await fetch(cfg.api + '/comando.php', { headers: { 'X-Chave': cfg.chave } });
-    if (!r.ok) return;
-    const d = await r.json();
-    for (const c of (d.comandos || [])) {
-      await doPainel({ zc: 'comando', acao: c.acao, arg: c.argumento || '', quem: c.quem || 'mod' });
-    }
-  } catch (e) { releQuieto = Date.now() + 15000; }
+/*
+ * Espera longa: uma requisição fica pendurada até aparecer comando. O mod
+ * aperta e a ponte reage em menos de um segundo — e mesmo assim são menos
+ * requisições do que perguntar de dois em dois segundos.
+ */
+async function lacoDoRele() {
+  while (cfg.chave) {
+    if (!estado.obs || Date.now() < releQuieto) { await dorme(1000); continue; }
+    try {
+      const r = await fetch(cfg.api + '/comando.php?esperar=15', { headers: { 'X-Chave': cfg.chave } });
+      if (r.status === 401) { releQuieto = Date.now() + 300000; continue; }
+      if (!r.ok) { await dorme(3000); continue; }
+
+      const d = await r.json();
+      const lista = d.comandos || [];
+      for (const c of lista) {
+        await doPainel({ zc: 'comando', acao: c.acao, arg: c.argumento || '', quem: c.quem || 'mod' });
+      }
+      // Agiu? Publica na hora, para o mod ver o resultado sem esperar o relógio.
+      if (lista.length) await subirEstado(true);
+
+    } catch (e) { await dorme(3000); }
+  }
 }
 
 if (cfg.chave) {
-  setInterval(subirEstado, 3000);
-  setInterval(buscarDoRele, 2500);
+  setInterval(() => subirEstado(), 700);   // olha rápido, envia só quando muda
+  lacoDoRele();
 }
 
 ligarObs();
