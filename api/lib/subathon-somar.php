@@ -123,7 +123,24 @@ function subathon_somar(int $usuario_id, array $d): array
         throw $e;
     }
 
+    /*
+     * Trava por streamer enquanto le-soma-regrava.
+     *
+     * Sem isto, dois eventos no mesmo instante — e num raid com subs de
+     * presente eles chegam aos montes — leem o MESMO tempo final, cada um
+     * soma o seu, e o segundo sobrescreve o primeiro. O tempo de um dos dois
+     * some, e ninguem descobre por que.
+     *
+     * Se a trava nao vier em 5 segundos, segue mesmo assim: perder um pouco
+     * de tempo e melhor do que travar a live inteira.
+     */
+    $trava = 'zc_sub_' . $usuario_id;
+    db()->prepare('SELECT GET_LOCK(?, 5)')->execute([$trava]);
+
     $r = subathon_gravar($c, $segundos);
+
+    db()->prepare('SELECT RELEASE_LOCK(?)')->execute([$trava]);
+
     if (empty($r['ok'])) {
         // Não gravou: desmarca. Senão o evento ficaria contado e o tempo
         // nunca entraria — e ninguém descobriria por quê.

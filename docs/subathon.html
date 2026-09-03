@@ -33,7 +33,7 @@
   h2 { font: 600 10px var(--disp); letter-spacing: .18em; text-transform: uppercase; color: var(--fraco); margin: 30px 0 4px; }
   .sub { color: var(--apagado); font-size: 13px; margin: 0 0 14px; max-width: 56ch; }
 
-  input[type=text] {
+  input[type=text], input[type=password] {
     width: 100%; font: 14px var(--mono); color: var(--tinta);
     background: var(--fundo); border: 1px solid var(--linha); padding: 12px; border-radius: 3px;
   }
@@ -88,6 +88,16 @@
   #porta { text-align: center; padding: 16vh 0; }
   #porta h1 { font-size: 24px; }
   #porta code { color: var(--sinal); }
+  .acao { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .acao span { flex: 1; font-size: 13px; }
+  .acao code {
+    flex: 1; min-width: 0; background: var(--fundo); border: 1px solid var(--linha);
+    padding: 11px 12px; font-size: 12px; color: var(--sinal);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: all;
+  }
+  .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .apagado { color: var(--apagado); }
+  @media (max-width: 520px) { .dupla { grid-template-columns: 1fr; } }
   .escondido { display: none !important; }
   .vazio { color: var(--apagado); font-size: 13.5px; padding: 14px 0; }
 </style>
@@ -129,11 +139,41 @@
        Existe pra um presente gigante não virar dois dias de live.</p>
     <div id="teto"></div>
 
-    <div class="aviso">
-      <b>Follow e doação ainda não somam sozinhos.</b> Sub, resub, sub de
-      presente e bits chegam pelo chat, e por isso já funcionam. Follow e
-      doação vêm por outro caminho, que ainda não está pronto — deixe eles em
-      0 por enquanto.
+    <h2>Follow</h2>
+    <p class="sub">Sub e bits chegam pelo chat sozinhos. <b>Follow não</b> — a
+       Twitch só conta se a gente pedir. É um clique, uma vez só.</p>
+    <div class="acao">
+      <span id="estadoFollow" class="apagado">conferindo…</span>
+      <button id="btFollow">Ligar o aviso de follow</button>
+    </div>
+
+    <h2>Doação pelo LivePix</h2>
+    <p class="sub">
+      No LivePix, vá em <b>Configurações → Aplicações</b> e crie uma. Ele te dá
+      um <b>Client ID</b> e um <b>Client Secret</b> — cole os dois aqui.
+    </p>
+    <div class="dupla">
+      <input id="lpId" type="text" placeholder="Client ID" autocomplete="off">
+      <input id="lpSec" type="password" placeholder="Client Secret" autocomplete="off">
+    </div>
+    <div class="acao">
+      <span id="estadoLp" class="apagado">não conectado</span>
+      <button id="btLivePix">Conectar</button>
+    </div>
+
+    <div id="lpUrl" class="escondido">
+      <p class="sub" style="margin-top:14px">
+        Agora crie um <b>webhook</b> no LivePix apontando para este endereço:
+      </p>
+      <div class="acao">
+        <code id="lpUrlTxt"></code>
+        <button id="btCopiarLp">Copiar</button>
+      </div>
+      <p class="sub" style="margin-top:8px; color:var(--ambar)">
+        Esse endereço é secreto. O LivePix não assina os avisos dele, então
+        quem tiver esse link consegue mandar aviso falso — mas todo aviso é
+        conferido com o LivePix antes de somar, então forjar não adianta.
+      </p>
     </div>
 
     <h2>Últimos que somaram</h2>
@@ -315,11 +355,87 @@ async function salva(mudarLigado) {
   el('btSalvar').disabled = false;
 }
 
+/* ---------------- follow (EventSub) ---------------- */
+
+async function veFollow() {
+  try {
+    const d = await api('/eventsub.php');
+    const ligado = (d.assinaturas || []).some((a) => a.tipo === 'channel.follow' && a.estado !== 'revoked');
+    if (d.falta_escopo) {
+      el('estadoFollow').textContent = 'falta permissão — entre de novo com a Twitch';
+      el('estadoFollow').className = 'meh';
+      el('btFollow').disabled = true;
+    } else {
+      el('estadoFollow').textContent = ligado ? 'ligado' : 'desligado';
+      el('estadoFollow').className = ligado ? 'on' : 'apagado';
+      el('btFollow').disabled = ligado;
+      if (ligado) el('btFollow').textContent = 'Já está ligado';
+    }
+  } catch (e) {
+    el('estadoFollow').textContent = 'não consegui conferir';
+    el('estadoFollow').className = 'apagado';
+  }
+}
+
+el('btFollow').addEventListener('click', async () => {
+  el('btFollow').disabled = true;
+  try {
+    const d = await api('/eventsub.php', { method: 'POST', body: '{}' });
+    if (d.erros && d.erros.length) recado(d.erros[0], 'ruim');
+    else recado('Pronto. A partir de agora follow também soma.', 'bom');
+  } catch (e) { recado(e.message, 'ruim'); }
+  veFollow();
+});
+
+/* ---------------- doação (LivePix) ---------------- */
+
+function mostraUrlLp(url) {
+  if (!url) return;
+  el('lpUrlTxt').textContent = url;
+  el('lpUrl').classList.remove('escondido');
+}
+
+async function veLivePix() {
+  try {
+    const d = await api('/livepix.php');
+    if (!d.configurado) { el('estadoLp').textContent = 'não conectado'; return; }
+    el('lpId').value = d.client_id || '';
+    el('estadoLp').textContent = d.ligado
+      ? (d.ultimo_ok ? 'conectado · último aviso recebido' : 'conectado · nenhum aviso ainda')
+      : 'desligado';
+    el('estadoLp').className = d.ligado ? 'on' : 'apagado';
+    el('btLivePix').textContent = 'Trocar credenciais';
+    mostraUrlLp(d.url);
+  } catch (e) { el('estadoLp').textContent = 'não conectado'; }
+}
+
+el('btLivePix').addEventListener('click', async () => {
+  const cid = el('lpId').value.trim(), sec = el('lpSec').value.trim();
+  if (!cid || !sec) { recado('Cole o Client ID e o Client Secret.', 'ruim'); return; }
+  el('btLivePix').disabled = true;
+  try {
+    const d = await api('/livepix.php', { method: 'POST', body: JSON.stringify({ client_id: cid, client_secret: sec }) });
+    el('lpSec').value = '';
+    mostraUrlLp(d.url);
+    recado('LivePix conectado. Agora crie o webhook lá com o endereço abaixo.', 'bom');
+  } catch (e) { recado(e.message, 'ruim'); }
+  el('btLivePix').disabled = false;
+  veLivePix();
+});
+
+el('btCopiarLp').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(el('lpUrlTxt').textContent);
+    el('btCopiarLp').textContent = 'Copiado';
+    setTimeout(() => { el('btCopiarLp').textContent = 'Copiar'; }, 2200);
+  } catch (e) { recado('Selecione o endereço e use Ctrl+C.', 'ruim'); }
+});
+
 el('btSalvar').addEventListener('click', () => salva(false));
 el('btDesligar').addEventListener('click', () => salva(true));
 
 if (!chave) el('porta').classList.remove('escondido');
-else { el('app').classList.remove('escondido'); carrega(); setInterval(carrega, 20000); }
+else { el('app').classList.remove('escondido'); carrega(); veFollow(); veLivePix(); setInterval(carrega, 20000); }
 </script>
 </body>
 </html>
