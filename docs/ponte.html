@@ -951,8 +951,19 @@ async function lacoDoRele() {
       for (const c of lista) {
         await doPainel({ zc: 'comando', acao: c.acao, arg: c.argumento || '', quem: c.quem || 'mod' });
       }
-      // Agiu? Publica na hora, para o mod ver o resultado sem esperar o relógio.
-      if (lista.length) await subirEstado(true);
+
+      /*
+       * O batimento sai daqui, e não de um setInterval, de propósito.
+       *
+       * Fonte de navegador em cena inativa o OBS não pinta, e aí o Chromium
+       * freia temporizador para 1x por minuto. O relógio congela, o estado
+       * envelhece e o painel do mod diz "sem sinal" com a live no ar.
+       *
+       * Este laço não depende de relógio nenhum: ele anda quando o fetch
+       * anterior volta. Forçado quando houve comando, para o mod ver o
+       * resultado na hora.
+       */
+      await subirEstado(lista.length > 0);
 
     } catch (e) { await dorme(3000); }
   }

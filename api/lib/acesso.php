@@ -37,13 +37,26 @@ function ip_de_quem_chama(): string
 }
 
 /**
- * Limite de tentativas. Chave errada é barata de testar, então tem que ficar cara.
+ * Limite de tentativas.
+ *
+ * Só conta ERRO, nunca acerto. O objetivo é encarecer quem fica adivinhando
+ * chave, e quem já tem a chave certa não está adivinhando nada — a ponte
+ * sozinha faz dezenas de chamadas legítimas por minuto.
  */
 function trava(string $rotulo, int $max = 30, int $janela = 60): void
 {
     require_once __DIR__ . '/seguranca.php';
     if (!limite_ok($rotulo . ':' . ip_de_quem_chama(), $max, $janela)) {
         json_saida(['erro' => 'Muitas tentativas. Espere um minuto.'], 429);
+    }
+}
+
+/** Registra uma chave recusada e barra o IP depois de poucas seguidas. */
+function contar_erro(string $rotulo): void
+{
+    require_once __DIR__ . '/seguranca.php';
+    if (!limite_ok('falha:' . $rotulo . ':' . ip_de_quem_chama(), 10, 300)) {
+        json_saida(['erro' => 'Chave recusada vezes demais. Espere alguns minutos.'], 429);
     }
 }
 
@@ -62,7 +75,6 @@ function quem_chama(): array
     $mod   = $_SERVER['HTTP_X_MOD']   ?? '';
 
     if ($chave !== '') {
-        trava('painel', 20, 60);
         $st = db()->prepare('SELECT id FROM usuarios WHERE chave_painel = ? LIMIT 1');
         $st->execute([hash_chave($chave)]);
         $id = $st->fetchColumn();
@@ -74,11 +86,11 @@ function quem_chama(): array
                 'pode'       => ['cena' => true, 'audio' => true, 'canal' => true, 'palpite' => true],
             ];
         }
+        contar_erro('painel');
         json_saida(['erro' => 'Chave inválida.'], 401);
     }
 
     if ($mod !== '') {
-        trava('mod', 20, 60);
         $st = db()->prepare(
             'SELECT id, usuario_id, nome, pode_cena, pode_audio, pode_canal
                FROM convites_mod WHERE token_hash = ? AND revogado = 0 LIMIT 1'
@@ -99,6 +111,7 @@ function quem_chama(): array
                 ],
             ];
         }
+        contar_erro('mod');
         json_saida(['erro' => 'Este link não vale mais.'], 401);
     }
 

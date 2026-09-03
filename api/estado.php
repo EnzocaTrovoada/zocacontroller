@@ -67,9 +67,11 @@ if (!$linha) {
 }
 
 // Estado velho é pior que estado nenhum: mostra o passado como se fosse agora.
+// A ponte publica junto com o ciclo da espera longa, que é de 15 s.
+// O teto tem que caber isso mais folga, senão pisca "sem sinal" à toa.
 $idade = (int) $linha['idade'];
 json_saida([
-    'ligada' => $idade <= 15,
+    'ligada' => $idade <= 30,
     'idade'  => $idade,
     'estado' => json_decode($linha['estado'], true),
     'eu'     => ['nome' => $quem['nome'], 'tipo' => $quem['tipo'], 'pode' => $quem['pode']],
