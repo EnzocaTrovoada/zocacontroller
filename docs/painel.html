@@ -90,6 +90,28 @@
   #entrar p { color: var(--fraco); font-size: 11.5px; margin: 0 0 10px; line-height: 1.5; }
   #aviso { color: var(--perigo); font-size: 11.5px; min-height: 1.4em; margin-top: 6px; }
   .escondido { display: none !important; }
+
+  input[type=text], input[type=password] {
+    width: 100%; font: 12px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); padding: 9px; border-radius: 2px;
+  }
+  input:focus { outline: 2px solid var(--sinal); outline-offset: 1px; }
+  button.fraco { background: transparent; color: var(--fraco); }
+  .dica { font-size: 11px; color: var(--fraco); margin: 8px 0 0; }
+  .opc {
+    display: flex; align-items: center; gap: 8px; padding: 9px 11px; margin-top: 6px;
+    border: 1px solid var(--linha); background: var(--caixa); cursor: pointer; border-radius: 2px;
+  }
+  .opc:hover { border-color: var(--sinal); }
+  .opc b { flex: 1; font: 600 12.5px var(--disp); }
+  .opc span { font-family: var(--mono); font-size: 11px; color: var(--fraco); white-space: nowrap; }
+  .opc.trava { cursor: default; opacity: .75; }
+  .cat {
+    display: flex; align-items: center; gap: 9px; padding: 7px 10px; margin-top: 5px;
+    border: 1px solid var(--linha); background: var(--caixa); cursor: pointer; font-size: 12px;
+  }
+  .cat:hover { border-color: var(--sinal); color: var(--sinal); }
+  .cat img { width: 26px; height: 36px; object-fit: cover; flex: none; background: var(--linha); }
 </style>
 </head>
 <body>
@@ -98,6 +120,9 @@
   <p>Cole a senha do WebSocket do OBS. Fica guardada aqui e você não digita de novo.</p>
   <input id="senha" type="password" placeholder="senha (vazio se não tiver)" autocomplete="off">
   <input id="porta" type="text" value="4455" inputmode="numeric">
+  <p style="margin:10px 0 6px">A chave do ZocaController libera palpite, título e categoria.
+     Sem ela o resto funciona igual.</p>
+  <input id="chave" type="password" placeholder="chave do ZocaController (opcional)" autocomplete="off">
   <button id="btEntrar">Conectar</button>
   <div id="aviso"></div>
 </div>
@@ -130,6 +155,46 @@
 
   <h2>Trocar de cena</h2>
   <select id="cenas"></select>
+
+  <div id="secaoCanal" class="escondido">
+    <h2>Título e categoria</h2>
+    <input id="titulo" type="text" placeholder="título da live">
+    <div class="grade" style="margin-top:6px">
+      <button id="btTitulo">Salvar título</button>
+      <button id="btLerCanal" class="fraco">Recarregar</button>
+    </div>
+    <input id="buscaCat" type="text" placeholder="trocar de jogo: digite mesmo que erre" style="margin-top:8px">
+    <div class="fila"><b>Agora</b><span id="vCat">—</span></div>
+    <div id="resultadosCat"></div>
+  </div>
+
+  <div id="secaoPalpite" class="escondido">
+    <h2>Palpite</h2>
+
+    <div id="palpiteFechado">
+      <input id="pergunta" type="text" placeholder="Vou ganhar essa?" maxlength="45">
+      <input id="opcoes" type="text" placeholder="opções separadas por ; (vazio = Sim / Não)" style="margin-top:6px">
+      <div class="grade" style="margin-top:6px">
+        <select id="duracao">
+          <option value="60">1 minuto</option>
+          <option value="120" selected>2 minutos</option>
+          <option value="300">5 minutos</option>
+          <option value="600">10 minutos</option>
+        </select>
+        <button id="btAbrir">Abrir palpite</button>
+      </div>
+    </div>
+
+    <div id="palpiteAberto" class="escondido">
+      <div class="fila"><b id="pTitulo">—</b><span id="pEstado">—</span></div>
+      <div id="pOpcoes"></div>
+      <div class="grade" style="margin-top:8px">
+        <button id="btTravar">Fechar apostas</button>
+        <button id="btCancelarP" class="perigo">Cancelar</button>
+      </div>
+      <p class="dica" id="pDica">Clique na opção que ganhou para pagar.</p>
+    </div>
+  </div>
 
   <h2>Últimas ações</h2>
   <div id="log"></div>
@@ -266,6 +331,9 @@ function conectar(senha, porta) {
     if (msg.op === 2) {
       espera = 1000;
       guardar('zc:senha', senha); guardar('zc:porta', porta);
+      chavePainel = el('chave').value.trim() || chavePainel;
+      if (chavePainel) guardar('zc:chave', chavePainel);
+      ligarSecoes();
       el('entrar').classList.add('escondido');
       el('app').classList.remove('escondido');
       anotar('conectado ao OBS');
@@ -426,6 +494,184 @@ function pintar() {
 }
 setInterval(pintar, 1000);
 
+/* ------------------------------------------------------------------ *
+ *  Palpite, título e categoria — falam com o relé, não com o OBS.
+ * ------------------------------------------------------------------ */
+
+const API = 'https://api.zocahop.com';
+let chavePainel = guardado('zc:chave') || '';
+let palpiteAtual = null;
+
+async function api(caminho, opcoes) {
+  if (!chavePainel) throw new Error('sem a chave do ZocaController');
+  const o = Object.assign({ headers: {} }, opcoes || {});
+  o.headers = Object.assign({ 'X-Chave': chavePainel, 'Content-Type': 'application/json' }, o.headers);
+  const r = await fetch(API + caminho, o);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.erro || ('falhou (' + r.status + ')'));
+  return d;
+}
+
+function ligarSecoes() {
+  const tem = !!chavePainel;
+  el('secaoCanal').classList.toggle('escondido', !tem);
+  el('secaoPalpite').classList.toggle('escondido', !tem);
+  if (tem) { lerCanal(); lerPalpite(); }
+}
+
+/* ---------- título e categoria ---------- */
+
+async function lerCanal() {
+  try {
+    const d = await api('/canal.php');
+    if (document.activeElement !== el('titulo')) el('titulo').value = d.titulo || '';
+    el('vCat').textContent = d.categoria || '—';
+  } catch (e) { anotar('canal: ' + e.message); }
+}
+
+el('btLerCanal').addEventListener('click', lerCanal);
+
+el('btTitulo').addEventListener('click', async () => {
+  const titulo = el('titulo').value.trim();
+  if (!titulo) return anotar('o título não pode ficar vazio');
+  try {
+    await api('/canal.php', { method: 'POST', body: JSON.stringify({ titulo }) });
+    anotar('título trocado');
+  } catch (e) { anotar('título: ' + e.message); }
+});
+
+/* A busca da própria Twitch já perdoa erro de digitação, então não existe
+   lista de apelidos para manter aqui: "league of legnds" acha o jogo certo. */
+let timerBusca = 0;
+el('buscaCat').addEventListener('input', () => {
+  clearTimeout(timerBusca);
+  const termo = el('buscaCat').value.trim();
+  if (termo.length < 2) { el('resultadosCat').innerHTML = ''; return; }
+
+  timerBusca = setTimeout(async () => {
+    try {
+      const d = await api('/canal.php?buscar=' + encodeURIComponent(termo));
+      const cx = el('resultadosCat');
+      cx.innerHTML = '';
+
+      for (const c of (d.categorias || [])) {
+        const l = document.createElement('div');
+        l.className = 'cat';
+        if (c.capa) { const i = document.createElement('img'); i.src = c.capa; i.alt = ''; l.appendChild(i); }
+        const n = document.createElement('span'); n.textContent = c.nome;
+        l.appendChild(n);
+        l.addEventListener('click', async () => {
+          try {
+            await api('/canal.php', { method: 'POST', body: JSON.stringify({ categoria_id: c.id }) });
+            el('vCat').textContent = c.nome;
+            el('buscaCat').value = '';
+            cx.innerHTML = '';
+            anotar('categoria: ' + c.nome);
+          } catch (e) { anotar('categoria: ' + e.message); }
+        });
+        cx.appendChild(l);
+      }
+
+      if (!(d.categorias || []).length) cx.innerHTML = '<p class="dica">nada encontrado</p>';
+    } catch (e) { anotar('busca: ' + e.message); }
+  }, 350);
+});
+
+/* ---------- palpite ---------- */
+
+async function lerPalpite() {
+  try {
+    const d = await api('/palpite.php');
+    palpiteAtual = d.aberto || null;
+  } catch (e) { palpiteAtual = null; }
+  pintarPalpite();
+}
+
+function pintarPalpite() {
+  const aberto = !!palpiteAtual;
+  el('palpiteFechado').classList.toggle('escondido', aberto);
+  el('palpiteAberto').classList.toggle('escondido', !aberto);
+  if (!aberto) return;
+
+  const p = palpiteAtual;
+  const travado = p.estado === 'LOCKED';
+
+  el('pTitulo').textContent = p.titulo;
+  el('pEstado').textContent = travado ? 'apostas fechadas' : 'aceitando apostas';
+  el('pEstado').className = travado ? 'meh' : 'on';
+  el('btTravar').disabled = travado;
+  el('pDica').textContent = travado
+    ? 'Clique na opção que ganhou para pagar.'
+    : 'Feche as apostas antes de decidir — senão ainda dá tempo de apostar sabendo o resultado.';
+
+  const cx = el('pOpcoes');
+  cx.innerHTML = '';
+  for (const o of (p.opcoes || [])) {
+    const l = document.createElement('div');
+    l.className = 'opc' + (travado ? '' : ' trava');
+    const b = document.createElement('b'); b.textContent = o.titulo;
+    const s = document.createElement('span');
+    s.textContent = (o.gente || 0) + ' pessoas · ' + (o.pontos || 0) + ' pts';
+    l.append(b, s);
+    if (travado) l.addEventListener('click', () => resolver(o));
+    cx.appendChild(l);
+  }
+}
+
+el('btAbrir').addEventListener('click', async () => {
+  const titulo = el('pergunta').value.trim();
+  if (!titulo) return anotar('escreva a pergunta');
+
+  /* Sem opções vira Sim / Não: é o caso comum, e assim não sobra sintaxe
+     nenhuma para decorar. */
+  const opcoes = el('opcoes').value.split(/[;|]/).map(s => s.trim()).filter(Boolean);
+
+  try {
+    await api('/palpite.php', { method: 'POST', body: JSON.stringify({
+      acao: 'criar',
+      titulo,
+      opcoes,
+      segundos: parseInt(el('duracao').value, 10) || 120,
+    }) });
+    el('pergunta').value = '';
+    el('opcoes').value = '';
+    anotar('palpite aberto: ' + titulo);
+    lerPalpite();
+  } catch (e) { anotar('palpite: ' + e.message); }
+});
+
+el('btTravar').addEventListener('click', async () => {
+  try {
+    await api('/palpite.php', { method: 'POST', body: JSON.stringify({ acao: 'travar' }) });
+    anotar('apostas fechadas');
+    lerPalpite();
+  } catch (e) { anotar('palpite: ' + e.message); }
+});
+
+el('btCancelarP').addEventListener('click', async () => {
+  if (!confirm('Cancelar devolve os pontos de todo mundo. Confirma?')) return;
+  try {
+    await api('/palpite.php', { method: 'POST', body: JSON.stringify({ acao: 'cancelar' }) });
+    anotar('palpite cancelado, pontos devolvidos');
+    lerPalpite();
+  } catch (e) { anotar('palpite: ' + e.message); }
+});
+
+async function resolver(opcao) {
+  if (!palpiteAtual) return;
+  if (!confirm('Pagar quem apostou em "' + opcao.titulo + '"?\n\nIsso não tem volta.')) return;
+  try {
+    await api('/palpite.php', { method: 'POST', body: JSON.stringify({
+      acao: 'resolver', id: palpiteAtual.id, vencedora: opcao.id,
+    }) });
+    anotar('pagou: ' + opcao.titulo);
+    lerPalpite();
+  } catch (e) { anotar('palpite: ' + e.message); }
+}
+
+/* Enquanto tem palpite aberto, os números mudam sozinhos. */
+setInterval(() => { if (chavePainel && palpiteAtual) lerPalpite(); }, 5000);
+
 /* ---------- botões ---------- */
 el('btEntrar').addEventListener('click', () => conectar(el('senha').value, el('porta').value.trim() || '4455'));
 el('senha').addEventListener('keydown', (e) => { if (e.key === 'Enter') el('btEntrar').click(); });
@@ -449,6 +695,7 @@ el('cenas').addEventListener('change', async (e) => {
 /* ---------- entra sozinho se já tem senha guardada ---------- */
 const sGuardada = guardado('zc:senha'), pGuardada = guardado('zc:porta') || '4455';
 el('porta').value = pGuardada;
+if (chavePainel) el('chave').value = chavePainel;
 if (sGuardada !== null) { el('senha').value = sGuardada; conectar(sGuardada, pGuardada); }
 </script>
 </body>

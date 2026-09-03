@@ -541,6 +541,129 @@ ACOES.som = {
 
 ACOES.clip = ACOES.replay;
 
+/* ------------------------------------------------------------------ *
+ *  Palpites pelo chat.
+ *
+ *  Usa os Palpites nativos da Twitch, com pontos de canal de verdade — a
+ *  Twitch guarda, paga sozinha e o viewer vê na interface que já conhece.
+ *  Inventar uma segunda moeda só deixaria o espectador com duas coisas que
+ *  ele não entende.
+ *
+ *  A assimetria é a mesma do pânico: o lado seguro é dos mods, o
+ *  irreversível é do dono. Abrir e cancelar devolve tudo; pagar não tem volta.
+ * ------------------------------------------------------------------ */
+
+async function apiRele(caminho, corpo) {
+  if (!cfg.chave) throw new Error('esta ponte não tem a chave do ZocaController');
+  const r = await fetch(cfg.api + caminho, {
+    method: corpo ? 'POST' : 'GET',
+    headers: { 'X-Chave': cfg.chave, 'Content-Type': 'application/json' },
+    body: corpo ? JSON.stringify(corpo) : undefined,
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.erro || ('falhou (' + r.status + ')'));
+  return d;
+}
+
+ACOES.aposta = {
+  minimo: 'mod', espera: 10000,
+  async fazer(quem, arg) {
+    if (!arg) return recado('Use: ' + cfg.prefixo + 'aposta vou ganhar essa?');
+
+    /* Sem opções vira Sim / Não, que é o caso comum — assim não sobra
+       sintaxe nenhuma para o mod decorar. Quem quiser opções próprias
+       separa com ponto e vírgula, que é uma tecla só no teclado do celular. */
+    const partes = arg.split(/[;|]/).map(s => s.trim()).filter(Boolean);
+    const titulo = partes.shift() || '';
+
+    try {
+      const d = await apiRele('/palpite.php', {
+        acao: 'criar', titulo, opcoes: partes, segundos: 120,
+      });
+      const nomes = (d.opcoes || []).map(o => o.titulo).join(' / ');
+      recado('Palpite aberto: ' + titulo + (nomes ? ' (' + nomes + ')' : '') + ' — ' + quem, 20000);
+    } catch (e) { recado('Palpite: ' + e.message, 15000); }
+  },
+};
+
+ACOES.fechar = {
+  minimo: 'mod', espera: 5000,
+  async fazer(quem) {
+    try {
+      await apiRele('/palpite.php', { acao: 'travar' });
+      recado('Apostas fechadas — ' + quem);
+    } catch (e) { recado('Palpite: ' + e.message, 15000); }
+  },
+};
+
+ACOES.cancelar = {
+  minimo: 'mod', espera: 5000,
+  async fazer(quem) {
+    try {
+      await apiRele('/palpite.php', { acao: 'cancelar' });
+      recado('Palpite cancelado, pontos devolvidos — ' + quem);
+    } catch (e) { recado('Palpite: ' + e.message, 15000); }
+  },
+};
+
+// Pagar não tem volta, então é do dono da voz — igual a sair do pânico.
+ACOES.ganhou = {
+  minimo: 'dono', espera: 5000,
+  async fazer(quem, arg) {
+    if (!arg) return recado('Use: ' + cfg.prefixo + 'ganhou NOME DA OPÇÃO');
+
+    try {
+      const atual = await apiRele('/palpite.php');
+      const p = atual.aberto;
+      if (!p) return recado('Não tem palpite aberto.');
+
+      // Aceita o número da opção ou parte do nome: no meio da live ninguém
+      // vai digitar o texto exato.
+      const n = parseInt(arg, 10);
+      const alvo = (!isNaN(n) && p.opcoes[n - 1])
+        || p.opcoes.find(o => o.titulo.toLowerCase() === arg.toLowerCase())
+        || p.opcoes.find(o => o.titulo.toLowerCase().includes(arg.toLowerCase()));
+
+      if (!alvo) {
+        return recado('Não achei "' + arg + '". Opções: ' + p.opcoes.map((o, i) => (i + 1) + ') ' + o.titulo).join('  '), 20000);
+      }
+
+      await apiRele('/palpite.php', { acao: 'resolver', id: p.id, vencedora: alvo.id });
+      recado('Pagou quem apostou em "' + alvo.titulo + '" — ' + quem, 20000);
+    } catch (e) { recado('Palpite: ' + e.message, 15000); }
+  },
+};
+
+ACOES.titulo = {
+  minimo: 'mod', espera: 10000,
+  async fazer(quem, arg) {
+    if (!arg) return recado('Use: ' + cfg.prefixo + 'titulo o novo título da live');
+    try {
+      await apiRele('/canal.php', { titulo: arg });
+      recado('Título trocado — ' + quem);
+    } catch (e) { recado('Título: ' + e.message, 15000); }
+  },
+};
+
+ACOES.categoria = {
+  minimo: 'mod', espera: 10000,
+  async fazer(quem, arg) {
+    if (!arg) return recado('Use: ' + cfg.prefixo + 'categoria nome do jogo');
+    try {
+      // A busca da própria Twitch perdoa erro de digitação, então não existe
+      // lista de apelidos para manter: "league of legnds" acha o jogo certo.
+      const d = await apiRele('/canal.php?buscar=' + encodeURIComponent(arg));
+      const c = (d.categorias || [])[0];
+      if (!c) return recado('Não achei nenhum jogo parecido com "' + arg + '".', 15000);
+
+      await apiRele('/canal.php', { categoria_id: c.id });
+      recado('Categoria: ' + c.nome + ' — ' + quem);
+    } catch (e) { recado('Categoria: ' + e.message, 15000); }
+  },
+};
+
+
+
 const ultimoUso = new Map();
 
 async function executar(nome, arg, tags) {
