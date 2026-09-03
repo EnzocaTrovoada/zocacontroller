@@ -172,6 +172,8 @@ const estado = {
   mudoDesde: 0,          // performance.now() de quando começou a falar mudo
   cenasConhecidas: [],
   sons: [],                // fontes com áudio, para os mods poderem mutar
+  fontes: [],              // itens da cena no ar, com o olhinho de cada um
+  ocultos: [],             // o que o dono tirou da vista do controller
 };
 
 let recadoAte = 0;
@@ -211,7 +213,7 @@ function pintar() {
 let ws = null, pendentes = new Map(), seq = 0, esperaObs = 1000;
 
 // General | Scenes | Inputs | InputVolumeMeters
-const ASSINATURAS = 1 | 4 | 8 | 65536;
+const ASSINATURAS = 1 | 4 | 8 | 128 | 65536;   // General, Scenes, Inputs, SceneItems, medidores
 
 /*
  * SHA-256 em JS puro.
@@ -356,11 +358,15 @@ function evento(tipo, d) {
     // solto a rédea e não volto sozinho por cima da decisão dele.
     if (d.sceneName !== olho.esperado) olho.euQueSai = false;
     olho.esperado = '';
+    lerFontesDaCena().then(() => subirEstado(true));
     pintar();
   } else if (tipo === 'InputMuteStateChanged') {
     const s = estado.sons.find(x => x.nome === d.inputName);
     if (s) s.mudo = d.inputMuted;
     if (d.inputName === estado.mic) { estado.micMudo = d.inputMuted; estado.mudoDesde = 0; pintar(); }
+  } else if (tipo === 'SceneItemEnableStateChanged') {
+    const f = estado.fontes.find(x => x.id === d.sceneItemId);
+    if (f) f.visivel = !!d.sceneItemEnabled;
   } else if (tipo === 'InputVolumeMeters') {
     for (const inp of (d.inputs || [])) {
       if (inp.inputName !== estado.mic) continue;
@@ -377,7 +383,9 @@ function evento(tipo, d) {
  * Descobre sozinho o microfone, o áudio do sistema e a cena de pânico.
  * Regra dos usuários leigos: se dá para adivinhar, não pergunte.
  */
-async function descobrir() {
+/* lerGaveta = false quando quem chamou JÁ sabe a lista nova: senão a
+ * releitura sobrescreve o aviso que acabou de chegar do painel. */
+async function descobrir(lerGaveta = true) {
   try {
     const esp = await pedir('GetSpecialInputs');
     estado.mic     = cfg.mic     || esp.mic1 || esp.mic2 || '';
@@ -414,6 +422,10 @@ async function descobrir() {
     }
     estado.sons = achados;
   } catch (e) {}
+
+  if (lerGaveta) await lerOcultos();
+  estado.sons = estado.sons.filter(s => !escondida(s.nome));
+  await lerFontesDaCena();
 
   if (estado.mic) {
     try { estado.micMudo = (await pedir('GetInputMute', { inputName: estado.mic })).inputMuted; } catch (e) {}
@@ -536,6 +548,64 @@ ACOES.som = {
     const r = await pedir('ToggleInputMute', { inputName: alvo.nome });
     alvo.mudo = r.inputMuted;
     recado(alvo.nome + ': ' + (r.inputMuted ? 'mudo' : 'no ar') + ' — ' + quem);
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ *  Fontes da cena e o que fica escondido do controller.
+ *
+ *  Duas coisas diferentes de propósito:
+ *
+ *  OCULTAR DO CONTROLLER — a fonte continua no OBS, funcionando; ela só não
+ *  aparece no painel nem para os mods. Serve para tirar da frente o que
+ *  ninguém precisa ver (áudio de teste, fonte de sistema, coisa antiga).
+ *
+ *  VISIBILIDADE NO OBS — é o olhinho de verdade, o que some da transmissão.
+ *
+ *  A lista do que está oculto mora numa gaveta do próprio OBS, então a ponte
+ *  e o painel leem a mesma coisa sem precisar de servidor no meio.
+ * ------------------------------------------------------------------ */
+
+const GAVETA_OCULTOS = 'zocacontroller_ocultos';
+
+async function lerOcultos() {
+  try {
+    const r = await pedir('GetPersistentData', { realm: CAIXA, slotName: GAVETA_OCULTOS });
+    const v = r && r.slotValue;
+    estado.ocultos = (v && Array.isArray(v.nomes)) ? v.nomes : [];
+  } catch (e) { estado.ocultos = []; }
+}
+
+const escondida = (nome) => estado.ocultos.some(n => n.toLowerCase() === (nome || '').toLowerCase());
+
+/** As fontes da cena que está no ar, com o estado do olhinho de cada uma. */
+async function lerFontesDaCena() {
+  if (!estado.cena) { estado.fontes = []; return; }
+  try {
+    const r = await pedir('GetSceneItemList', { sceneName: estado.cena });
+    estado.fontes = (r.sceneItems || [])
+      .map(i => ({ nome: i.sourceName, id: i.sceneItemId, visivel: !!i.sceneItemEnabled }))
+      .filter(f => !escondida(f.nome));
+  } catch (e) { estado.fontes = []; }
+}
+
+// Mostrar e esconder uma fonte da transmissão, na cena que está no ar.
+ACOES.fonte = {
+  minimo: 'mod', espera: 3000,
+  async fazer(quem, arg) {
+    if (!arg) return recado('Use: ' + cfg.prefixo + 'fonte NOME DA FONTE');
+
+    const alvo = estado.fontes.find(f => f.nome.toLowerCase() === arg.toLowerCase())
+              || estado.fontes.find(f => f.nome.toLowerCase().includes(arg.toLowerCase()));
+    if (!alvo) {
+      return recado('Não achei "' + arg + '" na cena ' + estado.cena + '.', 12000);
+    }
+
+    await pedir('SetSceneItemEnabled', {
+      sceneName: estado.cena, sceneItemId: alvo.id, sceneItemEnabled: !alvo.visivel,
+    });
+    alvo.visivel = !alvo.visivel;
+    recado(alvo.nome + ': ' + (alvo.visivel ? 'aparecendo' : 'escondida') + ' — ' + quem);
   },
 };
 
@@ -934,6 +1004,12 @@ document.addEventListener('visibilitychange', () => {
 const EU = 'p' + Math.random().toString(36).slice(2, 8);
 
 async function doPainel(d) {
+  if (d && d.zc === 'ocultos') {
+    estado.ocultos = Array.isArray(d.nomes) ? d.nomes : [];
+    await descobrir(false);
+    await subirEstado(true);
+    return;
+  }
   if (!d || d.zc !== 'comando') return;
 
   if (d.acao === 'camera') {
@@ -1030,10 +1106,12 @@ async function subirEstado(forcar) {
       : null,
     cenas: cfg.cenas.length ? cfg.cenas : estado.cenasConhecidas,
     sons: estado.sons,
+    fontes: estado.fontes,
   };
 
   const assinatura = JSON.stringify([corpo.cena, corpo.mudo, corpo.mic, corpo.panico,
-                                     corpo.chat, corpo.olho, corpo.cenas, corpo.sons]);
+                                     corpo.chat, corpo.olho, corpo.cenas, corpo.sons,
+                                     corpo.fontes]);
   const agora = Date.now();
   if (!forcar && assinatura === ultimaAssinatura && agora - ultimoEnvio < 5000) return;
 

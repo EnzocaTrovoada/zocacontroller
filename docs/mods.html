@@ -113,6 +113,7 @@
     </div>
 
     <div id="secaoAudio"><h2>Áudio</h2><div id="sons"></div></div>
+    <div id="secaoFontes"><h2>Fontes da cena</h2><div id="fontesCena"></div></div>
     <div id="secaoCena"><h2>Cenas</h2><div id="cenas"></div></div>
 
     <div id="recado">Tudo certo.</div>
@@ -150,7 +151,7 @@ if (!token) {
   setInterval(puxar, 3000);
 }
 
-let pode = {}, sons = [], cenas = [], cenaAtual = '', mudo = false, micNome = '', panico = false, olho = null;
+let pode = {}, sons = [], cenas = [], fontes = [], cenaAtual = '', mudo = false, micNome = '', panico = false, olho = null;
 let recadoAte = 0;
 
 /* Depois de apertar um botão, a gente pergunta rápido por alguns segundos.
@@ -202,6 +203,7 @@ function aplicar(d) {
   cenaAtual = e.cena || '';
   sons     = Array.isArray(e.sons) ? e.sons : [];
   cenas    = Array.isArray(e.cenas) ? e.cenas : [];
+  fontes   = Array.isArray(e.fontes) ? e.fontes : [];
 
   const cx = el('cxMic');
   if (!viva) {
@@ -248,8 +250,10 @@ function aplicar(d) {
 
   el('secaoAudio').classList.toggle('escondido', !pode.audio || !sons.length);
   el('secaoCena').classList.toggle('escondido', !pode.cena || !cenas.length);
+  el('secaoFontes').classList.toggle('escondido', !pode.cena || !viva || !fontes.length);
   desenharSons();
   desenharCenas();
+  desenharFontes();
 
   if (recadoAte && Date.now() > recadoAte) { el('recado').textContent = 'Tudo certo.'; el('recado').className = ''; recadoAte = 0; }
 }
@@ -266,6 +270,29 @@ function desenharSons() {
     b.textContent = s.mudo ? 'mudo' : 'no ar';
     if (s.mudo) b.className = 'mudo';
     b.addEventListener('click', () => enviar('som', s.nome, (s.mudo ? 'Abrindo ' : 'Mutando ') + s.nome));
+    l.append(n, b); cx.appendChild(l);
+  }
+}
+
+/* O olhinho do OBS: some da transmissão, mas a fonte continua lá. É outra
+   coisa do que "ocultar do controller", que só tira daqui da lista. */
+function desenharFontes() {
+  const cx = el('fontesCena');
+  const assinatura = JSON.stringify(fontes);
+  if (cx.dataset.assinatura === assinatura) return;
+  cx.dataset.assinatura = assinatura;
+  cx.innerHTML = '';
+
+  for (const f of fontes) {
+    const l = document.createElement('div'); l.className = 'som';
+    const n = document.createElement('span');
+    n.textContent = f.nome;
+    if (!f.visivel) n.style.opacity = '.5';
+    const b = document.createElement('button');
+    b.textContent = f.visivel ? 'na tela' : 'escondida';
+    if (!f.visivel) b.className = 'mudo';
+    b.addEventListener('click', () =>
+      enviar('fonte', f.nome, (f.visivel ? 'Escondendo ' : 'Mostrando ') + f.nome));
     l.append(n, b); cx.appendChild(l);
   }
 }

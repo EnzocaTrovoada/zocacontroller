@@ -20,6 +20,7 @@ const PERMITIDAS = [
     'som'    => 'audio',   // muta uma fonte específica pelo nome
     'panico' => 'audio',
     'cena'   => 'cena',
+    'fonte'  => 'cena',   // o olhinho: mostra e esconde na transmissão
     'camera' => 'cena',
     'replay' => 'cena',
 ];

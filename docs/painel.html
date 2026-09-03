@@ -112,6 +112,11 @@
   }
   .cat:hover { border-color: var(--sinal); color: var(--sinal); }
   .cat img { width: 26px; height: 36px; object-fit: cover; flex: none; background: var(--linha); }
+  button.mini {
+    width: auto; float: right; padding: 2px 8px; font-size: 10px;
+    letter-spacing: .04em; text-transform: none;
+  }
+  .som input[type=checkbox] { accent-color: var(--sinal); width: 16px; height: 16px; flex: none; margin: 0; }
 </style>
 </head>
 <body>
@@ -140,8 +145,15 @@
     <button id="btVoltar" disabled>Sair do pânico</button>
   </div>
 
-  <h2>Áudio</h2>
+  <h2>Áudio <button id="btEditarSons" class="mini">editar</button></h2>
+  <p class="dica escondido" id="dicaSons">Desmarque o que você não quer ver aqui nem no painel dos mods.
+     A fonte continua no OBS funcionando — isso não é o olhinho.</p>
   <div id="mixer"></div>
+
+  <div id="secaoFontes" class="escondido">
+    <h2>Fontes da cena</h2>
+    <div id="fontes"></div>
+  </div>
 
   <h2>Estado</h2>
   <div class="fila"><b>Cena</b><span id="vCena">—</span></div>
@@ -322,7 +334,7 @@ function conectar(senha, porta) {
 
     if (msg.op === 0) {
       clearTimeout(limite);
-      const ident = { rpcVersion: 1, eventSubscriptions: 1 | 4 | 8 };
+      const ident = { rpcVersion: 1, eventSubscriptions: 1 | 4 | 8 | 128 };  // + SceneItems
       if (msg.d.authentication) {
         if (!senha) { el('aviso').textContent = 'Seu OBS pede senha e o campo está vazio.'; return; }
         const s = await sha256b64(senha + msg.d.authentication.salt);
@@ -372,7 +384,9 @@ async function inicial() {
   } catch (e) {}
 
   try { const esp = await pedir('GetSpecialInputs'); micNome = esp.mic1 || esp.mic2 || ''; } catch (e) {}
+  await lerOcultos();
   await carregarMixer();
+  await lerFontes();
   pintar();
 }
 
@@ -399,7 +413,32 @@ async function carregarMixer() {
 function desenharMixer() {
   const cx = el('mixer');
   cx.innerHTML = '';
-  for (const s of sons) {
+
+  // Editando, aparece tudo com caixa de marcar. Fora disso, só o que ficou.
+  const lista = editandoSons ? sons : sons.filter(s => !estaOculta(s.nome));
+
+  for (const s of lista) {
+    if (editandoSons) {
+      const linha = document.createElement('div');
+      linha.className = 'som';
+      const marca = document.createElement('input');
+      marca.type = 'checkbox';
+      marca.checked = !estaOculta(s.nome);
+      marca.addEventListener('change', async () => {
+        ocultos = marca.checked
+          ? ocultos.filter(n => n.toLowerCase() !== s.nome.toLowerCase())
+          : ocultos.concat([s.nome]);
+        await salvarOcultos();
+        lerFontes();
+      });
+      const nome = document.createElement('span');
+      nome.textContent = s.nome;
+      if (!marca.checked) nome.style.opacity = '.5';
+      linha.append(marca, nome);
+      cx.appendChild(linha);
+      continue;
+    }
+
     const linha = document.createElement('div');
     linha.className = 'som';
     const nome = document.createElement('span');
@@ -444,7 +483,12 @@ function aplicar(d, via) {
 
 function evento(tipo, d) {
   if (tipo === 'CustomEvent') { aplicar(d, 'evento'); return; }
-  if (tipo === 'CurrentProgramSceneChanged') { el('vCena').textContent = d.sceneName; return; }
+  if (tipo === 'CurrentProgramSceneChanged') { el('vCena').textContent = d.sceneName; lerFontes(); return; }
+  if (tipo === 'SceneItemEnableStateChanged') {
+    const f = fontes.find(x => x.id === d.sceneItemId);
+    if (f) { f.visivel = !!d.sceneItemEnabled; desenharFontes(); }
+    return;
+  }
   if (tipo === 'InputMuteStateChanged') {
     const s = sons.find(x => x.nome === d.inputName);
     if (s) { s.mudo = d.inputMuted; desenharMixer(); }
@@ -675,6 +719,95 @@ async function resolver(opcao) {
 
 /* Enquanto tem palpite aberto, os números mudam sozinhos. */
 setInterval(() => { if (chavePainel && palpiteAtual) lerPalpite(); }, 5000);
+
+/* ------------------------------------------------------------------ *
+ *  O que aparece aqui, e o que aparece na live.
+ *
+ *  Ocultar do controller NÃO é o olhinho do OBS: a fonte continua lá,
+ *  funcionando, só não polui esta tela nem a dos mods. O olhinho é a seção
+ *  de baixo, e esse sim tira da transmissão.
+ *
+ *  A lista do que está oculto mora numa gaveta do próprio OBS, então a ponte
+ *  lê a mesma coisa sem servidor no meio.
+ * ------------------------------------------------------------------ */
+
+const GAVETA_OCULTOS = 'zocacontroller_ocultos';
+let ocultos = [];
+let editandoSons = false;
+let fontes = [];
+
+const estaOculta = (nome) => ocultos.some(n => n.toLowerCase() === (nome || '').toLowerCase());
+
+async function lerOcultos() {
+  try {
+    const r = await pedir('GetPersistentData', { realm: CAIXA, slotName: GAVETA_OCULTOS });
+    const v = r && r.slotValue;
+    ocultos = (v && Array.isArray(v.nomes)) ? v.nomes : [];
+  } catch (e) { ocultos = []; }
+}
+
+async function salvarOcultos() {
+  try {
+    await pedir('SetPersistentData', {
+      realm: CAIXA, slotName: GAVETA_OCULTOS, slotValue: { nomes: ocultos },
+    });
+    // Avisa a ponte na hora, para os mods verem a mesma lista sem esperar.
+    await pedir('BroadcastCustomEvent', { eventData: { zc: 'ocultos', nomes: ocultos } });
+  } catch (e) { anotar('não consegui guardar: ' + e.message); }
+}
+
+el('btEditarSons').addEventListener('click', () => {
+  editandoSons = !editandoSons;
+  el('btEditarSons').textContent = editandoSons ? 'pronto' : 'editar';
+  el('dicaSons').classList.toggle('escondido', !editandoSons);
+  desenharMixer();
+});
+
+/* ---------- fontes da cena (o olhinho de verdade) ---------- */
+
+async function lerFontes() {
+  const cena = el('vCena').textContent;
+  if (!cena || cena === '—') { fontes = []; desenharFontes(); return; }
+  try {
+    const r = await pedir('GetSceneItemList', { sceneName: cena });
+    fontes = (r.sceneItems || [])
+      .map(i => ({ nome: i.sourceName, id: i.sceneItemId, visivel: !!i.sceneItemEnabled }))
+      .filter(f => !estaOculta(f.nome));
+  } catch (e) { fontes = []; }
+  desenharFontes();
+}
+
+function desenharFontes() {
+  const cx = el('fontes');
+  el('secaoFontes').classList.toggle('escondido', !fontes.length);
+  cx.innerHTML = '';
+
+  for (const f of fontes) {
+    const linha = document.createElement('div');
+    linha.className = 'som';
+
+    const nome = document.createElement('span');
+    nome.textContent = f.nome;
+    if (!f.visivel) nome.style.opacity = '.5';
+
+    const b = document.createElement('button');
+    b.textContent = f.visivel ? 'na tela' : 'escondida';
+    if (!f.visivel) b.className = 'mudo';
+    b.addEventListener('click', async () => {
+      try {
+        await pedir('SetSceneItemEnabled', {
+          sceneName: el('vCena').textContent, sceneItemId: f.id, sceneItemEnabled: !f.visivel,
+        });
+        f.visivel = !f.visivel;
+        desenharFontes();
+        anotar(f.nome + ': ' + (f.visivel ? 'na tela' : 'escondida'));
+      } catch (err) { anotar('falhou: ' + err.message); }
+    });
+
+    linha.append(nome, b);
+    cx.appendChild(linha);
+  }
+}
 
 /* ---------- botões ---------- */
 el('btEntrar').addEventListener('click', () => conectar(el('senha').value, el('porta').value.trim() || '4455'));
