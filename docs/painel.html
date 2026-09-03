@@ -198,6 +198,10 @@
 
   <h2>Últimas ações</h2>
   <div id="log"></div>
+
+  <div class="grade um" style="margin-top:12px">
+    <button id="btConfig" class="fraco">Trocar senha ou chave</button>
+  </div>
 </div>
 
 <script>
@@ -674,6 +678,13 @@ setInterval(() => { if (chavePainel && palpiteAtual) lerPalpite(); }, 5000);
 
 /* ---------- botões ---------- */
 el('btEntrar').addEventListener('click', () => conectar(el('senha').value, el('porta').value.trim() || '4455'));
+
+el('btConfig').addEventListener('click', () => {
+  el('senha').value = guardado('zc:senha') || '';
+  el('chave').value = chavePainel || '';
+  el('aviso').textContent = '';
+  mostrarEntrada();
+});
 el('senha').addEventListener('keydown', (e) => { if (e.key === 'Enter') el('btEntrar').click(); });
 
 el('btPanico').addEventListener('click', () => { mandar('panico'); anotar('pânico pedido'); });
@@ -693,6 +704,17 @@ el('cenas').addEventListener('change', async (e) => {
 });
 
 /* ---------- entra sozinho se já tem senha guardada ---------- */
+/*
+ * A doca guarda a senha e reconecta sozinha, então a tela de conexão some
+ * depois da primeira vez — e com ela sumia o campo da chave. Aceitar pela URL
+ * resolve sem obrigar ninguém a limpar dado do navegador, e a URL da doca fica
+ * dentro das configurações do OBS, não na transmissão.
+ */
+const naUrl = new URLSearchParams(location.search);
+if (naUrl.get('chave')) { chavePainel = naUrl.get('chave').trim(); guardar('zc:chave', chavePainel); }
+if (naUrl.get('senha') !== null) guardar('zc:senha', naUrl.get('senha'));
+if (naUrl.get('porta')) guardar('zc:porta', naUrl.get('porta'));
+
 const sGuardada = guardado('zc:senha'), pGuardada = guardado('zc:porta') || '4455';
 el('porta').value = pGuardada;
 if (chavePainel) el('chave').value = chavePainel;
