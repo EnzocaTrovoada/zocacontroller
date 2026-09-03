@@ -855,15 +855,90 @@ function analisar(linha) {
     resto = resto.slice(corte + 1);
   }
 
-  if (!resto.startsWith('PRIVMSG')) return null;
+  if (!resto.startsWith('PRIVMSG') && !resto.startsWith('USERNOTICE')) return null;
+  const comando = resto.startsWith('USERNOTICE') ? 'USERNOTICE' : 'PRIVMSG';
   const dois = resto.indexOf(' :');
-  if (dois === -1) return null;
 
   tags.login = login;
-  return { tags, texto: resto.slice(dois + 2).trim() };
+  return { cmd: comando, tags: tags, texto: dois === -1 ? '' : resto.slice(dois + 2).trim() };
+}
+
+/* ------------------------------------------------------------------ *
+ *  Subathon automático.
+ *
+ *  Sub, resub, sub de presente e bits chegam pelo PRÓPRIO CHAT — o IRC
+ *  anônimo que a ponte já lê. Não precisa de token, nem de escopo, nem de
+ *  EventSub. Follow e doação não passam por aqui e ficam para depois.
+ *
+ *  Quem decide quanto cada coisa vale é o servidor, não esta página: a regra
+ *  mora no painel e o overlay é gravado lá, onde o código de dono não vaza.
+ * ------------------------------------------------------------------ */
+
+let subathonQuieto = 0;
+
+/* Prime e tier 1 valem igual; a Twitch manda "Prime" ou o número do plano. */
+function planoDoSub(tags) {
+  const p = String(tags['msg-param-sub-plan'] || '1000');
+  if (p === '2000') return 'sub2';
+  if (p === '3000') return 'sub3';
+  return 'sub1';
+}
+
+async function contaNoSubathon(dados) {
+  if (!cfg.chave || Date.now() < subathonQuieto) return;
+  try {
+    const r = await fetch(cfg.api + '/subathon.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Chave': cfg.chave },
+      body: JSON.stringify(Object.assign({ acao: 'somar' }, dados)),
+    });
+    const d = await r.json().catch(() => ({}));
+
+    /* Não configurado ou chave errada: para de tentar por um tempo em vez de
+       bater no servidor a cada sub. */
+    if (r.status === 400 || r.status === 401) { subathonQuieto = Date.now() + 600000; return; }
+    if (!r.ok) return;
+
+    if (d.somou) {
+      const m = Math.round(d.somou / 60);
+      recado('+' + (m >= 1 ? m + ' min' : d.somou + 's') + ' no subathon — ' + (dados.quem || ''), 10000);
+    }
+  } catch (e) { subathonQuieto = Date.now() + 30000; }
+}
+
+/* USERNOTICE é como sub, resub e sub de presente chegam no chat. */
+function olhaUsernotice(m) {
+  const t = m.tags, id = t['msg-id'] || '';
+  const quem = t['display-name'] || t.login || 'alguém';
+
+  if (id === 'sub' || id === 'resub') {
+    contaNoSubathon({ tipo: planoDoSub(t), chave: t.id, quem: quem, quantidade: 1, detalhe: id });
+    return;
+  }
+
+  /* Presente: conta UMA vez por quem recebeu.
+     O anúncio do pacote (submysterygift) vem junto com um subgift para cada
+     pessoa — somar os dois transformaria 10 subs em 20. */
+  if (id === 'subgift' || id === 'anonsubgift') {
+    contaNoSubathon({
+      tipo: planoDoSub(t), chave: t.id, quem: quem, quantidade: 1,
+      detalhe: 'presente para ' + (t['msg-param-recipient-display-name'] || '?'),
+    });
+  }
 }
 
 function tratar(m) {
+  if (m.cmd === 'USERNOTICE') { olhaUsernotice(m); return; }
+
+  /* Bits vêm como mensagem comum, só que com a etiqueta bits. */
+  const bits = parseInt(m.tags.bits, 10);
+  if (bits > 0) {
+    contaNoSubathon({
+      tipo: 'bits', chave: m.tags.id, quantidade: bits,
+      quem: m.tags['display-name'] || m.tags.login || 'alguém', detalhe: bits + ' bits',
+    });
+  }
+
   if (!m.texto.startsWith(cfg.prefixo)) return;
   const corpo = m.texto.slice(cfg.prefixo.length);
   const esp = corpo.indexOf(' ');

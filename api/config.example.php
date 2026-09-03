@@ -40,6 +40,10 @@ return [
         'url_retorno'    => 'https://zocahop.com/zocacontroller/obrigado.php',
     ],
 
+    // Onde mora o overlay do subathon. O servidor fala com ele para somar
+    // tempo, entao o codigo de dono nunca precisa ir numa URL que vaza.
+    'relogio_base' => 'https://relogio.zocahop.com',
+
     // Ninguem perde recurso no meio de uma live por atraso de cobranca.
     'grace_dias' => 3,
 ];
