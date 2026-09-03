@@ -40,6 +40,10 @@ return [
         'url_retorno'    => 'https://zocahop.com/zocacontroller/obrigado.php',
     ],
 
+    // O proprio endereco desta API. A Twitch precisa dele para entregar os
+    // avisos do EventSub, e tem que ser https com certificado valido.
+    'api_base' => 'https://api.zocahop.com',
+
     // Para onde mandar o streamer depois do login.
     'hub' => 'https://mods.zocahop.com/meu.html',
 

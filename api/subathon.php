@@ -18,78 +18,13 @@ require_once __DIR__ . '/lib/acesso.php';
 cors();
 $quem = quem_chama();
 
-const CAMPOS = ['seg_sub1', 'seg_sub2', 'seg_sub3', 'seg_bits', 'seg_follow', 'seg_real', 'teto_evento'];
+require_once __DIR__ . '/lib/subathon-somar.php';
 
-function config_de(int $usuario_id): ?array
-{
-    $st = db()->prepare('SELECT * FROM subathon WHERE usuario_id = ?');
-    $st->execute([$usuario_id]);
-    $c = $st->fetch();
-    return $c ?: null;
-}
-
-/**
- * Lê o overlay no servidor do relógio, soma os segundos e regrava.
- *
- * Pausado guarda quanto falta; correndo guarda quando acaba. Somar em cada um
- * é uma conta diferente, e somar no campo errado faria o tempo sumir.
- */
-function somar_no_overlay(array $c, int $segundos): array
-{
-    $base = rtrim(cfg()['relogio_base'] ?? 'https://relogio.zocahop.com', '/');
-
-    $ch = curl_init($base . '/estilos/' . rawurlencode($c['slug']) . '.json?t=' . time());
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8]);
-    $cru  = curl_exec($ch);
-    $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($http !== 200 || !$cru) {
-        return ['ok' => false, 'erro' => 'Não achei o overlay do subathon. O link ainda existe?'];
-    }
-    $estilo = json_decode($cru, true);
-    if (!is_array($estilo)) {
-        return ['ok' => false, 'erro' => 'O overlay respondeu algo que não entendi.'];
-    }
-
-    $agora = time();
-    if (($estilo['modo'] ?? 'pausado') === 'rodando') {
-        // Correndo: empurra o fim para a frente. Se já passou, conta a partir
-        // de agora — senão a primeira sub depois do zero somaria no passado.
-        $fim = max((int) ($estilo['fim'] ?? 0), $agora);
-        $estilo['fim'] = $fim + $segundos;
-        $restante = $estilo['fim'] - $agora;
-    } else {
-        $estilo['restante'] = max(0, (int) ($estilo['restante'] ?? 0) + $segundos);
-        $restante = $estilo['restante'];
-    }
-
-    $ch = curl_init($base . '/salvar.php');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_TIMEOUT        => 8,
-        CURLOPT_POSTFIELDS     => json_encode([
-            'acao'  => 'salvar',
-            'slug'  => $c['slug'],
-            'token' => $c['token'],
-            'cfg'   => $estilo,
-        ]),
-    ]);
-    $resp = json_decode((string) curl_exec($ch), true);
-    $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($http !== 200 || empty($resp['ok'])) {
-        return ['ok' => false, 'erro' => $resp['erro'] ?? 'O servidor do overlay recusou a gravação.'];
-    }
-    return ['ok' => true, 'restante' => $restante];
-}
+const CAMPOS = SUB_CAMPOS;
 
 // ---------- leitura ----------
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
-    $c = config_de($quem['usuario_id']);
+    $c = subathon_config($quem['usuario_id']);
     if (!$c) {
         json_saida(['ligado' => false, 'configurado' => false]);
     }
@@ -119,61 +54,10 @@ if (($d['acao'] ?? '') === 'somar') {
     }
     trava('subathon', 120, 60);
 
-    $c = config_de($quem['usuario_id']);
-    if (!$c)              json_saida(['erro' => 'Subathon não configurado.'], 400);
-    if (!$c['ligado'])    json_saida(['ok' => true, 'ignorado' => 'subathon desligado']);
-
-    $tipo  = (string) ($d['tipo'] ?? '');
-    $chave = trim((string) ($d['chave'] ?? ''));
-    if ($chave === '') json_saida(['erro' => 'Falta o id do evento.'], 400);
-
-    // Quantos segundos, conforme a regra que o streamer escolheu.
-    $qtd = max(0, (float) ($d['quantidade'] ?? 1));
-    $segundos = match ($tipo) {
-        'sub1'   => (int) $c['seg_sub1'] * (int) $qtd,
-        'sub2'   => (int) $c['seg_sub2'] * (int) $qtd,
-        'sub3'   => (int) $c['seg_sub3'] * (int) $qtd,
-        'bits'   => (int) round($c['seg_bits'] * $qtd / 100),
-        'follow' => (int) $c['seg_follow'],
-        'real'   => (int) round($c['seg_real'] * $qtd),
-        default  => -1,
-    };
-
-    if ($segundos < 0)  json_saida(['erro' => 'Tipo de evento desconhecido.'], 400);
-    if ($segundos === 0) json_saida(['ok' => true, 'ignorado' => 'esse tipo está zerado']);
-
-    // Teto por evento: um cheer gigante não pode virar dois dias de live.
-    $segundos = min($segundos, (int) $c['teto_evento']);
-
-    // Idempotência: o chat reentrega mensagem quando a conexão cai e volta.
-    // O UNIQUE resolve antes de somar, não depois.
-    try {
-        db()->prepare(
-            'INSERT INTO subathon_eventos (usuario_id, chave, tipo, quem, detalhe, segundos)
-                  VALUES (?, ?, ?, ?, ?, ?)'
-        )->execute([
-            $quem['usuario_id'], mb_substr($chave, 0, 120), $tipo,
-            mb_substr((string) ($d['quem'] ?? ''), 0, 64) ?: null,
-            mb_substr((string) ($d['detalhe'] ?? ''), 0, 64) ?: null,
-            $segundos,
-        ]);
-    } catch (PDOException $e) {
-        if ($e->getCode() === '23000') {
-            json_saida(['ok' => true, 'ignorado' => 'evento repetido']);
-        }
-        throw $e;
-    }
-
-    $r = somar_no_overlay($c, $segundos);
-    if (empty($r['ok'])) {
-        // Não deu para gravar: apaga o registro, senão o evento fica marcado
-        // como contado e o tempo nunca entra.
-        db()->prepare('DELETE FROM subathon_eventos WHERE usuario_id = ? AND chave = ?')
-            ->execute([$quem['usuario_id'], mb_substr($chave, 0, 120)]);
-        json_saida(['erro' => $r['erro']], 502);
-    }
-
-    json_saida(['ok' => true, 'somou' => $segundos, 'restante' => $r['restante']]);
+    // A conta mora na lib porque o EventSub tambem soma por la, quando
+    // alguem segue. Duas copias acabariam divergindo.
+    $r = subathon_somar($quem['usuario_id'], $d);
+    json_saida($r, empty($r['ok']) ? 400 : 200);
 }
 
 // ---------- configurar ----------

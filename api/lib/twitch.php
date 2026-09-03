@@ -16,7 +16,61 @@ const TW_HELIX     = 'https://api.twitch.tv/helix';
 const TW_ESCOPOS = [
     'channel:manage:predictions',   // criar e resolver Palpites
     'channel:manage:broadcast',     // mudar título e categoria
+    'moderator:read:followers',     // saber quem seguiu (channel.follow v2)
+    'channel:read:subscriptions',   // subs, para as metas
+    'bits:read',                    // bits, para as metas
 ];
+
+/**
+ * Token do APLICATIVO, não do usuário.
+ *
+ * Assinatura de EventSub por webhook exige este: com token de usuário a
+ * Twitch responde 401. O token do streamer serve para outra coisa — provar
+ * que ele autorizou os escopos, o que zera o custo da assinatura.
+ *
+ * Vale algumas horas, então guardamos e só renovamos quando falta pouco.
+ */
+function tw_token_do_app(): string
+{
+    static $cache = null;
+    if ($cache && $cache['ate'] > time() + 60) {
+        return $cache['token'];
+    }
+
+    $c = cfg()['twitch'];
+    [$http, $corpo] = tw_http('POST', TW_TOKEN,
+        ['Content-Type: application/x-www-form-urlencoded'],
+        http_build_query([
+            'client_id'     => $c['client_id'],
+            'client_secret' => $c['client_secret'],
+            'grant_type'    => 'client_credentials',
+        ])
+    );
+
+    if ($http !== 200 || empty($corpo['access_token'])) {
+        throw new RuntimeException('A Twitch não deu o token do aplicativo.');
+    }
+
+    $cache = [
+        'token' => $corpo['access_token'],
+        'ate'   => time() + (int) ($corpo['expires_in'] ?? 3600),
+    ];
+    return $cache['token'];
+}
+
+/** Chamada à Helix com o token do aplicativo. */
+function tw_helix_app(string $metodo, string $caminho, array $query = [], $corpo = null): array
+{
+    $cabecalhos = [
+        'Authorization: Bearer ' . tw_token_do_app(),
+        'Client-Id: ' . cfg()['twitch']['client_id'],
+    ];
+    if ($corpo !== null) {
+        $cabecalhos[] = 'Content-Type: application/json';
+    }
+    return tw_http($metodo, TW_HELIX . $caminho . ($query ? '?' . http_build_query($query) : ''),
+        $cabecalhos, $corpo);
+}
 
 function tw_url_login(string $estado): string
 {
