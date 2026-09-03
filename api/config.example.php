@@ -40,6 +40,9 @@ return [
         'url_retorno'    => 'https://zocahop.com/zocacontroller/obrigado.php',
     ],
 
+    // Para onde mandar o streamer depois do login.
+    'hub' => 'https://mods.zocahop.com/meu.html',
+
     // Onde mora o overlay do subathon. O servidor fala com ele para somar
     // tempo, entao o codigo de dono nunca precisa ir numa URL que vaza.
     'relogio_base' => 'https://relogio.zocahop.com',

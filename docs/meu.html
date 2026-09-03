@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Minhas coisas — ZocaController</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --fundo:#0F171C; --caixa:#17222A; --caixa2:#1E2B34; --linha:#2C3B45;
+    --tinta:#DCE6EA; --fraco:#8FA2AD; --apagado:#6D8290;
+    --sinal:#45B8BF; --sinal2:#17383C;
+    --perigo:#E4735A; --ambar:#D3A244;
+    --disp:"Archivo",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 18px 80px;
+    background: var(--fundo); color: var(--tinta);
+    font: 15px/1.55 var(--mono); -webkit-font-smoothing: antialiased;
+  }
+  .w { max-width: 680px; margin: 0 auto; }
+
+  header { padding: 44px 0 20px; border-bottom: 2px solid var(--tinta); margin-bottom: 24px; }
+  .tag { font: 600 10px var(--disp); letter-spacing: .2em; text-transform: uppercase; color: var(--sinal); margin: 0 0 10px; }
+  h1 { font: 700 clamp(27px,6vw,40px)/1.03 var(--disp); letter-spacing: -.02em; margin: 0 0 8px; }
+  header p { margin: 0; color: var(--fraco); font-size: 14px; }
+
+  h2 { font: 600 10px var(--disp); letter-spacing: .18em; text-transform: uppercase; color: var(--fraco); margin: 30px 0 10px; }
+
+  /* a chave: aparece uma vez, então tem que gritar */
+  .chave { border: 1px solid var(--ambar); background: var(--caixa); padding: 16px 18px; margin-bottom: 8px; }
+  .chave code {
+    display: block; background: var(--fundo); border: 1px solid var(--linha);
+    padding: 13px; font-size: 13px; word-break: break-all; user-select: all;
+    color: var(--ambar); margin: 10px 0;
+  }
+  .chave p { margin: 0; font-size: 13px; color: var(--fraco); }
+  .chave p b { color: var(--tinta); }
+
+  .item {
+    border: 1px solid var(--linha); background: var(--caixa);
+    padding: 15px 17px; margin-bottom: 9px;
+  }
+  .item .topo { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .item b { font: 700 16px var(--disp); }
+  .item .quando { margin-left: auto; font-size: 11.5px; color: var(--apagado); }
+  .item p { margin: 0 0 11px; font-size: 13px; color: var(--fraco); max-width: 58ch; }
+  .item .fila { display: flex; gap: 8px; align-items: center; }
+  .item code {
+    flex: 1; min-width: 0; background: var(--fundo); border: 1px solid var(--linha);
+    padding: 10px 12px; font-size: 12px; color: var(--sinal);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: all;
+  }
+
+  button {
+    font: 600 13px var(--disp); cursor: pointer; border-radius: 3px; flex: none;
+    background: var(--caixa2); color: var(--tinta); border: 1px solid var(--linha); padding: 10px 16px;
+  }
+  button:hover { border-color: var(--sinal); color: var(--sinal); }
+  button.feito { background: var(--sinal2); color: var(--sinal); border-color: var(--sinal); }
+  button:focus-visible { outline: 2px solid var(--sinal); outline-offset: 1px; }
+  a.botao { text-decoration: none; display: inline-block; }
+
+  .aviso { border-left: 3px solid var(--ambar); background: var(--caixa); padding: 13px 16px; margin: 18px 0; font-size: 13.5px; color: var(--fraco); }
+  .aviso b { color: var(--tinta); }
+
+  #porta { text-align: center; padding: 15vh 0; }
+  #porta h1 { font-size: 25px; margin-bottom: 14px; }
+  #porta p { color: var(--fraco); font-size: 14px; max-width: 40ch; margin: 0 auto 20px; }
+  .escondido { display: none !important; }
+</style>
+</head>
+<body>
+<div class="w">
+
+  <div id="porta" class="escondido">
+    <h1>Entre com a Twitch</h1>
+    <p>Esta página junta tudo que é seu: a chave, os links do OBS e os painéis.
+       Você entra uma vez e ela monta o resto.</p>
+    <p><a class="botao" href="https://api.zocahop.com/entrar.php"><button>Entrar com a Twitch</button></a></p>
+  </div>
+
+  <div id="app" class="escondido">
+    <header>
+      <p class="tag">ZocaController</p>
+      <h1>Minhas coisas</h1>
+      <p id="ola">Tudo que é seu, num lugar só.</p>
+    </header>
+
+    <div class="chave" id="caixaChave">
+      <p><b>Sua chave.</b> É ela que destrava os painéis. Já está dentro de
+         todos os links aqui embaixo, então você quase nunca vai precisar dela
+         solta — mas guarde num lugar seguro.</p>
+      <code id="txChave">—</code>
+      <p>Não mostre na transmissão: quem tiver ela mexe no seu canal.</p>
+    </div>
+
+    <h2>Para colar no OBS</h2>
+    <div id="obs"></div>
+
+    <h2>Painéis para abrir no navegador</h2>
+    <div id="paineis"></div>
+
+    <div class="aviso">
+      <b>Perdeu a chave?</b> Entre de novo com a Twitch que ela é gerada outra
+      vez — mas a antiga para de valer na hora, e aí você precisa trocar o
+      endereço na fonte e na doca do OBS.
+    </div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+const AQUI = location.href.replace(/[^/]*$/, '');
+const el = (id) => document.getElementById(id);
+
+/* A chave chega no # do link que o entrar.php monta. Sai da barra de endereço
+   na hora: o # nunca vai para o servidor, e assim ela não fica no histórico
+   nem num print da barra. */
+let chave = '';
+try {
+  const doHash = decodeURIComponent(location.hash.replace(/^#/, '')).trim();
+  if (doHash) { sessionStorage.setItem('zc:chave', doHash); history.replaceState(null, '', location.pathname); }
+  chave = sessionStorage.getItem('zc:chave') || '';
+} catch (e) { chave = decodeURIComponent(location.hash.replace(/^#/, '')).trim(); }
+
+if (!chave) {
+  el('porta').classList.remove('escondido');
+} else {
+  el('app').classList.remove('escondido');
+  el('txChave').textContent = chave;
+}
+
+const comChave = (arquivo, marca) => AQUI + arquivo + marca + 'chave=' + encodeURIComponent(chave);
+
+/* Cada coisa diz PARA QUE serve antes de dizer o que é. Ninguém decide entre
+   "painel" e "doca" pelo nome; decide pelo que quer fazer. */
+const NO_OBS = [
+  { nome: 'Fonte de navegador', onde: 'Fontes → + → Navegador',
+    txt: 'É a ponte: o chat conversa com o OBS por ela. Sem isso nada funciona. Monte o endereço no gerador, que ele lê suas cenas sozinho.',
+    url: () => comChave('criar.html', '?'), botao: 'Abrir o gerador', link: true },
+
+  { nome: 'Doca do painel', onde: 'Painéis → Painéis personalizáveis com URL',
+    txt: 'Fica dentro da janela do OBS, na sua tela, e nunca aparece na transmissão. Mostra se o microfone está mudo e tem os botões de pânico, cena e palpite.',
+    url: () => comChave('painel.html', '?') },
+];
+
+const PAINEIS = [
+  { nome: 'Moderadores', txt: 'Criar e revogar o link de cada mod, e ver quem anda usando.',
+    url: () => comChave('convites.html', '?') },
+  { nome: 'Subathon', txt: 'Escolher quanto cada sub, bit ou doação soma no cronômetro.',
+    url: () => comChave('subathon.html', '?') },
+  { nome: 'Overlays', txt: 'Relógio, contador, placar e o cronômetro do subathon. Cada um vira um link fixo que atualiza sozinho.',
+    url: () => 'https://relogio.zocahop.com', semChave: true },
+];
+
+function cartao(it) {
+  const cx = document.createElement('div');
+  cx.className = 'item';
+
+  const topo = document.createElement('div');
+  topo.className = 'topo';
+  const b = document.createElement('b'); b.textContent = it.nome;
+  topo.appendChild(b);
+  if (it.onde) {
+    const q = document.createElement('span'); q.className = 'quando'; q.textContent = it.onde;
+    topo.appendChild(q);
+  }
+
+  const p = document.createElement('p'); p.textContent = it.txt;
+
+  const fila = document.createElement('div');
+  fila.className = 'fila';
+  const url = it.url();
+  const code = document.createElement('code');
+  code.textContent = url;
+
+  const bt = document.createElement('button');
+  bt.textContent = it.botao || 'Copiar';
+  bt.addEventListener('click', async () => {
+    if (it.link) { window.open(url, '_blank', 'noopener'); return; }
+    try {
+      await navigator.clipboard.writeText(url);
+      bt.textContent = 'Copiado';
+      bt.className = 'feito';
+      setTimeout(() => { bt.textContent = 'Copiar'; bt.className = ''; }, 2200);
+    } catch (e) {
+      bt.textContent = 'Selecione e Ctrl+C';
+    }
+  });
+
+  const abrir = document.createElement('button');
+  abrir.textContent = 'Abrir';
+  abrir.addEventListener('click', () => window.open(url, '_blank', 'noopener'));
+
+  fila.append(code, bt);
+  if (!it.link) fila.appendChild(abrir);
+  cx.append(topo, p, fila);
+  return cx;
+}
+
+/* Montar so aqui embaixo, e nao la em cima junto com a leitura da chave:
+   as listas sao const, e const nao sobe — chamar antes estourava calado e a
+   pagina aparecia sem link nenhum. */
+if (chave) {
+  NO_OBS.forEach((i) => el('obs').appendChild(cartao(i)));
+  PAINEIS.forEach((i) => el('paineis').appendChild(cartao(i)));
+}
+</script>
+</body>
+</html>

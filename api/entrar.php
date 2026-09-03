@@ -85,11 +85,11 @@ try {
         . '<p><a href="entrar.php">Tentar de novo</a></p>');
 }
 
-pagina('Pronto',
-    '<h1>Conectado como ' . htmlspecialchars($perfil['display_name']) . '</h1>'
-  . '<p>Esta é a sua chave. Ela vai no painel e na ponte, no lugar de senha.</p>'
-  . '<code>' . htmlspecialchars($chave) . '</code>'
-  . '<div class="aviso"><b>Copie agora.</b> Guardamos só um resumo embaralhado dela, '
-  . 'então esta é a única vez que ela aparece. Se perder, é só entrar de novo aqui — '
-  . 'mas aí a antiga para de funcionar.<br><br>'
-  . 'Não mostre esta chave na transmissão: quem tiver ela controla seu canal.</div>');
+/*
+ * Em vez de mostrar a chave numa pagina sem saida, manda para o hub com ela
+ * no # do endereco. O # nunca chega ao servidor, entao a chave nao entra em
+ * log nenhum — e la ela ja vem montada dentro de todos os links.
+ */
+$hub = (cfg()['hub'] ?? 'https://mods.zocahop.com/meu.html') . '#' . rawurlencode($chave);
+header('Location: ' . $hub);
+exit;

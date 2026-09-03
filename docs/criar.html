@@ -432,6 +432,11 @@ function montar() {
   const senha = el('senha').value;
   if (senha) p.set('senha', senha);
 
+  /* A chave veio do hub, entao ela ja entra no link pronto: quem esta criando
+     a fonte nao precisa saber que ela existe. */
+  const chave = new URLSearchParams(location.search).get('chave');
+  if (chave) p.set('chave', chave.trim());
+
   el('saida').textContent = new URL('ponte.html', location.href).href + '?' + p.toString();
 }
 
