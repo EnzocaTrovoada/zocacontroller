@@ -60,42 +60,56 @@ if ($quem['tipo'] !== 'painel') {
 }
 
 $pdo = db();
-$st = $pdo->prepare(
-    'SELECT id, acao, argumento, quem
-       FROM fila_comandos
+
+/*
+ * Marcar PRIMEIRO, ler depois.
+ *
+ * Antes era o contrario, e entre o ler e o marcar cabia uma segunda leitura
+ * pegando os mesmos comandos — dois panicos do mesmo clique. Acontece de
+ * verdade quando a ponte reconecta e a espera longa anterior ainda esta
+ * pendurada aqui. O UPDATE e atomico: quem marcar o lote leva, o outro nao
+ * acha nada.
+ */
+$lote = bin2hex(random_bytes(10));
+
+$marcar = $pdo->prepare(
+    'UPDATE fila_comandos SET entregue_em = NOW(), lote = ?
       WHERE usuario_id = ? AND entregue_em IS NULL
         AND criado_em > DATE_SUB(NOW(), INTERVAL 2 MINUTE)
       ORDER BY id LIMIT 20'
 );
+$ler = $pdo->prepare(
+    'SELECT id, acao, argumento, quem FROM fila_comandos WHERE lote = ? ORDER BY id'
+);
 
 /*
  * Espera longa: em vez de a ponte perguntar de tempo em tempo, ela pergunta
- * uma vez e a gente segura a resposta até aparecer comando. O mod aperta o
- * botão e a coisa acontece em menos de um segundo, e ainda dá MENOS
- * requisição do que perguntar a cada dois segundos.
+ * uma vez e a gente segura a resposta ate aparecer comando. O mod aperta o
+ * botao e a coisa acontece em menos de um segundo, e ainda da MENOS
+ * requisicao do que perguntar a cada dois segundos.
  *
- * O teto é baixo de propósito: cada espera segura um processo PHP, e em
- * hospedagem compartilhada isso é recurso contado.
+ * O teto e baixo de proposito: cada espera segura um processo PHP, e em
+ * hospedagem compartilhada isso e recurso contado.
  */
 $espera = min(20, max(0, (int) ($_GET['esperar'] ?? 0)));
 $ate    = microtime(true) + $espera;
 set_time_limit($espera + 15);
 
+$lista = [];
 do {
-    $st->execute([$quem['usuario_id']]);
-    $lista = $st->fetchAll();
-    if ($lista || microtime(true) >= $ate) {
+    $marcar->execute([$lote, $quem['usuario_id']]);
+    if ($marcar->rowCount() > 0) {
+        $ler->execute([$lote]);
+        $lista = $ler->fetchAll();
         break;
     }
+    if (microtime(true) >= $ate) break;
     usleep(350000);
 } while (true);
 
-if ($lista) {
-    $ids = array_column($lista, 'id');
-    $pdo->prepare(
-        'UPDATE fila_comandos SET entregue_em = NOW()
-          WHERE id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')'
-    )->execute($ids);
+// Fila entregue nao serve mais para nada depois de um dia.
+if (random_int(1, 200) === 1) {
+    $pdo->exec('DELETE FROM fila_comandos WHERE entregue_em < DATE_SUB(NOW(), INTERVAL 1 DAY)');
 }
 
 // Pedido velho não vale: se a ponte estava fora do ar, ninguém quer que a

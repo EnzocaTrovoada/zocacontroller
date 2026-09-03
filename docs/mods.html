@@ -152,7 +152,6 @@ if (!token) {
   el('porta').classList.add('escondido');
   el('app').classList.remove('escondido');
   puxar();
-  setInterval(puxar, 3000);
 }
 
 let pode = {}, sons = [], cenas = [], fontes = [], cenaAtual = '', mudo = false, micNome = '', panico = false, olho = null;
@@ -162,7 +161,11 @@ let recadoAte = 0;
    É o único momento em que a demora incomoda — no resto do tempo, de três em
    três segundos está de bom tamanho. */
 let rajadaAte = 0;
+
+/* Um relogio so, com passo variavel. Antes eram dois — um de 3 s e outro de
+   800 ms — e durante a rajada os dois disparavam juntos, pedindo em dobro. */
 setInterval(() => { if (Date.now() < rajadaAte) puxar(); }, 800);
+setInterval(() => { if (Date.now() >= rajadaAte) puxar(); }, 3000);
 
 function recado(txt, tipo) {
   const n = el('recado');
@@ -217,14 +220,20 @@ function aplicar(d) {
   } else {
     cx.className = 'mic ' + (mudo ? 'mudo' : 'aberto');
     el('txMic').textContent = mudo ? 'MICROFONE MUDO' : 'MICROFONE ABERTO';
-    el('nmMic').textContent = micNome || '';
+    el('nmMic').textContent = (micNome || '')
+      + (mudo ? '' : (e.falando ? '  ·  falando agora' : '  ·  em silêncio'));
   }
   el('vu').firstElementChild.style.right = (100 - Math.min(100, (e.nivel || 0) * 320)) + '%';
 
   el('vCena').textContent = panico ? 'EM PÂNICO' : (cenaAtual || '—');
   el('vCena').className = panico ? 'meh' : '';
 
-  el('vPonte').textContent = viva ? 'ligada' : 'não encontrada';
+  /* Mostrar a idade importa: sem ela o mod ve a ultima cena conhecida e
+     acha que e a de agora, ate meio minuto depois do OBS ter fechado. */
+  const idade = d.idade || 0;
+  el('vPonte').textContent = viva
+    ? (idade > 8 ? 'ligada · há ' + idade + 's' : 'ligada')
+    : 'não encontrada';
   el('vPonte').className = viva ? 'on' : 'off';
 
   if (!olho) {

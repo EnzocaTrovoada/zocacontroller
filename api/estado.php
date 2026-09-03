@@ -39,7 +39,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             'vendo'    => isset($estado['olho']['vendo']) ? (bool) $estado['olho']['vendo'] : null,
             'quebrado' => (string) ($estado['olho']['quebrado'] ?? ''),
         ] : null,
+        // Binario, e nao o numero do medidor: quem ve de fora precisa saber se
+        // esta saindo som, e isso muda devagar o bastante para caber aqui.
+        'falando' => (bool) ($estado['falando'] ?? false),
         'cenas'  => array_slice(array_map('strval', (array) ($estado['cenas'] ?? [])), 0, 40),
+        // As fontes da cena no ar, com o olhinho de cada uma.
+        'fontes' => array_slice(array_values(array_map(
+            fn($f) => [
+                'nome'    => (string) ($f['nome'] ?? ''),
+                'id'      => (int) ($f['id'] ?? 0),
+                'visivel' => (bool) ($f['visivel'] ?? false),
+            ],
+            (array) ($estado['fontes'] ?? [])
+        )), 0, 40),
         'sons'   => array_slice(array_values(array_map(
             fn($s) => ['nome' => (string) ($s['nome'] ?? ''), 'mudo' => (bool) ($s['mudo'] ?? false)],
             (array) ($estado['sons'] ?? [])

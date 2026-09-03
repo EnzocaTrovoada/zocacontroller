@@ -174,6 +174,8 @@ const estado = {
   sons: [],                // fontes com áudio, para os mods poderem mutar
   fontes: [],              // itens da cena no ar, com o olhinho de cada um
   ocultos: [],             // o que o dono tirou da vista do controller
+  falando: false,          // ha som entrando agora? (para quem ve de fora)
+  falouAte: 0,
 };
 
 let recadoAte = 0;
@@ -1086,6 +1088,13 @@ function avaliar() {
     estado.mudoDesde = 0;
   }
 
+  /* Para quem ve de fora, o numero do medidor nao serve: ele muda toda hora
+     e mandar isso pela rede seria uma requisicao por respiracao. O que o mod
+     precisa saber e binario — esta saindo som ou nao — e isso muda devagar.
+     A cauda de 1,2 s existe para nao piscar entre palavras. */
+  if (estado.nivel > cfg.limiar) estado.falouAte = agora + 1200;
+  estado.falando = agora < estado.falouAte;
+
   const gritar = cfg.aviso && estado.mudoDesde && (agora - estado.mudoDesde > cfg.segundosMudo * 1000);
   el('aviso').classList.toggle('on', !!gritar);
 
@@ -1220,6 +1229,7 @@ async function subirEstado(forcar) {
   const corpo = {
     cena: estado.cena, mudo: estado.micMudo, mic: estado.mic,
     nivel: Math.round(estado.nivel * 1000) / 1000,
+    falando: estado.falando,
     panico: estado.panico, chat: estado.chat,
     olho: cfg.ausencia
       ? { ligado: olho.ligado, pronto: olho.pronto, quebrado: olho.quebrado, vendo: olho.vendo }
@@ -1231,7 +1241,7 @@ async function subirEstado(forcar) {
 
   const assinatura = JSON.stringify([corpo.cena, corpo.mudo, corpo.mic, corpo.panico,
                                      corpo.chat, corpo.olho, corpo.cenas, corpo.sons,
-                                     corpo.fontes]);
+                                     corpo.fontes, corpo.falando]);
   const agora = Date.now();
   if (!forcar && assinatura === ultimaAssinatura && agora - ultimoEnvio < 5000) return;
 

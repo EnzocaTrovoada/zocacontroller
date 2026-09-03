@@ -48,6 +48,13 @@ function limite_ok(string $chave, int $max, int $janela_seg): bool
     );
     $st->execute([$chave, $janela]);
 
+    /* Uma linha por chave por janela, para sempre, viraria uma tabela gigante
+       de lixo. Uma faxina a cada tantas chamadas resolve sem precisar de cron. */
+    if (random_int(1, 500) === 1) {
+        db()->prepare('DELETE FROM rate_limit WHERE janela < ?')
+            ->execute([(int) floor((time() - 86400) / $janela_seg)]);
+    }
+
     $st = db()->prepare('SELECT contagem FROM rate_limit WHERE chave = ? AND janela = ?');
     $st->execute([$chave, $janela]);
 
