@@ -704,6 +704,51 @@ ACOES.ganhou = {
   },
 };
 
+/* ------------------------------------------------------------------ *
+ *  Marcador de momento.
+ *
+ *  O que faz isso valer não é a hora do relógio: é o TEMPO DECORRIDO da
+ *  transmissão, que o obs-websocket sabe e que bate com o VOD. "23h41" não
+ *  ajuda ninguém a achar o trecho depois; "01:23:45 de live" ajuda.
+ *
+ *  Se não estiver transmitindo, tenta a gravação. Se não houver nenhum dos
+ *  dois, grava mesmo assim com a hora — melhor do que recusar e o momento
+ *  passar.
+ * ------------------------------------------------------------------ */
+
+async function tempoDaLive() {
+  try {
+    const s = await pedir('GetStreamStatus');
+    if (s.outputActive) return { tempo: s.outputTimecode || '', aoVivo: true };
+  } catch (e) {}
+  try {
+    const g = await pedir('GetRecordStatus');
+    if (g.outputActive) return { tempo: g.outputTimecode || '', aoVivo: false };
+  } catch (e) {}
+  return { tempo: '', aoVivo: false };
+}
+
+ACOES.marcar = {
+  minimo: 'mod', espera: 3000,
+  async fazer(quem, arg) {
+    if (!cfg.chave) {
+      return recado('O marcador precisa da chave do ZocaController no link.', 15000);
+    }
+
+    const t = await tempoDaLive();
+
+    try {
+      const d = await apiRele('/marcador.php', {
+        nota: arg || '', quem, tempo_live: t.tempo, ao_vivo: t.aoVivo,
+      });
+      recado('Marcado' + (d.tempo_live ? ' em ' + d.tempo_live : '')
+             + (arg ? ': ' + arg : '') + ' — ' + quem, 12000);
+    } catch (e) { recado('Marcador: ' + e.message, 12000); }
+  },
+};
+
+ACOES.marca = ACOES.marcar;
+
 ACOES.titulo = {
   minimo: 'mod', espera: 10000,
   async fazer(quem, arg) {

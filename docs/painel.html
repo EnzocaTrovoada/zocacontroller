@@ -180,6 +180,15 @@
     <div id="resultadosCat"></div>
   </div>
 
+  <div id="secaoMomentos" class="escondido">
+    <h2>Momentos</h2>
+    <div class="grade" style="grid-template-columns:1fr auto">
+      <input id="notaMomento" type="text" placeholder="o que foi? (opcional)" maxlength="120">
+      <button id="btMarcar">Marcar</button>
+    </div>
+    <div id="momentos"></div>
+  </div>
+
   <div id="secaoPalpite" class="escondido">
     <h2>Palpite</h2>
 
@@ -564,7 +573,8 @@ function ligarSecoes() {
   const tem = !!chavePainel;
   el('secaoCanal').classList.toggle('escondido', !tem);
   el('secaoPalpite').classList.toggle('escondido', !tem);
-  if (tem) { lerCanal(); lerPalpite(); }
+  el('secaoMomentos').classList.toggle('escondido', !tem);
+  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); }
 }
 
 /* ---------- título e categoria ---------- */
@@ -808,6 +818,63 @@ function desenharFontes() {
     cx.appendChild(linha);
   }
 }
+
+/* ------------------------------------------------------------------ *
+ *  Momentos.
+ *
+ *  Quem grava é a ponte, porque só ela sabe há quanto tempo a live está no
+ *  ar — e é esse número que bate com o VOD.
+ * ------------------------------------------------------------------ */
+
+async function lerMomentos() {
+  if (!chavePainel) return;
+  try {
+    const d = await api('/marcador.php?horas=12');
+    desenharMomentos(d.marcadores || []);
+  } catch (e) { /* sem chave ou sem rede: a seção fica vazia */ }
+}
+
+function desenharMomentos(lista) {
+  const cx = el('momentos');
+  cx.innerHTML = '';
+
+  if (!lista.length) {
+    cx.innerHTML = '<p class="dica">Nada marcado nas últimas 12 horas.</p>';
+    return;
+  }
+
+  for (const m of lista) {
+    const l = document.createElement('div');
+    l.className = 'fila';
+
+    const esq = document.createElement('b');
+    // Sem tempo de live (OBS fora do ar), mostra ha quanto tempo foi.
+    const ha = m.ha_segundos || 0;
+    esq.textContent = m.tempo_live
+      || (ha < 90 ? 'agora' : ha < 5400 ? 'há ' + Math.round(ha / 60) + ' min'
+                                        : 'há ' + Math.round(ha / 3600) + ' h');
+    if (m.tempo_live) esq.style.color = 'var(--sinal)';
+
+    const dir = document.createElement('span');
+    dir.textContent = (m.nota ? m.nota + ' · ' : '') + m.quem;
+
+    l.append(esq, dir);
+    cx.appendChild(l);
+  }
+}
+
+el('btMarcar').addEventListener('click', () => {
+  const nota = el('notaMomento').value.trim();
+  mandar('marcar', { arg: nota });
+  el('notaMomento').value = '';
+  anotar('momento marcado' + (nota ? ': ' + nota : ''));
+  // A ponte grava e só então aparece na lista; dá um tempo antes de reler.
+  setTimeout(lerMomentos, 1800);
+});
+
+el('notaMomento').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') el('btMarcar').click();
+});
 
 /* ---------- botões ---------- */
 el('btEntrar').addEventListener('click', () => conectar(el('senha').value, el('porta').value.trim() || '4455'));

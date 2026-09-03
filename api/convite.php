@@ -17,8 +17,15 @@ cors();
 $quem = exige_painel();
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+    /*
+     * A idade vem calculada DAQUI, em segundos. DATETIME do MySQL nao carrega
+     * fuso: o navegador leria como hora local e o servidor esta noutro fuso,
+     * o que fazia "usou ontem" virar "usou hoje". Numero relativo nao tem fuso.
+     */
     $st = db()->prepare(
-        'SELECT id, nome, pode_cena, pode_audio, pode_canal, criado_em, ultimo_uso, revogado
+        'SELECT id, nome, pode_cena, pode_audio, pode_canal, revogado,
+                TIMESTAMPDIFF(SECOND, criado_em, NOW())  AS criado_ha,
+                TIMESTAMPDIFF(SECOND, ultimo_uso, NOW()) AS usado_ha
            FROM convites_mod WHERE usuario_id = ? ORDER BY id DESC'
     );
     $st->execute([$quem['usuario_id']]);
@@ -31,8 +38,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
             'audio' => (bool) $c['pode_audio'],
             'canal' => (bool) $c['pode_canal'],
         ],
-        'criado_em'  => $c['criado_em'],
-        'ultimo_uso' => $c['ultimo_uso'],
+        'criado_ha'  => (int) $c['criado_ha'],
+        'usado_ha'   => $c['usado_ha'] === null ? null : (int) $c['usado_ha'],
         'revogado'   => (bool) $c['revogado'],
     ], $st->fetchAll())]);
 }

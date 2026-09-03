@@ -112,6 +112,10 @@
       <button id="btCamera">Troca por câmera</button>
     </div>
 
+    <div class="par" style="grid-template-columns:1fr">
+      <button id="btMarcar">Marcar este momento</button>
+    </div>
+
     <div id="secaoAudio"><h2>Áudio</h2><div id="sons"></div></div>
     <div id="secaoFontes"><h2>Fontes da cena</h2><div id="fontesCena"></div></div>
     <div id="secaoCena"><h2>Cenas</h2><div id="cenas"></div></div>
@@ -234,6 +238,7 @@ function aplicar(d) {
     el('vOlho').className = olho.quebrado ? 'off' : !olho.ligado ? 'meh' : olho.vendo ? 'on' : 'meh';
   }
 
+  el('btMarcar').disabled = !viva;
   el('btMute').disabled   = !viva || !pode.audio;
   el('btPanico').disabled = !viva || !pode.audio || panico;
   el('btPanico').textContent = panico ? 'JÁ EM PÂNICO' : 'PÂNICO';
@@ -332,6 +337,10 @@ async function enviar(acao, argumento, aviso) {
 }
 
 el('btMute').addEventListener('click', () => enviar('mute', '', mudo ? 'Abrindo o microfone' : 'Mutando'));
+// Guarda o ponto da live para achar no VOD depois. Nao mexe em nada no ar,
+// entao nao pede confirmacao: no meio de um momento bom, atrito atrapalha.
+el('btMarcar').addEventListener('click', () => enviar('marcar', '', 'Marcando o momento'));
+
 el('btCamera').addEventListener('click', () => {
   const ligando = !(olho && olho.ligado);
   enviar('camera', '', ligando ? 'Ligando a troca por câmera' : 'Desligando a troca por câmera');

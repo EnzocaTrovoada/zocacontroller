@@ -23,6 +23,7 @@ const PERMITIDAS = [
     'fonte'  => 'cena',   // o olhinho: mostra e esconde na transmissão
     'camera' => 'cena',
     'replay' => 'cena',
+    'marcar' => 'cena',   // anota o momento para achar no VOD depois
 ];
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {

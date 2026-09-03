@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Convites — ZocaController</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --fundo:#0F171C; --caixa:#17222A; --caixa2:#1E2B34; --linha:#2C3B45;
+    --tinta:#DCE6EA; --fraco:#8FA2AD; --apagado:#6D8290;
+    --sinal:#45B8BF; --sinal2:#17383C;
+    --perigo:#E4735A; --perigo2:#3A211B; --ambar:#D3A244;
+    --disp:"Archivo",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 18px 70px;
+    background: var(--fundo); color: var(--tinta);
+    font: 15px/1.5 var(--mono); -webkit-font-smoothing: antialiased;
+  }
+  .w { max-width: 620px; margin: 0 auto; }
+
+  header { padding: 42px 0 20px; border-bottom: 2px solid var(--tinta); margin-bottom: 26px; }
+  .tag { font-family: var(--disp); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--sinal); margin: 0 0 10px; }
+  h1 { font: 700 clamp(26px,6vw,38px)/1.05 var(--disp); letter-spacing: -.02em; margin: 0 0 10px; }
+  header p { margin: 0; color: var(--fraco); font-size: 14px; max-width: 52ch; }
+
+  h2 { font: 600 10px var(--disp); letter-spacing: .18em; text-transform: uppercase; color: var(--fraco); margin: 28px 0 10px; }
+
+  input[type=text] {
+    width: 100%; font: 14px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); padding: 11px; border-radius: 2px;
+  }
+  input:focus, button:focus-visible { outline: 2px solid var(--sinal); outline-offset: 1px; }
+
+  button {
+    font: 600 14px var(--disp); cursor: pointer; border-radius: 2px;
+    background: var(--caixa); color: var(--tinta); border: 1px solid var(--linha);
+    padding: 12px 18px;
+  }
+  button:hover:not(:disabled) { border-color: var(--sinal); color: var(--sinal); }
+  button:disabled { opacity: .35; cursor: default; }
+  button.principal { background: var(--sinal2); color: var(--sinal); border-color: var(--sinal); }
+  button.perigo { background: transparent; color: var(--perigo); border-color: var(--linha); padding: 7px 12px; font-size: 12px; }
+  button.perigo:hover { border-color: var(--perigo); color: var(--perigo); }
+
+  .marcas { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
+  .marcas label {
+    display: flex; align-items: center; gap: 7px; cursor: pointer;
+    background: var(--caixa2); border: 1px solid var(--linha);
+    padding: 9px 13px; border-radius: 2px; font-size: 13px;
+  }
+  .marcas label:has(input:checked) { border-color: var(--sinal); color: var(--sinal); }
+  .marcas input { accent-color: var(--sinal); width: 15px; height: 15px; margin: 0; }
+
+  /* ---- a lista: o que ele quer é bater o olho e saber quem tem o quê ---- */
+  .pessoa {
+    border: 1px solid var(--linha); background: var(--caixa);
+    padding: 14px 16px; margin-bottom: 9px;
+  }
+  .pessoa.fora { opacity: .5; }
+  .topo { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .nome { font: 700 16px var(--disp); }
+  .estado { margin-left: auto; font-size: 12px; }
+  .abaixo { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .chip {
+    font-size: 11px; letter-spacing: .04em; padding: 3px 8px;
+    border: 1px solid var(--linha); color: var(--apagado); border-radius: 2px;
+  }
+  .chip.tem { border-color: var(--sinal); color: var(--sinal); }
+  .abaixo button { margin-left: auto; }
+  .on { color: var(--sinal); } .off { color: var(--perigo); } .meh { color: var(--ambar); }
+  .apagado { color: var(--apagado); }
+
+  /* ---- o link só aparece uma vez ---- */
+  #novoLink { border: 1px solid var(--sinal); background: var(--sinal2); padding: 16px; margin: 14px 0; }
+  #novoLink p { margin: 0 0 10px; font-size: 13px; color: var(--tinta); }
+  #novoLink code {
+    display: block; background: var(--fundo); border: 1px solid var(--linha);
+    padding: 11px; font-size: 12.5px; word-break: break-all; user-select: all; margin-bottom: 10px;
+  }
+  #novoLink .aviso { color: var(--ambar); font-size: 12.5px; margin: 10px 0 0; }
+
+  #recado { min-height: 1.5em; font-size: 13px; margin-top: 12px; color: var(--fraco); }
+  #recado.ruim { color: var(--perigo); }
+  #recado.bom { color: var(--sinal); }
+
+  #porta { text-align: center; padding: 16vh 0; }
+  #porta h1 { font-size: 24px; }
+  .escondido { display: none !important; }
+  .vazio { color: var(--apagado); font-size: 14px; padding: 18px 0; }
+</style>
+</head>
+<body>
+<div class="w">
+
+  <div id="porta" class="escondido">
+    <h1>Falta a chave</h1>
+    <p style="color:var(--fraco);font-size:14px">
+      Abra esta página com a sua chave no endereço:<br><br>
+      <code style="color:var(--sinal)">convites.html?chave=SUACHAVE</code><br><br>
+      É a mesma chave que você usa no painel.
+    </p>
+  </div>
+
+  <div id="app" class="escondido">
+    <header>
+      <p class="tag">ZocaController</p>
+      <h1>Quem pode mexer</h1>
+      <p>Cada moderador tem um link só dele. Assim você tira o acesso de uma
+         pessoa sem derrubar o de todo mundo.</p>
+    </header>
+
+    <h2>Novo convite</h2>
+    <input id="nome" type="text" placeholder="nome do moderador" maxlength="64" autocomplete="off">
+    <div class="marcas">
+      <label><input type="checkbox" id="pCena" checked> Trocar cena e fontes</label>
+      <label><input type="checkbox" id="pAudio" checked> Mutar áudio e pânico</label>
+      <label><input type="checkbox" id="pCanal"> Mudar título e categoria</label>
+    </div>
+    <button id="btCriar" class="principal">Criar link</button>
+
+    <div id="novoLink" class="escondido">
+      <p>Link de <b id="linkNome"></b> — mande para essa pessoa:</p>
+      <code id="linkTexto"></code>
+      <button id="btCopiar">Copiar link</button>
+      <p class="aviso">Copie agora. Este link não aparece de novo — se perder,
+         revogue e crie outro.</p>
+    </div>
+
+    <h2>Com acesso</h2>
+    <div id="lista"></div>
+    <div id="recado"></div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+const API = 'https://api.zocahop.com';
+const el = (id) => document.getElementById(id);
+
+/* A chave vem na URL e sai da barra de endereço na hora: esta página mostra
+   quem tem acesso ao seu canal, não precisa ficar em histórico nem em print. */
+let chave = '';
+try {
+  const naUrl = new URLSearchParams(location.search).get('chave');
+  if (naUrl) { sessionStorage.setItem('zc:chave', naUrl.trim()); history.replaceState(null, '', location.pathname); }
+  chave = sessionStorage.getItem('zc:chave') || '';
+} catch (e) {
+  chave = new URLSearchParams(location.search).get('chave') || '';
+}
+
+if (!chave) {
+  el('porta').classList.remove('escondido');
+} else {
+  el('app').classList.remove('escondido');
+  listar();
+}
+
+function recado(txt, tipo) {
+  el('recado').textContent = txt || '';
+  el('recado').className = tipo || '';
+}
+
+async function api(caminho, opcoes) {
+  const o = Object.assign({ headers: {} }, opcoes || {});
+  o.headers = Object.assign({ 'X-Chave': chave, 'Content-Type': 'application/json' }, o.headers);
+  const r = await fetch(API + caminho, o);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.erro || ('falhou (' + r.status + ')'));
+  return d;
+}
+
+/* "usou há 4 dias" diz mais do que uma data. E "nunca abriu" é o que revela
+   que você mandou o link e a pessoa perdeu. */
+function comoEsta(c) {
+  if (c.revogado) return { texto: 'revogado', classe: 'off' };
+  if (c.usado_ha === null || c.usado_ha === undefined) return { texto: 'nunca abriu', classe: 'meh' };
+
+  // A idade vem pronta do servidor, em segundos: assim nao existe fuso para
+  // errar entre a Hostinger e o navegador de quem esta olhando.
+  const dias = Math.floor(c.usado_ha / 86400);
+  if (dias <= 0) return { texto: 'usou hoje', classe: 'on' };
+  if (dias === 1) return { texto: 'usou ontem', classe: 'on' };
+  if (dias < 14) return { texto: 'há ' + dias + ' dias', classe: 'apagado' };
+  return { texto: 'parado há ' + dias + ' dias', classe: 'meh' };
+}
+
+async function listar() {
+  try {
+    const d = await api('/convite.php');
+    desenhar(d.convites || []);
+  } catch (e) { recado(e.message, 'ruim'); }
+}
+
+function desenhar(convites) {
+  const cx = el('lista');
+  cx.innerHTML = '';
+
+  if (!convites.length) {
+    cx.innerHTML = '<p class="vazio">Ninguém ainda. Crie o primeiro link aí em cima.</p>';
+    return;
+  }
+
+  for (const c of convites) {
+    const est = comoEsta(c);
+
+    const cartao = document.createElement('div');
+    cartao.className = 'pessoa' + (c.revogado ? ' fora' : '');
+
+    const topo = document.createElement('div');
+    topo.className = 'topo';
+    const nome = document.createElement('span');
+    nome.className = 'nome';
+    nome.textContent = c.nome;
+    const estado = document.createElement('span');
+    estado.className = 'estado ' + est.classe;
+    estado.textContent = est.texto;
+    topo.append(nome, estado);
+
+    const abaixo = document.createElement('div');
+    abaixo.className = 'abaixo';
+    for (const [campo, rotulo] of [['cena', 'cena'], ['audio', 'áudio'], ['canal', 'canal']]) {
+      const chip = document.createElement('span');
+      chip.className = 'chip' + (c.pode[campo] ? ' tem' : '');
+      chip.textContent = rotulo;
+      abaixo.appendChild(chip);
+    }
+
+    if (!c.revogado) {
+      const bt = document.createElement('button');
+      bt.className = 'perigo';
+      bt.textContent = 'Revogar';
+      bt.addEventListener('click', () => revogar(c));
+      abaixo.appendChild(bt);
+    }
+
+    cartao.append(topo, abaixo);
+    cx.appendChild(cartao);
+  }
+}
+
+async function revogar(c) {
+  if (!confirm('Tirar o acesso de ' + c.nome + '?\n\nO link dele para de funcionar na hora. Isso não tem volta — para devolver o acesso você cria um link novo.')) return;
+  try {
+    await api('/convite.php', { method: 'POST', body: JSON.stringify({ revogar: c.id }) });
+    recado('Acesso de ' + c.nome + ' removido.', 'bom');
+    listar();
+  } catch (e) { recado(e.message, 'ruim'); }
+}
+
+el('btCriar').addEventListener('click', async () => {
+  const nome = el('nome').value.trim();
+  if (!nome) { recado('Escreva o nome do moderador.', 'ruim'); return; }
+
+  el('btCriar').disabled = true;
+  try {
+    const d = await api('/convite.php', { method: 'POST', body: JSON.stringify({
+      nome,
+      pode: { cena: el('pCena').checked, audio: el('pAudio').checked, canal: el('pCanal').checked },
+    }) });
+
+    el('linkNome').textContent = nome;
+    el('linkTexto').textContent = d.link;
+    el('novoLink').classList.remove('escondido');
+    el('nome').value = '';
+    recado('');
+    listar();
+  } catch (e) { recado(e.message, 'ruim'); }
+  el('btCriar').disabled = false;
+});
+
+el('nome').addEventListener('keydown', (e) => { if (e.key === 'Enter') el('btCriar').click(); });
+
+el('btCopiar').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(el('linkTexto').textContent);
+    el('btCopiar').textContent = 'Copiado';
+    setTimeout(() => { el('btCopiar').textContent = 'Copiar link'; }, 2500);
+  } catch (e) {
+    recado('Não consegui copiar sozinho — selecione o texto e use Ctrl+C.', 'ruim');
+  }
+});
+</script>
+</body>
+</html>
