@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Subathon — ZocaController</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --fundo:#0F171C; --caixa:#17222A; --caixa2:#1E2B34; --linha:#2C3B45;
+    --tinta:#DCE6EA; --fraco:#8FA2AD; --apagado:#6D8290;
+    --sinal:#45B8BF; --sinal2:#17383C;
+    --perigo:#E4735A; --ambar:#D3A244;
+    --disp:"Archivo",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 18px 80px;
+    background: var(--fundo); color: var(--tinta);
+    font: 15px/1.55 var(--mono); -webkit-font-smoothing: antialiased;
+  }
+  .w { max-width: 660px; margin: 0 auto; }
+
+  header { padding: 42px 0 20px; border-bottom: 2px solid var(--tinta); margin-bottom: 24px; }
+  .tag { font: 600 10px var(--disp); letter-spacing: .2em; text-transform: uppercase; color: var(--sinal); margin: 0 0 10px; }
+  h1 { font: 700 clamp(26px,6vw,40px)/1.03 var(--disp); letter-spacing: -.02em; margin: 0 0 10px; }
+  header p { margin: 0; color: var(--fraco); font-size: 14px; max-width: 54ch; }
+
+  h2 { font: 600 10px var(--disp); letter-spacing: .18em; text-transform: uppercase; color: var(--fraco); margin: 30px 0 4px; }
+  .sub { color: var(--apagado); font-size: 13px; margin: 0 0 14px; max-width: 56ch; }
+
+  input[type=text] {
+    width: 100%; font: 14px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); padding: 12px; border-radius: 3px;
+  }
+  input:focus, button:focus-visible { outline: 2px solid var(--sinal); outline-offset: 1px; }
+
+  button {
+    font: 600 14px var(--disp); cursor: pointer; border-radius: 3px;
+    background: var(--caixa); color: var(--tinta); border: 1px solid var(--linha); padding: 12px 20px;
+  }
+  button:hover:not(:disabled) { border-color: var(--sinal); color: var(--sinal); }
+  button:disabled { opacity: .35; cursor: default; }
+  button.principal { background: var(--sinal2); color: var(--sinal); border-color: var(--sinal); }
+
+  /* uma regra por linha: o nome, quanto soma, e se está valendo */
+  .regra {
+    display: flex; align-items: center; gap: 12px;
+    border: 1px solid var(--linha); background: var(--caixa);
+    padding: 13px 15px; margin-bottom: 8px; border-radius: 3px;
+  }
+  .regra.off { opacity: .55; }
+  .regra .nome { flex: 1; min-width: 0; }
+  .regra .nome b { display: block; font: 600 15px var(--disp); }
+  .regra .nome span { font-size: 12px; color: var(--apagado); }
+  .regra .val { display: flex; align-items: center; gap: 6px; flex: none; }
+  .regra .val input {
+    width: 74px; text-align: right; font: 14px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); padding: 9px; border-radius: 3px;
+  }
+  .regra .val small { color: var(--apagado); font-size: 12px; width: 34px; }
+  .regra .estado { flex: none; width: 74px; text-align: right; font-size: 11.5px; }
+  .on { color: var(--sinal); } .off-txt { color: var(--apagado); }
+
+  .aviso {
+    border-left: 3px solid var(--ambar); background: var(--caixa);
+    padding: 13px 16px; margin: 16px 0; font-size: 13.5px; color: var(--fraco);
+  }
+  .aviso b { color: var(--tinta); }
+
+  .barra {
+    position: sticky; bottom: 0; margin-top: 22px; padding: 14px 0;
+    background: linear-gradient(transparent, var(--fundo) 30%);
+    display: flex; align-items: center; gap: 14px;
+  }
+  #recado { flex: 1; font-size: 13px; color: var(--fraco); }
+  #recado.ruim { color: var(--perigo); } #recado.bom { color: var(--sinal); }
+
+  .ev { display: flex; gap: 10px; padding: 7px 2px; border-bottom: 1px solid var(--linha); font-size: 12.5px; }
+  .ev b { color: var(--sinal); font-weight: 500; width: 62px; flex: none; }
+  .ev span { flex: 1; color: var(--fraco); }
+  .ev i { color: var(--apagado); font-style: normal; }
+
+  #porta { text-align: center; padding: 16vh 0; }
+  #porta h1 { font-size: 24px; }
+  #porta code { color: var(--sinal); }
+  .escondido { display: none !important; }
+  .vazio { color: var(--apagado); font-size: 13.5px; padding: 14px 0; }
+</style>
+</head>
+<body>
+<div class="w">
+
+  <div id="porta" class="escondido">
+    <h1>Falta a chave</h1>
+    <p style="color:var(--fraco);font-size:14px">
+      Abra com a sua chave no endereço:<br><br>
+      <code>subathon.html?chave=SUACHAVE</code><br><br>
+      É a mesma que você usa no painel.
+    </p>
+  </div>
+
+  <div id="app" class="escondido">
+    <header>
+      <p class="tag">ZocaController</p>
+      <h1>Subathon</h1>
+      <p>Cada sub, bit ou doação empurra o cronômetro pra frente sozinho.
+         Você escolhe quanto cada coisa vale.</p>
+    </header>
+
+    <h2>Qual é o seu cronômetro</h2>
+    <p class="sub">
+      Crie o overlay em <b>relogio.zocahop.com</b> escolhendo <b>Subathon</b>.
+      Ao criar o link ele te dá um <b>código de recuperação</b> — cole ele aqui.
+    </p>
+    <input id="codigo" type="text" placeholder="ex: k7m2qx9vbn-a1b2c3d4e5f6..." autocomplete="off">
+    <p class="sub" id="ligadoA"></p>
+
+    <h2>Quanto cada coisa soma</h2>
+    <p class="sub">Em minutos. Deixe <b>0</b> pra aquilo não somar nada.</p>
+    <div id="regras"></div>
+
+    <h2>Teto por evento</h2>
+    <p class="sub">O máximo que uma única sub ou um único cheer pode somar.
+       Existe pra um presente gigante não virar dois dias de live.</p>
+    <div id="teto"></div>
+
+    <div class="aviso">
+      <b>Follow e doação ainda não somam sozinhos.</b> Sub, resub, sub de
+      presente e bits chegam pelo chat, e por isso já funcionam. Follow e
+      doação vêm por outro caminho, que ainda não está pronto — deixe eles em
+      0 por enquanto.
+    </div>
+
+    <h2>Últimos que somaram</h2>
+    <div id="eventos"></div>
+
+    <div class="barra">
+      <span id="recado"></span>
+      <button id="btDesligar">Desligar</button>
+      <button id="btSalvar" class="principal">Salvar</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+const API = 'https://api.zocahop.com';
+const el = (id) => document.getElementById(id);
+
+let chave = '';
+try {
+  const naUrl = new URLSearchParams(location.search).get('chave');
+  if (naUrl) { sessionStorage.setItem('zc:chave', naUrl.trim()); history.replaceState(null, '', location.pathname); }
+  chave = sessionStorage.getItem('zc:chave') || '';
+} catch (e) { chave = new URLSearchParams(location.search).get('chave') || ''; }
+
+/* Minutos na tela, segundos no servidor. Ninguém pensa "300 segundos por
+   sub" — pensa "5 minutos". */
+const REGRAS = [
+  { k: 'seg_sub1', nome: 'Sub tier 1', obs: 'e Prime também',      padrao: 300 },
+  { k: 'seg_sub2', nome: 'Sub tier 2', obs: '',                    padrao: 600 },
+  { k: 'seg_sub3', nome: 'Sub tier 3', obs: '',                    padrao: 1500 },
+  { k: 'seg_bits', nome: 'Bits',       obs: 'a cada 100 bits',     padrao: 30 },
+  { k: 'seg_real', nome: 'Doação',     obs: 'por R$ 1 doado',      padrao: 60 },
+  { k: 'seg_follow', nome: 'Follow',   obs: 'ainda não funciona',  padrao: 0 },
+];
+
+let atual = {};
+let ligado = true;
+
+function recado(txt, tipo) { el('recado').textContent = txt || ''; el('recado').className = tipo || ''; }
+
+async function api(caminho, opcoes) {
+  const o = Object.assign({ headers: {} }, opcoes || {});
+  o.headers = Object.assign({ 'X-Chave': chave, 'Content-Type': 'application/json' }, o.headers);
+  const r = await fetch(API + caminho, o);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.erro || ('falhou (' + r.status + ')'));
+  return d;
+}
+
+/* Mostra o valor em minutos, mas guarda em segundos. Bits e doação viram
+   número quebrado com frequência (30s = 0,5 min), então aceita vírgula. */
+const paraMin = (seg) => Math.round((seg / 60) * 100) / 100;
+const paraSeg = (min) => Math.round(parseFloat(String(min).replace(',', '.')) * 60) || 0;
+
+function linhaRegra(r) {
+  const cx = document.createElement('div');
+  cx.className = 'regra';
+
+  const nome = document.createElement('div');
+  nome.className = 'nome';
+  const b = document.createElement('b'); b.textContent = r.nome;
+  const s = document.createElement('span'); s.textContent = r.obs;
+  nome.append(b, s);
+
+  const val = document.createElement('div');
+  val.className = 'val';
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.inputMode = 'decimal';
+  inp.value = paraMin(atual[r.k] !== undefined ? atual[r.k] : r.padrao);
+  const u = document.createElement('small'); u.textContent = 'min';
+  val.append(inp, u);
+
+  const est = document.createElement('div');
+  est.className = 'estado';
+
+  function pinta() {
+    const seg = paraSeg(inp.value);
+    const off = seg <= 0;
+    cx.classList.toggle('off', off);
+    est.textContent = off ? 'não soma' : 'valendo';
+    est.className = 'estado ' + (off ? 'off-txt' : 'on');
+  }
+  inp.addEventListener('input', pinta);
+  pinta();
+
+  cx.append(nome, val, est);
+  cx.__ler = () => paraSeg(inp.value);
+  cx.__chave = r.k;
+  return cx;
+}
+
+function desenhaRegras() {
+  const cx = el('regras');
+  cx.innerHTML = '';
+  REGRAS.forEach((r) => cx.appendChild(linhaRegra(r)));
+
+  const t = el('teto');
+  t.innerHTML = '';
+  const linha = linhaRegra({ k: 'teto_evento', nome: 'Máximo por evento', obs: 'um único sub ou cheer', padrao: 7200 });
+  linha.querySelector('.estado').textContent = '';
+  t.appendChild(linha);
+}
+
+function desenhaEventos(lista) {
+  const cx = el('eventos');
+  cx.innerHTML = '';
+  if (!lista || !lista.length) {
+    cx.innerHTML = '<p class="vazio">Nada ainda. Quando alguém der sub ou bits, aparece aqui.</p>';
+    return;
+  }
+  for (const e of lista) {
+    const l = document.createElement('div');
+    l.className = 'ev';
+    const t = document.createElement('b');
+    t.textContent = '+' + (e.segundos >= 60 ? Math.round(e.segundos / 60) + ' min' : e.segundos + 's');
+    const q = document.createElement('span');
+    q.textContent = (e.quem || 'alguém') + (e.detalhe ? ' · ' + e.detalhe : '');
+    const h = document.createElement('i');
+    const s = e.ha_segundos || 0;
+    h.textContent = s < 90 ? 'agora' : s < 5400 ? 'há ' + Math.round(s / 60) + ' min' : 'há ' + Math.round(s / 3600) + ' h';
+    l.append(t, q, h);
+    cx.appendChild(l);
+  }
+}
+
+async function carrega() {
+  try {
+    const d = await api('/subathon.php');
+    atual = d.regras || {};
+    ligado = d.ligado !== false;
+    if (d.slug) el('ligadoA').textContent = 'Ligado ao cronômetro ' + d.slug + '.';
+    el('btDesligar').textContent = ligado ? 'Desligar' : 'Ligar';
+    desenhaRegras();
+    desenhaEventos(d.eventos);
+  } catch (e) {
+    desenhaRegras();
+    desenhaEventos([]);
+    if (!String(e.message).includes('configurad')) recado(e.message, 'ruim');
+  }
+}
+
+/* O relógio entrega "link-código" numa string só. O código é hexadecimal e
+   não tem hífen, então o último hífen separa os dois com segurança. */
+function separaCodigo(txt) {
+  const s = txt.trim();
+  const i = s.lastIndexOf('-');
+  if (i < 1) return null;
+  const slug = s.slice(0, i), token = s.slice(i + 1);
+  if (!/^[a-z0-9-]{4,32}$/.test(slug) || token.length < 8) return null;
+  return { slug, token };
+}
+
+async function salva(mudarLigado) {
+  const bruto = el('codigo').value.trim();
+  const par = separaCodigo(bruto);
+  if (!par) {
+    recado('Esse código não parece certo. Ele tem o formato link-código, os dois juntos.', 'ruim');
+    el('codigo').focus();
+    return;
+  }
+
+  const corpo = { slug: par.slug, token: par.token };
+  document.querySelectorAll('.regra').forEach((l) => { corpo[l.__chave] = l.__ler(); });
+  if (!corpo.teto_evento) corpo.teto_evento = 7200;
+  if (mudarLigado) ligado = !ligado;
+  if (!ligado) corpo.desligar = 1;
+
+  el('btSalvar').disabled = true;
+  try {
+    await api('/subathon.php', { method: 'POST', body: JSON.stringify(corpo) });
+    el('btDesligar').textContent = ligado ? 'Desligar' : 'Ligar';
+    recado(ligado ? 'Salvo. O subathon já está contando sozinho.' : 'Salvo, e desligado — nada vai somar.', 'bom');
+    carrega();
+  } catch (e) { recado(e.message, 'ruim'); }
+  el('btSalvar').disabled = false;
+}
+
+el('btSalvar').addEventListener('click', () => salva(false));
+el('btDesligar').addEventListener('click', () => salva(true));
+
+if (!chave) el('porta').classList.remove('escondido');
+else { el('app').classList.remove('escondido'); carrega(); setInterval(carrega, 20000); }
+</script>
+</body>
+</html>
