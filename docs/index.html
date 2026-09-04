@@ -289,7 +289,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=10"></script>
+<script src="clock.js?v=14"></script>
 <script>
 'use strict';
 
@@ -388,11 +388,12 @@ function padraoDe(tipo) {
     return Object.assign(base, {
       titulo: '', font: 'Archivo', size: 26, weight: 700, color: '#FFFFFF',
       sw: 0, glow: 0, shx: 0, shy: 2, shb: 8, sho: 75, shc: '#000000',
-      mcapa: 1, mtam: 108, mlado: 'esquerda', mlarg: 480, mgap: 16,
+      mcapa: 1, mtam: 132, mlado: 'esquerda', mlarg: 520, mgap: 18,
       mbarra: 1, mbalt: 4, mbcor: '#1DB954',
       martcor: '#FFFFFF', martopac: 70, martsize: 70,
-      mfundo: 'capa', mborrar: 30, mescuro: 30, mfcor: '#0B0F0D', mfopac: 70,
-      mfpad: 14, mraio: 22, mrola: 1, mabrir: 900, mfechar: 1400, mtempo: 7,
+      mfundo: 'capa', mborrar: 34, msatura: 170, mescuro: 22,
+      mfcor: '#0B0F0D', mfopac: 70, mfpad: 12, mraio: 34, mcapraio: 16,
+      mrola: 1, mabrir: 1000, mfechar: 1500, mtempo: 7,
     });
   }
   if (tipo === 'feed') {
@@ -573,12 +574,15 @@ const GRUPOS = [
       dica: 'a capa borrada pinta a caixa com a cor do próprio disco, e muda a cada música',
       ops: [['capa', 'A capa, borrada'], ['solid', 'Cor sólida'], ['none', 'Nenhum']] },
     { k: 'mborrar', l: 'Borrão', c: 'faixa', min: 0, max: 80, u: 'px', se: (c) => c.mfundo === 'capa' },
-    { k: 'mescuro', l: 'Escurecer', c: 'faixa', min: 0, max: 90, u: '%', se: (c) => c.mfundo === 'capa',
-      dica: 'sem escurecer um pouco, capa clara engole o texto branco' },
+    { k: 'msatura', l: 'Saturação', c: 'faixa', min: 100, max: 300, u: '%', se: (c) => c.mfundo === 'capa',
+      dica: 'puxa a cor do disco pra cima; borrar sempre desbota um pouco' },
+    { k: 'mescuro', l: 'Véu escuro', c: 'faixa', min: 0, max: 90, u: '%', se: (c) => c.mfundo === 'capa',
+      dica: 'sem um véu, capa clara engole o texto branco' },
     { k: 'mfcor',  l: 'Cor', c: 'cor', se: (c) => c.mfundo === 'solid' },
     { k: 'mfopac', l: 'Opacidade', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => c.mfundo === 'solid' },
     { k: 'mfpad',  l: 'Respiro', c: 'faixa', min: 0, max: 40, u: 'px' },
-    { k: 'mraio',  l: 'Cantos', c: 'faixa', min: 0, max: 80, u: 'px' },
+    { k: 'mraio',  l: 'Cantos da faixa', c: 'faixa', min: 0, max: 120, u: 'px' },
+    { k: 'mcapraio', l: 'Cantos da capa', c: 'faixa', min: 0, max: 80, u: 'px', se: (c) => !!c.mcapa },
   ] },
 
   { t: 'O feed', aberto: true, se: so('feed'), itens: [

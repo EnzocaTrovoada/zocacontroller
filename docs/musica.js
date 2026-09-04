@@ -13,16 +13,25 @@
 
   var R = global.Relogio;
 
+  /* A CAPA POR CIMA, A FAIXA POR TRÁS.
+
+     A capa vem PRIMEIRO no HTML porque num flex a ordem visual segue a
+     ordem do documento — pondo a faixa antes, ela ia parar à esquerda e a
+     capa à direita, que foi exatamente o que aconteceu na primeira tentativa.
+
+     Quem resolve a pintura é o z-index positivo (capa 2, faixa 1), e não a
+     ordem: z-index POSITIVO empilha sem criar aquele problema do negativo,
+     que pinta atrás do fundo do pai. */
   var MOLDE =
     '<div class="mu__caixa">' +
-      /* A capa de novo, borrada e ampliada, como fundo. É a cor da própria
-         música pintando a caixa — muda a cada faixa sem ninguém escolher. */
-      '<img class="mu__brilho" alt="" aria-hidden="true">' +
       '<img class="mu__capa" alt="">' +
-      '<div class="mu__texto">' +
-        '<div class="mu__nome"></div>' +
-        '<div class="mu__artista"></div>' +
-        '<div class="mu__barra"><i></i></div>' +
+      '<div class="mu__faixa">' +
+        '<img class="mu__brilho" alt="" aria-hidden="true">' +
+        '<div class="mu__texto">' +
+          '<div class="mu__nome"></div>' +
+          '<div class="mu__artista"></div>' +
+        '</div>' +
+        '<div class="mu__prog"><i></i></div>' +
       '</div>' +
     '</div>';
 
@@ -30,13 +39,11 @@
     root.classList.add('mu', 'rl');
     root.innerHTML = MOLDE;
 
-    var caixa   = root.querySelector('.mu__caixa');
     var capa    = root.querySelector('.mu__capa');
     var brilho  = root.querySelector('.mu__brilho');
     var elNome  = root.querySelector('.mu__nome');
     var elArt   = root.querySelector('.mu__artista');
-    var barra   = root.querySelector('.mu__barra');
-    var dentro  = barra.firstElementChild;
+    var dentro  = root.querySelector('.mu__prog > i');
 
     var cfg = R.sanitize(cfgInicial);
     var atual = null;         /* a música de agora */
@@ -51,6 +58,29 @@
        que sobrevive. */
     var fase = 'fora';        /* fora | abrindo | parado | fechando */
     var trocaEm = 0;
+    var mediuLargura = false;
+
+    /* Só rola o texto que realmente não cabe.
+    
+       A largura disponível vem da CONFIG, e não do elemento. Medir o elemento
+       parece o certo e não é: quando o OBS não pinta a fonte, a animação da
+       faixa fica congelada em largura zero enquanto o relógio do Worker segue
+       andando — e aí TODO texto é medido contra zero e todo texto vira longo.
+    
+       Da config, a conta vale mesmo com a tela parada, porque é a mesma que o
+       CSS vai usar quando ela voltar a pintar. */
+    function larguraUtil() {
+      var recuo = cfg.mcapa ? Math.round(cfg.mtam * 0.42) + cfg.mgap : Math.round(cfg.mgap * 1.4);
+      return Math.max(20, cfg.mlarg - recuo - Math.round(cfg.mgap * 1.4));
+    }
+
+    function mede() {
+      mediuLargura = true;
+      var cabe = larguraUtil();
+      [elNome, elArt].forEach(function (el) {
+        el.classList.toggle('mu--longo', !!cfg.mrola && el.scrollWidth > cabe + 2);
+      });
+    }
 
     function ciclo() {
       if (cfg.manim === 'nenhum' || cfg.mquando === 'sempre') return;
@@ -58,6 +88,7 @@
 
       if (fase === 'abrindo') {
         fase = 'parado';
+        mede();                 /* agora a faixa já tem a largura final */
         trocaEm = Date.now() + cfg.mtempo * 1000;
       } else if (fase === 'parado') {
         fase = 'fechando';
@@ -90,15 +121,19 @@
       s.setProperty('--mu-capa', cfg.mtam + 'px');
       s.setProperty('--mu-gap', cfg.mgap + 'px');
       s.setProperty('--mu-larg', cfg.mlarg + 'px');
-      /* O lado do quadrado fechado: a capa mais o respiro dos dois lados.
-         Sem capa, um quadrado do tamanho da altura da linha. */
-      s.setProperty('--mu-quad', (cfg.mcapa ? cfg.mtam + cfg.mfpad * 2 : Math.round(cfg.size * 2.2)) + 'px');
       s.setProperty('--mu-raio', cfg.mraio + 'px');
       /* No modo capa a cor chapada sai de cena: quem pinta é a imagem. */
       s.setProperty('--mu-fundo', (cfg.mfundo === 'none' || cfg.mfundo === 'capa')
         ? 'transparent' : R.rgba(cfg.mfcor, cfg.mfopac));
       s.setProperty('--mu-borrar', cfg.mborrar + 'px');
-      s.setProperty('--mu-escuro', (1 - cfg.mescuro / 100).toFixed(2));
+      s.setProperty('--mu-satura', (cfg.msatura / 100).toFixed(2));
+      /* Véu, e não brightness: o véu tira contraste de capa clara e de capa
+         escura do mesmo jeito. */
+      s.setProperty('--mu-veu', (cfg.mescuro / 100).toFixed(2));
+      s.setProperty('--mu-capa-raio', cfg.mcapraio + 'px');
+      /* A faixa tem que ser mais baixa que a capa: é a diferença que faz a
+         capa sobrar pra fora e a peça ganhar profundidade. */
+      s.setProperty('--mu-faixa', Math.round(cfg.mtam * 0.66) + 'px');
       s.setProperty('--mu-abrir', cfg.mabrir + 'ms');
       s.setProperty('--mu-fechar', cfg.mfechar + 'ms');
       s.setProperty('--mu-fpad', cfg.mfpad + 'px');
@@ -119,6 +154,7 @@
        conta local, senão a barra pularia de 15 em 15 segundos. */
     function pinta() {
       if (!atual) return;
+      if (!mediuLargura && (cfg.mquando === 'sempre' || cfg.manim === 'nenhum')) mede();
       var em = atual.em + (atual.tocando ? (Date.now() - marcado) : 0);
       var pct = atual.dura > 0 ? Math.min(100, em * 100 / atual.dura) : 0;
       dentro.style.width = pct + '%';
@@ -149,10 +185,10 @@
         /* Reinicia a animação de entrada só quando a MÚSICA muda, e não a
            cada consulta: senão ela repetiria de 15 em 15 segundos. */
         abre();
-        /* O texto que não cabe rola; o que cabe fica quieto. */
-        [elNome, elArt].forEach(function (el) {
-          el.classList.toggle('mu--longo', cfg.mrola && el.scrollWidth > el.clientWidth + 2);
-        });
+        /* A medida de "cabe ou não" NÃO pode sair daqui: neste instante a
+           faixa ainda tem largura zero e tudo parece grande demais. Ela roda
+           quando a entrada termina, lá no ciclo. */
+        mediuLargura = false;
       }
       pinta();
     }

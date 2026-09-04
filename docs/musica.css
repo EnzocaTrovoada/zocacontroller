@@ -1,7 +1,14 @@
 /* musica.css — o que está tocando.
+   ---------------------------------------------------------------------
    A tipografia e as cores vêm das variáveis do clock.css, iguais às dos
-   outros overlays. Aqui só mora o que é próprio da música: a capa, a barra
-   e o texto que rola quando não cabe. */
+   outros overlays. Aqui mora só o que é próprio da música.
+
+   A PEÇA TEM DUAS PARTES INDEPENDENTES: a capa, que é um quadrado de
+   tamanho fixo, e a faixa, que estica pra direita por TRÁS dela.
+
+   Antes a capa vivia dentro da faixa, e por isso encolhia junto quando a
+   faixa encolhia — a animação inteira era uma caixa só mudando de largura.
+   Separadas, a capa aparece primeiro e FICA, e a faixa sai de trás dela. */
 
 .mu {
   display: flex;
@@ -19,39 +26,113 @@
 
 /* Sem nada tocando o overlay some. Um overlay preso na última música mente,
    e mentir na tela é pior do que não estar lá. */
-.mu--vazio .mu__caixa { opacity: 0; pointer-events: none; }
+.mu--vazio .mu__caixa { opacity: 0; }
 
 .mu__caixa {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--mu-gap);
-  width: var(--mu-larg);
-  max-width: 100%;
-  padding: var(--mu-fpad);
-  background: var(--mu-fundo);
-  border-radius: var(--mu-raio);
-  box-sizing: border-box;
-  /* Enquanto a barra ainda está esticando, o texto não pode vazar por fora
-     dela: é o corte que faz parecer que ele está SAINDO de dentro. */
-  overflow: hidden;
-  transform-origin: left center;
+  flex: none;
 }
-.mu--capa-direita .mu__caixa { transform-origin: right center; }
-.mu--capa-direita .mu__caixa { flex-direction: row-reverse; }
 
+/* ---------------------------------------------------------------------
+   A CAPA
+
+   Fica POR CIMA e à esquerda, saindo um pouco pra fora da faixa. É essa
+   saliência que dá profundidade e faz a peça parecer montada, em vez de um
+   retângulo com uma imagem dentro.
+   --------------------------------------------------------------------- */
 .mu__capa {
+  position: relative;
+  z-index: 2;
   width: var(--mu-capa);
   height: var(--mu-capa);
   flex: none;
   object-fit: cover;
-  border-radius: calc(var(--mu-raio) * .7);
-  background: rgba(255, 255, 255, .08);
+  border-radius: var(--mu-capa-raio);
+  background: rgba(255, 255, 255, .06);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .45);
 }
 .mu--sem-capa .mu__capa { display: none; }
 
-/* min-width:0 num filho de flex é o que permite ele ENCOLHER: sem isso o
-   texto longo estica a caixa e empurra a capa pra fora. */
-.mu__texto { flex: 1; min-width: 0; }
+/* ---------------------------------------------------------------------
+   A FAIXA
+
+   Entra por baixo da capa e estica pra direita. A margem negativa é o que a
+   enfia atrás; o padding devolve o espaço por dentro, pra que o texto comece
+   depois da capa e não embaixo dela.
+   --------------------------------------------------------------------- */
+.mu__faixa {
+  position: relative;
+  z-index: 1;
+  width: var(--mu-larg);
+  min-height: var(--mu-faixa);
+  margin-left: calc(var(--mu-capa) * -0.42);
+  padding: var(--mu-fpad) calc(var(--mu-gap) * 1.4) var(--mu-fpad)
+           calc(var(--mu-capa) * 0.42 + var(--mu-gap));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: var(--mu-raio);
+  background: var(--mu-fundo);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.mu--sem-capa .mu__faixa {
+  margin-left: 0;
+  padding-left: calc(var(--mu-gap) * 1.4);
+}
+
+.mu--capa-direita .mu__caixa { flex-direction: row-reverse; }
+.mu--capa-direita .mu__faixa {
+  margin-left: 0;
+  margin-right: calc(var(--mu-capa) * -0.42);
+  padding-left: calc(var(--mu-gap) * 1.4);
+  padding-right: calc(var(--mu-capa) * 0.42 + var(--mu-gap));
+  text-align: right;
+}
+
+/* ---------------------------------------------------------------------
+   O FUNDO SAI DA CAPA
+
+   A mesma imagem, ampliada e borrada, pintando a faixa por trás. A cor muda
+   a cada música sem ninguém escolher nada, e combina sempre — porque é
+   literalmente a cor daquele disco.
+
+   Ampliada de propósito: um blur forte come as bordas da imagem, e sem a
+   sobra ficaria uma moldura clara em volta.
+   --------------------------------------------------------------------- */
+.mu__brilho { display: none; }
+
+.mu--fundo-capa .mu__brilho {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(2.2);
+  filter: blur(var(--mu-borrar)) saturate(var(--mu-satura));
+  z-index: 0;
+}
+
+/* Um véu por cima do borrão, e não brightness na imagem: com brightness, a
+   capa clara continua clara demais pro texto branco e a escura vira preta.
+   O véu tira contraste de qualquer capa do mesmo jeito. */
+.mu--fundo-capa .mu__faixa::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: rgba(8, 10, 12, var(--mu-veu));
+}
+.mu--fundo-capa .mu__texto,
+.mu--fundo-capa .mu__prog { position: relative; z-index: 1; }
+
+/* ---------------------------------------------------------------------
+   O TEXTO
+   --------------------------------------------------------------------- */
+.mu__texto { min-width: 0; }
 
 .mu__nome, .mu__artista {
   font-family: var(--rl-font);
@@ -66,34 +147,34 @@
   color: var(--rl-color);
   -webkit-text-stroke: var(--rl-sw) var(--rl-sc);
   paint-order: stroke fill;
+  line-height: 1.15;
 }
 .mu__artista {
   font-size: calc(var(--rl-size) * var(--mu-artsize));
   color: var(--mu-artcor);
-  margin-top: .15em;
+  margin-top: .12em;
+  line-height: 1.2;
 }
 
 /* Texto que não cabe passa devagar de um lado pro outro. Só quem não cabe
    ganha a classe — animar o que já cabe é movimento à toa na tela. */
 .mu--longo { text-overflow: clip; }
 .mu--longo > * { display: inline-block; }
-.mu--rola .mu--longo {
-  animation: mu-rola 12s linear infinite;
-}
+.mu--rola .mu--longo { animation: mu-rola 14s linear infinite; }
 @keyframes mu-rola {
-  0%, 12%   { transform: translateX(0); }
-  88%, 100% { transform: translateX(calc(-100% + var(--mu-larg) - var(--mu-capa) - var(--mu-gap) - var(--mu-fpad) * 2)); }
+  0%, 10%   { transform: translateX(0); }
+  90%, 100% { transform: translateX(calc(-100% + var(--mu-larg) * .55)); }
 }
 
-.mu__barra {
+.mu__prog {
   height: var(--mu-balt);
-  margin-top: 8px;
+  margin-top: 9px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .22);
   overflow: hidden;
 }
-.mu--sem-barra .mu__barra { display: none; }
-.mu__barra > i {
+.mu--sem-barra .mu__prog { display: none; }
+.mu__prog > i {
   display: block;
   height: 100%;
   width: 0;
@@ -104,122 +185,96 @@
   transition: width .25s linear;
 }
 
-.mu--entra { animation: mu-entra .5s cubic-bezier(.22, 1, .36, 1); }
-@keyframes mu-entra {
-  from { opacity: 0; transform: translateX(-14px); }
+/* ---------------------------------------------------------------------
+   A ENTRADA EM QUATRO TEMPOS
+
+   Nada → a capa cresce → a faixa estica pra direita → o nome aparece.
+   Pra sumir, o mesmo de trás pra frente.
+
+   Cada parte anima a SUA propriedade: a capa a escala, a faixa a largura, o
+   texto a opacidade. Uma animação só não daria conta, porque a capa não pode
+   encolher quando a faixa encolhe — ela é justamente o que fica.
+   --------------------------------------------------------------------- */
+.mu--revelar .mu__capa {
+  animation: mu-capa-entra calc(var(--mu-abrir) * .42) cubic-bezier(.34, 1.56, .64, 1) both;
+}
+@keyframes mu-capa-entra {
+  from { opacity: 0; transform: scale(.3); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.mu--revelar .mu__faixa {
+  animation: mu-faixa-entra calc(var(--mu-abrir) * .62) cubic-bezier(.22, 1, .36, 1)
+             calc(var(--mu-abrir) * .34) both;
+}
+@keyframes mu-faixa-entra {
+  from { width: 0; }
+  to   { width: var(--mu-larg); }
+}
+
+.mu--revelar .mu__texto,
+.mu--revelar .mu__prog {
+  animation: mu-texto-entra calc(var(--mu-abrir) * .4) ease calc(var(--mu-abrir) * .68) both;
+}
+@keyframes mu-texto-entra {
+  from { opacity: 0; transform: translateX(-12px); }
   to   { opacity: 1; transform: none; }
 }
 
+/* Saída: o texto some, a faixa recolhe, e só então a capa vai embora. */
+.mu--fechando .mu__texto,
+.mu--fechando .mu__prog {
+  animation: mu-texto-sai calc(var(--mu-fechar) * .2) ease both;
+}
+@keyframes mu-texto-sai {
+  to { opacity: 0; transform: translateX(-12px); }
+}
+
+.mu--fechando .mu__faixa {
+  animation: mu-faixa-sai calc(var(--mu-fechar) * .55) cubic-bezier(.5, 0, .75, 0)
+             calc(var(--mu-fechar) * .18) both;
+}
+@keyframes mu-faixa-sai {
+  from { width: var(--mu-larg); }
+  to   { width: 0; }
+}
+
+.mu--fechando .mu__capa {
+  animation: mu-capa-sai calc(var(--mu-fechar) * .3) cubic-bezier(.5, 0, .75, 0)
+             calc(var(--mu-fechar) * .7) both;
+}
+@keyframes mu-capa-sai {
+  to { opacity: 0; transform: scale(.3); }
+}
+
+/* "Surge" é a entrada simples, pra quem acha a de quatro tempos demais. */
+.mu--surge .mu__caixa {
+  animation: mu-surge calc(var(--mu-abrir) * .5) cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes mu-surge {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: none; }
+}
+.mu--surge.mu--fechando .mu__caixa {
+  animation: mu-surge-sai calc(var(--mu-fechar) * .5) ease both;
+}
+@keyframes mu-surge-sai {
+  to { opacity: 0; transform: translateX(-20px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .mu--entra { animation: none; }
-  .mu--rola .mu--longo { animation: none; }
+  .mu--revelar .mu__capa, .mu--revelar .mu__faixa, .mu--revelar .mu__texto,
+  .mu--revelar .mu__prog, .mu--fechando .mu__capa, .mu--fechando .mu__faixa,
+  .mu--fechando .mu__texto, .mu--fechando .mu__prog,
+  .mu--surge .mu__caixa, .mu--rola .mu--longo { animation: none; }
 }
 
 /* Modo edição, igual ao dos outros: só existe dentro do editor. */
 .mu.is-editando { pointer-events: auto; }
 .mu.is-editando .mu__caixa {
   outline: 1px dashed rgba(255, 255, 255, .35);
-  outline-offset: 4px;
+  outline-offset: 6px;
   cursor: move;
 }
 .mu.is-editando .mu__caixa:hover { outline-color: #45B8BF; }
 .mu.is-editando .mu__caixa.pegando { outline: 1px solid #45B8BF; }
-
-/* ---------------------------------------------------------------------
-   A ENTRADA EM QUATRO TEMPOS
-
-   Nada → o quadrado cresce → a barra estica pra direita → o nome aparece.
-   Pra sumir, o mesmo de trás pra frente.
-
-   É uma animação só na caixa, e não três elementos animando junto: assim os
-   tempos não têm como sair de sincronia, e a largura vai do quadrado até o
-   fim sem um segundo elemento tentando acompanhar.
-
-   --mu-quad é o lado do quadrado fechado: a capa mais o respiro dos dois
-   lados. Sem ele a barra "esticaria" a partir do zero e o quadrado nunca
-   apareceria como quadrado.
-   --------------------------------------------------------------------- */
-.mu--revelar .mu__caixa {
-  animation: mu-abre var(--mu-abrir) cubic-bezier(.22, 1, .36, 1) forwards;
-}
-@keyframes mu-abre {
-  0%   { opacity: 0; width: var(--mu-quad); transform: scale(.2); }
-  18%  { opacity: 1; width: var(--mu-quad); transform: scale(1.08); }
-  30%  { opacity: 1; width: var(--mu-quad); transform: scale(1); }
-  100% { opacity: 1; width: var(--mu-larg); transform: scale(1); }
-}
-
-/* O texto entra depois que a barra já tem onde caber. */
-.mu--revelar .mu__texto {
-  animation: mu-texto-entra 380ms ease calc(var(--mu-abrir) * .58) both;
-}
-@keyframes mu-texto-entra {
-  from { opacity: 0; transform: translateX(-10px); }
-  to   { opacity: 1; transform: none; }
-}
-
-.mu--fechando .mu__caixa {
-  /* Saída mais demorada que a entrada, e não o contrário: sumir depressa
-      parece defeito, aparecer depressa parece resposta. */
-  animation: mu-fecha var(--mu-fechar) cubic-bezier(.45, 0, .3, 1) forwards;
-}
-@keyframes mu-fecha {
-  0%   { opacity: 1; width: var(--mu-larg); transform: scale(1); }
-  20%  { opacity: 1; width: var(--mu-larg); transform: scale(1); }
-  70%  { opacity: 1; width: var(--mu-quad); transform: scale(1); }
-  100% { opacity: 0; width: var(--mu-quad); transform: scale(.2); }
-}
-.mu--fechando .mu__texto { animation: mu-texto-sai 260ms ease forwards; }
-@keyframes mu-texto-sai {
-  to { opacity: 0; transform: translateX(-10px); }
-}
-
-/* "Surge" é a entrada simples, pra quem acha a de quatro tempos demais. */
-.mu--surge .mu__caixa { animation: mu-surge 420ms cubic-bezier(.22, 1, .36, 1) forwards; }
-@keyframes mu-surge {
-  from { opacity: 0; transform: translateX(-16px); }
-  to   { opacity: 1; transform: none; }
-}
-.mu--surge.mu--fechando .mu__caixa { animation: mu-surge-sai 320ms ease forwards; }
-@keyframes mu-surge-sai {
-  to { opacity: 0; transform: translateX(-16px); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mu--revelar .mu__caixa, .mu--fechando .mu__caixa, .mu--surge .mu__caixa,
-  .mu--revelar .mu__texto, .mu--fechando .mu__texto { animation: none; }
-}
-
-/* ---------------------------------------------------------------------
-   O FUNDO SAI DA CAPA
-
-   A mesma imagem, ampliada e borrada, pintando a caixa por trás. A cor
-   muda a cada música sem ninguém escolher nada — e combina sempre, porque
-   é literalmente a cor daquele disco.
-
-   Ampliada de propósito: um blur forte come as bordas da imagem, e sem a
-   sobra ficaria uma moldura clara em volta.
-   --------------------------------------------------------------------- */
-.mu__brilho { display: none; }
-
-.mu--fundo-capa .mu__brilho {
-  display: block;
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scale(1.8);
-  filter: blur(var(--mu-borrar)) saturate(1.7) brightness(var(--mu-escuro));
-  z-index: 0;
-}
-/* O conteúdo sobe pra cima do fundo. Sem z-index positivo aqui, a imagem
-   pintaria por cima do texto — ela vem depois no HTML. */
-.mu--fundo-capa .mu__capa,
-.mu--fundo-capa .mu__texto { position: relative; z-index: 1; }
-
-/* A capa da frente ganha sombra própria: sobre um fundo da mesma imagem,
-   sem ela a arte se dissolveria no borrão. */
-.mu--fundo-capa .mu__capa {
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
-}

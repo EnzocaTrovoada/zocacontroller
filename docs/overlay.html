@@ -6,9 +6,9 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="clock.css?v=10">
-<link rel="stylesheet" href="chat.css?v=10">
-<link rel="stylesheet" href="musica.css?v=10">
+<link rel="stylesheet" href="clock.css?v=14">
+<link rel="stylesheet" href="chat.css?v=14">
+<link rel="stylesheet" href="musica.css?v=14">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
@@ -37,9 +37,9 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=10"></script>
-<script src="chat.js?v=10"></script>
-<script src="musica.js?v=10"></script>
+<script src="clock.js?v=14"></script>
+<script src="chat.js?v=14"></script>
+<script src="musica.js?v=14"></script>
 <script>
 (function () {
   'use strict';
@@ -87,7 +87,17 @@
     if (!montaPara(config)) relogio.update(config);
   }
 
-  montaPara(Relogio.parseConfig());
+  /* NADA NA TELA ATÉ SABER O QUE DESENHAR.
+
+     Antes eu montava o desenhista já na carga, com a config que viesse na
+     URL — e no modo link fixo não vem nenhuma, então o padrão valia: um
+     RELÓGIO. Resultado: todo overlay piscava um relógio por um instante
+     antes de virar o que era de verdade, e ao vivo isso aparece.
+
+     Com ?k= a resposta do servidor é que decide, e ela chega em milissegundos.
+     Sem ?k= a config está na própria URL e dá pra montar na hora. */
+  if (k) raiz.innerHTML = '';
+  else montaPara(Relogio.parseConfig());
 
   /* PREVIEW DO EDITOR.
      O hub mostra este mesmo arquivo num iframe e manda a config a cada
@@ -179,7 +189,7 @@
   }
 
   raiz.addEventListener('pointerdown', function (e) {
-    if (!editando) return;
+    if (!editando || !relogio) return;
     var alvo = null;
     for (var i = 0; i < ALVOS.length; i++) {
       var el = raiz.querySelector(ALVOS[i][0]);
@@ -298,9 +308,28 @@
     buscar();
   }
 
+  /* O PULSO É DESTA PÁGINA, NÃO DO DESENHISTA.
+
+     Antes o laço de busca pegava carona no tique do relógio. Só que o
+     desenhista é TROCADO quando o tipo é chat, feed ou música — e o ouvinte
+     ficava registrado no relógio já destruído. Esses três overlays estavam
+     rodando só no setInterval de reserva, que o Chromium freia pra uma vez
+     por minuto quando o OBS não pinta a fonte.
+
+     Um Worker próprio resolve pros oito tipos de uma vez, e não depende de
+     qual desenhista está montado agora. */
   buscar();
-  relogio.aoTique(talvezBuscar);
-  setInterval(talvezBuscar, 15000);
+
+  (function () {
+    try {
+      var fonte = 'onmessage=function(){setInterval(function(){postMessage(0)},1000)}';
+      var w = new Worker(URL.createObjectURL(new Blob([fonte], { type: 'text/javascript' })));
+      w.onmessage = talvezBuscar;
+      w.postMessage(0);
+    } catch (e) { /* sem Worker: sobra o intervalo abaixo */ }
+  })();
+
+  setInterval(talvezBuscar, 15000);   /* reserva, se o Worker não nascer */
   document.addEventListener('visibilitychange', function () { if (!document.hidden) buscar(); });
   window.addEventListener('obsSourceVisibleChanged', buscar);
 })();

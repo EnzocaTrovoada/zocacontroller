@@ -120,6 +120,22 @@
     letter-spacing: .04em; text-transform: none;
   }
   .som input[type=checkbox] { accent-color: var(--sinal); width: 16px; height: 16px; flex: none; margin: 0; }
+
+  /* O medidor. Fica logo abaixo do nome do microfone porque é a mesma
+     pergunta: "o que está saindo do meu mic agora". */
+  .medidor {
+    height: 6px; margin-top: 7px; border-radius: 999px;
+    background: rgba(255,255,255,.10); overflow: hidden;
+  }
+  .medidor > i {
+    display: block; height: 100%; width: 0;
+    background: var(--fraco); border-radius: inherit;
+    /* Curtíssima: a barra recebe nível várias vezes por segundo, e uma
+       transição longa faria ela correr atrás do próprio valor. */
+    transition: width .08s linear, background .15s;
+  }
+  .medidor > i.falando { background: var(--sinal); }
+  .medidor > i.mudo { background: var(--perigo); opacity: .5; }
 </style>
 </head>
 <body>
@@ -140,6 +156,7 @@
   <div class="mic" id="cxMic">
     <b id="txMic">—</b>
     <small id="nmMic">—</small>
+    <div class="medidor"><i id="nivelMic"></i></div>
     <div id="vu"><i></i></div>
   </div>
 
@@ -346,7 +363,13 @@ function conectar(senha, porta) {
 
     if (msg.op === 0) {
       clearTimeout(limite);
-      const ident = { rpcVersion: 1, eventSubscriptions: 1 | 4 | 8 | 128 };  // + SceneItems
+      /* 65536 = InputVolumeMeters. Sem ele, o nível do microfone tinha que
+         vir relayado pela fonte do OBS até o servidor e voltar — e o que se
+         via aqui era sempre o som de um segundo atrás.
+
+         Este painel fala com o OBS por um cano direto. Ler o medidor daqui é
+         instantâneo, e é o único caminho que não tem atraso pra ter. */
+      const ident = { rpcVersion: 1, eventSubscriptions: 1 | 4 | 8 | 128 | 65536 };
       if (msg.d.authentication) {
         if (!senha) { el('aviso').textContent = 'Seu OBS pede senha e o campo está vazio.'; return; }
         const s = await sha256b64(senha + msg.d.authentication.salt);
@@ -507,6 +530,21 @@ function evento(tipo, d) {
     if (d.inputName === micNome) { mudo = d.inputMuted; pintar(); }
     return;
   }
+  if (tipo === 'InputVolumeMeters') {
+    for (const inp of (d.inputs || [])) {
+      if (inp.inputName !== micNome) continue;
+      let pico = 0;
+      for (const canal of (inp.inputLevelsMul || [])) {
+        for (const v of canal) if (typeof v === 'number' && v > pico) pico = v;
+      }
+      /* O OBS manda o nível como multiplicador linear, e o ouvido não é
+         linear: sem a raiz, uma fala normal mal move a barra e só grito
+         parece som. */
+      nivelMic = Math.min(1, Math.sqrt(pico));
+      pintarNivel();
+    }
+    return;
+  }
   if (tipo === 'InputCreated' || tipo === 'InputRemoved' || tipo === 'InputNameChanged') carregarMixer();
 }
 
@@ -520,6 +558,23 @@ async function espiar() {
   } catch (e) {}
 }
 setInterval(espiar, 1500);
+
+let nivelMic = 0, nivelEm = 0;
+
+/* A barra desce sozinha quando para de chegar nível: sem isso ela congelaria
+   no último pico e diria "falando" com o microfone já em silêncio. */
+function pintarNivel() {
+  const b = el('nivelMic');
+  if (!b) return;
+  if (Date.now() - nivelEm > 400) nivelMic = Math.max(0, nivelMic - 0.08);
+  nivelEm = Date.now();
+  b.style.width = Math.round(nivelMic * 100) + '%';
+  b.className = mudo ? 'mudo' : (nivelMic > 0.04 ? 'falando' : '');
+}
+setInterval(function () {
+  /* Sem evento novo, decai. O medidor do OBS só manda quando há áudio. */
+  if (Date.now() - nivelEm > 250) { nivelMic = Math.max(0, nivelMic - 0.12); pintarNivel(); }
+}, 120);
 
 function pintar() {
   const cx = el('cxMic');
