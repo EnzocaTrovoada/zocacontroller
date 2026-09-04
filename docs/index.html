@@ -560,6 +560,13 @@ function montaBandejas() {
      inteira na barra do navegador no meio de uma live. */
   const bf = el('bandejaFerramentas');
   bf.innerHTML = '';
+  const cmd = h('button', { type: 'button' }, [
+    document.createTextNode('Comandos'),
+    h('small', { txt: 'O que o chat pode mandar, e criar os seus' }),
+  ]);
+  cmd.onclick = () => { fechaBandejas(null); vaiPara('#/comandos'); };
+  bf.appendChild(cmd);
+
   [
     ['Subathon', 'Quanto cada sub, bit ou doação soma', 'subathon.html'],
     ['Moderadores', 'Criar e revogar o link de cada mod', 'convites.html'],
@@ -877,6 +884,143 @@ function telaControlador() {
   tela.appendChild(fatiaOv);
 }
 
+/* Os quinze que a ponte já sabe fazer. A lista mora aqui só pra explicar —
+   quem executa é a ponte, e é lá que ela é a verdade. */
+const DE_FABRICA = [
+  ['panico',    'mod',   'Corta som e vídeo na hora'],
+  ['voltar',    'dono',  'Desfaz o pânico'],
+  ['mute',      'mod',   'Liga e desliga o microfone'],
+  ['cena',      'mod',   'Troca de cena — !cena Jogo'],
+  ['replay',    'mod',   'Salva os últimos segundos'],
+  ['camera',    'mod',   'Liga e desliga a troca por ausência'],
+  ['som',       'mod',   'Muta uma fonte de áudio — !som Spotify'],
+  ['fonte',     'mod',   'Mostra e esconde uma fonte — !fonte Webcam'],
+  ['aposta',    'mod',   'Abre enquete de pontos — !aposta vou ganhar? sim OR não'],
+  ['fechar',    'mod',   'Fecha as apostas'],
+  ['cancelar',  'mod',   'Cancela e devolve os pontos'],
+  ['ganhou',    'dono',  'Paga a aposta — !ganhou 1'],
+  ['marcar',    'mod',   'Marca um momento pra achar depois'],
+  ['titulo',    'mod',   'Troca o título da live'],
+  ['categoria', 'mod',   'Troca a categoria'],
+];
+
+const IDEIAS = [
+  ['!morte', 'O chat soma no contador de mortes. O contador já existe como overlay — falta o comando somar nele.'],
+  ['!tempo', 'O chat pergunta quanto falta no subathon. A ponte não fala no chat hoje: precisaria de um bot com token.'],
+  ['!clipe', 'Cria um clipe. Funciona, mas o crédito vai pro token que criou, não pra quem pediu — a Twitch não tem campo pra isso.'],
+  ['!luz',   'Muda a cor das luzes. Precisa de um programa rodando no seu PC: o navegador do OBS não alcança aparelho na rede local.'],
+];
+
+function telaComandos() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Comandos' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'O que o seu chat pode mandar pro OBS. Os de fábrica já funcionam; os seus são apelidos com o argumento pronto — "!brb" vira "cena Cenário BRB".' }));
+
+  /* ----- os de fábrica ----- */
+  const fab = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Já funcionam' }),
+    h('p', { cls: 'd', txt: 'Quem pode usar cada um é decidido pela etiqueta que a Twitch manda junto da mensagem — não dá pra fingir ser mod.' }),
+  ]);
+  DE_FABRICA.forEach((c) => {
+    fab.appendChild(h('div', { cls: 'campo' }, [
+      h('code', { txt: '!' + c[0], style: 'flex:0 0 96px;background:var(--fundo);border:1px solid var(--linha);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--verde-forte)' }),
+      h('span', { cls: 'selo', txt: c[1] }),
+      h('label', { style: 'flex:1 1 200px', txt: c[2] }),
+    ]));
+  });
+  tela.appendChild(fab);
+
+  /* ----- os seus ----- */
+  const meus = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Os seus' }),
+    h('p', { cls: 'd', txt: 'Um comando seu não é código novo: é um nome novo pra uma ação que já existe, com o argumento já preenchido. Assim o mod digita "!brb" em vez de lembrar o nome exato da cena.' }),
+  ]);
+  const listaMeus = h('div');
+  meus.appendChild(listaMeus);
+
+  const cNome = h('input', { type: 'text', placeholder: 'brb' });
+  const cAcao = h('select');
+  DE_FABRICA.forEach((c) => cAcao.appendChild(h('option', { value: c[0], txt: c[0] })));
+  const cArg = h('input', { type: 'text', placeholder: 'Cenário BRB' });
+  const cQuem = h('select');
+  [['chat', 'Qualquer um'], ['mod', 'Mods'], ['dono', 'Só eu']].forEach((q) =>
+    cQuem.appendChild(h('option', { value: q[0], txt: q[1] })));
+  cQuem.value = 'mod';
+  const cEspera = h('input', { type: 'number', min: '1', max: '600', value: '5' });
+  let editandoCmd = null;
+
+  const salvar = h('button', { cls: 'bt principal', type: 'button', txt: 'Criar comando' });
+  salvar.onclick = async () => {
+    salvar.disabled = true;
+    try {
+      await api('/comandos.php', { method: 'POST', body: JSON.stringify({
+        acao: 'salvar', id: editandoCmd, nome: cNome.value, destino: cAcao.value,
+        argumento: cArg.value, quem: cQuem.value, espera: parseInt(cEspera.value, 10) || 5,
+      }) });
+      cNome.value = ''; cArg.value = ''; editandoCmd = null;
+      salvar.textContent = 'Criar comando';
+      recado('Pronto. A ponte pega em até 5 minutos, ou na hora se você recarregar a fonte no OBS.', 'bom');
+      pintaMeus();
+    } catch (e) { recado(e.message, 'ruim'); }
+    salvar.disabled = false;
+  };
+
+  meus.append(
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Nome (sem o !)' }), cNome]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Faz o quê' }), cAcao]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Com qual argumento' }), cArg]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Quem pode usar' }), cQuem]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Espera entre usos (s)' }), cEspera]),
+    h('p', { style: 'margin:6px 0 12px' }, [salvar]),
+  );
+  tela.appendChild(meus);
+
+  async function pintaMeus() {
+    listaMeus.innerHTML = '';
+    let d;
+    try { d = await api('/comandos.php'); } catch (e) { recado(e.message, 'ruim'); return; }
+    const lista = d.comandos || [];
+    if (!lista.length) {
+      listaMeus.appendChild(h('div', { cls: 'vazio', txt: 'Nenhum comando seu ainda.' }));
+      return;
+    }
+    lista.forEach((c) => {
+      const ed = h('button', { cls: 'bt mini', type: 'button', txt: 'Editar' });
+      ed.onclick = () => {
+        editandoCmd = c.id; cNome.value = c.nome; cAcao.value = c.acao;
+        cArg.value = c.argumento || ''; cQuem.value = c.quem; cEspera.value = c.espera;
+        salvar.textContent = 'Salvar alterações';
+      };
+      const ap = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'Apagar' });
+      ap.onclick = async () => {
+        if (!confirm('Apagar o !' + c.nome + '?')) return;
+        try { await api('/comandos.php', { method: 'POST', body: JSON.stringify({ acao: 'apagar', id: c.id }) }); pintaMeus(); }
+        catch (e) { recado(e.message, 'ruim'); }
+      };
+      listaMeus.appendChild(h('div', { cls: 'campo' }, [
+        h('code', { txt: '!' + c.nome, style: 'flex:0 0 96px;background:var(--fundo);border:1px solid var(--linha);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--verde-forte)' }),
+        h('label', { txt: c.acao + (c.argumento ? ' ' + c.argumento : '') + ' \u00b7 ' + c.quem + ' \u00b7 ' + c.espera + 's' }),
+        ed, ap,
+      ]));
+    });
+  }
+  pintaMeus();
+
+  /* ----- o que ainda não existe ----- */
+  const ideias = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Ainda não existem' }),
+    h('p', { cls: 'd', txt: 'Ideias que fazem sentido pra este sistema, com o motivo de cada uma ainda não estar de pé. Sem promessa de data.' }),
+  ]);
+  IDEIAS.forEach((i) => {
+    ideias.appendChild(h('div', { cls: 'campo' }, [
+      h('code', { txt: i[0], style: 'flex:0 0 96px;background:var(--fundo);border:1px solid var(--linha);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--apagado)' }),
+      h('label', { style: 'flex:1 1 240px', txt: i[1] }),
+    ]));
+  });
+  tela.appendChild(ideias);
+}
+
 /* ---------------- navegação ---------------- */
 function vaiPara(hash) { if (location.hash === hash) rota(); else location.hash = hash; }
 
@@ -884,6 +1028,7 @@ function rota() {
   recado('');
   const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/');
   if (p[0] === 'meu') return telaControlador();
+  if (p[0] === 'comandos') return telaComandos();
   if (p[0] === 'novo' && TIPOS[p[1]]) return telaEditor(null, p[1]);
   if (p[0] === 'editar') {
     const perfil = perfis.find((x) => String(x.id) === String(p[1]));

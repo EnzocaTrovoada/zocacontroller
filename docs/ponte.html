@@ -1307,12 +1307,59 @@ async function lacoDoRele() {
        */
       await subirEstado(lista.length > 0);
 
+      /* De cinco em cinco minutos relê os comandos do painel. Pega carona
+         neste laço porque ele sobrevive ao OBS esconder a fonte — um
+         setInterval aqui congelaria junto com o resto. */
+      if (Date.now() - comandosEm > 300000) await carregarComandos();
+
     } catch (e) { await dorme(3000); }
   }
 }
 
+/* ------------------------------------------------------------------ *
+ *  Comandos que o dono inventou.
+ *
+ *  Não são código novo: cada um é um apelido pra uma ação que já existe
+ *  aqui em cima, com o argumento já preenchido. "!brb" vira "cena Cenário
+ *  BRB". Por isso a ação vem do registro local e nunca da resposta do
+ *  servidor — se um dia a resposta fosse forjada, o pior que daria pra
+ *  fazer é chamar algo que a ponte já sabia fazer.
+ *
+ *  Os de fábrica não podem ser sobrescritos: !panico é !panico.
+ * ------------------------------------------------------------------ */
+
+let comandosEm = 0;
+
+async function carregarComandos() {
+  if (!cfg.chave) return;
+  comandosEm = Date.now();
+  try {
+    const r = await fetch(cfg.api + '/comandos.php', { headers: { 'X-Chave': cfg.chave } });
+    if (!r.ok) return;
+    const d = await r.json();
+
+    /* Tira os apelidos antigos antes de pôr os novos, senão um comando
+       apagado no painel continuaria valendo até a ponte reiniciar. */
+    for (const k of Object.keys(ACOES)) {
+      if (ACOES[k].apelido) delete ACOES[k];
+    }
+
+    for (const c of (d.comandos || [])) {
+      const base = ACOES[c.acao];
+      if (!base || ACOES[c.nome]) continue;      // nome de fábrica não se troca
+      ACOES[c.nome] = {
+        apelido: true,
+        minimo: c.quem || 'mod',
+        espera: Math.max(1, c.espera || 5) * 1000,
+        fazer: (quem, arg) => base.fazer(quem, c.argumento || arg),
+      };
+    }
+  } catch (e) { /* sem internet: fica com os de fábrica */ }
+}
+
 if (cfg.chave) {
   setInterval(() => subirEstado(), 700);   // olha rápido, envia só quando muda
+  carregarComandos();
   lacoDoRele();
 }
 
