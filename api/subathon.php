@@ -39,6 +39,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     json_saida([
         'configurado' => true,
         'ligado'      => (bool) $c['ligado'],
+        'perfil_id'   => $c['perfil_id'] ?? null,
         'slug'        => $c['slug'],
         'regras'      => array_map('intval', array_intersect_key($c, array_flip(CAMPOS))),
         'eventos'     => $st->fetchAll(),
@@ -73,11 +74,30 @@ if (($d['acao'] ?? '') === 'somar') {
 // ---------- configurar ----------
 $quem = exige_painel();
 
+/*
+ * DOIS JEITOS DE APONTAR O CRONOMETRO.
+ *
+ * O novo: perfil_id, um overlay de subathon desta conta. A pessoa escolhe
+ * numa lista e pronto.
+ *
+ * O velho: slug + codigo de dono do site do relogio, copiados na mao. Fica
+ * aceito porque quem ja configurou nao pode perder o subathon no meio de uma
+ * live so porque eu mudei de ideia.
+ */
+$perfil_id = (int) ($d['perfil_id'] ?? 0);
 $slug  = preg_replace('/[^a-z0-9-]/', '', strtolower(trim((string) ($d['slug'] ?? ''))));
 $token = trim((string) ($d['token'] ?? ''));
 
-if ($slug === '' || $token === '') {
-    json_saida(['erro' => 'Cole o link do subathon e o código de dono dele.'], 400);
+if ($perfil_id > 0) {
+    $st = db()->prepare("SELECT id FROM perfis WHERE id = ? AND usuario_id = ? AND tipo = 'subathon'");
+    $st->execute([$perfil_id, $quem['usuario_id']]);
+    if (!$st->fetchColumn()) {
+        json_saida(['erro' => 'Esse overlay de subathon não é seu, ou não existe mais.'], 400);
+    }
+    $slug = null;
+    $token = null;
+} elseif ($slug === '' || $token === '') {
+    json_saida(['erro' => 'Escolha qual overlay de subathon o tempo vai alimentar.'], 400);
 }
 
 $valores = [];
@@ -86,15 +106,16 @@ foreach (CAMPOS as $campo) {
 }
 
 db()->prepare(
-    'INSERT INTO subathon (usuario_id, slug, token, ligado, seg_sub1, seg_sub2, seg_sub3,
+    'INSERT INTO subathon (usuario_id, perfil_id, slug, token, ligado, seg_sub1, seg_sub2, seg_sub3,
                            seg_bits, seg_follow, seg_real, teto_evento)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE slug = VALUES(slug), token = VALUES(token), ligado = VALUES(ligado),
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE perfil_id = VALUES(perfil_id),
+          slug = VALUES(slug), token = VALUES(token), ligado = VALUES(ligado),
           seg_sub1 = VALUES(seg_sub1), seg_sub2 = VALUES(seg_sub2), seg_sub3 = VALUES(seg_sub3),
           seg_bits = VALUES(seg_bits), seg_follow = VALUES(seg_follow), seg_real = VALUES(seg_real),
           teto_evento = VALUES(teto_evento)'
 )->execute([
-    $quem['usuario_id'], $slug, $token, empty($d['desligar']) ? 1 : 0,
+    $quem['usuario_id'], $perfil_id ?: null, $slug, $token, empty($d['desligar']) ? 1 : 0,
     $valores['seg_sub1'], $valores['seg_sub2'], $valores['seg_sub3'],
     $valores['seg_bits'], $valores['seg_follow'], $valores['seg_real'],
     $valores['teto_evento'] ?: 7200,
@@ -105,6 +126,7 @@ db()->prepare(
    a configuração já está salva, e o overlay pega na próxima. */
 $aviso = null;
 $pub = subathon_publica_valores([
+    'usuario_id' => $quem['usuario_id'], 'perfil_id' => $perfil_id ?: null,
     'slug' => $slug, 'token' => $token,
     'seg_sub1' => $valores['seg_sub1'], 'seg_sub2' => $valores['seg_sub2'],
     'seg_sub3' => $valores['seg_sub3'], 'seg_bits' => $valores['seg_bits'],

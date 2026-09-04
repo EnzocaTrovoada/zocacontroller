@@ -93,9 +93,16 @@ function rl_salvar_estilo(string $slug, string $token, array $estilo, bool $mexe
  */
 function subathon_publica_valores(array $c): array
 {
-    $erro = null;
-    $estilo = rl_ler_estilo($c['slug'], $erro);
-    if ($estilo === null) return ['ok' => false, 'erro' => $erro, 'transitorio' => true];
+    $daqui = !empty($c['perfil_id']);
+
+    if ($daqui) {
+        $estilo = perfil_estilo((int) $c['perfil_id'], (int) $c['usuario_id']);
+        if ($estilo === null) return ['ok' => false, 'erro' => 'Overlay nao encontrado.'];
+    } else {
+        $erro = null;
+        $estilo = rl_ler_estilo((string) $c['slug'], $erro);
+        if ($estilo === null) return ['ok' => false, 'erro' => $erro, 'transitorio' => true];
+    }
 
     $estilo['vsub1']   = (int) $c['seg_sub1'];
     $estilo['vsub2']   = (int) $c['seg_sub2'];
@@ -104,14 +111,50 @@ function subathon_publica_valores(array $c): array
     $estilo['vfollow'] = (int) $c['seg_follow'];
     $estilo['vreal']   = (int) $c['seg_real'];
 
-    return rl_salvar_estilo($c['slug'], $c['token'], $estilo, false);
+    if ($daqui) {
+        perfil_grava_estilo((int) $c['perfil_id'], (int) $c['usuario_id'], $estilo);
+        return ['ok' => true];
+    }
+    return rl_salvar_estilo((string) $c['slug'], (string) $c['token'], $estilo, false);
+}
+
+/**
+ * Le e regrava o estilo de um overlay DAQUI.
+ *
+ * E o caminho novo: sem curl, sem codigo de dono na mao da pessoa, e sem o
+ * limite por IP do outro servidor — que dava 40 gravacoes por minuto para
+ * todos os streamers somados.
+ */
+function perfil_estilo(int $perfil_id, int $usuario_id): ?array
+{
+    $st = db()->prepare('SELECT config FROM perfis WHERE id = ? AND usuario_id = ?');
+    $st->execute([$perfil_id, $usuario_id]);
+    $cru = $st->fetchColumn();
+    if ($cru === false) return null;
+    $d = json_decode((string) $cru, true);
+    return is_array($d) ? $d : [];
+}
+
+function perfil_grava_estilo(int $perfil_id, int $usuario_id, array $estilo): void
+{
+    db()->prepare('UPDATE perfis SET config = ? WHERE id = ? AND usuario_id = ?')
+        ->execute([json_encode($estilo, JSON_UNESCAPED_UNICODE), $perfil_id, $usuario_id]);
 }
 
 function subathon_gravar(array $c, int $segundos): array
 {
-    $erro = null;
-    $estilo = rl_ler_estilo($c['slug'], $erro);
-    if ($estilo === null) return ['ok' => false, 'erro' => $erro, 'transitorio' => true];
+    $daqui = !empty($c['perfil_id']);
+
+    if ($daqui) {
+        $estilo = perfil_estilo((int) $c['perfil_id'], (int) $c['usuario_id']);
+        if ($estilo === null) {
+            return ['ok' => false, 'erro' => 'O overlay do subathon nao existe mais. Escolha outro no painel.'];
+        }
+    } else {
+        $erro = null;
+        $estilo = rl_ler_estilo((string) $c['slug'], $erro);
+        if ($estilo === null) return ['ok' => false, 'erro' => $erro, 'transitorio' => true];
+    }
 
     $agora = time();
     if (($estilo['modo'] ?? 'pausado') === 'rodando') {
@@ -125,9 +168,15 @@ function subathon_gravar(array $c, int $segundos): array
         $restante = $estilo['restante'];
     }
 
-    /* true: esta é a única gravação que PODE mexer no tempo. */
-    $r = rl_salvar_estilo($c['slug'], $c['token'], $estilo, true);
-    if (empty($r['ok'])) return $r;
+    if ($daqui) {
+        /* Aqui nao existe a protecao de "so grava o tempo com tempo:1": a
+           config e nossa e ninguem escreve nela por fora. */
+        perfil_grava_estilo((int) $c['perfil_id'], (int) $c['usuario_id'], $estilo);
+    } else {
+        /* true: esta é a única gravação que PODE mexer no tempo. */
+        $r = rl_salvar_estilo((string) $c['slug'], (string) $c['token'], $estilo, true);
+        if (empty($r['ok'])) return $r;
+    }
 
     return ['ok' => true, 'restante' => $restante];
 }

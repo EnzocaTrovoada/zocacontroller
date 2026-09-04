@@ -578,10 +578,23 @@ function montaBandejas() {
   cmd.onclick = () => { fechaBandejas(null); vaiPara('#/comandos'); };
   bf.appendChild(cmd);
 
+  /* Estas duas moram aqui dentro agora. */
   [
-    ['Subathon', 'Quanto cada sub, bit ou doação soma', 'subathon.html'],
-    ['Moderadores', 'Criar e revogar o link de cada mod', 'convites.html'],
-    ['Fonte do OBS', 'O que liga o seu chat no OBS', 'criar.html'],
+    ['Subathon', 'Quanto cada sub, bit ou doação soma', '#/subathon'],
+    ['Moderadores', 'Criar e revogar o link de cada mod', '#/mods'],
+  ].forEach(([n, txt, rota]) => {
+    const b = h('button', { type: 'button' }, [document.createTextNode(n), h('small', { txt })]);
+    b.onclick = () => { fechaBandejas(null); vaiPara(rota); };
+    bf.appendChild(b);
+  });
+
+  bf.appendChild(h('hr'));
+
+  /* Estas duas ainda são páginas separadas. O gerador lê as suas cenas
+     falando com o OBS, e o painel é feito pra viver DENTRO do OBS — os dois
+     precisam de um cuidado que eu não quis fazer às pressas. */
+  [
+    ['Fonte do OBS', 'Montar o endereço que liga o chat', 'criar.html'],
     ['Painel', 'A janelinha de controle dentro do OBS', 'painel.html'],
   ].forEach(([n, txt, url]) => {
     bf.appendChild(h('a', { href: url }, [document.createTextNode(n), h('small', { txt })]));
@@ -1078,6 +1091,252 @@ window.addEventListener('message', (e) => {
   }
 });
 
+
+/* ==================================================================
+   SUBATHON
+
+   Quanto cada coisa soma no cronometro. Em MINUTOS na tela e segundos no
+   servidor: ninguem pensa "300 segundos por sub", pensa "5 minutos".
+   ================================================================== */
+const REGRAS = [
+  { k: 'seg_sub1',   nome: 'Sub',        obs: 'e Prime também',    padrao: 300 },
+  { k: 'seg_sub2',   nome: 'Sub tier 2', obs: '',                  padrao: 600 },
+  { k: 'seg_sub3',   nome: 'Sub tier 3', obs: '',                  padrao: 1500 },
+  { k: 'seg_bits',   nome: 'Bits',       obs: 'a cada 100 bits',   padrao: 30 },
+  { k: 'seg_real',   nome: 'Doação',     obs: 'por R$ 1 no LivePix', padrao: 60 },
+  { k: 'seg_follow', nome: 'Follow',     obs: 'precisa ligar o aviso abaixo', padrao: 0 },
+];
+
+const paraMin = (seg) => Math.round((seg / 60) * 100) / 100;
+const paraSeg = (min) => Math.round(parseFloat(String(min).replace(',', '.')) * 60) || 0;
+
+async function telaSubathon() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Subathon' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Quanto cada sub, bit ou doação estica a sua live. Sub e bits chegam pelo chat sozinhos; follow e doação precisam de um passo a mais, logo abaixo.' }));
+
+  let d = {};
+  try { d = await api('/subathon.php'); } catch (e) { /* ainda não configurado */ }
+  const regras = d.regras || {};
+
+  /* ----- qual cronômetro ----- */
+  const cronos = perfis.filter((p) => p.tipo === 'subathon');
+  const fatiaAlvo = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Qual cronômetro' }),
+    h('p', { cls: 'd', txt: 'O tempo entra no overlay que você escolher aqui. Antes era preciso copiar um código do outro site — agora é só apontar.' }),
+  ]);
+
+  const selAlvo = h('select', { style: 'width:100%' });
+  if (!cronos.length) {
+    fatiaAlvo.appendChild(h('div', { cls: 'vazio', txt: 'Você ainda não tem um overlay de subathon.' }));
+    const criar = h('button', { cls: 'bt principal', type: 'button', txt: '+ Criar cronômetro de subathon' });
+    criar.onclick = () => vaiPara('#/novo/subathon');
+    fatiaAlvo.appendChild(h('p', { style: 'margin:10px 0 0' }, [criar]));
+  } else {
+    cronos.forEach((c) => {
+      const o = h('option', { value: String(c.id), txt: c.nome || 'Sem nome' });
+      if (String(d.perfil_id) === String(c.id)) o.selected = true;
+      selAlvo.appendChild(o);
+    });
+    fatiaAlvo.appendChild(h('div', { cls: 'campo' }, [h('label', { txt: 'Cronômetro' }), selAlvo]));
+    if (!d.perfil_id && d.slug) {
+      fatiaAlvo.appendChild(h('p', { cls: 'aviso', txt: 'Hoje isto aponta pro cronômetro ' + d.slug + ', lá no site do relógio. Ao salvar, passa a apontar pro overlay escolhido acima.' }));
+    }
+  }
+  tela.appendChild(fatiaAlvo);
+
+  /* ----- as regras ----- */
+  const fatiaRegras = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Quanto cada coisa soma' }),
+    h('p', { cls: 'd', txt: 'Em minutos. Deixe em 0 o que você não quiser contar — some da conta e da legenda do overlay.' }),
+  ]);
+  const entradas = {};
+  REGRAS.concat([{ k: 'teto_evento', nome: 'Teto por evento', obs: 'um cheer gigante não vira dois dias de live', padrao: 7200 }])
+    .forEach((r) => {
+      const inp = h('input', { type: 'text', inputmode: 'decimal' });
+      inp.value = paraMin(regras[r.k] !== undefined ? regras[r.k] : r.padrao);
+      entradas[r.k] = inp;
+      const estado = h('span', { style: 'flex:0 0 62px;font-size:11.5px;text-align:right' });
+      const pinta = () => {
+        const off = paraSeg(inp.value) <= 0;
+        estado.textContent = off ? 'não soma' : 'valendo';
+        estado.style.color = off ? 'var(--apagado)' : 'var(--verde-forte)';
+      };
+      inp.oninput = pinta; pinta();
+      fatiaRegras.appendChild(h('div', { cls: 'campo' }, [
+        h('label', { txt: r.nome + (r.obs ? ' — ' + r.obs : '') }), inp,
+        h('span', { style: 'flex:0 0 26px;font-size:12px;color:var(--apagado)', txt: 'min' }),
+        estado,
+      ]));
+    });
+  tela.appendChild(fatiaRegras);
+
+  /* ----- follow ----- */
+  const fatiaFollow = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Aviso de follow' }),
+    h('p', { cls: 'd', txt: 'Sub e bits a gente lê do chat. Follow a Twitch só conta se a gente pedir — é um clique, uma vez só.' }),
+  ]);
+  const estFollow = h('span', { style: 'flex:1;font-size:13px;color:var(--apagado)', txt: 'conferindo…' });
+  const btFollow = h('button', { cls: 'bt', type: 'button', txt: 'Ligar o aviso de follow' });
+  btFollow.onclick = async () => {
+    btFollow.disabled = true;
+    try {
+      const r = await api('/eventsub.php', { method: 'POST', body: '{}' });
+      if (r.erros && r.erros.length) recado(r.erros[0], 'ruim');
+      else recado('Pronto. A partir de agora follow também soma.', 'bom');
+    } catch (e) { recado(e.message, 'ruim'); }
+    veFollow();
+  };
+  async function veFollow() {
+    try {
+      const r = await api('/eventsub.php');
+      const on = (r.assinaturas || []).some((a) => a.tipo === 'channel.follow' && a.estado !== 'revoked');
+      if (r.falta_escopo) {
+        estFollow.textContent = 'falta permissão — entre de novo com a Twitch';
+        btFollow.disabled = true;
+      } else {
+        estFollow.textContent = on ? 'ligado' : 'desligado';
+        estFollow.style.color = on ? 'var(--verde-forte)' : 'var(--apagado)';
+        btFollow.disabled = on;
+        if (on) btFollow.textContent = 'Já está ligado';
+      }
+    } catch (e) { estFollow.textContent = 'não consegui conferir'; }
+  }
+  fatiaFollow.appendChild(h('div', { cls: 'campo' }, [estFollow, btFollow]));
+  tela.appendChild(fatiaFollow);
+  veFollow();
+
+  /* ----- salvar ----- */
+  const btSalvar = h('button', { cls: 'bt principal', type: 'button', txt: 'Salvar' });
+  const btLigar = h('button', { cls: 'bt', type: 'button', txt: (d.ligado === false) ? 'Ligar' : 'Desligar' });
+  let ligado = d.ligado !== false;
+
+  async function grava(trocaLigado) {
+    if (trocaLigado) ligado = !ligado;
+    const corpo = {};
+    Object.keys(entradas).forEach((k) => { corpo[k] = paraSeg(entradas[k].value); });
+    if (!corpo.teto_evento) corpo.teto_evento = 7200;
+    if (cronos.length) corpo.perfil_id = parseInt(selAlvo.value, 10);
+    else if (d.slug) { corpo.slug = d.slug; corpo.token = d.token || ''; }
+    if (!ligado) corpo.desligar = 1;
+
+    btSalvar.disabled = true;
+    try {
+      const r = await api('/subathon.php', { method: 'POST', body: JSON.stringify(corpo) });
+      btLigar.textContent = ligado ? 'Desligar' : 'Ligar';
+      recado(r.aviso || (ligado ? 'Salvo. O subathon já está contando sozinho.' : 'Salvo, e desligado — nada vai somar.'),
+             r.aviso ? 'ruim' : 'bom');
+    } catch (e) { recado(e.message, 'ruim'); }
+    btSalvar.disabled = false;
+  }
+  btSalvar.onclick = () => grava(false);
+  btLigar.onclick = () => grava(true);
+  tela.appendChild(h('p', { style: 'display:flex;gap:8px;margin-top:14px' }, [btSalvar, btLigar]));
+}
+
+/* ==================================================================
+   MODERADORES
+   ================================================================== */
+async function telaMods() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Quem pode mexer' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Cada moderador ganha um link só dele. Assim você tira o acesso de uma pessoa sem derrubar o de todo mundo.' }));
+
+  /* ----- criar ----- */
+  const nome = h('input', { type: 'text', placeholder: 'nome do moderador', maxlength: '64' });
+  const pCena = h('input', { type: 'checkbox' }); pCena.checked = true;
+  const pAudio = h('input', { type: 'checkbox' }); pAudio.checked = true;
+  const pCanal = h('input', { type: 'checkbox' });
+  const caixa = (inp, txt) => h('label', { cls: 'campo', style: 'cursor:pointer' }, [inp, h('span', { style: 'font-size:13px', txt })]);
+
+  const btCriar = h('button', { cls: 'bt principal', type: 'button', txt: 'Criar link' });
+  const saida = h('div', { cls: 'escondido' });
+
+  const fatiaNovo = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Novo convite' }),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Nome' }), nome]),
+    caixa(pCena, 'Trocar cena e fontes'),
+    caixa(pAudio, 'Mutar áudio e pânico'),
+    caixa(pCanal, 'Mudar título e categoria'),
+    h('p', { style: 'margin:10px 0 0' }, [btCriar]),
+    saida,
+  ]);
+  tela.appendChild(fatiaNovo);
+
+  btCriar.onclick = async () => {
+    if (!nome.value.trim()) { recado('Escreva o nome do moderador.', 'ruim'); return; }
+    btCriar.disabled = true;
+    try {
+      const r = await api('/convite.php', { method: 'POST', body: JSON.stringify({
+        nome: nome.value.trim(),
+        pode: { cena: pCena.checked, audio: pAudio.checked, canal: pCanal.checked },
+      }) });
+      saida.innerHTML = '';
+      saida.classList.remove('escondido');
+      saida.append(
+        h('p', { style: 'margin:14px 0 6px;font-size:13px;color:var(--fraco)', txt: 'Link de ' + nome.value.trim() + ' — mande pra essa pessoa:' }),
+        segredo(r.link, null),
+        h('p', { cls: 'aviso', txt: 'Copie agora. Este link não aparece de novo: se perder, revogue e crie outro.' }),
+      );
+      nome.value = '';
+      recado('');
+      lista();
+    } catch (e) { recado(e.message, 'ruim'); }
+    btCriar.disabled = false;
+  };
+
+  /* ----- quem tem acesso ----- */
+  const fatiaLista = h('div', { cls: 'fatia' }, [h('h3', { txt: 'Com acesso' })]);
+  const cx = h('div');
+  fatiaLista.appendChild(cx);
+  tela.appendChild(fatiaLista);
+
+  /* "usou há 4 dias" diz mais do que uma data. E "nunca abriu" é o que revela
+     que você mandou o link e a pessoa perdeu. */
+  function comoEsta(c) {
+    if (c.revogado) return ['revogado', 'var(--apagado)'];
+    if (c.usado_ha === null || c.usado_ha === undefined) return ['nunca abriu', 'var(--perigo)'];
+    const dias = Math.floor(c.usado_ha / 86400);
+    if (dias <= 0) return ['usou hoje', 'var(--verde-forte)'];
+    if (dias === 1) return ['usou ontem', 'var(--verde-forte)'];
+    if (dias < 14) return ['há ' + dias + ' dias', 'var(--apagado)'];
+    return ['parado há ' + dias + ' dias', 'var(--perigo)'];
+  }
+
+  async function lista() {
+    cx.innerHTML = '';
+    let d;
+    try { d = await api('/convite.php'); } catch (e) { recado(e.message, 'ruim'); return; }
+    const cs = d.convites || [];
+    if (!cs.length) { cx.appendChild(h('div', { cls: 'vazio', txt: 'Ninguém ainda. Crie o primeiro link aí em cima.' })); return; }
+
+    cs.forEach((c) => {
+      const [txt, cor] = comoEsta(c);
+      const poderes = ['cena', 'audio', 'canal'].filter((k) => c.pode[k]).join(', ') || 'nenhum poder';
+      const linha = h('div', { cls: 'campo', style: c.revogado ? 'opacity:.5' : '' }, [
+        h('label', { style: 'flex:1 1 160px' }, [
+          h('b', { style: 'display:block;font:600 15px var(--disp);color:var(--tinta)', txt: c.nome }),
+          h('span', { style: 'font-size:12px', txt: poderes }),
+        ]),
+        h('span', { style: 'flex:0 0 auto;font-size:12px;color:' + cor, txt }),
+      ]);
+      if (!c.revogado) {
+        const bt = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'Revogar' });
+        bt.onclick = async () => {
+          if (!confirm('Tirar o acesso de ' + c.nome + '?\n\nO link dele para de funcionar na hora, e isso não tem volta: pra devolver o acesso você cria um link novo.')) return;
+          try { await api('/convite.php', { method: 'POST', body: JSON.stringify({ revogar: c.id }) }); recado('Acesso de ' + c.nome + ' removido.', 'bom'); lista(); }
+          catch (e) { recado(e.message, 'ruim'); }
+        };
+        linha.appendChild(bt);
+      }
+      cx.appendChild(linha);
+    });
+  }
+  lista();
+}
+
 /* ---------------- navegação ---------------- */
 function vaiPara(hash) { if (location.hash === hash) rota(); else location.hash = hash; }
 
@@ -1086,6 +1345,8 @@ function rota() {
   const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/');
   if (p[0] === 'meu') return telaControlador();
   if (p[0] === 'comandos') return telaComandos();
+  if (p[0] === 'subathon') return telaSubathon();
+  if (p[0] === 'mods') return telaMods();
   if (p[0] === 'novo' && TIPOS[p[1]]) return telaEditor(null, p[1]);
   if (p[0] === 'editar') {
     const perfil = perfis.find((x) => String(x.id) === String(p[1]));
