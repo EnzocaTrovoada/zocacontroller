@@ -7,25 +7,25 @@
   :root { color-scheme: dark; }
   body {
     margin: 0; padding: 28px;
-    background: #101A20; color: #DCE6EA;
+    background: #101A20; color: #E4EDE7;
     font: 14px/1.6 "IBM Plex Mono", ui-monospace, Consolas, monospace;
   }
   h1 { font-size: 17px; margin: 0 0 4px; letter-spacing: .04em; }
-  .sub { color: #6D8290; margin: 0 0 22px; font-size: 12.5px; }
+  .sub { color: #71857A; margin: 0 0 22px; font-size: 12.5px; }
   .linha { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid #22303A; align-items: baseline; }
   .marca { width: 18px; flex: none; font-weight: 700; }
-  .ok   { color: #45B8BF; }
+  .ok   { color: #3DD47F; }
   .ruim { color: #E4735A; }
   .indo { color: #D3A244; }
-  .det  { color: #6D8290; margin-left: auto; text-align: right; font-size: 12px; max-width: 55%; word-break: break-word; }
+  .det  { color: #71857A; margin-left: auto; text-align: right; font-size: 12px; max-width: 55%; word-break: break-word; }
   form { display: flex; gap: 8px; margin: 0 0 22px; flex-wrap: wrap; }
   input, button {
-    font: inherit; background: #17222A; color: #DCE6EA;
-    border: 1px solid #2C3B45; padding: 8px 12px; border-radius: 2px;
+    font: inherit; background: #161F1A; color: #E4EDE7;
+    border: 1px solid #2A3830; padding: 8px 12px; border-radius: 2px;
   }
-  button { background: #17383C; border-color: #45B8BF; color: #45B8BF; cursor: pointer; }
+  button { background: #14301F; border-color: #3DD47F; color: #3DD47F; cursor: pointer; }
   button:hover { background: #1d474c; }
-  #veredito { margin-top: 24px; padding: 16px 18px; border-left: 3px solid #2C3B45; background: #17222A; font-size: 13px; }
+  #veredito { margin-top: 24px; padding: 16px 18px; border-left: 3px solid #2A3830; background: #161F1A; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -243,7 +243,7 @@ function testar(senha, porta) {
 }
 
 function concluir(bom, texto) {
-  veredito.style.borderLeftColor = bom ? '#45B8BF' : '#E4735A';
+  veredito.style.borderLeftColor = bom ? '#3DD47F' : '#E4735A';
   veredito.textContent = texto;
 }
 

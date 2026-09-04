@@ -275,7 +275,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=3"></script>
+<script src="clock.js?v=4"></script>
 <script>
 'use strict';
 
@@ -344,6 +344,7 @@ const TIPOS = {
   contador: { nome: 'Contador', txt: 'Mortes, vitórias, o que for' },
   placar:   { nome: 'Placar',   txt: 'Dois números, um contra o outro' },
   chat:     { nome: 'Chat',     txt: 'As mensagens do seu chat na tela' },
+  feed:     { nome: 'Feed',     txt: 'Último sub, último follow, quem doou' },
 };
 
 /* Padrões que já nascem bonitos. Um leigo não quer escolher opacidade de
@@ -366,6 +367,17 @@ function padraoDe(tipo) {
     return Object.assign(base, {
       modo: 'pausado', restante: 3600, horas: 1, fimtxt: 'ACABOU', titulo: 'SUBATHON',
       sanim: 'subir', spopc: '#7CE07C', spopt: 55, spulso: 1, surg: 5, surgc: '#FF4D4D', leg: 1,
+    });
+  }
+  if (tipo === 'feed') {
+    return Object.assign(base, {
+      titulo: '', font: 'Archivo', size: 20, weight: 600, color: '#FFFFFF',
+      sw: 0, glow: 0, shx: 0, shy: 2, shb: 6, sho: 70, shc: '#000000',
+      cmax: 5, cdir: 'baixo', clarg: 380, cgap: 8,
+      cnick: 1, cnickpos: 'linha', cnicksize: 100, csep: ' ',
+      cbolha: 0, cbcor: '#000000', cbopac: 45, cbraio: 10, cbpad: 8,
+      c3d: 0, c3dang: 18, c3dprof: 600, cgirar: 0,
+      fcor: verde, fseg: 1, fsub: 1, fbits: 1, freal: 1,
     });
   }
   if (tipo === 'chat') {
@@ -421,6 +433,20 @@ const GRUPOS = [
     { k: '_tempo', l: 'Tempo', c: 'tempo', se: so('subathon') },
   ] },
 
+  { t: 'O feed', aberto: true, se: so('feed'), itens: [
+    { k: 'cmax',  l: 'Quantos eventos', c: 'faixa', min: 1, max: 20 },
+    { k: 'cdir',  l: 'O mais novo entra', c: 'lista',
+      ops: [['baixo', 'Por baixo'], ['cima', 'Por cima']] },
+    { k: 'clarg', l: 'Largura da caixa', c: 'faixa', min: 120, max: 1600, u: 'px' },
+    { k: 'cgap',  l: 'Espaço entre eles', c: 'faixa', min: 0, max: 60, u: 'px' },
+    { k: 'fcor',  l: 'Cor do nome', c: 'cor' },
+    { k: 'fsub',  l: 'Mostrar subs', c: 'chave',
+      dica: 'pacote de presentes vira uma linha só, com a conta' },
+    { k: 'fseg',  l: 'Mostrar follows', c: 'chave' },
+    { k: 'fbits', l: 'Mostrar bits', c: 'chave' },
+    { k: 'freal', l: 'Mostrar doações', c: 'chave' },
+  ] },
+
   { t: 'O chat', aberto: true, se: so('chat'), itens: [
     { k: 'canal', l: 'Canal da Twitch', c: 'texto',
       dica: 'o nome do canal, sem @ e sem o link. Lê sem login e sem bot.' },
@@ -446,7 +472,7 @@ const GRUPOS = [
     { k: 'cnicksize', l: 'Tamanho do nome', c: 'faixa', min: 30, max: 200, u: '%', se: (c) => !!c.cnick },
   ] },
 
-  { t: 'Balão atrás da mensagem', se: so('chat'), itens: [
+  { t: 'Balão atrás da mensagem', se: so('chat', 'feed'), itens: [
     { k: 'cbolha', l: 'Mostrar balão', c: 'chave' },
     { k: 'cbcor',  l: 'Cor', c: 'cor', se: (c) => !!c.cbolha },
     { k: 'cbopac', l: 'Opacidade', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => !!c.cbolha },
@@ -454,7 +480,7 @@ const GRUPOS = [
     { k: 'cbpad',  l: 'Respiro', c: 'faixa', min: 0, max: 40, u: 'px', se: (c) => !!c.cbolha },
   ] },
 
-  { t: 'Perspectiva', se: so('chat'), itens: [
+  { t: 'Perspectiva', se: so('chat', 'feed'), itens: [
     { k: 'c3d',    l: 'Inclinar em 3D', c: 'chave',
       dica: 'o efeito de Star Wars: a lista deita pra trás e foge no horizonte' },
     { k: 'c3dang', l: 'Inclinação', c: 'faixa', min: -60, max: 60, u: '°', se: (c) => !!c.c3d },
@@ -656,7 +682,7 @@ function manda() {
   try { quadro.contentWindow.postMessage({ type: 'zc:config', config: cfg }, location.origin); } catch (e) {}
   /* Trocar de tipo remonta o desenhista e esvazia a lista. Repovoo depois de
      um respiro, e so uma vez por rajada de ajustes. */
-  if (cfg.tipo === 'chat') {
+  if (cfg.tipo === 'chat' || cfg.tipo === 'feed') {
     clearTimeout(exemploPendente);
     exemploPendente = setTimeout(() => {
       try { quadro.contentWindow.postMessage({ type: 'zc:exemplo' }, location.origin); } catch (e) {}
@@ -711,6 +737,13 @@ function montaBandejas() {
      inteira na barra do navegador no meio de uma live. */
   const bf = el('bandejaFerramentas');
   bf.innerHTML = '';
+  const tut = h('button', { type: 'button' }, [
+    document.createTextNode('Como instalar'),
+    h('small', { txt: 'O passo a passo no OBS' }),
+  ]);
+  tut.onclick = () => { fechaBandejas(null); vaiPara('#/tutorial'); };
+  bf.appendChild(tut);
+
   const cmd = h('button', { type: 'button' }, [
     document.createTextNode('Comandos'),
     h('small', { txt: 'O que o seu chat pode mandar, e criar os seus' }),
@@ -927,7 +960,7 @@ function telaEditor(perfil, tipoNovo) {
       quadro.contentWindow.postMessage({ type: 'zc:editar', on: true }, location.origin);
       /* O chat so tem o que mostrar quando alguem fala. No editor isso
          significaria uma tela vazia, entao peco frases de mentira. */
-      if (cfg.tipo === 'chat') quadro.contentWindow.postMessage({ type: 'zc:exemplo' }, location.origin);
+      if (cfg.tipo === 'chat' || cfg.tipo === 'feed') quadro.contentWindow.postMessage({ type: 'zc:exemplo' }, location.origin);
     } catch (e) {}
   };
 
@@ -1373,6 +1406,27 @@ async function telaSubathon() {
     });
   tela.appendChild(fatiaRegras);
 
+  /* ----- meta de viewers ----- */
+  const vAlvo = h('input', { type: 'number', min: '0' });
+  const vSeg = h('input', { type: 'number', min: '0' });
+  const vPasso = h('input', { type: 'number', min: '0' });
+  vAlvo.value = d.viewers_alvo || 0;
+  vSeg.value = Math.round((d.viewers_seg || 0) / 60 * 100) / 100;
+  vPasso.value = d.viewers_passo || 0;
+
+  const fatiaViewers = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Meta de gente assistindo' }),
+    h('p', { cls: 'd', txt: 'Bateu o número de espectadores, soma tempo — e o alvo sobe sozinho pro próximo. Deixe o alvo em 0 pra desligar.' }),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Bater em' }), vAlvo,
+      h('span', { style: 'flex:0 0 60px;font-size:12px;color:var(--apagado)', txt: 'pessoas' })]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Soma' }), vSeg,
+      h('span', { style: 'flex:0 0 60px;font-size:12px;color:var(--apagado)', txt: 'min' })]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'E o próximo alvo sobe' }), vPasso,
+      h('span', { style: 'flex:0 0 60px;font-size:12px;color:var(--apagado)', txt: 'pessoas' })]),
+    h('p', { cls: 'aviso', txt: 'A conta é conferida quando um overlay de meta de viewers está no ar — é ele que pergunta pra Twitch quantos estão assistindo. Sem esse overlay, a meta não dispara.' }),
+  ]);
+  tela.appendChild(fatiaViewers);
+
   /* ----- follow ----- */
   const fatiaFollow = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Aviso de follow' }),
@@ -1418,6 +1472,9 @@ async function telaSubathon() {
     const corpo = {};
     Object.keys(entradas).forEach((k) => { corpo[k] = paraSeg(entradas[k].value); });
     if (!corpo.teto_evento) corpo.teto_evento = 7200;
+    corpo.viewers_alvo = Math.max(0, parseInt(vAlvo.value, 10) || 0);
+    corpo.viewers_seg = paraSeg(vSeg.value);
+    corpo.viewers_passo = Math.max(0, parseInt(vPasso.value, 10) || 0);
     if (cronos.length) corpo.perfil_id = parseInt(selAlvo.value, 10);
     else if (d.slug) { corpo.slug = d.slug; corpo.token = d.token || ''; }
     if (!ligado) corpo.desligar = 1;
@@ -1558,6 +1615,65 @@ async function telaMods() {
   lista();
 }
 
+const PASSOS_OBS = [
+  ['Entre com a Twitch', 'Você já fez isso — é o que trouxe você até aqui. Essa permissão é a única do sistema inteiro.'],
+  ['Crie um overlay', 'Em Overlays, escolha o que quer: meta, subathon, relógio, chat, feed. Ajuste na hora e clique em criar.'],
+  ['Copie o link do overlay', 'No cartão dele, "Copiar link". Esse link não carrega a sua chave — pode aparecer na tela sem risco.'],
+  ['No OBS: Fontes → + → Navegador', 'Dê um nome, cole o link no campo URL, e ponha a largura e a altura que o editor sugeriu embaixo da prévia.'],
+  ['DESMARQUE "Desligar a fonte quando não estiver visível"', 'É o passo que mais dá problema. Marcado, o overlay morre toda vez que você troca de cena e volta zerado.'],
+  ['Pronto: nunca mais mexa nessa fonte', 'O que você editar aqui aparece na live em até 15 segundos, sozinho. O link é fixo.'],
+];
+
+const PASSOS_CHAT = [
+  ['Monte o endereço da fonte do OBS', 'Em Ferramentas → Fonte do OBS. Ela lê as suas cenas conversando com o OBS, então deixe o OBS aberto.'],
+  ['Ligue o servidor do OBS', 'No OBS: Ferramentas → Configurações do WebSocket → marque "Ativar servidor". É por aí que o chat fala com ele.'],
+  ['Cole o endereço numa Fonte de Navegador', 'Igual à de cima, mas essa não aparece na live: pode deixar 100 por 100 e escondida num canto.'],
+  ['Essa fonte carrega a sua chave', 'Não mostre ela na tela e não mande pra ninguém. Se aparecer em print ou VOD, troque a chave em Meu Controller.'],
+];
+
+function telaTutorial() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Como instalar' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'São seis passos pro primeiro overlay, e você só faz isso uma vez por overlay. Depois é só editar aqui que a live acompanha.' }));
+
+  function lista(titulo, sub, passos) {
+    const fatia = h('div', { cls: 'fatia' }, [h('h3', { txt: titulo }), h('p', { cls: 'd', txt: sub })]);
+    passos.forEach((p, i) => {
+      fatia.appendChild(h('div', { cls: 'campo', style: 'align-items:flex-start' }, [
+        h('span', { style: 'flex:0 0 26px;font:700 15px var(--disp);color:var(--verde-forte)', txt: (i + 1) + '.' }),
+        h('div', { style: 'flex:1 1 240px' }, [
+          h('b', { style: 'display:block;font:600 14px var(--disp)', txt: p[0] }),
+          h('span', { style: 'font-size:12.5px;color:var(--apagado)', txt: p[1] }),
+        ]),
+      ]));
+    });
+    tela.appendChild(fatia);
+  }
+
+  lista('Um overlay na tela', 'Vale pra meta, subathon, relógio, contador, placar, chat e feed — todos funcionam do mesmo jeito.', PASSOS_OBS);
+  lista('O chat controlando o OBS', 'Só se você quiser que mods usem comandos. Overlay funciona sem isso.', PASSOS_CHAT);
+
+  const fatiaAjuda = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Quando não funciona' }),
+    h('p', { cls: 'd', txt: 'Na ordem em que costuma ser o problema:' }),
+  ]);
+  [
+    ['O overlay some quando troco de cena', 'É a caixa "Desligar a fonte quando não estiver visível". Desmarque.'],
+    ['Fica um retângulo preto atrás', 'Não é o overlay: é a Fonte de Navegador com "Fundo personalizado". Deixe vazio.'],
+    ['Editei e não mudou na live', 'Espere 15 segundos. Se não mudar, clique com o botão direito na fonte → Atualizar.'],
+    ['O chat não controla nada', 'O servidor do WebSocket do OBS está desligado, ou a fonte da ponte não está numa cena ativa.'],
+  ].forEach((p) => {
+    fatiaAjuda.appendChild(h('div', { cls: 'campo', style: 'align-items:flex-start' }, [
+      h('div', { style: 'flex:1 1 240px' }, [
+        h('b', { style: 'display:block;font:600 14px var(--disp)', txt: p[0] }),
+        h('span', { style: 'font-size:12.5px;color:var(--apagado)', txt: p[1] }),
+      ]),
+    ]));
+  });
+  tela.appendChild(fatiaAjuda);
+}
+
 /* ---------------- navegação ---------------- */
 function vaiPara(hash) { if (location.hash === hash) rota(); else location.hash = hash; }
 
@@ -1566,6 +1682,7 @@ function rota() {
   const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/');
   if (p[0] === 'meu') return telaControlador();
   if (p[0] === 'comandos') return telaComandos();
+  if (p[0] === 'tutorial') return telaTutorial();
   if (p[0] === 'subathon') return telaSubathon();
   if (p[0] === 'mods') return telaMods();
   if (p[0] === 'novo' && TIPOS[p[1]]) return telaEditor(null, p[1]);

@@ -90,7 +90,16 @@
       'Europe/Moscow', 'Africa/Luanda', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Shanghai',
       'Asia/Dubai', 'Australia/Sydney', 'Pacific/Auckland', 'UTC'
     ] },
-    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat'] },
+    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat', 'feed'] },
+    /* ---- feed de eventos ----
+       Divide as chaves com o chat: os dois sao a mesma lista com origem
+       diferente, e duplicar as opcoes so criaria dois lugares pra ajustar
+       a mesma coisa. */
+    fcor:     { t: 'c', d: '#8fd07a' },
+    fseg:     { t: 'b', d: 1 },
+    fsub:     { t: 'b', d: 1 },
+    fbits:    { t: 'b', d: 1 },
+    freal:    { t: 'b', d: 1 },
     /* ---- chat na tela ----
        Mora no mesmo esquema dos outros de proposito: assim o chatbox herda
        fonte, cor, contorno, sombra, brilho e caixa de fundo sem existir um

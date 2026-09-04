@@ -106,6 +106,21 @@
     } catch (e) { return null; }
   }
 
+  /* COMO CADA EVENTO VIRA UMA FRASE.
+     Um pacote de presentes ja chega junto do servidor com a conta feita —
+     dez linhas iguais empurrariam todo o resto da tela pra fora. */
+  var FRASES = {
+    sub1:    function (e) { return e.presente ? 'presenteou ' + e.quantidade + (e.quantidade > 1 ? ' subs' : ' sub') : 'assinou'; },
+    sub2:    function (e) { return e.presente ? 'presenteou ' + e.quantidade + ' subs tier 2' : 'assinou tier 2'; },
+    sub3:    function (e) { return e.presente ? 'presenteou ' + e.quantidade + ' subs tier 3' : 'assinou tier 3'; },
+    follow:  function ()  { return 'seguiu'; },
+    bits:    function (e) { return 'mandou ' + e.quantidade + ' bits'; },
+    real:    function (e) { return 'doou R$ ' + e.quantidade; },
+    viewers: function (e) { return 'a live bateu a meta de gente'; },
+  };
+
+  var LIGA = { sub1: 'fsub', sub2: 'fsub', sub3: 'fsub', follow: 'fseg', bits: 'fbits', real: 'freal', viewers: 'fseg' };
+
   var MOLDE =
     '<div class="ch__palco">' +
       '<div class="ch__pista"></div>' +
@@ -203,9 +218,42 @@
       while (mensagens.length && mensagens[0].nasceu < limite) tira(mensagens.shift());
     }
 
+    /* ---------------- o feed ---------------- */
+
+    /* Redesenha a lista inteira, em vez de anexar o que chegou: o servidor
+       manda "os ultimos N", nao "o que e novo". Comparar antes evita repintar
+       a cada consulta e matar a animacao de quem acabou de entrar. */
+    var ultimoFeed = '';
+
+    function poeFeed(lista) {
+      var s = JSON.stringify(lista);
+      if (s === ultimoFeed) return;
+      var primeira = ultimoFeed === '';
+      ultimoFeed = s;
+
+      pista.innerHTML = '';
+      mensagens = [];
+      (lista || []).slice().reverse().forEach(function (e, i) {
+        if (cfg[LIGA[e.tipo]] === 0) return;
+        var frase = (FRASES[e.tipo] || function () { return 'apareceu'; })(e);
+        var el = document.createElement('div');
+        /* So anima na chegada de coisa nova: na primeira pintura, animar
+           tudo faria a tela inteira tremer quando o OBS abre a cena. */
+        el.className = 'ch__msg' + (primeira ? '' : ' ch__entra');
+        el.innerHTML =
+          (cfg.cnick ? '<span class="ch__nick" style="color:' + esc(cfg.fcor) + '">' + esc(e.quem)
+             + (cfg.cnickpos === 'linha' ? '<i>' + esc(cfg.csep) + '</i>' : '') + '</span>' : '') +
+          '<span class="ch__txt">' + esc(frase) + '</span>';
+        pista.appendChild(el);
+        mensagens.push({ el: el, nasceu: Date.now() });
+      });
+    }
+
     /* ---------------- ligação com o chat ---------------- */
     function ligar() {
-      if (morto || !cfg.canal) return;
+      /* O feed nao ouve o chat: os eventos vem prontos do servidor, junto da
+         config, na consulta que o overlay ja faz de 15 em 15 segundos. */
+      if (morto || cfg.tipo === 'feed' || !cfg.canal) return;
       canalLigado = cfg.canal;
 
       try { soquete = new WebSocket(IRC); } catch (e) { return religar(); }
@@ -260,9 +308,20 @@
     return {
       update: update,
       config: function () { return cfg; },
+      feed: poeFeed,
       /* Só o editor usa: enche a tela com frases de mentira pra dar pra ver
          o desenho sem depender de alguém falar no chat naquele instante. */
       exemplo: function () {
+        if (cfg.tipo === 'feed') {
+          ultimoFeed = '';
+          return poeFeed([
+            { tipo: 'sub1', quem: 'Fulaninha', quantidade: 1, presente: false },
+            { tipo: 'follow', quem: 'zé_do_chat', quantidade: 1, presente: false },
+            { tipo: 'sub1', quem: 'Padrinho', quantidade: 10, presente: true },
+            { tipo: 'bits', quem: 'Generoso', quantidade: 500, presente: false },
+            { tipo: 'real', quem: 'Marmota', quantidade: 20, presente: false },
+          ]);
+        }
         pista.innerHTML = '';
         mensagens = [];
         [

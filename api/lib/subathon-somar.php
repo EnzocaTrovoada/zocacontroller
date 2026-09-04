@@ -7,6 +7,7 @@
  * conta acabariam divergindo — e divergir aqui significa tempo errado no ar.
  */
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/eventos.php';
 
 const SUB_CAMPOS = ['seg_sub1', 'seg_sub2', 'seg_sub3', 'seg_bits', 'seg_follow', 'seg_real', 'teto_evento'];
 
@@ -189,6 +190,11 @@ function subathon_gravar(array $c, int $segundos): array
  */
 function subathon_somar(int $usuario_id, array $d): array
 {
+    /* ANTES de qualquer coisa: o feed na tela tem que funcionar mesmo pra
+       quem nunca fez subathon nenhum, e mesmo com o subathon desligado.
+       Repetido é ignorado lá dentro. */
+    evento_registrar($usuario_id, $d);
+
     $c = subathon_config($usuario_id);
     /* 'parar' separa "nunca vai funcionar" de "não funcionou agora". A ponte
        só fica quieta de verdade no primeiro caso; no segundo ela volta a
@@ -203,6 +209,12 @@ function subathon_somar(int $usuario_id, array $d): array
     if ($chave === '') return ['ok' => false, 'erro' => 'Falta o id do evento.'];
 
     $qtd = max(0, (float) ($d['quantidade'] ?? 1));
+
+    /* A meta de viewers diz quantos segundos ela vale — nao existe "por
+       viewer". Vem de dentro do servidor, nunca do chat. */
+    if (!empty($d['segundos_fixos'])) {
+        $segundos = (int) $d['segundos_fixos'];
+    } else
     $segundos = match ($tipo) {
         'sub1'   => (int) $c['seg_sub1'] * (int) $qtd,
         'sub2'   => (int) $c['seg_sub2'] * (int) $qtd,

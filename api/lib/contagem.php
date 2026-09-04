@@ -8,8 +8,9 @@
  */
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/twitch.php';
+require_once __DIR__ . '/subathon-somar.php';
 
-const CONTAGEM_FONTES = ['seguidores', 'subs'];
+const CONTAGEM_FONTES = ['seguidores', 'subs', 'viewers'];
 
 /**
  * Devolve o número, ou null se nunca deu pra saber.
@@ -17,6 +18,43 @@ const CONTAGEM_FONTES = ['seguidores', 'subs'];
  * NUNCA devolve zero por causa de falha: um overlay que zera no meio da live
  * porque a Twitch tossiu é pior do que um overlay parado no número de ontem.
  */
+/**
+ * A meta de viewers: bateu o alvo, soma tempo e o alvo sobe.
+ *
+ * O alvo mora no banco e nao na memoria justamente pra disparar UMA vez por
+ * travessia. Se ficasse so na tela, cada consulta do overlay somaria tempo de
+ * novo enquanto a live estivesse acima do numero — e uma live boa viraria
+ * tempo infinito em minutos.
+ */
+function viewers_meta(int $usuario_id, int $agora): void
+{
+    $st = db()->prepare(
+        'SELECT viewers_alvo, viewers_seg, viewers_passo FROM subathon
+          WHERE usuario_id = ? AND ligado = 1'
+    );
+    $st->execute([$usuario_id]);
+    $c = $st->fetch();
+    if (!$c || !$c['viewers_alvo'] || !$c['viewers_seg']) return;
+    if ($agora < (int) $c['viewers_alvo']) return;
+
+    /* O UPDATE condicional E a trava: quem conseguir mudar a linha e quem
+       soma. Duas consultas ao mesmo tempo, so uma passa. */
+    $sobe = db()->prepare(
+        'UPDATE subathon SET viewers_alvo = viewers_alvo + GREATEST(viewers_passo, 1)
+          WHERE usuario_id = ? AND viewers_alvo = ?'
+    );
+    $sobe->execute([$usuario_id, (int) $c['viewers_alvo']]);
+    if (!$sobe->rowCount()) return;
+
+    subathon_somar($usuario_id, [
+        'tipo'  => 'viewers',
+        'chave' => 'viewers-' . $usuario_id . '-' . $c['viewers_alvo'],
+        'quem'  => 'a galera',
+        'detalhe' => $c['viewers_alvo'] . ' assistindo',
+        'segundos_fixos' => (int) $c['viewers_seg'],
+    ]);
+}
+
 function contagem(int $usuario_id, string $fonte, int $maxIdade = 60): ?int
 {
     if (!in_array($fonte, CONTAGEM_FONTES, true)) return null;
@@ -35,10 +73,19 @@ function contagem(int $usuario_id, string $fonte, int $maxIdade = 60): ?int
 
     try {
         $bid = tw_broadcaster_id($usuario_id);
-        [$http, $corpo] = $fonte === 'seguidores'
-            ? tw_helix($usuario_id, 'GET', 'channels/followers', ['broadcaster_id' => $bid, 'first' => 1])
-            : tw_helix($usuario_id, 'GET', 'subscriptions',      ['broadcaster_id' => $bid, 'first' => 1]);
-        $ok = ($http === 200 && isset($corpo['total']));
+        if ($fonte === 'viewers') {
+            /* Fora do ar a Helix devolve lista vazia, e isso NAO e falha: e
+               zero de verdade. Tratar como falha deixaria o numero de ontem
+               congelado na tela com a live desligada. */
+            [$http, $corpo] = tw_helix($usuario_id, 'GET', 'streams', ['user_id' => $bid, 'first' => 1]);
+            $ok = ($http === 200 && isset($corpo['data']));
+            if ($ok) $corpo['total'] = (int) ($corpo['data'][0]['viewer_count'] ?? 0);
+        } else {
+            [$http, $corpo] = $fonte === 'seguidores'
+                ? tw_helix($usuario_id, 'GET', 'channels/followers', ['broadcaster_id' => $bid, 'first' => 1])
+                : tw_helix($usuario_id, 'GET', 'subscriptions',      ['broadcaster_id' => $bid, 'first' => 1]);
+            $ok = ($http === 200 && isset($corpo['total']));
+        }
     } catch (Throwable $e) {
         $ok = false;
     }

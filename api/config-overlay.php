@@ -6,6 +6,7 @@
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/contagem.php';
+require_once __DIR__ . '/lib/eventos.php';
 
 header('Access-Control-Allow-Origin: *');   // o overlay roda dentro do OBS
 
@@ -39,14 +40,30 @@ $config = json_decode($perfil['config'], true) ?: [];
 $fonte = (string) ($config['fonte'] ?? 'manual');
 if ($perfil['tipo'] === 'meta' && $fonte !== 'manual') {
     $auto = contagem((int) $perfil['usuario_id'], $fonte);
-    if ($auto !== null) $config['atual'] = $auto;
+    if ($auto !== null) {
+        $config['atual'] = $auto;
+        /* A meta de viewers vive de saber quantos estao assistindo AGORA.
+           Aproveito a consulta que ja foi feita em vez de pedir de novo. */
+        if ($fonte === 'viewers') viewers_meta((int) $perfil['usuario_id'], $auto);
+    }
+}
+
+/* O FEED.
+
+   Os eventos vao no corpo da resposta, e nao dentro da config: config e o
+   que a PESSOA escolheu, e isso aqui muda sozinho. Misturar os dois faria
+   cada sub novo parecer uma edicao do overlay. */
+$eventos = null;
+if ($perfil['tipo'] === 'feed') {
+    $eventos = evento_recentes((int) $perfil['usuario_id'], max(1, min(30, (int) ($config['cmax'] ?? 8))));
 }
 
 /* ETag: quase toda resposta vira um 304 de poucos bytes. O polling sai de graça.
    O número automático entra na conta — sem ele o 304 devolveria o valor velho
    pra sempre e a meta ficaria congelada, justo a que deveria se mexer sozinha. */
 $etag = '"' . md5($perfil['atualizado_em'] . '|' . json_encode($recursos)
-                  . '|' . (string) ($config['atual'] ?? '')) . '"';
+                  . '|' . (string) ($config['atual'] ?? '')
+                  . '|' . ($eventos === null ? '' : md5(json_encode($eventos)))) . '"';
 header('ETag: ' . $etag);
 header('Cache-Control: no-cache, must-revalidate');
 
@@ -58,5 +75,6 @@ if (($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $etag) {
 json_saida([
     'tipo'     => $perfil['tipo'],
     'config'   => $config,
+    'eventos'  => $eventos,
     'recursos' => $recursos,
 ]);

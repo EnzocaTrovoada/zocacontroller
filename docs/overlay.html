@@ -36,7 +36,7 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=3"></script>
+<script src="clock.js?v=4"></script>
 <script src="chat.js?v=2"></script>
 <script>
 (function () {
@@ -60,7 +60,8 @@
   var relogio = null;
 
   function montaPara(config) {
-    var querChat = (config && config.tipo) === 'chat';
+    var tipo = config && config.tipo;
+    var querChat = (tipo === 'chat' || tipo === 'feed');
     if (atual === (querChat ? 'chat' : 'relogio')) return false;
     if (relogio) relogio.destroy();
     raiz.className = '';
@@ -265,9 +266,9 @@
       .then(function (j) {
         if (!j || !j.config) return;
         var s = JSON.stringify(j.config);
-        if (s === ultimo) return;
-        ultimo = s;
-        desenha(j.config);
+        if (s !== ultimo) { ultimo = s; desenha(j.config); }
+        /* O feed muda sem a config mudar: sub novo nao e edicao de overlay. */
+        if (j.eventos && relogio && relogio.feed) relogio.feed(j.eventos);
       })
       ['catch'](function () { /* servidor fora: fica com o que já está na tela */ })
       ['finally'](function () { buscando = false; });
