@@ -1361,6 +1361,12 @@ const DE_FABRICA = [
   ['marcar',    'mod',   'Marca um momento pra achar depois'],
   ['titulo',    'mod',   'Troca o título da live'],
   ['categoria', 'mod',   'Troca a categoria'],
+  ['pular',     'mod',   'Pula a música — precisa de Spotify Premium'],
+  ['like',      'mod',   'Curte o que está tocando'],
+  ['adicionar', 'chat',  'Pede música pra playlist do chat — !adicionar nome'],
+  ['fila',      'chat',  'Pede música pra fila — precisa de Premium'],
+  ['musica',    'mod',   'Mostra e esconde a overlay de música'],
+  ['vod',       'dono',  'Tira o som do Spotify do VOD, pra não tomar strike'],
 ];
 
 function telaComandos() {
@@ -1770,6 +1776,29 @@ async function telaMods() {
     } catch (e) { recado(e.message, 'ruim'); }
     btCriar.disabled = false;
   };
+
+  /* ----- quem pode pedir música ----- */
+  const selMus = h('select');
+  [['chat','Qualquer um do chat'],['sub','Subs pra cima'],['vip','VIPs pra cima'],
+   ['mod','Mods pra cima'],['supermod','Só moderadores-chefe'],['dono','Só eu']]
+    .forEach((q) => selMus.appendChild(h('option', { value: q[0], txt: q[1] })));
+  const btMus = h('button', { cls: 'bt', type: 'button', txt: 'Salvar' });
+  btMus.onclick = async () => {
+    btMus.disabled = true;
+    try {
+      await api('/musica.php', { method: 'POST', body: JSON.stringify({ acao: 'cargo', cargo: selMus.value }) });
+      recado('Salvo. A fonte do OBS pega em até 5 minutos.', 'bom');
+    } catch (e) { recado(e.message, 'ruim'); }
+    btMus.disabled = false;
+  };
+  api('/musica.php').then((r) => { selMus.value = r.cargo || 'sub'; }).catch(() => {});
+
+  tela.appendChild(h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Quem pode pedir música' }),
+    h('p', { cls: 'd', txt: 'Vale pro !adicionar e pro !fila. Cada pessoa só pode pedir uma vez a cada dois minutos — mod pra cima passa direto, porque quem modera não precisa ser moderado.' }),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'De qual cargo pra cima' }), selMus, btMus]),
+    h('p', { cls: 'aviso', txt: 'O !fila e o !pular precisam de Spotify Premium: os endpoints de player do Spotify recusam conta grátis. O !adicionar e o !like funcionam em qualquer conta.' }),
+  ]));
 
   /* ----- supermods ----- */
   const inpSuper = h('input', { type: 'text', placeholder: 'fulano, beltrano' });

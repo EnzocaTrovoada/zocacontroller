@@ -22,6 +22,7 @@ cors();
 const ACOES_VALIDAS = [
     'panico', 'voltar', 'mute', 'cena', 'replay', 'camera', 'som', 'fonte',
     'aposta', 'fechar', 'cancelar', 'ganhou', 'marcar', 'titulo', 'categoria',
+    'pular', 'like', 'adicionar', 'fila', 'musica', 'vod',
 ];
 const QUEM_VALIDO = ['chat', 'sub', 'vip', 'mod', 'supermod', 'dono'];
 const COMANDOS_MAX = 40;

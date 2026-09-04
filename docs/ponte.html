@@ -126,6 +126,10 @@ const cfg = {
   cenaPanico:   q.get('cenaPanico') || '',
   cenas:       (q.get('cenas') || '').split(',').map(s => s.trim()).filter(Boolean),
   prefixo:      q.get('prefixo') || '!',
+  /* Nome das fontes do OBS ligadas à música: a de imagem, que o !musica
+     mostra e esconde, e a de áudio, que o !vod tira do VOD. */
+  fonteMusica:      q.get('fonteMusica') || '',
+  fonteAudioMusica: q.get('fonteAudioMusica') || '',
   hud:          q.get('hud') !== '0',
   aviso:        q.get('aviso') !== '0',
   segundosMudo: Math.max(2, parseFloat(q.get('segundosMudo')) || 4),
@@ -790,6 +794,106 @@ ACOES.titulo = {
   },
 };
 
+/* ------------------------------------------------------------------ *
+ *  MÚSICA
+ *
+ *  Quem fala com o Spotify é o servidor: o token dele dá acesso à conta de
+ *  quem transmite, e aqui é o navegador — qualquer um que abrisse a fonte
+ *  veria a chave. Esta parte só manda "o chat pediu isto" e conta o que
+ *  voltou.
+ *
+ *  O cargo vai junto e é conferido LÁ TAMBÉM. Barrar aqui é conforto; a
+ *  regra de verdade não pode morar na parte que dá pra editar.
+ * ------------------------------------------------------------------ */
+
+async function pedirMusica(corpo, quem, cargo) {
+  if (!cfg.chave) return recado('Sem a chave, a música não funciona.');
+  try {
+    const r = await fetch(cfg.api + '/musica.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Chave': cfg.chave },
+      body: JSON.stringify(Object.assign({ quem: quem, cargo: cargo }, corpo)),
+    });
+    const d = await r.json().catch(() => ({}));
+    return d;
+  } catch (e) { return { ok: false, erro: 'não consegui falar com o servidor' }; }
+}
+
+ACOES.pular = {
+  minimo: 'mod', espera: 3000,
+  async fazer(quem, arg, cargo) {
+    const d = await pedirMusica({ acao: 'pular' }, quem, cargo);
+    recado(d.ok ? 'Pulou — ' + quem : 'Pular: ' + (d.erro || 'não deu'), 12000);
+  },
+};
+
+ACOES.like = {
+  minimo: 'mod', espera: 5000,
+  async fazer(quem, arg, cargo) {
+    const d = await pedirMusica({ acao: 'curtir' }, quem, cargo);
+    recado(d.ok ? 'Curtiu "' + (d.faixa || '') + '" — ' + quem : 'Curtir: ' + (d.erro || 'não deu'), 12000);
+  },
+};
+
+ACOES.adicionar = {
+  /* O mínimo de verdade é o que está guardado no painel; este aqui só evita
+     bater no servidor à toa quando nem o chat inteiro pode. */
+  minimo: 'chat', espera: 3000,
+  async fazer(quem, arg, cargo) {
+    if (!arg) return recado('Use: ' + cfg.prefixo + 'adicionar nome da música');
+    const d = await pedirMusica({ acao: 'pedir', texto: arg }, quem, cargo);
+    if (d.ok) recado(quem + ' pediu "' + d.faixa + '" de ' + d.artista, 12000);
+    else if (d.erro && d.erro.indexOf('permissão') === -1) recado(d.erro, 12000);
+  },
+};
+
+ACOES.fila = {
+  minimo: 'chat', espera: 3000,
+  async fazer(quem, arg, cargo) {
+    if (!arg) return recado('Use: ' + cfg.prefixo + 'fila nome da música');
+    const d = await pedirMusica({ acao: 'fila', texto: arg }, quem, cargo);
+    if (d.ok) recado('Na fila: "' + d.faixa + '" — ' + quem, 12000);
+    else if (d.erro && d.erro.indexOf('permissão') === -1) recado(d.erro, 12000);
+  },
+};
+
+/* Mostra e esconde a overlay de música na cena atual. É o !fonte com um nome
+   que a pessoa lembra — e o nome da fonte vem da URL, não do chat. */
+ACOES.musica = {
+  minimo: 'mod', espera: 4000,
+  async fazer(quem, arg) {
+    if (!cfg.fonteMusica) return recado('Falta ?fonteMusica= no endereço da fonte.');
+    return ACOES.fonte.fazer(quem, cfg.fonteMusica);
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ *  TIRAR O SPOTIFY DO VOD
+ *
+ *  A Twitch grava o VOD numa trilha de áudio SEPARADA da que vai ao vivo.
+ *  Quem tira a música dessa trilha não perde nada na live e não toma
+ *  strike depois — é o mesmo botão que a doca do OBS tem, feito daqui.
+ *
+ *  Qual trilha é a do VOD sai das configurações do OBS (Saída → Avançado);
+ *  a padrão é a 2, e é a que a gente desliga.
+ * ------------------------------------------------------------------ */
+ACOES.vod = {
+  minimo: 'dono', espera: 5000,
+  async fazer(quem, arg) {
+    const nome = arg || cfg.fonteAudioMusica;
+    if (!nome) return recado('Use: ' + cfg.prefixo + 'vod nome da fonte de áudio do Spotify');
+    try {
+      const atual = await pedir('GetInputAudioTracks', { inputName: nome });
+      const trilhas = Object.assign({}, atual.inputAudioTracks);
+      /* Fica na 1 (o que vai ao vivo) e sai da 2 (o que vira VOD). */
+      trilhas['1'] = true;
+      trilhas['2'] = false;
+      await pedir('SetInputAudioTracks', { inputName: nome, inputAudioTracks: trilhas });
+      recado('"' + nome + '" saiu da trilha do VOD. A live continua com som.', 15000);
+    } catch (e) { recado('Não consegui: ' + e.message, 15000); }
+  },
+};
+
 ACOES.categoria = {
   minimo: 'mod', espera: 10000,
   async fazer(quem, arg) {
@@ -823,7 +927,9 @@ async function executar(nome, arg, tags) {
   ultimoUso.set(nome, agora);
 
   const quem = tags['display-name'] || tags.login || 'alguém';
-  try { await acao.fazer(quem, arg); }
+  /* O cargo segue junto: os comandos de música precisam dele pra pedir ao
+     servidor, e é o servidor quem decide de verdade o que é permitido. */
+  try { await acao.fazer(quem, arg, cargo); }
   catch (err) { recado('Falhou: ' + err.message); }
 }
 
@@ -1388,13 +1494,13 @@ async function carregarComandos() {
         apelido: true,
         minimo: c.quem || 'mod',
         espera: Math.max(1, c.espera || 5) * 1000,
-        fazer: async (quem, arg) => {
+        fazer: async (quem, arg, cargo) => {
           /* Em sequência, e não todas de uma vez: "!sumir" precisa mutar
              ANTES de trocar de cena, senão o microfone fica aberto no meio
              do corte. E um passo que falha não derruba os outros — meio
              comando feito é melhor que nenhum quando você quer sumir. */
           for (const p of passos) {
-            try { await ACOES[p.acao].fazer(quem, p.argumento || arg); }
+            try { await ACOES[p.acao].fazer(quem, p.argumento || arg, cargo); }
             catch (e) { recado('!' + c.nome + ' — ' + p.acao + ': ' + e.message); }
           }
         },
