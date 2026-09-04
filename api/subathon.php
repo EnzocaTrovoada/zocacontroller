@@ -57,7 +57,17 @@ if (($d['acao'] ?? '') === 'somar') {
     // A conta mora na lib porque o EventSub tambem soma por la, quando
     // alguem segue. Duas copias acabariam divergindo.
     $r = subathon_somar($quem['usuario_id'], $d);
-    json_saida($r, empty($r['ok']) ? 400 : 200);
+
+    /* 503 quando foi só um soluço (o overlay não respondeu). A ponte trata
+       503 como "tento de novo já"; 400 ela entende como "esse evento não
+       serve" e 'parar' como "desiste por um bom tempo". Mandar 400 pra tudo
+       fazia um soluço calar o subathon inteiro. */
+    if (!empty($r['ok']))           $http = 200;
+    elseif (!empty($r['parar']))    $http = 400;
+    elseif (!empty($r['transitorio'])) $http = 503;
+    else                            $http = 400;
+
+    json_saida($r, $http);
 }
 
 // ---------- configurar ----------

@@ -75,7 +75,10 @@ function rl_salvar_estilo(string $slug, string $token, array $estilo, bool $mexe
     curl_close($ch);
 
     if ($http !== 200 || empty($resp['ok'])) {
-        return ['ok' => false, 'erro' => $resp['erro'] ?? 'O servidor do overlay recusou a gravação.'];
+        /* Transitório: o overlay pode estar só lento. Quem chama NÃO deve
+           desistir por dez minutos por causa disto. */
+        return ['ok' => false, 'transitorio' => true,
+                'erro' => $resp['erro'] ?? 'O servidor do overlay recusou a gravação.'];
     }
     return ['ok' => true];
 }
@@ -92,7 +95,7 @@ function subathon_publica_valores(array $c): array
 {
     $erro = null;
     $estilo = rl_ler_estilo($c['slug'], $erro);
-    if ($estilo === null) return ['ok' => false, 'erro' => $erro];
+    if ($estilo === null) return ['ok' => false, 'erro' => $erro, 'transitorio' => true];
 
     $estilo['vsub1']   = (int) $c['seg_sub1'];
     $estilo['vsub2']   = (int) $c['seg_sub2'];
@@ -108,7 +111,7 @@ function subathon_gravar(array $c, int $segundos): array
 {
     $erro = null;
     $estilo = rl_ler_estilo($c['slug'], $erro);
-    if ($estilo === null) return ['ok' => false, 'erro' => $erro];
+    if ($estilo === null) return ['ok' => false, 'erro' => $erro, 'transitorio' => true];
 
     $agora = time();
     if (($estilo['modo'] ?? 'pausado') === 'rodando') {
@@ -138,7 +141,12 @@ function subathon_gravar(array $c, int $segundos): array
 function subathon_somar(int $usuario_id, array $d): array
 {
     $c = subathon_config($usuario_id);
-    if (!$c)           return ['ok' => false, 'erro' => 'Subathon não configurado.'];
+    /* 'parar' separa "nunca vai funcionar" de "não funcionou agora". A ponte
+       só fica quieta de verdade no primeiro caso; no segundo ela volta a
+       tentar em segundos. Sem essa separação, um soluço do servidor do
+       overlay calava o subathon por dez minutos — e num raid isso é o raid
+       inteiro. */
+    if (!$c)           return ['ok' => false, 'erro' => 'Subathon não configurado.', 'parar' => true];
     if (!$c['ligado']) return ['ok' => true, 'ignorado' => 'subathon desligado'];
 
     $tipo  = (string) ($d['tipo'] ?? '');
@@ -202,7 +210,7 @@ function subathon_somar(int $usuario_id, array $d): array
         // nunca entraria — e ninguém descobriria por quê.
         db()->prepare('DELETE FROM subathon_eventos WHERE usuario_id = ? AND chave = ?')
             ->execute([$usuario_id, $chave]);
-        return ['ok' => false, 'erro' => $r['erro']];
+        return ['ok' => false, 'erro' => $r['erro'], 'transitorio' => !empty($r['transitorio'])];
     }
 
     return ['ok' => true, 'somou' => $segundos, 'restante' => $r['restante']];

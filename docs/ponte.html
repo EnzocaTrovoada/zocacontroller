@@ -896,10 +896,21 @@ async function contaNoSubathon(dados) {
     });
     const d = await r.json().catch(() => ({}));
 
-    /* Não configurado ou chave errada: para de tentar por um tempo em vez de
-       bater no servidor a cada sub. */
-    if (r.status === 400 || r.status === 401) { subathonQuieto = Date.now() + 600000; return; }
-    if (!r.ok) return;
+    /* Três respostas diferentes, três reações diferentes.
+
+       Antes qualquer 400 calava o subathon por dez minutos — e o servidor
+       mandava 400 até quando era só o overlay demorando pra responder. Um
+       soluço de oito segundos custava dez minutos de subs. Num raid, o raid
+       inteiro. */
+    if (r.status === 401 || d.parar) {
+      subathonQuieto = Date.now() + 600000;   /* chave errada ou nem configurado */
+      return;
+    }
+    if (r.status === 503) {
+      subathonQuieto = Date.now() + 10000;    /* soluço: volto já */
+      return;
+    }
+    if (!r.ok) return;                        /* evento estranho: pulo só ele */
 
     if (d.somou) {
       const m = Math.round(d.somou / 60);
