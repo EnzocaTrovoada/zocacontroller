@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Meta — ZocaController</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --fundo:#0F171C; --caixa:#17222A; --caixa2:#1E2B34; --linha:#2C3B45;
+    --tinta:#DCE6EA; --fraco:#8FA2AD; --apagado:#6D8290;
+    --sinal:#45B8BF; --sinal2:#17383C;
+    --perigo:#E4735A; --ambar:#D3A244;
+    --disp:"Archivo",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 18px 80px;
+    background: var(--fundo); color: var(--tinta);
+    font: 15px/1.55 var(--mono); -webkit-font-smoothing: antialiased;
+  }
+  .w { max-width: 660px; margin: 0 auto; }
+  header { padding: 42px 0 20px; border-bottom: 2px solid var(--tinta); margin-bottom: 24px; }
+  .tag { font: 600 10px var(--disp); letter-spacing: .2em; text-transform: uppercase; color: var(--sinal); margin: 0 0 10px; }
+  h1 { font: 700 clamp(26px,6vw,40px)/1.03 var(--disp); letter-spacing: -.02em; margin: 0 0 10px; }
+  header p { margin: 0; color: var(--fraco); font-size: 14px; max-width: 54ch; }
+  h2 { font: 600 10px var(--disp); letter-spacing: .18em; text-transform: uppercase; color: var(--fraco); margin: 30px 0 4px; }
+  .sub { color: var(--apagado); font-size: 13px; margin: 0 0 14px; max-width: 56ch; }
+
+  input[type=text], input[type=number] {
+    width: 100%; font: 14px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); padding: 12px; border-radius: 3px;
+  }
+  input[type=color] {
+    width: 52px; height: 42px; padding: 2px; background: var(--fundo);
+    border: 1px solid var(--linha); border-radius: 3px; cursor: pointer;
+  }
+  input:focus, button:focus-visible { outline: 2px solid var(--sinal); outline-offset: 1px; }
+  button {
+    font: 600 14px var(--disp); cursor: pointer; border-radius: 3px;
+    background: var(--caixa); color: var(--tinta); border: 1px solid var(--linha); padding: 12px 20px;
+  }
+  button:hover:not(:disabled) { border-color: var(--sinal); color: var(--sinal); }
+  button:disabled { opacity: .35; cursor: default; }
+  button.principal { background: var(--sinal2); color: var(--sinal); border-color: var(--sinal); }
+  button.mini { padding: 7px 12px; font-size: 12px; }
+
+  .escolha { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 6px; }
+  .escolha button { width: 100%; padding: 14px 8px; text-align: center; }
+  .escolha button[aria-pressed="true"] { background: var(--sinal2); color: var(--sinal); border-color: var(--sinal); }
+  .escolha button small { display: block; font: 400 11px var(--mono); color: var(--apagado); margin-top: 3px; }
+  .escolha button[aria-pressed="true"] small { color: var(--sinal); opacity: .8; }
+
+  .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .linha { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .linha label { flex: 1; font-size: 13px; color: var(--fraco); }
+
+  .item {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    border: 1px solid var(--linha); background: var(--caixa);
+    padding: 13px 15px; margin-bottom: 8px; border-radius: 3px;
+  }
+  .item .nome { flex: 1; min-width: 140px; }
+  .item .nome b { display: block; font: 600 15px var(--disp); }
+  .item .nome span { font-size: 12px; color: var(--apagado); }
+  .item code {
+    display: block; width: 100%; background: var(--fundo); border: 1px solid var(--linha);
+    padding: 9px 10px; font-size: 11.5px; color: var(--sinal);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: all;
+  }
+  #recado { min-height: 22px; font-size: 13px; margin: 14px 0 0; }
+  #recado.bom { color: var(--sinal); } #recado.ruim { color: var(--perigo); }
+  .escondido { display: none; }
+  @media (max-width: 520px) { .escolha, .dupla { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="w">
+
+  <header>
+    <p class="tag">ZocaController</p>
+    <h1>Meta</h1>
+    <p>A barra que enche sozinha. Você diz o alvo, e o número de seguidores
+       vem da Twitch — sem digitar nada, sem atualizar na mão.</p>
+  </header>
+
+  <div id="semChave" class="escondido">
+    <h2>Falta a chave</h2>
+    <p class="sub">Abra esta página pelo seu hub, que ele já põe a chave no link.</p>
+  </div>
+
+  <div id="tudo" class="escondido">
+
+    <h2>O que contar</h2>
+    <p class="sub">Seguidores e subs a gente busca na Twitch a cada minuto.</p>
+    <div class="escolha" id="fontes">
+      <button type="button" data-f="seguidores" aria-pressed="true">Seguidores<small>automático</small></button>
+      <button type="button" data-f="subs" aria-pressed="false">Subs<small>automático</small></button>
+      <button type="button" data-f="manual" aria-pressed="false">Eu digito<small>na mão</small></button>
+    </div>
+
+    <h2>Alvo</h2>
+    <div class="dupla">
+      <div class="linha"><label for="alvo">Chegar em</label><input id="alvo" type="number" min="1" value="1000"></div>
+      <div class="linha escondido" id="linhaAtual"><label for="atual">Já tem</label><input id="atual" type="number" min="0" value="0"></div>
+    </div>
+
+    <h2>Aparência</h2>
+    <div class="linha"><label for="titulo">Nome na tela</label><input id="titulo" type="text" placeholder="META DE SEGUIDORES"></div>
+    <div class="linha"><label for="cor">Cor da barra</label><input id="cor" type="color" value="#45b8bf"></div>
+
+    <p style="margin:18px 0 0">
+      <button id="btSalvar" class="principal">Criar overlay</button>
+      <button id="btCancelar" class="escondido">Cancelar</button>
+    </p>
+    <p id="recado"></p>
+
+    <h2>Meus overlays de meta</h2>
+    <p class="sub" id="vazio">Nenhum ainda. Crie o primeiro aí em cima.</p>
+    <div id="lista"></div>
+
+  </div>
+</div>
+
+<script>
+const API = 'https://api.zocahop.com';
+const el = (id) => document.getElementById(id);
+
+let chave = '';
+try {
+  const naUrl = new URLSearchParams(location.search).get('chave');
+  if (naUrl) { sessionStorage.setItem('zc:chave', naUrl.trim()); history.replaceState(null, '', location.pathname); }
+  chave = sessionStorage.getItem('zc:chave') || '';
+} catch (e) { chave = new URLSearchParams(location.search).get('chave') || ''; }
+
+let fonte = 'seguidores';
+let editando = null;      /* id do overlay sendo editado, ou null pra criar novo */
+
+function recado(t, tipo) { el('recado').textContent = t || ''; el('recado').className = tipo || ''; }
+
+async function api(caminho, opcoes) {
+  const o = Object.assign({ headers: {} }, opcoes || {});
+  o.headers = Object.assign({ 'X-Chave': chave, 'Content-Type': 'application/json' }, o.headers);
+  const r = await fetch(API + caminho, o);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.erro || ('falhou (' + r.status + ')'));
+  return d;
+}
+
+/* Poucas perguntas, o resto decidido aqui. Um leigo não quer escolher
+   opacidade de fundo de barra — quer uma meta que já nasce bonita. */
+function montaConfig() {
+  const cor = el('cor').value;
+  return {
+    tipo: 'meta',
+    fonte: fonte,                       /* só o servidor lê isto */
+    alvo: Math.max(1, parseInt(el('alvo').value, 10) || 1000),
+    atual: fonte === 'manual' ? Math.max(0, parseInt(el('atual').value, 10) || 0) : 0,
+    titulo: el('titulo').value.trim(),
+    mfmt: 'fracao',
+    barra: 1, baltura: 18, bcantos: 9, bgap: 12, bfopac: 16,
+    bcor: cor, bfundo: '#ffffff',
+    font: 'Anton', size: 72, color: '#ffffff',
+    sw: 2, sc: '#101010', glow: 10, gc: cor, gi: 35,
+    dcolor: cor, dsize: 24, dtrack: 6, dcaps: 1
+  };
+}
+
+function poeFonte(f) {
+  fonte = f;
+  [...el('fontes').querySelectorAll('button')].forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.f === f));
+  });
+  el('linhaAtual').classList.toggle('escondido', f !== 'manual');
+}
+
+el('fontes').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (b) poeFonte(b.dataset.f);
+});
+
+function linkDe(k) {
+  return location.origin + location.pathname.replace(/[^/]*$/, '') + 'overlay.html?k=' + k;
+}
+
+function desenha(perfis) {
+  const metas = perfis.filter((p) => p.tipo === 'meta');
+  el('vazio').classList.toggle('escondido', metas.length > 0);
+  el('lista').innerHTML = '';
+
+  metas.forEach((p) => {
+    const c = p.config || {};
+    const div = document.createElement('div');
+    div.className = 'item';
+
+    const nome = document.createElement('div');
+    nome.className = 'nome';
+    const b = document.createElement('b');
+    b.textContent = p.nome || 'Sem nome';
+    const s = document.createElement('span');
+    const de = c.fonte === 'subs' ? 'subs' : c.fonte === 'manual' ? 'na mão' : 'seguidores';
+    s.textContent = de + ' · alvo ' + (c.alvo || '?');
+    nome.append(b, s);
+
+    const editar = document.createElement('button');
+    editar.className = 'mini';
+    editar.textContent = 'Editar';
+    editar.onclick = () => carregaNoForm(p);
+
+    const copiar = document.createElement('button');
+    copiar.className = 'mini';
+    copiar.textContent = 'Copiar link';
+    copiar.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(linkDe(p.chave_publica));
+        copiar.textContent = 'Copiado';
+      } catch (e) { recado('Selecione o link abaixo e use Ctrl+C.', 'ruim'); }
+      setTimeout(() => { copiar.textContent = 'Copiar link'; }, 2000);
+    };
+
+    const apagar = document.createElement('button');
+    apagar.className = 'mini';
+    apagar.textContent = 'Apagar';
+    apagar.onclick = async () => {
+      if (!confirm('Apagar "' + (p.nome || 'esta meta') + '"? Quem estiver com ela no OBS fica sem nada.')) return;
+      try {
+        await api('/perfil.php', { method: 'POST', body: JSON.stringify({ acao: 'apagar', id: p.id }) });
+        carrega();
+      } catch (e) { recado(e.message, 'ruim'); }
+    };
+
+    const code = document.createElement('code');
+    code.textContent = linkDe(p.chave_publica);
+
+    div.append(nome, editar, copiar, apagar, code);
+    el('lista').appendChild(div);
+  });
+}
+
+function carregaNoForm(p) {
+  const c = p.config || {};
+  editando = p.id;
+  poeFonte(c.fonte === 'subs' || c.fonte === 'manual' ? c.fonte : 'seguidores');
+  el('alvo').value = c.alvo || 1000;
+  el('atual').value = c.atual || 0;
+  el('titulo').value = c.titulo || '';
+  el('cor').value = c.bcor || '#45b8bf';
+  el('btSalvar').textContent = 'Salvar alterações';
+  el('btCancelar').classList.remove('escondido');
+  recado('Editando "' + (p.nome || 'sem nome') + '".');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function novo() {
+  editando = null;
+  el('btSalvar').textContent = 'Criar overlay';
+  el('btCancelar').classList.add('escondido');
+  recado('');
+}
+el('btCancelar').onclick = novo;
+
+el('btSalvar').onclick = async () => {
+  el('btSalvar').disabled = true;
+  const config = montaConfig();
+  const nome = config.titulo || (fonte === 'subs' ? 'Meta de subs' : 'Meta de seguidores');
+  try {
+    if (editando) {
+      await api('/perfil.php', { method: 'POST', body: JSON.stringify({ acao: 'salvar', id: editando, nome: nome, config: config }) });
+      recado('Salvo. O OBS pega em até 15 s, sem mexer em nada.', 'bom');
+      novo();
+    } else {
+      await api('/perfil.php', { method: 'POST', body: JSON.stringify({ acao: 'criar', tipo: 'meta', nome: nome, config: config }) });
+      recado('Pronto! Copie o link aí embaixo e cole numa Fonte de Navegador no OBS.', 'bom');
+    }
+    carrega();
+  } catch (e) { recado(e.message, 'ruim'); }
+  el('btSalvar').disabled = false;
+};
+
+async function carrega() {
+  try { desenha((await api('/perfil.php')).perfis || []); }
+  catch (e) { recado(e.message, 'ruim'); }
+}
+
+if (!chave) el('semChave').classList.remove('escondido');
+else { el('tudo').classList.remove('escondido'); carrega(); }
+</script>
+</body>
+</html>

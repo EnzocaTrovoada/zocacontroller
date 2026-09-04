@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Overlay — ZocaController</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="clock.css?v=1">
+<style>
+  /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
+     só o overlay, sem retângulo preto por trás. */
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+</style>
+</head>
+<body>
+
+<div id="overlay"></div>
+
+<script src="clock.js?v=1"></script>
+<script>
+(function () {
+  'use strict';
+
+  var API = 'https://api.zocahop.com';
+  var raiz = document.getElementById('overlay');
+
+  /* A chave vem na URL e é só de LEITURA: ela aparece em print, em VOD e em
+     tutorial. Quem escreve é o painel, com a chave da conta no cabeçalho —
+     que nunca passa por aqui. */
+  var k = (new URLSearchParams(location.search).get('k') || '')
+            .replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+
+  var relogio = Relogio.mount(raiz, Relogio.parseConfig());
+  if (!k) return;
+
+  var ultimo = '', buscando = false;
+
+  function buscar() {
+    if (buscando) return;
+    buscando = true;
+    fetch(API + '/config-overlay.php?k=' + encodeURIComponent(k), { cache: 'no-store' })
+      .then(function (r) {
+        /* O cabeçalho Date da própria resposta diz a hora do servidor. É de
+           graça, não depende de site de terceiro, e é o que mantém o subathon
+           certo mesmo com o relógio da máquina torto. */
+        var d = r.headers.get('Date');
+        if (d) { var t = Date.parse(d); if (t) Relogio.ajustaRelogioDoServidor(t - Date.now()); }
+        if (r.status === 304) return null;      /* nada mudou */
+        return r.ok ? r.json() : null;
+      })
+      .then(function (j) {
+        if (!j || !j.config) return;
+        var s = JSON.stringify(j.config);
+        if (s === ultimo) return;
+        ultimo = s;
+        relogio.update(j.config);
+      })
+      ['catch'](function () { /* servidor fora: fica com o que já está na tela */ })
+      ['finally'](function () { buscando = false; });
+  }
+
+  /* Quem chama a busca é a BATIDA do relógio (Web Worker). O setInterval comum
+     congela quando o OBS esconde a fonte — e aí o overlay para de atualizar
+     justamente enquanto ninguém está olhando pra perceber. O intervalo aqui
+     embaixo é só a reserva, pro caso do worker não nascer. */
+  var ultimaBusca = 0;
+  function talvezBuscar() {
+    if (Date.now() - ultimaBusca < 15000) return;
+    ultimaBusca = Date.now();
+    buscar();
+  }
+
+  buscar();
+  relogio.aoTique(talvezBuscar);
+  setInterval(talvezBuscar, 15000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) buscar(); });
+  window.addEventListener('obsSourceVisibleChanged', buscar);
+})();
+</script>
+</body>
+</html>

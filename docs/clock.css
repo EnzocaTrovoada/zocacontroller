@@ -1,0 +1,311 @@
+/* =====================================================================
+   RELÓGIO DO ZOCA — aparência do relógio
+   Todo valor ajustável é uma variável CSS que o clock.js escreve. Isso
+   vale tanto pro overlay do OBS quanto pro preview do personalizador —
+   os dois usam ESTE arquivo, então o que você vê é o que vai no ar.
+   ===================================================================== */
+
+.rl {
+  /* padrões de segurança: se o JS não rodar, ainda dá pra ver alguma coisa */
+  --rl-font: system-ui, sans-serif;
+  --rl-size: 96px;
+  --rl-weight: 700;
+  --rl-style: normal;
+  --rl-track: 0px;
+  --rl-caps: none;
+  --rl-numeric: tabular-nums;
+  --rl-color: #fff;
+  --rl-c2: #8fd07a;
+  --rl-gangle: 180deg;
+  --rl-sw: 0px;
+  --rl-sc: #000;
+  --rl-filter: none;
+  --rl-bg: transparent;
+  --rl-bgr: 14px;
+  --rl-bgp: 18px 25px;
+  --rl-bd: 0px;
+  --rl-bdc: transparent;
+  --rl-blur: none;
+  --rl-dsize: 26px;
+  --rl-dcolor: rgba(255, 255, 255, .85);
+  --rl-dweight: 500;
+  --rl-dtrack: 2px;
+  --rl-dcaps: none;
+  --rl-dgap: 6px;
+  --rl-dorder: 1;
+  --rl-justify: center;
+  --rl-valign: center;
+  --rl-items: center;
+  --rl-text-align: center;
+  --rl-mx: 0px;
+  --rl-my: 0px;
+
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: var(--rl-justify);
+  align-items: var(--rl-valign);
+  padding: var(--rl-my) var(--rl-mx);
+  box-sizing: border-box;
+  overflow: hidden;
+  /* nada de seleção/cursor: isso vive dentro do OBS */
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+
+.rl__box {
+  display: flex;
+  flex-direction: column;
+  align-items: var(--rl-items);
+  gap: var(--rl-dgap);
+  padding: 0;
+  border-radius: var(--rl-bgr);
+  line-height: 1.05;
+}
+
+.rl.has-bg .rl__box {
+  padding: var(--rl-bgp);
+  background: var(--rl-bg);
+  border: var(--rl-bd) solid var(--rl-bdc);
+  backdrop-filter: var(--rl-blur);
+  -webkit-backdrop-filter: var(--rl-blur);
+}
+
+/* ---------------------------------------------------------------------
+   As duas camadas empilhadas (traçado atrás, preenchimento na frente).
+   O grid com as duas no MESMO slot garante alinhamento perfeito sem
+   position:absolute e sem depender de paint-order (que o Chromium do
+   OBS nem sempre respeita em texto HTML).
+   --------------------------------------------------------------------- */
+.rl__time,
+.rl__date {
+  display: grid;
+  filter: var(--rl-filter);
+  text-align: var(--rl-text-align);
+}
+
+.rl__layer {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+  /* o espaçamento entre letras sobra depois do último caractere e
+     desalinha a centralização: desconto ele aqui */
+  margin-inline-end: calc(var(--rl-track) * -1);
+}
+
+/* ------------------------------ hora ------------------------------ */
+
+.rl__time .rl__layer {
+  font-family: var(--rl-font);
+  font-size: var(--rl-size);
+  font-weight: var(--rl-weight);
+  font-style: var(--rl-style);
+  letter-spacing: var(--rl-track);
+  text-transform: var(--rl-caps);
+  font-variant-numeric: var(--rl-numeric);
+  font-feature-settings: "tnum" 1;
+}
+
+.rl__time .rl__layer--fill { color: var(--rl-color); }
+
+.rl.is-grad .rl__time .rl__layer--fill {
+  background-image: linear-gradient(var(--rl-gangle), var(--rl-color), var(--rl-c2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.rl__time .rl__layer--stroke {
+  -webkit-text-stroke: var(--rl-sw) var(--rl-sc);
+  color: transparent;
+}
+
+/* "sem preenchimento" = só o contorno. Precisa vir depois do gradiente. */
+.rl.is-nofill .rl__time .rl__layer--fill,
+.rl.is-nofill .rl__date .rl__layer--fill {
+  color: transparent;
+  background-image: none;
+}
+
+/* ------------------------------ data ------------------------------ */
+
+.rl__date {
+  order: var(--rl-dorder);
+}
+
+.rl.is-date-off .rl__date { display: none; }
+
+.rl__date .rl__layer {
+  font-family: var(--rl-font);
+  font-size: var(--rl-dsize);
+  font-weight: var(--rl-dweight);
+  font-style: var(--rl-style);
+  letter-spacing: var(--rl-dtrack);
+  text-transform: var(--rl-dcaps);
+  margin-inline-end: calc(var(--rl-dtrack) * -1);
+}
+
+.rl__date .rl__layer--fill { color: var(--rl-dcolor); }
+
+/* traçado da data proporcional ao da hora, pra não engrossar demais */
+.rl__date .rl__layer--stroke {
+  -webkit-text-stroke: calc(var(--rl-sw) * .6) var(--rl-sc);
+  color: transparent;
+}
+
+/* --------------------------- separador --------------------------- */
+
+.rl__sep { display: inline-block; }
+.rl__ap {
+  font-size: .42em;
+  letter-spacing: .08em;
+  margin-inline-start: .28em;
+  vertical-align: baseline;
+}
+
+.rl.is-blink .rl__sep {
+  animation: rl-blink 1s steps(1, end) infinite;
+}
+
+@keyframes rl-blink {
+  0%, 49.9% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rl.is-blink .rl__sep { animation: none; }
+}
+
+/* ---- barra da meta ---- */
+.rl__barra {
+  display: none;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+.rl__barra > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  transition: width .5s cubic-bezier(.2,.8,.2,1);
+}
+@media (prefers-reduced-motion: reduce) { .rl__barra > i { transition: none; } }
+
+/* =====================================================================
+   SUBATHON — o que acontece quando entra tempo
+   ---------------------------------------------------------------------
+   Um número que só anda pra trás não conta história nenhuma. O sub que
+   acabou de entrar tem que APARECER: é o "+1UP" do Mario, sobe e some.
+
+   Tudo aqui é CSS puro e sai do fluxo (position:absolute). Um efeito nunca
+   pode empurrar o relógio de lugar no meio da live.
+   ===================================================================== */
+
+.rl__box { position: relative; }
+
+/* Âncora de tamanho zero no topo da caixa: os "+X" nascem daqui e sobem. */
+.rl__pops {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.rl__pop {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  white-space: nowrap;
+  font-family: var(--rl-font);
+  font-size: var(--rl-spops);
+  font-weight: 800;
+  letter-spacing: var(--rl-track);
+  font-variant-numeric: var(--rl-numeric);
+  color: var(--rl-spopc);
+  /* herda a sombra/brilho do relógio: o "+X" pertence à mesma peça */
+  filter: var(--rl-filter);
+  opacity: 0;
+  animation: rl-pop 2.4s cubic-bezier(.22, 1, .36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* Ainda é o "pulou" do 1-UP, mas sem o estalo: o estouro agora é de 12%
+   em vez de 28%, a entrada não parte de quase nada, e a subida ficou mais
+   longa. O olho lê o número inteiro antes de ele começar a sumir. */
+@keyframes rl-pop {
+  0%   { opacity: 0; transform: translate(-50%,  6px)  scale(.78); }
+  10%  { opacity: 1; transform: translate(-50%, -2px)  scale(1.12); }
+  22%  { opacity: 1; transform: translate(-50%, -11px) scale(.99); }
+  32%  { opacity: 1; transform: translate(-50%, -17px) scale(1); }
+  74%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, calc(-1 * var(--rl-spopd))) scale(.99); }
+}
+
+/* O relógio leva um baque quando o tempo entra. Fica no .rl__time (transform)
+   e a urgência fica na camada de preenchimento (opacity): elementos
+   diferentes, senão uma animação cancelaria a outra. */
+.rl__time.rl--baque { animation: rl-baque .6s cubic-bezier(.22, 1, .36, 1); }
+
+@keyframes rl-baque {
+  0%   { transform: scale(1); }
+  22%  { transform: scale(1.045); }
+  52%  { transform: scale(.995); }
+  100% { transform: scale(1); }
+}
+
+/* Reta final: o tempo muda de cor e pulsa. É o que faz a plateia perceber
+   sozinha que a live está por um fio — sem ninguém precisar avisar. */
+.rl--urgente .rl__time .rl__layer--fill { color: var(--rl-surgc); }
+
+/* O degradê venceria a cor de urgência (ele pinta com background-clip).
+   Desligo ele enquanto durar a urgência. */
+.rl.is-grad.rl--urgente .rl__time .rl__layer--fill {
+  background-image: none;
+  color: var(--rl-surgc);
+}
+
+.rl--urgente .rl__time .rl__layer--fill {
+  animation: rl-urgente 1s ease-in-out infinite;
+}
+
+@keyframes rl-urgente {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .5; }
+}
+
+/* Quem pediu menos movimento continua vendo o "+X" e a cor da urgência —
+   só não leva os pulos. A informação fica; o balanço sai. */
+@media (prefers-reduced-motion: reduce) {
+  .rl__pop { animation-duration: 1.9s; animation-timing-function: linear; }
+  .rl__time.rl--baque { animation: none; }
+  .rl--urgente .rl__time .rl__layer--fill { animation: none; }
+}
+
+/* O brilho também vira vermelho na reta final: número vermelho com halo
+   verde em volta fica pior do que halo nenhum. */
+.rl--urgente .rl__time { filter: var(--rl-urgfilter); }
+
+/* ---------------------------------------------------------------------
+   LEGENDA — "o que dá quanto"
+
+   Quem chega no meio da live não faz ideia de que uma sub vale 5 minutos,
+   e quem não sabe disso não tem motivo pra assinar. Fica pequena embaixo:
+   é informação de consulta, não é o assunto.
+   --------------------------------------------------------------------- */
+.rl__leg {
+  display: none;
+  order: 2;
+  font-family: var(--rl-font);
+  font-size: var(--rl-legsize);
+  font-weight: 600;
+  color: var(--rl-legcolor);
+  letter-spacing: .06em;
+  text-transform: var(--rl-legcaps);
+  white-space: nowrap;
+  filter: var(--rl-filter);
+  /* desconta o gap da caixa pra "Distância" valer exatamente o que diz */
+  margin-top: calc(var(--rl-leggap) - var(--rl-dgap));
+}
