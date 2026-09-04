@@ -17,7 +17,10 @@ require_once __DIR__ . '/lib/assinatura.php';
 
 cors();
 
-const PERFIL_TIPOS = ['meta', 'relogio', 'contador', 'placar', 'subathon'];
+/* Espelha os tipos que o desenhista sabe montar. Quando as duas listas
+   divergem, o overlay novo simplesmente nao pode ser criado — e o erro que
+   aparece ("tipo de overlay desconhecido") nao diz onde esta o problema. */
+const PERFIL_TIPOS = ['meta', 'relogio', 'contador', 'placar', 'subathon', 'chat', 'feed', 'musica'];
 const PERFIL_CFG_MAX = 8192;
 
 $quem = exige_painel();
@@ -68,7 +71,9 @@ function perfil_nome(array $d): string
 if ($acao === 'criar') {
     $tipo = (string) ($d['tipo'] ?? '');
     if (!in_array($tipo, PERFIL_TIPOS, true)) {
-        json_saida(['erro' => 'Tipo de overlay desconhecido.'], 400);
+        json_saida(['erro' => 'Tipo de overlay desconhecido: "' . $tipo . '". Este servidor aceita: '
+            . implode(', ', PERFIL_TIPOS) . '. Se o tipo que você quer está faltando, o api/perfil.php '
+            . 'do servidor está mais velho que a página.'], 400);
     }
 
     $acesso = acesso_do_usuario((int) $quem['usuario_id']);
