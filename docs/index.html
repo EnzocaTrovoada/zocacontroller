@@ -289,7 +289,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=8"></script>
+<script src="clock.js?v=9"></script>
 <script>
 'use strict';
 
@@ -529,6 +529,17 @@ const GRUPOS = [
     { k: 'modo',   l: 'Estado', c: 'lista', se: so('subathon'),
       ops: [['pausado', 'Pausado'], ['rodando', 'Correndo']] },
     { k: '_tempo', l: 'Tempo', c: 'tempo', se: so('subathon') },
+  ] },
+
+  { t: 'Como aparece', aberto: true, se: so('musica'), itens: [
+    { k: 'manim', l: 'Animação', c: 'lista',
+      dica: 'a de quatro tempos é a do desenho: o quadrado cresce, a barra estica pro lado, o nome aparece',
+      ops: [['revelar', 'Quadrado → barra → nome'], ['surge', 'Só desliza pro lado'], ['nenhum', 'Nada, fica parado']] },
+    { k: 'mquando', l: 'Quando mostrar', c: 'lista', se: (c) => c.manim !== 'nenhum',
+      ops: [['trocou', 'Ao trocar de música, e some depois'], ['sempre', 'Fica na tela o tempo todo']] },
+    { k: 'mtempo', l: 'Fica na tela', c: 'faixa', min: 2, max: 120, u: 's',
+      se: (c) => c.manim !== 'nenhum' && c.mquando === 'trocou',
+      dica: 'o !musica traz de volta a qualquer momento' },
   ] },
 
   { t: 'A música', aberto: true, se: so('musica'), itens: [

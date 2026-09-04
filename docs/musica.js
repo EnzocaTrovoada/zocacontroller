@@ -39,12 +39,56 @@
     var marcado = 0;          /* quando o servidor mediu o progresso */
     var pulso = null, reserva = null;
 
+    /* O CICLO DA ANIMAÇÃO.
+
+       Guardo QUANDO cada etapa deve acontecer, e não uso setTimeout: com a
+       fonte escondida no OBS os temporizadores congelam, e ao voltar a
+       música fecharia toda de uma vez. O relógio aqui é o pulso do Worker,
+       que sobrevive. */
+    var fase = 'fora';        /* fora | abrindo | parado | fechando */
+    var trocaEm = 0;
+
+    function ciclo() {
+      if (cfg.manim === 'nenhum' || cfg.mquando === 'sempre') return;
+      if (!trocaEm || Date.now() < trocaEm) return;
+
+      if (fase === 'abrindo') {
+        fase = 'parado';
+        trocaEm = Date.now() + cfg.mtempo * 1000;
+      } else if (fase === 'parado') {
+        fase = 'fechando';
+        root.classList.remove('mu--revelar', 'mu--surge');
+        root.classList.add('mu--fechando');
+        trocaEm = Date.now() + 760;
+      } else if (fase === 'fechando') {
+        fase = 'fora';
+        trocaEm = 0;
+        root.classList.add('mu--vazio');
+        root.classList.remove('mu--fechando');
+      }
+    }
+
+    function abre() {
+      if (cfg.manim === 'nenhum') { root.classList.remove('mu--vazio'); return; }
+      root.classList.remove('mu--vazio', 'mu--fechando');
+      /* Tira e devolve a classe pra animação recomeçar: sem isso, música nova
+         durante a anterior não reanima nada. */
+      root.classList.remove('mu--revelar', 'mu--surge');
+      void root.offsetWidth;
+      root.classList.add(cfg.manim === 'surge' ? 'mu--surge' : 'mu--revelar');
+      fase = 'abrindo';
+      trocaEm = Date.now() + (cfg.manim === 'surge' ? 440 : 920);
+    }
+
     function aplica() {
       R.aplicaEstilo(root, cfg);
       var s = root.style;
       s.setProperty('--mu-capa', cfg.mtam + 'px');
       s.setProperty('--mu-gap', cfg.mgap + 'px');
       s.setProperty('--mu-larg', cfg.mlarg + 'px');
+      /* O lado do quadrado fechado: a capa mais o respiro dos dois lados.
+         Sem capa, um quadrado do tamanho da altura da linha. */
+      s.setProperty('--mu-quad', (cfg.mcapa ? cfg.mtam + cfg.mfpad * 2 : Math.round(cfg.size * 2.2)) + 'px');
       s.setProperty('--mu-raio', cfg.mraio + 'px');
       s.setProperty('--mu-fundo', cfg.mfundo === 'none' ? 'transparent' : R.rgba(cfg.mfcor, cfg.mfopac));
       s.setProperty('--mu-fpad', cfg.mfpad + 'px');
@@ -78,9 +122,11 @@
         /* Nada tocando: some. Um overlay preso na última música é pior do que
            overlay nenhum — ele mente. */
         root.classList.add('mu--vazio');
+        root.classList.remove('mu--revelar', 'mu--surge', 'mu--fechando');
+        fase = 'fora'; trocaEm = 0;
         return;
       }
-      root.classList.remove('mu--vazio');
+      if (cfg.mquando === 'sempre' || cfg.manim === 'nenhum') root.classList.remove('mu--vazio');
 
       if (mudou) {
         elNome.textContent = m.nome;
@@ -88,9 +134,7 @@
         if (m.capa && capa.getAttribute('src') !== m.capa) capa.setAttribute('src', m.capa);
         /* Reinicia a animação de entrada só quando a MÚSICA muda, e não a
            cada consulta: senão ela repetiria de 15 em 15 segundos. */
-        caixa.classList.remove('mu--entra');
-        void caixa.offsetWidth;
-        caixa.classList.add('mu--entra');
+        abre();
         /* O texto que não cabe rola; o que cabe fica quieto. */
         [elNome, elArt].forEach(function (el) {
           el.classList.toggle('mu--longo', cfg.mrola && el.scrollWidth > el.clientWidth + 2);
@@ -111,17 +155,25 @@
       try {
         var f = 'onmessage=function(){setInterval(function(){postMessage(0)},250)}';
         var w = new Worker(URL.createObjectURL(new Blob([f], { type: 'text/javascript' })));
-        w.onmessage = pinta;
+        w.onmessage = function () { pinta(); ciclo(); };
         w.postMessage(0);
         return w;
       } catch (e) { return null; }
     })();
-    reserva = setInterval(pinta, 500);
+    reserva = setInterval(function () { pinta(); ciclo(); }, 500);
+
+    /* O !musica mostra e esconde a fonte no OBS. Quando ela volta a aparecer,
+       a animação recomeça — é assim que o comando "chama" a música na tela. */
+    global.addEventListener('obsSourceVisibleChanged', function (e) {
+      if (e && e.detail && e.detail.visible === false) return;
+      if (atual) abre();
+    });
 
     return {
       update: update,
       config: function () { return cfg; },
       musica: mostra,
+      mostrarDeNovo: function () { if (atual) abre(); },
       exemplo: function () {
         mostra({
           nome: 'Tempo Perdido', artista: 'Legião Urbana', album: 'Dois',

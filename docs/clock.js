@@ -109,6 +109,9 @@
     mfpad:    { t: 'n', d: 10,  min: 0,  max: 40 },
     mraio:    { t: 'n', d: 12,  min: 0,  max: 80 },
     mrola:    { t: 'b', d: 1 },
+    manim:    { t: 'e', d: 'revelar', v: ['revelar', 'surge', 'nenhum'] },
+    mquando:  { t: 'e', d: 'trocou',  v: ['trocou', 'sempre'] },
+    mtempo:   { t: 'n', d: 7, min: 2, max: 120 },
     /* ---- feed de eventos ----
        Divide as chaves com o chat: os dois sao a mesma lista com origem
        diferente, e duplicar as opcoes so criaria dois lugares pra ajustar

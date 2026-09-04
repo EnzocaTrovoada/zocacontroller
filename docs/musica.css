@@ -19,7 +19,7 @@
 
 /* Sem nada tocando o overlay some. Um overlay preso na última música mente,
    e mentir na tela é pior do que não estar lá. */
-.mu--vazio .mu__caixa { opacity: 0; transform: translateY(8px); }
+.mu--vazio .mu__caixa { opacity: 0; pointer-events: none; }
 
 .mu__caixa {
   display: flex;
@@ -30,9 +30,13 @@
   padding: var(--mu-fpad);
   background: var(--mu-fundo);
   border-radius: var(--mu-raio);
-  transition: opacity .35s ease, transform .35s cubic-bezier(.22, 1, .36, 1);
   box-sizing: border-box;
+  /* Enquanto a barra ainda está esticando, o texto não pode vazar por fora
+     dela: é o corte que faz parecer que ele está SAINDO de dentro. */
+  overflow: hidden;
+  transform-origin: left center;
 }
+.mu--capa-direita .mu__caixa { transform-origin: right center; }
 .mu--capa-direita .mu__caixa { flex-direction: row-reverse; }
 
 .mu__capa {
@@ -120,3 +124,63 @@
 }
 .mu.is-editando .mu__caixa:hover { outline-color: #45B8BF; }
 .mu.is-editando .mu__caixa.pegando { outline: 1px solid #45B8BF; }
+
+/* ---------------------------------------------------------------------
+   A ENTRADA EM QUATRO TEMPOS
+
+   Nada → o quadrado cresce → a barra estica pra direita → o nome aparece.
+   Pra sumir, o mesmo de trás pra frente.
+
+   É uma animação só na caixa, e não três elementos animando junto: assim os
+   tempos não têm como sair de sincronia, e a largura vai do quadrado até o
+   fim sem um segundo elemento tentando acompanhar.
+
+   --mu-quad é o lado do quadrado fechado: a capa mais o respiro dos dois
+   lados. Sem ele a barra "esticaria" a partir do zero e o quadrado nunca
+   apareceria como quadrado.
+   --------------------------------------------------------------------- */
+.mu--revelar .mu__caixa {
+  animation: mu-abre 900ms cubic-bezier(.22, 1, .36, 1) forwards;
+}
+@keyframes mu-abre {
+  0%   { opacity: 0; width: var(--mu-quad); transform: scale(.2); }
+  18%  { opacity: 1; width: var(--mu-quad); transform: scale(1.08); }
+  30%  { opacity: 1; width: var(--mu-quad); transform: scale(1); }
+  100% { opacity: 1; width: var(--mu-larg); transform: scale(1); }
+}
+
+/* O texto entra depois que a barra já tem onde caber. */
+.mu--revelar .mu__texto { animation: mu-texto-entra 380ms ease 520ms both; }
+@keyframes mu-texto-entra {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.mu--fechando .mu__caixa {
+  animation: mu-fecha 700ms cubic-bezier(.5, 0, .75, 0) forwards;
+}
+@keyframes mu-fecha {
+  0%   { opacity: 1; width: var(--mu-larg); transform: scale(1); }
+  55%  { opacity: 1; width: var(--mu-quad); transform: scale(1); }
+  100% { opacity: 0; width: var(--mu-quad); transform: scale(.2); }
+}
+.mu--fechando .mu__texto { animation: mu-texto-sai 220ms ease forwards; }
+@keyframes mu-texto-sai {
+  to { opacity: 0; transform: translateX(-10px); }
+}
+
+/* "Surge" é a entrada simples, pra quem acha a de quatro tempos demais. */
+.mu--surge .mu__caixa { animation: mu-surge 420ms cubic-bezier(.22, 1, .36, 1) forwards; }
+@keyframes mu-surge {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: none; }
+}
+.mu--surge.mu--fechando .mu__caixa { animation: mu-surge-sai 320ms ease forwards; }
+@keyframes mu-surge-sai {
+  to { opacity: 0; transform: translateX(-16px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mu--revelar .mu__caixa, .mu--fechando .mu__caixa, .mu--surge .mu__caixa,
+  .mu--revelar .mu__texto, .mu--fechando .mu__texto { animation: none; }
+}
