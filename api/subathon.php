@@ -90,4 +90,18 @@ db()->prepare(
     $valores['teto_evento'] ?: 7200,
 ]);
 
-json_saida(['ok' => true]);
+/* A legenda do overlay vem daqui: quem define quanto vale uma sub é esta
+   tabela, então ela é publicada junto. Falhar aqui NÃO derruba a gravação —
+   a configuração já está salva, e o overlay pega na próxima. */
+$aviso = null;
+$pub = subathon_publica_valores([
+    'slug' => $slug, 'token' => $token,
+    'seg_sub1' => $valores['seg_sub1'], 'seg_sub2' => $valores['seg_sub2'],
+    'seg_sub3' => $valores['seg_sub3'], 'seg_bits' => $valores['seg_bits'],
+    'seg_follow' => $valores['seg_follow'], 'seg_real' => $valores['seg_real'],
+]);
+if (empty($pub['ok'])) {
+    $aviso = 'Salvei, mas não consegui atualizar a legenda no overlay: ' . $pub['erro'];
+}
+
+json_saida(['ok' => true, 'aviso' => $aviso]);

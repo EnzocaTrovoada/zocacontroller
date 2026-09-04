@@ -23,23 +23,92 @@ function subathon_config(int $usuario_id): ?array
  * Pausado guarda quanto falta; correndo guarda quando acaba. São contas
  * diferentes, e somar no campo errado faria o tempo sumir.
  */
-function subathon_gravar(array $c, int $segundos): array
+function rl_base(): string
 {
-    $base = rtrim(cfg()['relogio_base'] ?? 'https://relogio.zocahop.com', '/');
+    return rtrim(cfg()['relogio_base'] ?? 'https://relogio.zocahop.com', '/');
+}
 
-    $ch = curl_init($base . '/estilos/' . rawurlencode($c['slug']) . '.json?t=' . time());
+/** Lê o estilo publicado. Devolve null e a mensagem em $erro se não der. */
+function rl_ler_estilo(string $slug, ?string &$erro = null): ?array
+{
+    $ch = curl_init(rl_base() . '/estilos/' . rawurlencode($slug) . '.json?t=' . time());
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8]);
     $cru  = curl_exec($ch);
     $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
     if ($http !== 200 || !$cru) {
-        return ['ok' => false, 'erro' => 'Não achei o overlay do subathon. O link ainda existe?'];
+        $erro = 'Não achei o overlay do subathon. O link ainda existe?';
+        return null;
     }
     $estilo = json_decode($cru, true);
     if (!is_array($estilo)) {
-        return ['ok' => false, 'erro' => 'O overlay respondeu algo que não entendi.'];
+        $erro = 'O overlay respondeu algo que não entendi.';
+        return null;
     }
+    return $estilo;
+}
+
+/**
+ * Republica o estilo.
+ *
+ * $mexeNoTempo diz se as chaves de tempo do pedido valem. Só a soma de evento
+ * manda true; qualquer outra coisa manda false e o servidor do relógio guarda
+ * o tempo que já estava lá — é o que impede uma gravação de aparência de
+ * apagar os minutos que entraram de sub no meio do caminho.
+ */
+function rl_salvar_estilo(string $slug, string $token, array $estilo, bool $mexeNoTempo): array
+{
+    $ch = curl_init(rl_base() . '/salvar.php');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT        => 8,
+        CURLOPT_POSTFIELDS     => json_encode([
+            'acao'  => 'salvar', 'slug' => $slug, 'token' => $token,
+            'cfg'   => $estilo,  'tempo' => $mexeNoTempo ? 1 : 0,
+        ]),
+    ]);
+    $resp = json_decode((string) curl_exec($ch), true);
+    $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($http !== 200 || empty($resp['ok'])) {
+        return ['ok' => false, 'erro' => $resp['erro'] ?? 'O servidor do overlay recusou a gravação.'];
+    }
+    return ['ok' => true];
+}
+
+/**
+ * Manda pro overlay quanto vale cada coisa, pra ele desenhar a linha
+ * "SUB = 5 MIN · 100 BITS = 1 MIN" embaixo do cronômetro.
+ *
+ * Vai junto de cada gravação da configuração, então a legenda nunca fica
+ * dizendo um número que já mudou: quem manda continua sendo esta tabela, e o
+ * overlay só desenha. Zerado some sozinho lá.
+ */
+function subathon_publica_valores(array $c): array
+{
+    $erro = null;
+    $estilo = rl_ler_estilo($c['slug'], $erro);
+    if ($estilo === null) return ['ok' => false, 'erro' => $erro];
+
+    $estilo['vsub1']   = (int) $c['seg_sub1'];
+    $estilo['vsub2']   = (int) $c['seg_sub2'];
+    $estilo['vsub3']   = (int) $c['seg_sub3'];
+    $estilo['vbits']   = (int) $c['seg_bits'];
+    $estilo['vfollow'] = (int) $c['seg_follow'];
+    $estilo['vreal']   = (int) $c['seg_real'];
+
+    return rl_salvar_estilo($c['slug'], $c['token'], $estilo, false);
+}
+
+function subathon_gravar(array $c, int $segundos): array
+{
+    $erro = null;
+    $estilo = rl_ler_estilo($c['slug'], $erro);
+    if ($estilo === null) return ['ok' => false, 'erro' => $erro];
 
     $agora = time();
     if (($estilo['modo'] ?? 'pausado') === 'rodando') {
@@ -53,23 +122,10 @@ function subathon_gravar(array $c, int $segundos): array
         $restante = $estilo['restante'];
     }
 
-    $ch = curl_init($base . '/salvar.php');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_TIMEOUT        => 8,
-        CURLOPT_POSTFIELDS     => json_encode([
-            'acao' => 'salvar', 'slug' => $c['slug'], 'token' => $c['token'], 'cfg' => $estilo,
-        ]),
-    ]);
-    $resp = json_decode((string) curl_exec($ch), true);
-    $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    /* true: esta é a única gravação que PODE mexer no tempo. */
+    $r = rl_salvar_estilo($c['slug'], $c['token'], $estilo, true);
+    if (empty($r['ok'])) return $r;
 
-    if ($http !== 200 || empty($resp['ok'])) {
-        return ['ok' => false, 'erro' => $resp['erro'] ?? 'O servidor do overlay recusou a gravação.'];
-    }
     return ['ok' => true, 'restante' => $restante];
 }
 
