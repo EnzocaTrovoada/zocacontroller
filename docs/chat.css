@@ -1,0 +1,113 @@
+/* chat.css — o chat na tela.
+   ---------------------------------------------------------------------
+   A tipografia, a cor, o contorno, a sombra e o brilho vêm das variáveis
+   do clock.css: o overlay carrega os dois, e a raiz leva as classes .ch e
+   .rl juntas. Assim existe UM sistema de aparência, e não dois que
+   divergem com o tempo. */
+
+.ch {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  padding: var(--rl-my) var(--rl-mx);
+  box-sizing: border-box;
+  justify-content: var(--rl-justify);
+  align-items: var(--rl-valign);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+
+/* O palco é quem leva a perspectiva. Se ela fosse por mensagem, cada uma
+   teria o próprio ponto de fuga e o conjunto não pareceria um plano só. */
+.ch__palco {
+  width: var(--ch-larg);
+  max-width: 100%;
+}
+
+.ch__pista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ch-gap);
+  /* As novas entram embaixo: é a ordem que o olho já espera de um chat. */
+  justify-content: flex-end;
+}
+.ch--cima .ch__pista { justify-content: flex-start; }
+
+.ch__msg {
+  font-family: var(--rl-font);
+  font-size: var(--rl-size);
+  font-weight: var(--rl-weight);
+  font-style: var(--rl-style);
+  letter-spacing: var(--rl-track);
+  color: var(--rl-color);
+  line-height: 1.25;
+  /* Palavra gigante sem espaço não pode esticar a caixa e empurrar tudo. */
+  overflow-wrap: anywhere;
+  filter: var(--rl-filter);
+  -webkit-text-stroke: var(--rl-sw) var(--rl-sc);
+  paint-order: stroke fill;
+}
+
+.ch--bolha .ch__msg {
+  background: var(--ch-bolha);
+  border-radius: var(--ch-braio);
+  padding: var(--ch-bpad) calc(var(--ch-bpad) * 1.5);
+  /* A bolha acompanha o texto em vez de esticar até a borda: uma mensagem
+     de duas palavras numa faixa larga fica ridícula. */
+  width: fit-content;
+  max-width: 100%;
+}
+.ch.is-dir-right .ch--bolha .ch__msg { margin-left: auto; }
+
+.ch__nick {
+  display: block;
+  font-size: calc(var(--rl-size) * var(--ch-nick));
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.ch--nick-linha .ch__nick { display: inline; }
+.ch--nick-linha .ch__nick i { font-style: normal; opacity: .55; padding: 0 .35em; }
+.ch--nick-abaixo .ch__msg { display: flex; flex-direction: column-reverse; }
+.ch--sem-nick .ch__nick { display: none; }
+
+.ch__emote {
+  display: inline-block;
+  height: 1.35em;
+  vertical-align: -.32em;
+  margin: 0 .06em;
+}
+
+/* Entrada e saída. Curtas de propósito: numa live movimentada, animação
+   longa faz a lista inteira parecer que está tremendo. */
+.ch__entra { animation: ch-entra .28s cubic-bezier(.22, 1, .36, 1); }
+.ch__sai {
+  animation: ch-sai .35s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes ch-entra {
+  from { opacity: 0; transform: translateY(10px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes ch-sai {
+  to { opacity: 0; transform: translateX(-14px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ch__entra { animation: none; }
+  .ch__sai { animation: ch-sai .01s linear forwards; }
+}
+
+/* MODO EDIÇÃO — igual ao dos outros overlays: o tracejado é a única forma
+   de saber onde a caixa começa quando o fundo é transparente. Só existe
+   dentro do editor; a fonte no OBS nunca recebe esta classe. */
+.ch.is-editando { pointer-events: auto; }
+.ch.is-editando .ch__palco {
+  outline: 1px dashed rgba(255, 255, 255, .35);
+  outline-offset: 4px;
+  cursor: move;
+}
+.ch.is-editando .ch__palco:hover { outline-color: #45B8BF; }
+.ch.is-editando .ch__palco.pegando { outline: 1px solid #45B8BF; }

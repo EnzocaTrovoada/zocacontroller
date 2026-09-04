@@ -90,7 +90,33 @@
       'Europe/Moscow', 'Africa/Luanda', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Shanghai',
       'Asia/Dubai', 'Australia/Sydney', 'Pacific/Auckland', 'UTC'
     ] },
-    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta'] },
+    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat'] },
+    /* ---- chat na tela ----
+       Mora no mesmo esquema dos outros de proposito: assim o chatbox herda
+       fonte, cor, contorno, sombra, brilho e caixa de fundo sem existir um
+       segundo sistema de aparencia pra divergir com o tempo. */
+    canal:    { t: 't', d: '', max: 25 },
+    cmax:     { t: 'n', d: 8,   min: 1,  max: 40 },
+    cdir:     { t: 'e', d: 'baixo', v: ['baixo', 'cima'] },
+    cvida:    { t: 'n', d: 0,   min: 0,  max: 600 },
+    clarg:    { t: 'n', d: 420, min: 120, max: 1600 },
+    cgap:     { t: 'n', d: 10,  min: 0,  max: 60 },
+    cnick:    { t: 'b', d: 1 },
+    cnickpos: { t: 'e', d: 'acima', v: ['acima', 'linha', 'abaixo'] },
+    cnicksize:{ t: 'n', d: 90,  min: 30, max: 200 },
+    cnickcor: { t: 'c', d: '#8fd07a' },
+    cnickauto:{ t: 'b', d: 1 },
+    csep:     { t: 't', d: ':', max: 4 },
+    cemotes:  { t: 'b', d: 1 },
+    cbolha:   { t: 'b', d: 0 },
+    cbcor:    { t: 'c', d: '#000000' },
+    cbopac:   { t: 'n', d: 45,  min: 0,  max: 100 },
+    cbraio:   { t: 'n', d: 10,  min: 0,  max: 60 },
+    cbpad:    { t: 'n', d: 8,   min: 0,  max: 40 },
+    c3d:      { t: 'b', d: 0 },
+    c3dang:   { t: 'n', d: 18,  min: -60, max: 60 },
+    c3dprof:  { t: 'n', d: 600, min: 120, max: 3000 },
+    cgirar:   { t: 'n', d: 0,   min: -30, max: 30 },
     /* Onde cada peca fica. Sai de zero, entao overlay antigo nao se mexe.
        Quem escreve aqui e o arrasto no editor, nao a pessoa digitando. */
     nx:       { t: 'n', d: 0, min: -2000, max: 2000 },
@@ -1081,6 +1107,11 @@
   }
 
   global.Relogio = {
+    /* O chat.js usa os dois. Sao a MESMA aparencia dos outros overlays: se
+       ele tivesse a propria, existiriam dois sistemas de cor e tipografia
+       pra divergir com o tempo. */
+    rgba: rgba,
+    aplicaEstilo: aplicaEstilo,
     TZ: TZ,
     FONTS: FONTS,
     SCHEMA: SCHEMA,

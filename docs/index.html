@@ -275,7 +275,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=2"></script>
+<script src="clock.js?v=3"></script>
 <script>
 'use strict';
 
@@ -332,6 +332,7 @@ const TIPOS = {
   relogio:  { nome: 'Relógio',  txt: 'A hora, do fuso que você escolher' },
   contador: { nome: 'Contador', txt: 'Mortes, vitórias, o que for' },
   placar:   { nome: 'Placar',   txt: 'Dois números, um contra o outro' },
+  chat:     { nome: 'Chat',     txt: 'As mensagens do seu chat na tela' },
 };
 
 /* Padrões que já nascem bonitos. Um leigo não quer escolher opacidade de
@@ -354,6 +355,16 @@ function padraoDe(tipo) {
     return Object.assign(base, {
       modo: 'pausado', restante: 3600, horas: 1, fimtxt: 'ACABOU', titulo: 'SUBATHON',
       sanim: 'subir', spopc: '#7CE07C', spopt: 55, spulso: 1, surg: 5, surgc: '#FF4D4D', leg: 1,
+    });
+  }
+  if (tipo === 'chat') {
+    return Object.assign(base, {
+      titulo: '', font: 'Archivo', size: 22, weight: 600, color: '#FFFFFF',
+      sw: 0, glow: 0, shx: 0, shy: 2, shb: 6, sho: 70, shc: '#000000',
+      canal: '', cmax: 8, cdir: 'baixo', clarg: 420, cgap: 10,
+      cnick: 1, cnickpos: 'acima', cnicksize: 90, cnickcor: verde, cnickauto: 1,
+      cemotes: 1, cbolha: 0, cbcor: '#000000', cbopac: 45, cbraio: 10, cbpad: 8,
+      c3d: 0, c3dang: 18, c3dprof: 600, cgirar: 0,
     });
   }
   if (tipo === 'contador') return Object.assign(base, { titulo: 'MORTES', valor: 0 });
@@ -397,6 +408,48 @@ const GRUPOS = [
     { k: 'modo',   l: 'Estado', c: 'lista', se: so('subathon'),
       ops: [['pausado', 'Pausado'], ['rodando', 'Correndo']] },
     { k: '_tempo', l: 'Tempo', c: 'tempo', se: so('subathon') },
+  ] },
+
+  { t: 'O chat', aberto: true, se: so('chat'), itens: [
+    { k: 'canal', l: 'Canal da Twitch', c: 'texto',
+      dica: 'o nome do canal, sem @ e sem o link. Lê sem login e sem bot.' },
+    { k: 'cmax',  l: 'Quantas mensagens', c: 'faixa', min: 1, max: 40,
+      dica: '1 mostra só a última, grande' },
+    { k: 'cdir',  l: 'Mensagem nova entra', c: 'lista',
+      ops: [['baixo', 'Por baixo'], ['cima', 'Por cima']] },
+    { k: 'cvida', l: 'Some depois de', c: 'faixa', min: 0, max: 300, u: 's',
+      dica: '0 deixa na tela até sair pela contagem acima' },
+    { k: 'clarg', l: 'Largura da caixa', c: 'faixa', min: 120, max: 1600, u: 'px' },
+    { k: 'cgap',  l: 'Espaço entre elas', c: 'faixa', min: 0, max: 60, u: 'px' },
+    { k: 'cemotes', l: 'Mostrar emotes', c: 'chave' },
+  ] },
+
+  { t: 'O nome de quem fala', se: so('chat'), itens: [
+    { k: 'cnick',    l: 'Mostrar o nome', c: 'chave' },
+    { k: 'cnickpos', l: 'Onde fica', c: 'lista', se: (c) => !!c.cnick,
+      ops: [['acima', 'Acima da mensagem'], ['linha', 'Na mesma linha'], ['abaixo', 'Abaixo da mensagem']] },
+    { k: 'csep',     l: 'Separador', c: 'texto', se: (c) => c.cnick && c.cnickpos === 'linha' },
+    { k: 'cnickauto', l: 'Usar a cor da pessoa', c: 'chave', se: (c) => !!c.cnick,
+      dica: 'cada um aparece com a cor que escolheu na Twitch' },
+    { k: 'cnickcor', l: 'Cor do nome', c: 'cor', se: (c) => c.cnick && !c.cnickauto },
+    { k: 'cnicksize', l: 'Tamanho do nome', c: 'faixa', min: 30, max: 200, u: '%', se: (c) => !!c.cnick },
+  ] },
+
+  { t: 'Balão atrás da mensagem', se: so('chat'), itens: [
+    { k: 'cbolha', l: 'Mostrar balão', c: 'chave' },
+    { k: 'cbcor',  l: 'Cor', c: 'cor', se: (c) => !!c.cbolha },
+    { k: 'cbopac', l: 'Opacidade', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => !!c.cbolha },
+    { k: 'cbraio', l: 'Cantos', c: 'faixa', min: 0, max: 60, u: 'px', se: (c) => !!c.cbolha },
+    { k: 'cbpad',  l: 'Respiro', c: 'faixa', min: 0, max: 40, u: 'px', se: (c) => !!c.cbolha },
+  ] },
+
+  { t: 'Perspectiva', se: so('chat'), itens: [
+    { k: 'c3d',    l: 'Inclinar em 3D', c: 'chave',
+      dica: 'o efeito de Star Wars: a lista deita pra trás e foge no horizonte' },
+    { k: 'c3dang', l: 'Inclinação', c: 'faixa', min: -60, max: 60, u: '°', se: (c) => !!c.c3d },
+    { k: 'c3dprof', l: 'Profundidade', c: 'faixa', min: 120, max: 3000, u: 'px', se: (c) => !!c.c3d,
+      dica: 'menor deforma mais' },
+    { k: 'cgirar', l: 'Girar', c: 'faixa', min: -30, max: 30, u: '°' },
   ] },
 
   { t: 'Quando entra tempo', se: so('subathon'), itens: [
@@ -523,9 +576,18 @@ const observador = ('IntersectionObserver' in window) ? new IntersectionObserver
   });
 }, { rootMargin: '150px' }) : null;
 
+let exemploPendente = null;
 function manda() {
   if (!quadro || !quadro.contentWindow) return;
   try { quadro.contentWindow.postMessage({ type: 'zc:config', config: cfg }, location.origin); } catch (e) {}
+  /* Trocar de tipo remonta o desenhista e esvazia a lista. Repovoo depois de
+     um respiro, e so uma vez por rajada de ajustes. */
+  if (cfg.tipo === 'chat') {
+    clearTimeout(exemploPendente);
+    exemploPendente = setTimeout(() => {
+      try { quadro.contentWindow.postMessage({ type: 'zc:exemplo' }, location.origin); } catch (e) {}
+    }, 120);
+  }
 }
 
 function mudou(k, v) {
@@ -773,7 +835,12 @@ function telaEditor(perfil, tipoNovo) {
     manda();
     /* Só a prévia entra em modo edição. A fonte que roda no OBS nunca
        recebe esta mensagem, então lá não existe tracejado nem arrasto. */
-    try { quadro.contentWindow.postMessage({ type: 'zc:editar', on: true }, location.origin); } catch (e) {}
+    try {
+      quadro.contentWindow.postMessage({ type: 'zc:editar', on: true }, location.origin);
+      /* O chat so tem o que mostrar quando alguem fala. No editor isso
+         significaria uma tela vazia, entao peco frases de mentira. */
+      if (cfg.tipo === 'chat') quadro.contentWindow.postMessage({ type: 'zc:exemplo' }, location.origin);
+    } catch (e) {}
   };
 
   const controles = h('div', { cls: 'controles' });

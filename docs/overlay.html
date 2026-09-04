@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="clock.css?v=3">
+<link rel="stylesheet" href="chat.css?v=1">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
@@ -17,7 +18,8 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=2"></script>
+<script src="clock.js?v=3"></script>
+<script src="chat.js?v=2"></script>
 <script>
 (function () {
   'use strict';
@@ -31,7 +33,31 @@
   var k = (new URLSearchParams(location.search).get('k') || '')
             .replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
 
-  var relogio = Relogio.mount(raiz, Relogio.parseConfig());
+  /* DOIS DESENHISTAS, UMA PAGINA.
+     O chat e uma LISTA que cresce; os outros sao um texto que se reescreve.
+     Forcar os dois no mesmo motor deixaria os dois piores — entao a pagina
+     troca de desenhista quando o tipo muda, e o resto (busca, previa,
+     arrasto) nao precisa saber qual dos dois esta montado. */
+  var atual = null;
+  var relogio = null;
+
+  function montaPara(config) {
+    var querChat = (config && config.tipo) === 'chat';
+    if (atual === (querChat ? 'chat' : 'relogio')) return false;
+    if (relogio) relogio.destroy();
+    raiz.className = '';
+    raiz.innerHTML = '';
+    relogio = querChat ? Chat.mount(raiz, config) : Relogio.mount(raiz, config);
+    atual = querChat ? 'chat' : 'relogio';
+    return true;
+  }
+
+  function desenha(config) {
+    /* Se acabou de montar, o mount ja recebeu a config. */
+    if (!montaPara(config)) relogio.update(config);
+  }
+
+  montaPara(Relogio.parseConfig());
 
   /* PREVIEW DO EDITOR.
      O hub mostra este mesmo arquivo num iframe e manda a config a cada
@@ -42,8 +68,11 @@
     if (e.origin !== location.origin) return;
     var d = e.data;
     if (!d) return;
-    if (d.type === 'zc:config') relogio.update(d.config);
+    if (d.type === 'zc:config') desenha(d.config);
     if (d.type === 'zc:editar') ligaEdicao(!!d.on);
+    /* Sem isso o editor do chat abre vazio e a pessoa nao ve o que esta
+       ajustando ate alguem falar no chat naquele instante. */
+    if (d.type === 'zc:exemplo' && relogio && relogio.exemplo) relogio.exemplo();
   });
 
   /* ------------------------------------------------------------------
@@ -63,6 +92,9 @@
     ['.rl__time',  'nx', 'ny', 'numero'],
     ['.rl__date',  'tx', 'ty', 'nome'],
     ['.rl__barra', 'bx', 'by', 'barra'],
+    /* O chat tem uma caixa só: ela usa as mesmas chaves do número, porque
+       nenhum overlay é chat E relógio ao mesmo tempo. */
+    ['.ch__palco', 'nx', 'ny', 'caixa'],
   ];
 
   var editando = false, arrasto = null;
@@ -115,8 +147,16 @@
       if (Math.abs(e.clientX - arrasto.x0) > Math.abs(e.clientY - arrasto.y0)) y = arrasto.vy;
       else x = arrasto.vx;
     }
-    raiz.style.setProperty('--rl-' + arrasto.kx, x + 'px');
-    raiz.style.setProperty('--rl-' + arrasto.ky, y + 'px');
+    if (atual === 'chat') {
+      /* O chat monta o transform inteiro no JS (perspectiva + giro), então
+         mexer só na variável não teria efeito: peço a ele pra redesenhar. */
+      var c = relogio.config();
+      c[arrasto.kx] = x; c[arrasto.ky] = y;
+      relogio.update(c);
+    } else {
+      raiz.style.setProperty('--rl-' + arrasto.kx, x + 'px');
+      raiz.style.setProperty('--rl-' + arrasto.ky, y + 'px');
+    }
     var d = {}; d[arrasto.kx] = x; d[arrasto.ky] = y;
     avisa('zc:moveu', { valores: d });
   });
@@ -160,7 +200,7 @@
         var s = JSON.stringify(j.config);
         if (s === ultimo) return;
         ultimo = s;
-        relogio.update(j.config);
+        desenha(j.config);
       })
       ['catch'](function () { /* servidor fora: fica com o que já está na tela */ })
       ['finally'](function () { buscando = false; });
