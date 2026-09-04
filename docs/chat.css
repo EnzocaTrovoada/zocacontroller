@@ -24,6 +24,8 @@
 .ch__palco {
   width: var(--ch-larg);
   max-width: 100%;
+  /* âncora da alça de tamanho, que é absoluta */
+  position: relative;
 }
 
 .ch__pista {

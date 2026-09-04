@@ -6,8 +6,8 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="clock.css?v=3">
-<link rel="stylesheet" href="chat.css?v=1">
+<link rel="stylesheet" href="clock.css?v=4">
+<link rel="stylesheet" href="chat.css?v=2">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
@@ -67,6 +67,8 @@
     raiz.innerHTML = '';
     relogio = querChat ? Chat.mount(raiz, config) : Relogio.mount(raiz, config);
     atual = querChat ? 'chat' : 'relogio';
+    raiz.classList.toggle('is-editando', editando);
+    poeAlca();
     return true;
   }
 
@@ -117,10 +119,41 @@
 
   var editando = false, arrasto = null;
 
+  /* A alça de tamanho nasce junto do modo edição e morre com ele: a fonte
+     que roda no OBS nunca recebe essa mensagem, então lá ela não existe. */
+  var alca = null;
+
+  function poeAlca() {
+    if (alca && alca.parentNode) alca.parentNode.removeChild(alca);
+    alca = null;
+    if (!editando) return;
+
+    var dono = raiz.querySelector('.ch__palco') || raiz.querySelector('.rl__box');
+    if (!dono) return;
+    alca = document.createElement('i');
+    alca.className = 'rl__alca';
+    alca.title = 'Puxe pro lado pra alargar, pra baixo pra aumentar a letra';
+    dono.appendChild(alca);
+
+    alca.addEventListener('pointerdown', function (e) {
+      var c = relogio.config();
+      arrasto = {
+        alca: true, el: alca,
+        x0: e.clientX, y0: e.clientY,
+        larg: c.clarg || 0, tam: c.size || 0,
+        temLarg: atual === 'chat',
+      };
+      try { alca.setPointerCapture(e.pointerId); } catch (err) {}
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  }
+
   function ligaEdicao(on) {
     editando = on;
     raiz.classList.toggle('is-editando', on);
     if (!on && arrasto) soltar();
+    poeAlca();
   }
 
   function avisa(tipo, dados) {
@@ -129,7 +162,7 @@
 
   function soltar() {
     if (!arrasto) return;
-    arrasto.el.classList.remove('pegando');
+    if (arrasto.el && arrasto.el.classList) arrasto.el.classList.remove('pegando');
     avisa('zc:soltou', {});
     arrasto = null;
   }
@@ -157,6 +190,22 @@
 
   raiz.addEventListener('pointermove', function (e) {
     if (!arrasto) return;
+
+    if (arrasto.alca) {
+      /* Horizontal muda a largura da caixa; vertical muda o tamanho da
+         letra. Dois eixos, duas coisas — é o que dá pra fazer sem inventar
+         um segundo sistema de medida só pro editor. */
+      var c = relogio.config();
+      var novo = {};
+      for (var k in c) novo[k] = c[k];
+      if (arrasto.temLarg) novo.clarg = Math.max(120, Math.min(1600, arrasto.larg + (e.clientX - arrasto.x0)));
+      novo.size = Math.max(10, Math.min(400, Math.round(arrasto.tam + (e.clientY - arrasto.y0) * 0.4)));
+      relogio.update(novo);
+      poeAlca();
+      avisa('zc:moveu', { valores: arrasto.temLarg ? { clarg: novo.clarg, size: novo.size } : { size: novo.size } });
+      return;
+    }
+
     var x = Math.round(arrasto.vx + (e.clientX - arrasto.x0));
     var y = Math.round(arrasto.vy + (e.clientY - arrasto.y0));
     /* Segurando Shift, trava no eixo que andou mais. Copiado do Photoshop

@@ -380,3 +380,26 @@
 .rl.is-editando .rl__time,
 .rl.is-editando .rl__date,
 .rl.is-editando .rl__barra { pointer-events: auto; }
+
+/* ---------------------------------------------------------------------
+   ALÇA DE TAMANHO
+
+   Só no editor. Fica no canto de baixo à direita, como em qualquer
+   programa de desenho: puxar pro lado alarga, puxar pra baixo aumenta a
+   letra. É o gesto que a pessoa já sabe sem ninguém explicar.
+   --------------------------------------------------------------------- */
+.rl__alca {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  right: -8px;
+  bottom: -8px;
+  border-radius: 3px;
+  background: #45B8BF;
+  border: 2px solid #0F171C;
+  cursor: nwse-resize;
+  display: none;
+  z-index: 5;
+}
+.rl.is-editando .rl__alca,
+.ch.is-editando .rl__alca { display: block; }

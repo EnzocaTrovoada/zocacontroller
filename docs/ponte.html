@@ -1367,13 +1367,26 @@ async function carregarComandos() {
       .forEach((n) => SUPERMODS.add(n));
 
     for (const c of (d.comandos || [])) {
-      const base = ACOES[c.acao];
-      if (!base || ACOES[c.nome]) continue;      // nome de fábrica não se troca
+      if (ACOES[c.nome]) continue;               // nome de fábrica não se troca
+
+      /* O servidor entrega sempre uma lista, mesmo pros de um passo só. */
+      const passos = (c.passos || []).filter((p) => ACOES[p.acao]);
+      if (!passos.length) continue;
+
       ACOES[c.nome] = {
         apelido: true,
         minimo: c.quem || 'mod',
         espera: Math.max(1, c.espera || 5) * 1000,
-        fazer: (quem, arg) => base.fazer(quem, c.argumento || arg),
+        fazer: async (quem, arg) => {
+          /* Em sequência, e não todas de uma vez: "!sumir" precisa mutar
+             ANTES de trocar de cena, senão o microfone fica aberto no meio
+             do corte. E um passo que falha não derruba os outros — meio
+             comando feito é melhor que nenhum quando você quer sumir. */
+          for (const p of passos) {
+            try { await ACOES[p.acao].fazer(quem, p.argumento || arg); }
+            catch (e) { recado('!' + c.nome + ' — ' + p.acao + ': ' + e.message); }
+          }
+        },
       };
     }
   } catch (e) { /* sem internet: fica com os de fábrica */ }

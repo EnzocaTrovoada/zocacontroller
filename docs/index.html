@@ -1133,15 +1133,48 @@ function telaComandos() {
   meus.appendChild(listaMeus);
 
   const cNome = h('input', { type: 'text', placeholder: 'brb' });
-  const cAcao = h('select');
-  DE_FABRICA.forEach((c) => cAcao.appendChild(h('option', { value: c[0], txt: c[0] })));
-  /* Textarea, e nao input de uma linha: o argumento as vezes e o nome de uma
-     cena, mas as vezes e uma frase inteira. */
-  const cArg = h('textarea', {
-    placeholder: 'Cenário BRB',
-    rows: '3',
-    style: 'width:100%;font:13px var(--mono);color:var(--tinta);background:var(--fundo);border:1px solid var(--linha);padding:8px;border-radius:4px;resize:vertical',
-  });
+
+  /* OS PASSOS.
+
+     Um comando não é mais um apelido pra uma ação: é uma sequência. Na
+     prática o que a pessoa quer é "sair da mesa" — mutar E esconder a câmera
+     E trocar de cena, com um comando só.
+
+     A ordem importa e é a que está na tela: mutar antes de trocar de cena,
+     senão o microfone fica aberto no meio do corte. */
+  const listaPassos = h('div');
+  let passos = [{ acao: 'cena', argumento: '' }];
+
+  function pintaPassos() {
+    listaPassos.innerHTML = '';
+    passos.forEach((p, i) => {
+      const sel = h('select', { style: 'flex:0 0 130px' });
+      DE_FABRICA.forEach((c) => {
+        const o = h('option', { value: c[0], txt: c[0] });
+        if (c[0] === p.acao) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = () => { p.acao = sel.value; };
+
+      const arg = h('input', { type: 'text', placeholder: 'sem argumento', style: 'flex:1 1 130px' });
+      arg.value = p.argumento || '';
+      arg.oninput = () => { p.argumento = arg.value; };
+
+      const tirar = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×', title: 'Tirar este passo' });
+      tirar.onclick = () => { passos.splice(i, 1); if (!passos.length) passos = [{ acao: 'cena', argumento: '' }]; pintaPassos(); };
+
+      listaPassos.appendChild(h('div', { cls: 'campo' }, [
+        h('span', { style: 'flex:0 0 20px;font-size:12px;color:var(--apagado)', txt: (i + 1) + '.' }),
+        sel, arg, tirar,
+      ]));
+    });
+
+    const mais = h('button', { cls: 'bt mini', type: 'button', txt: '+ mais uma ação' });
+    mais.disabled = passos.length >= 8;
+    mais.onclick = () => { passos.push({ acao: 'mute', argumento: '' }); pintaPassos(); };
+    listaPassos.appendChild(h('p', { style: 'margin:4px 0 0' }, [mais]));
+  }
+  pintaPassos();
   const cQuem = h('select');
   /* Quem esta em cima pode tudo que os de baixo podem: liberar pra "subs"
      tambem libera pra VIP e mod. */
@@ -1162,10 +1195,11 @@ function telaComandos() {
     salvar.disabled = true;
     try {
       await api('/comandos.php', { method: 'POST', body: JSON.stringify({
-        acao: 'salvar', id: editandoCmd, nome: cNome.value, destino: cAcao.value,
-        argumento: cArg.value, quem: cQuem.value, espera: parseInt(cEspera.value, 10) || 5,
+        acao: 'salvar', id: editandoCmd, nome: cNome.value, passos: passos,
+        quem: cQuem.value, espera: parseInt(cEspera.value, 10) || 5,
       }) });
-      cNome.value = ''; cArg.value = ''; editandoCmd = null;
+      cNome.value = ''; passos = [{ acao: 'cena', argumento: '' }]; pintaPassos();
+      editandoCmd = null;
       salvar.textContent = 'Criar comando';
       recado('Pronto. A fonte do OBS pega em até 5 minutos, ou na hora se você recarregar ela.', 'bom');
       pintaMeus();
@@ -1175,12 +1209,10 @@ function telaComandos() {
 
   meus.append(
     h('div', { cls: 'campo' }, [h('label', { txt: 'Nome (sem o !)' }), cNome]),
-    h('div', { cls: 'campo' }, [h('label', { txt: 'Faz o quê' }), cAcao]),
-    h('div', {}, [
-      h('div', { cls: 'campo', style: 'align-items:flex-start' }, [h('label', { txt: 'Com qual argumento' }), cArg]),
-      h('p', { style: 'margin:-4px 0 12px;font-size:11.5px;color:var(--apagado)',
-               txt: 'o nome de uma cena, de uma fonte, ou o texto de uma enquete' }),
-    ]),
+    h('p', { style: 'margin:14px 0 4px;font-size:13px;color:var(--fraco)', txt: 'Faz o quê, nesta ordem' }),
+    listaPassos,
+    h('p', { style: 'margin:6px 0 12px;font-size:11.5px;color:var(--apagado)',
+             txt: 'o argumento é o nome de uma cena, de uma fonte, ou o texto de uma enquete — deixe vazio no que não precisa' }),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Quem pode usar' }), cQuem]),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Espera entre usos (s)' }), cEspera]),
     h('p', { style: 'margin:6px 0 12px' }, [salvar]),
@@ -1199,9 +1231,15 @@ function telaComandos() {
     lista.forEach((c) => {
       const ed = h('button', { cls: 'bt mini', type: 'button', txt: 'Editar' });
       ed.onclick = () => {
-        editandoCmd = c.id; cNome.value = c.nome; cAcao.value = c.acao;
-        cArg.value = c.argumento || ''; cQuem.value = c.quem; cEspera.value = c.espera;
+        editandoCmd = c.id;
+        cNome.value = c.nome;
+        /* O servidor entrega sempre uma lista, mesmo pros de um passo só. */
+        passos = (c.passos && c.passos.length ? c.passos : [{ acao: c.acao, argumento: c.argumento }])
+          .map((p) => ({ acao: p.acao, argumento: p.argumento || '' }));
+        pintaPassos();
+        cQuem.value = c.quem; cEspera.value = c.espera;
         salvar.textContent = 'Salvar alterações';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       };
       const ap = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'Apagar' });
       ap.onclick = async () => {
@@ -1211,7 +1249,9 @@ function telaComandos() {
       };
       listaMeus.appendChild(h('div', { cls: 'campo' }, [
         h('code', { txt: '!' + c.nome, style: 'flex:0 0 96px;background:var(--fundo);border:1px solid var(--linha);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--verde-forte)' }),
-        h('label', { txt: c.acao + (c.argumento ? ' ' + c.argumento : '') + ' \u00b7 ' + c.quem + ' \u00b7 ' + c.espera + 's' }),
+        h('label', { txt: (c.passos || [{ acao: c.acao, argumento: c.argumento }])
+            .map((p) => p.acao + (p.argumento ? ' ' + p.argumento : '')).join('  →  ')
+            + '  ·  ' + c.quem + '  ·  ' + c.espera + 's' }),
         ed, ap,
       ]));
     });
@@ -1222,7 +1262,7 @@ function telaComandos() {
 
 /* A prévia devolve o arrasto por mensagem. Só aceito da mesma origem, e só
    as chaves de posição — nada mais entra na config por este caminho. */
-const CHAVES_DE_POSICAO = ['nx', 'ny', 'tx', 'ty', 'bx', 'by'];
+const CHAVES_DE_POSICAO = ['nx', 'ny', 'tx', 'ty', 'bx', 'by', 'clarg', 'size'];
 const PECA_PRO_CAMPO = { numero: 'size', nome: 'titulo', barra: 'bcor' };
 
 window.addEventListener('message', (e) => {
