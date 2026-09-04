@@ -90,6 +90,6 @@ try {
  * no # do endereco. O # nunca chega ao servidor, entao a chave nao entra em
  * log nenhum — e la ela ja vem montada dentro de todos os links.
  */
-$hub = (cfg()['hub'] ?? 'https://mods.zocahop.com/meu.html') . '#' . rawurlencode($chave);
+$hub = (cfg()['hub'] ?? 'https://mods.zocahop.com/') . '#' . rawurlencode($chave);
 header('Location: ' . $hub);
 exit;

@@ -128,21 +128,9 @@
   .editor { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; }
   .palco {
     position: sticky; top: 74px;
-    border: 1px solid var(--linha); border-radius: 6px; overflow: hidden; background: var(--caixa2);
-    background-image:
-      linear-gradient(45deg, var(--linha) 25%, transparent 25%, transparent 75%, var(--linha) 75%),
-      linear-gradient(45deg, var(--linha) 25%, transparent 25%, transparent 75%, var(--linha) 75%);
-    background-size: 18px 18px; background-position: 0 0, 9px 9px;
+    border: 1px solid var(--linha); border-radius: 6px; overflow: hidden;
   }
-  /* Xadrez ESCURO mesmo no tema claro: overlay de live é quase sempre texto
-     claro, e num palco branco a barra vazia e o contorno somem — o preview
-     mentiria justo sobre o que a pessoa está ajustando. */
-  .palco {
-    background-color: #23282A;
-    background-image:
-      linear-gradient(45deg, #2E3436 25%, transparent 25%, transparent 75%, #2E3436 75%),
-      linear-gradient(45deg, #2E3436 25%, transparent 25%, transparent 75%, #2E3436 75%);
-  }
+
   .palco iframe { display: block; width: 100%; height: 300px; border: 0; }
   .controles > details {
     border: 1px solid var(--linha); border-radius: 6px; background: var(--caixa); margin-bottom: 8px;
@@ -184,6 +172,48 @@
   .chave input:checked + span::after { transform: translateX(18px); }
   .tempoBotoes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
 
+  /* ---------- segredos ---------- */
+  .segredo {
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid var(--linha); border-radius: 5px; background: var(--fundo);
+    padding: 4px 4px 4px 10px; min-width: 0;
+  }
+  .segredo .txt {
+    flex: 1; min-width: 0; font: 13px var(--mono); color: var(--tinta);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    letter-spacing: .02em;
+  }
+  .segredo .txt.tapado { color: var(--apagado); letter-spacing: .16em; user-select: none; }
+  .segredo .txt.aberto { user-select: all; }
+  .olho {
+    flex: none; border: 0; background: none; cursor: pointer; font-size: 15px;
+    padding: 5px 7px; border-radius: 4px; color: var(--fraco); line-height: 1;
+  }
+  .olho:hover { background: var(--verde-fraco); }
+
+  .fatia { border: 1px solid var(--linha); border-radius: 6px; background: var(--caixa); padding: 16px; margin-bottom: 12px; }
+  .fatia h3 { font: 600 15px var(--disp); margin: 0 0 4px; }
+  .fatia p.d { margin: 0 0 12px; font-size: 12.5px; color: var(--apagado); max-width: 62ch; }
+  .aviso {
+    border-left: 3px solid var(--perigo); background: var(--caixa2);
+    padding: 10px 12px; font-size: 12.5px; color: var(--fraco); margin: 10px 0 0; border-radius: 0 4px 4px 0;
+  }
+
+  /* Xadrez escuro tipo PNG: é o fundo honesto pra mostrar overlay, que é
+     quase sempre texto claro e vive por cima da imagem do jogo. */
+  .xadrez {
+    background-color: #23282A;
+    background-image:
+      linear-gradient(45deg, #2E3436 25%, transparent 25%, transparent 75%, #2E3436 75%),
+      linear-gradient(45deg, #2E3436 25%, transparent 25%, transparent 75%, #2E3436 75%);
+    background-size: 18px 18px; background-position: 0 0, 9px 9px;
+  }
+  .cartao .previa {
+    height: 108px; margin: -15px -16px 2px; border-bottom: 1px solid var(--linha);
+    border-radius: 6px 6px 0 0; overflow: hidden; position: relative;
+  }
+  .cartao .previa iframe { width: 200%; height: 216px; border: 0; transform: scale(.5); transform-origin: 0 0; }
+
   #recado { min-height: 22px; font-size: 13px; margin: 12px 0 0; }
   #recado.bom { color: var(--verde-forte); } #recado.ruim { color: var(--perigo); }
   .escondido { display: none !important; }
@@ -216,6 +246,8 @@
     Ferramentas <i></i>
     <span class="bandeja" id="bandejaFerramentas"></span>
   </button>
+
+  <button class="aba" id="abaMeu" type="button">Meu Controller</button>
 
   <span class="espaco"></span>
   <button class="lua" id="btTema" type="button" title="Trocar tema" aria-label="Trocar tema">🌙</button>
@@ -253,12 +285,20 @@ el('btTema').onclick = () => {
 };
 
 /* ---------------- chave do painel ---------------- */
+/* A CHAVE NUNCA FICA NA BARRA DE ENDEREÇOS.
+   Ela chega de dois jeitos: no # (é assim que o entrar.php manda, porque o #
+   não chega ao servidor e não entra em log nenhum) ou no ?chave= de um link
+   antigo. Nos dois casos ela é guardada e o endereço é reescrito na hora —
+   senão bastava abrir o painel numa live pra chave inteira aparecer na tela.
+   O # também é o roteador aqui: o que começa com "/" é rota, o resto é chave. */
 let chave = '';
 try {
-  const naUrl = new URLSearchParams(location.search).get('chave');
-  if (naUrl) {
-    sessionStorage.setItem('zc:chave', naUrl.trim());
-    history.replaceState(null, '', location.pathname + location.hash);
+  const cru = decodeURIComponent((location.hash || '').slice(1));
+  const naBusca = new URLSearchParams(location.search).get('chave');
+  const achada = (cru && cru[0] !== '/') ? cru : (naBusca || '');
+  if (achada) {
+    sessionStorage.setItem('zc:chave', achada.trim());
+    history.replaceState(null, '', location.pathname + '#/overlays');
   }
   chave = sessionStorage.getItem('zc:chave') || '';
 } catch (e) { chave = new URLSearchParams(location.search).get('chave') || ''; }
@@ -415,6 +455,60 @@ function h(tag, attrs, filhos) {
   return e;
 }
 
+/* SEGREDO NA TELA.
+   Nasce tapado. Quem está transmitindo não escolhe mostrar a chave: ela
+   simplesmente não está lá até alguém clicar no olho. */
+function segredo(valor, aoRedefinir) {
+  const txt = h('span', { cls: 'txt tapado' });
+  const olho = h('button', { cls: 'olho', type: 'button' });
+  let aberto = false;
+
+  const pinta = () => {
+    txt.textContent = aberto ? valor : '•'.repeat(Math.min(28, Math.max(12, valor.length)));
+    txt.className = 'txt ' + (aberto ? 'aberto' : 'tapado');
+    olho.textContent = aberto ? '🙈' : '👁';
+    olho.title = aberto ? 'Esconder' : 'Mostrar';
+  };
+  olho.onclick = () => { aberto = !aberto; pinta(); };
+
+  const copiar = h('button', { cls: 'bt mini', type: 'button', txt: 'Copiar' });
+  copiar.onclick = async () => {
+    try { await navigator.clipboard.writeText(valor); copiar.textContent = 'Copiado'; }
+    catch (e) {
+      aberto = true; pinta();
+      recado('Não consegui copiar. Mostrei o valor: selecione e use Ctrl+C.', 'ruim');
+    }
+    setTimeout(() => { copiar.textContent = 'Copiar'; }, 2000);
+  };
+
+  const filhos = [txt, olho, copiar];
+  if (aoRedefinir) {
+    const rd = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'Redefinir' });
+    rd.onclick = aoRedefinir;
+    filhos.push(rd);
+  }
+  pinta();
+  return h('div', { cls: 'segredo' }, filhos);
+}
+
+/* A prévia só nasce quando o cartão entra na tela: são vários overlays por
+   pessoa, e montar todos de uma vez carregaria o desenhista e as fontes N
+   vezes pra mostrar coisa que ninguém rolou até ainda. */
+const observador = ('IntersectionObserver' in window) ? new IntersectionObserver((itens, obs) => {
+  itens.forEach((i) => {
+    if (!i.isIntersecting) return;
+    obs.unobserve(i.target);
+    const cx = i.target;
+    const q = h('iframe', { src: 'overlay.html', title: '', tabindex: '-1', 'aria-hidden': 'true' });
+    q.onload = () => {
+      try {
+        q.contentWindow.postMessage({ type: 'zc:config', config: JSON.parse(cx.dataset.cfg) }, location.origin);
+      } catch (e) {}
+    };
+    cx.appendChild(q);
+  });
+}, { rootMargin: '150px' }) : null;
+
 function manda() {
   if (!quadro || !quadro.contentWindow) return;
   try { quadro.contentWindow.postMessage({ type: 'zc:config', config: cfg }, location.origin); } catch (e) {}
@@ -460,14 +554,17 @@ function montaBandejas() {
   todos.onclick = () => { fechaBandejas(null); vaiPara('#/overlays'); };
   bo.appendChild(todos);
 
+  /* SEM ?chave= NO LINK.
+     Estas páginas moram no mesmo domínio, então já enxergam a mesma chave no
+     sessionStorage. Pendurar a chave no endereço só servia pra ela aparecer
+     inteira na barra do navegador no meio de uma live. */
   const bf = el('bandejaFerramentas');
   bf.innerHTML = '';
-  const comChave = (p) => p + (chave ? '?chave=' + encodeURIComponent(chave) : '');
   [
-    ['Subathon', 'Quanto cada sub, bit ou doação soma', comChave('subathon.html')],
-    ['Moderadores', 'Criar e revogar o link de cada mod', comChave('convites.html')],
-    ['Ponte do OBS', 'A fonte que liga o chat no OBS', comChave('criar.html')],
-    ['Painel do OBS', 'A doca que fica dentro do OBS', comChave('painel.html')],
+    ['Subathon', 'Quanto cada sub, bit ou doação soma', 'subathon.html'],
+    ['Moderadores', 'Criar e revogar o link de cada mod', 'convites.html'],
+    ['Ponte do OBS', 'A fonte que liga o chat no OBS', 'criar.html'],
+    ['Painel do OBS', 'A doca que fica dentro do OBS', 'painel.html'],
   ].forEach(([n, txt, url]) => {
     bf.appendChild(h('a', { href: url }, [document.createTextNode(n), h('small', { txt })]));
   });
@@ -606,7 +703,12 @@ function telaLista(filtro) {
       ? (c.fonte === 'manual' ? 'na mão' : (c.fonte === 'subs' ? 'subs' : 'seguidores')) + ' · alvo ' + (c.alvo || '?')
       : (TIPOS[p.tipo] ? TIPOS[p.tipo].txt : p.tipo);
 
+    const previa = h('div', { cls: 'previa xadrez' });
+    previa.dataset.cfg = JSON.stringify(Object.assign(padraoDe(p.tipo), c));
+    if (observador) observador.observe(previa);
+
     grade.appendChild(h('div', { cls: 'cartao' }, [
+      previa,
       h('div', { cls: 'topo' }, [
         h('b', { txt: p.nome || 'Sem nome' }),
         h('span', { cls: 'selo', txt: (TIPOS[p.tipo] || {}).nome || p.tipo }),
@@ -704,12 +806,84 @@ function telaEditor(perfil, tipoNovo) {
   ]));
 }
 
+function telaControlador() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Meu Controller' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Tudo que é seu num lugar só: a chave, os links que você já tem, e o que cada um faz. Nada aqui aparece destapado sozinho — se você abrir esta página na live, ninguém leva sua chave.' }));
+
+  const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+
+  /* ----- a chave ----- */
+  const fatiaChave = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Chave do painel' }),
+    h('p', { cls: 'd', txt: 'É ela que prova que o painel é seu. Quem tiver essa chave controla o seu OBS — trate como senha.' }),
+  ]);
+
+  async function redefinir() {
+    const aviso = 'Trocar a chave agora?\n\nA ponte no OBS PARA de funcionar até você trocar a URL dela, e links salvos nos favoritos deixam de valer.';
+    if (!confirm(aviso)) return;
+    try {
+      const d = await api('/chave.php', { method: 'POST', body: JSON.stringify({ acao: 'redefinir' }) });
+      chave = d.chave;
+      try { sessionStorage.setItem('zc:chave', chave); } catch (e) {}
+      telaControlador();
+      recado('Chave trocada. Agora refaça a URL da ponte no OBS — a antiga não vale mais.', 'bom');
+    } catch (e) { recado(e.message, 'ruim'); }
+  }
+
+  fatiaChave.appendChild(segredo(chave, redefinir));
+  fatiaChave.appendChild(h('p', { cls: 'aviso', txt: 'Trocar a chave quebra a ponte que estiver no OBS: ela carrega a chave dentro do endereço. Só troque se ela tiver aparecido em print, em VOD ou na tela durante a live — e já deixe o OBS aberto pra colar a nova.' }));
+  tela.appendChild(fatiaChave);
+
+  /* ----- links que carregam a chave dentro ----- */
+  const fatiaLinks = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Meus links com chave' }),
+    h('p', { cls: 'd', txt: 'Estes carregam a chave dentro do endereço, então nascem tapados. Copie e cole direto no OBS sem mostrar na tela.' }),
+  ]);
+  [
+    ['Ponte (Fonte de Navegador)', base + 'ponte.html?chave=' + encodeURIComponent(chave)],
+    ['Painel (doca do OBS)', base + 'painel.html?chave=' + encodeURIComponent(chave)],
+  ].forEach(function (par) {
+    fatiaLinks.appendChild(h('p', { style: 'margin:12px 0 5px;font-size:12.5px;color:var(--fraco)', txt: par[0] }));
+    fatiaLinks.appendChild(segredo(par[1], null));
+  });
+  tela.appendChild(fatiaLinks);
+
+  /* ----- links dos overlays: sem segredo dentro ----- */
+  const fatiaOv = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Meus overlays' }),
+    h('p', { cls: 'd', txt: 'Estes NÃO carregam a sua chave — só um endereço sorteado que apenas mostra o overlay. Podem aparecer na tela sem risco.' }),
+  ]);
+  if (!perfis.length) {
+    fatiaOv.appendChild(h('div', { cls: 'vazio', txt: 'Nenhum overlay ainda.' }));
+  } else {
+    perfis.forEach((p) => {
+      const url = base + 'overlay.html?k=' + p.chave_publica;
+      const cod = h('code', { txt: url,
+        style: 'flex:2 1 240px;min-width:0;background:var(--fundo);border:1px solid var(--linha);border-radius:4px;padding:8px 9px;font-size:11px;color:var(--fraco);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:all' });
+      const cp = h('button', { cls: 'bt mini', type: 'button', txt: 'Copiar' });
+      cp.onclick = async () => {
+        try { await navigator.clipboard.writeText(url); cp.textContent = 'Copiado'; } catch (e) {}
+        setTimeout(() => { cp.textContent = 'Copiar'; }, 2000);
+      };
+      const linha = h('div', { cls: 'campo' }, [
+        h('label', { txt: (p.nome || 'Sem nome') + ' · ' + ((TIPOS[p.tipo] || {}).nome || p.tipo) }),
+        cod, cp,
+      ]);
+      fatiaOv.appendChild(linha);
+    });
+  }
+  tela.appendChild(fatiaOv);
+}
+
 /* ---------------- navegação ---------------- */
 function vaiPara(hash) { if (location.hash === hash) rota(); else location.hash = hash; }
 
 function rota() {
   recado('');
   const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/');
+  if (p[0] === 'meu') return telaControlador();
   if (p[0] === 'novo' && TIPOS[p[1]]) return telaEditor(null, p[1]);
   if (p[0] === 'editar') {
     const perfil = perfis.find((x) => String(x.id) === String(p[1]));
@@ -720,6 +894,7 @@ function rota() {
 }
 window.addEventListener('hashchange', rota);
 el('irInicio').onclick = () => vaiPara('#/overlays');
+el('abaMeu').onclick = () => { fechaBandejas(null); vaiPara('#/meu'); };
 
 async function carrega() {
   try { perfis = (await api('/perfil.php')).perfis || []; }
