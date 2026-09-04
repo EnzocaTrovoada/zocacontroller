@@ -23,7 +23,7 @@ const ACOES_VALIDAS = [
     'panico', 'voltar', 'mute', 'cena', 'replay', 'camera', 'som', 'fonte',
     'aposta', 'fechar', 'cancelar', 'ganhou', 'marcar', 'titulo', 'categoria',
 ];
-const QUEM_VALIDO = ['chat', 'mod', 'dono'];
+const QUEM_VALIDO = ['chat', 'sub', 'vip', 'mod', 'supermod', 'dono'];
 const COMANDOS_MAX = 40;
 
 $quem = quem_chama();
@@ -34,7 +34,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         'SELECT id, nome, acao, argumento, quem, espera FROM comandos WHERE usuario_id = ? ORDER BY nome'
     );
     $st->execute([$quem['usuario_id']]);
-    json_saida(['comandos' => $st->fetchAll(), 'acoes' => ACOES_VALIDAS]);
+
+    /* A ponte le a lista de supermods daqui junto com os comandos: e uma
+       requisicao so, e ela ja faz essa de qualquer jeito. */
+    $sm = db()->prepare('SELECT supermods FROM usuarios WHERE id = ?');
+    $sm->execute([$quem['usuario_id']]);
+
+    json_saida([
+        'comandos'  => $st->fetchAll(),
+        'acoes'     => ACOES_VALIDAS,
+        'supermods' => (string) ($sm->fetchColumn() ?: ''),
+    ]);
 }
 
 if ($quem['tipo'] !== 'painel') {
@@ -44,6 +54,20 @@ if ($quem['tipo'] !== 'painel') {
 $d = corpo_json();
 $acao = (string) ($d['acao'] ?? '');
 trava('comandos', 60, 60);
+
+if ($acao === 'supermods') {
+    /* Logins da Twitch, separados por virgula ou espaco. Guardo em minusculas
+       porque e assim que a etiqueta do chat chega. */
+    $lista = preg_split('/[,\s]+/', mb_strtolower(trim((string) ($d['lista'] ?? ''))), -1, PREG_SPLIT_NO_EMPTY);
+    $lista = array_slice(array_unique(array_filter($lista, function ($n) {
+        return preg_match('/^[a-z0-9_]{2,25}$/', $n);
+    })), 0, 40);
+
+    db()->prepare('UPDATE usuarios SET supermods = ? WHERE id = ?')
+        ->execute([implode(',', $lista) ?: null, $quem['usuario_id']]);
+
+    json_saida(['ok' => true, 'supermods' => implode(', ', $lista)]);
+}
 
 if ($acao === 'apagar') {
     $id = (int) ($d['id'] ?? 0);
@@ -77,11 +101,12 @@ if (!in_array($quemPode, QUEM_VALIDO, true)) $quemPode = 'mod';
 
 /* Pânico e voltar mexem na live inteira: liberar pro chat seria entregar o
    botão de desligar pra qualquer um que entrasse. */
-if (in_array($destino, ['panico', 'voltar', 'ganhou'], true) && $quemPode === 'chat') {
-    json_saida(['erro' => 'Essa ação é forte demais pra liberar pro chat inteiro.'], 400);
+if (in_array($destino, ['panico', 'voltar', 'ganhou'], true)
+    && in_array($quemPode, ['chat', 'sub', 'vip'], true)) {
+    json_saida(['erro' => 'Essa ação é forte demais pra liberar fora da moderação.'], 400);
 }
 
-$argumento = mb_substr(trim((string) ($d['argumento'] ?? '')), 0, 120);
+$argumento = mb_substr(trim((string) ($d['argumento'] ?? '')), 0, 500);
 $espera    = max(1, min(600, (int) ($d['espera'] ?? 5)));
 
 $id = (int) ($d['id'] ?? 0);

@@ -368,3 +368,15 @@
 .rl.is-editando .rl__barra.pegando { outline: 1px solid #45B8BF; }
 .rl.is-editando .rl__date[contenteditable="true"],
 .rl.is-editando .rl__leg[contenteditable="true"] { cursor: text; outline-color: #45B8BF; }
+
+/* ---------------------------------------------------------------------
+   O .rl inteiro tem pointer-events:none, porque no OBS ele nao pode
+   interceptar clique nenhum. Isso e certo la e fatal aqui: sem devolver o
+   clique, o arrasto do editor nunca recebe nem o primeiro pointerdown.
+
+   Volta so no modo edicao, que so existe dentro do editor.
+   --------------------------------------------------------------------- */
+.rl.is-editando { pointer-events: auto; }
+.rl.is-editando .rl__time,
+.rl.is-editando .rl__date,
+.rl.is-editando .rl__barra { pointer-events: auto; }

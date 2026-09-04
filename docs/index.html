@@ -209,11 +209,14 @@
   /* A grade do transparente, igual à do Photoshop: quadradinho claro e
      escuro alternados. É ela que deixa ver onde o overlay começa e acaba, e
      que o fundo vai sumir no OBS. */
+  /* A grade e a mesma nos dois temas, mas no escuro ela sumia: os dois tons
+     tinham 14 pontos de diferenca, e contra uma pagina escura isso vira uma
+     mancha lisa. Com o dobro de diferenca ela le nos dois. */
   .xadrez {
-    background-color: #22272A;
+    background-color: #1C2124;
     background-image:
-      linear-gradient(45deg, #30373A 25%, transparent 25%, transparent 75%, #30373A 75%),
-      linear-gradient(45deg, #30373A 25%, transparent 25%, transparent 75%, #30373A 75%);
+      linear-gradient(45deg, #394045 25%, transparent 25%, transparent 75%, #394045 75%),
+      linear-gradient(45deg, #394045 25%, transparent 25%, transparent 75%, #394045 75%);
     background-size: 16px 16px; background-position: 0 0, 8px 8px;
   }
   .cartao .previa {
@@ -946,13 +949,6 @@ const DE_FABRICA = [
   ['categoria', 'mod',   'Troca a categoria'],
 ];
 
-const IDEIAS = [
-  ['!morte', 'O chat soma no contador de mortes. O contador já existe como overlay — falta o comando somar nele.'],
-  ['!tempo', 'O chat pergunta quanto falta no subathon. Hoje o sistema só escuta o chat, não fala nele — responder exigiria um bot com login próprio.'],
-  ['!clipe', 'Cria um clipe. Funciona, mas o crédito vai pro token que criou, não pra quem pediu — a Twitch não tem campo pra isso.'],
-  ['!luz',   'Muda a cor das luzes. Precisa de um programa rodando no seu PC: o navegador do OBS não alcança aparelho na rede local.'],
-];
-
 function telaComandos() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -984,10 +980,24 @@ function telaComandos() {
   const cNome = h('input', { type: 'text', placeholder: 'brb' });
   const cAcao = h('select');
   DE_FABRICA.forEach((c) => cAcao.appendChild(h('option', { value: c[0], txt: c[0] })));
-  const cArg = h('input', { type: 'text', placeholder: 'Cenário BRB' });
+  /* Textarea, e nao input de uma linha: o argumento as vezes e o nome de uma
+     cena, mas as vezes e uma frase inteira. */
+  const cArg = h('textarea', {
+    placeholder: 'Cenário BRB',
+    rows: '3',
+    style: 'width:100%;font:13px var(--mono);color:var(--tinta);background:var(--fundo);border:1px solid var(--linha);padding:8px;border-radius:4px;resize:vertical',
+  });
   const cQuem = h('select');
-  [['chat', 'Qualquer um'], ['mod', 'Mods'], ['dono', 'Só eu']].forEach((q) =>
-    cQuem.appendChild(h('option', { value: q[0], txt: q[1] })));
+  /* Quem esta em cima pode tudo que os de baixo podem: liberar pra "subs"
+     tambem libera pra VIP e mod. */
+  [
+    ['chat', 'Qualquer um do chat'],
+    ['sub', 'Subs pra cima'],
+    ['vip', 'VIPs pra cima'],
+    ['mod', 'Mods pra cima'],
+    ['supermod', 'Só supermods'],
+    ['dono', 'Só eu'],
+  ].forEach((q) => cQuem.appendChild(h('option', { value: q[0], txt: q[1] })));
   cQuem.value = 'mod';
   const cEspera = h('input', { type: 'number', min: '1', max: '600', value: '5' });
   let editandoCmd = null;
@@ -1011,7 +1021,11 @@ function telaComandos() {
   meus.append(
     h('div', { cls: 'campo' }, [h('label', { txt: 'Nome (sem o !)' }), cNome]),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Faz o quê' }), cAcao]),
-    h('div', { cls: 'campo' }, [h('label', { txt: 'Com qual argumento' }), cArg]),
+    h('div', {}, [
+      h('div', { cls: 'campo', style: 'align-items:flex-start' }, [h('label', { txt: 'Com qual argumento' }), cArg]),
+      h('p', { style: 'margin:-4px 0 12px;font-size:11.5px;color:var(--apagado)',
+               txt: 'o nome de uma cena, de uma fonte, ou o texto de uma enquete' }),
+    ]),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Quem pode usar' }), cQuem]),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Espera entre usos (s)' }), cEspera]),
     h('p', { style: 'margin:6px 0 12px' }, [salvar]),
@@ -1049,18 +1063,6 @@ function telaComandos() {
   }
   pintaMeus();
 
-  /* ----- o que ainda não existe ----- */
-  const ideias = h('div', { cls: 'fatia' }, [
-    h('h3', { txt: 'Ainda não existem' }),
-    h('p', { cls: 'd', txt: 'Ideias que fazem sentido pra este sistema, com o motivo de cada uma ainda não estar de pé. Sem promessa de data.' }),
-  ]);
-  IDEIAS.forEach((i) => {
-    ideias.appendChild(h('div', { cls: 'campo' }, [
-      h('code', { txt: i[0], style: 'flex:0 0 96px;background:var(--fundo);border:1px solid var(--linha);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--apagado)' }),
-      h('label', { style: 'flex:1 1 240px', txt: i[1] }),
-    ]));
-  });
-  tela.appendChild(ideias);
 }
 
 /* A prévia devolve o arrasto por mensagem. Só aceito da mesma origem, e só
@@ -1286,6 +1288,26 @@ async function telaMods() {
     } catch (e) { recado(e.message, 'ruim'); }
     btCriar.disabled = false;
   };
+
+  /* ----- supermods ----- */
+  const inpSuper = h('input', { type: 'text', placeholder: 'fulano, beltrano' });
+  const btSuper = h('button', { cls: 'bt', type: 'button', txt: 'Salvar' });
+  const fatiaSuper = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Supermods' }),
+    h('p', { cls: 'd', txt: 'Mods em quem você confia o pânico. Escreva os logins da Twitch separados por vírgula. Serve pra separar quem só cuida do chat de quem pode derrubar a live inteira — nos comandos você escolhe qual nível cada um exige.' }),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Logins' }), inpSuper, btSuper]),
+  ]);
+  btSuper.onclick = async () => {
+    btSuper.disabled = true;
+    try {
+      const r = await api('/comandos.php', { method: 'POST', body: JSON.stringify({ acao: 'supermods', lista: inpSuper.value }) });
+      inpSuper.value = r.supermods || '';
+      recado('Supermods salvos. A fonte do OBS pega em até 5 minutos.', 'bom');
+    } catch (e) { recado(e.message, 'ruim'); }
+    btSuper.disabled = false;
+  };
+  api('/comandos.php').then((r) => { inpSuper.value = r.supermods || ''; }).catch(() => {});
+  tela.appendChild(fatiaSuper);
 
   /* ----- quem tem acesso ----- */
   const fatiaLista = h('div', { cls: 'fatia' }, [h('h3', { txt: 'Com acesso' })]);

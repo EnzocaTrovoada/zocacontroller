@@ -441,12 +441,29 @@ async function descobrir(lerGaveta = true) {
  *  não existe: negar por padrão é o que segura mod novo e tenant curioso.
  * ------------------------------------------------------------------ */
 
-const CARGOS = { chat: 0, mod: 1, dono: 2 };
+/* Quem manda mais, em ordem. Quem esta em cima pode tudo que os de baixo
+   podem — entao um comando liberado pra "sub" tambem vale pra VIP e mod. */
+const CARGOS = { chat: 0, sub: 1, vip: 2, mod: 3, supermod: 4, dono: 5 };
+
+/* Os supermods sao escolhidos pelo dono, um por um. Nao existe esse cargo na
+   Twitch: e uma camada a mais pra separar "mod que eu confio o panico" de
+   "mod que so cuida do chat". Chega na URL da fonte, em minusculas. */
+const SUPERMODS = new Set();   /* preenchido pelo painel, junto dos comandos */
 
 function cargoDe(tags) {
   const badges = tags.badges || '';
+  const login = String(tags.login || '').toLowerCase();
+
+  /* Vem tudo de etiqueta que o SERVIDOR da Twitch escreve na mensagem.
+     Ninguem digita "sou mod" e vira mod. */
   if (badges.includes('broadcaster/')) return 'dono';
-  if (tags.mod === '1' || badges.includes('moderator/')) return 'mod';
+  const ehMod = tags.mod === '1' || badges.includes('moderator/');
+  if (ehMod && SUPERMODS.has(login)) return 'supermod';
+  if (ehMod) return 'mod';
+  if (badges.includes('vip/')) return 'vip';
+  /* subscriber cobre o assinante; founder e o assinante antigo do canal, e
+     perder ele faria os mais fieis valerem menos que os novos. */
+  if (tags.subscriber === '1' || badges.includes('subscriber/') || badges.includes('founder/')) return 'sub';
   return 'chat';
 }
 
@@ -1343,6 +1360,11 @@ async function carregarComandos() {
     for (const k of Object.keys(ACOES)) {
       if (ACOES[k].apelido) delete ACOES[k];
     }
+
+    /* A lista chega junto dos comandos: uma requisicao so. */
+    SUPERMODS.clear();
+    String(d.supermods || '').toLowerCase().split(/[,\s]+/).filter(Boolean)
+      .forEach((n) => SUPERMODS.add(n));
 
     for (const c of (d.comandos || [])) {
       const base = ACOES[c.acao];
