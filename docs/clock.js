@@ -144,6 +144,23 @@
     nktxt:    { t: 'c', d: '#ffffff' },
     nkgap:    { t: 'n', d: 8,  min: 0, max: 60 },
     nkalin:   { t: 'e', d: 'esquerda', v: ['esquerda', 'centro', 'direita'] },
+    /* Quinas uma a uma. Cantos iguais nos quatro e o caso comum, mas o que
+       da personalidade e o canto solto — o balao de fala e um retangulo com
+       tres cantos redondos e um reto. */
+    nkq1:     { t: 'n', d: -1, min: -1, max: 80 },
+    nkq2:     { t: 'n', d: -1, min: -1, max: 80 },
+    nkq3:     { t: 'n', d: -1, min: -1, max: 80 },
+    nkq4:     { t: 'n', d: -1, min: -1, max: 80 },
+    nkgrad:   { t: 'b', d: 0 },
+    nkcor2:   { t: 'c', d: '#0b7a3b' },
+    nkang:    { t: 'n', d: 135, min: 0, max: 360 },
+    cbq1:     { t: 'n', d: -1, min: -1, max: 80 },
+    cbq2:     { t: 'n', d: -1, min: -1, max: 80 },
+    cbq3:     { t: 'n', d: -1, min: -1, max: 80 },
+    cbq4:     { t: 'n', d: -1, min: -1, max: 80 },
+    cbgrad:   { t: 'b', d: 0 },
+    cbcor2:   { t: 'c', d: '#000000' },
+    cbang:    { t: 'n', d: 135, min: 0, max: 360 },
     nkdx:     { t: 'n', d: 0,  min: -400, max: 400 },
     nkdy:     { t: 'n', d: 0,  min: -200, max: 200 },
     /* ---- o que nao entra na tela ---- */

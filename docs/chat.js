@@ -24,6 +24,19 @@
 
      A conta e a de luminancia percebida: o olho enxerga muito mais o verde
      do que o azul, entao os tres canais nao valem igual. */
+  /* O ponto do meio entre duas cores. */
+  function mistura(a, b) {
+    function n(h) {
+      h = String(h || '').replace('#', '');
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
+    }
+    var x = n(a), y = n(b);
+    return '#' + [0, 1, 2].map(function (i) {
+      return ('0' + Math.round((x[i] + y[i]) / 2).toString(16)).slice(-2);
+    }).join('');
+  }
+
   function contrasteDe(hex) {
     var h = String(hex || '').replace('#', '');
     if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
@@ -168,6 +181,26 @@
       s.setProperty('--ch-braio', cfg.cbraio + 'px');
       s.setProperty('--ch-bpad', cfg.cbpad + 'px');
 
+      /* -1 numa quina quer dizer "usa o valor geral". Assim mexer no controle
+         de cantos continua valendo pras quatro, e quem quiser soltar UMA
+         solta so ela — sem precisar redigitar as outras tres. */
+      var q = function (v, geral) { return (v < 0 ? geral : v) + 'px'; };
+      s.setProperty('--nk-quinas',
+        q(cfg.nkq1, cfg.nkraio) + ' ' + q(cfg.nkq2, cfg.nkraio) + ' ' +
+        q(cfg.nkq3, cfg.nkraio) + ' ' + q(cfg.nkq4, cfg.nkraio));
+      s.setProperty('--cb-quinas',
+        q(cfg.cbq1, cfg.cbraio) + ' ' + q(cfg.cbq2, cfg.cbraio) + ' ' +
+        q(cfg.cbq3, cfg.cbraio) + ' ' + q(cfg.cbq4, cfg.cbraio));
+
+      /* Degradê ou cor chapada, na mesma propriedade: assim o CSS não precisa
+         saber qual dos dois é, e não existem duas regras disputando. */
+      s.setProperty('--nk-fundo', cfg.nkgrad
+        ? 'linear-gradient(' + cfg.nkang + 'deg, ' + R.rgba(cfg.nkcor, cfg.nkopac) + ', ' + R.rgba(cfg.nkcor2, cfg.nkopac) + ')'
+        : R.rgba(cfg.nkcor, cfg.nkopac));
+      s.setProperty('--cb-fundo', cfg.cbgrad
+        ? 'linear-gradient(' + cfg.cbang + 'deg, ' + R.rgba(cfg.cbcor, cfg.cbopac) + ', ' + R.rgba(cfg.cbcor2, cfg.cbopac) + ')'
+        : R.rgba(cfg.cbcor, cfg.cbopac));
+
       s.setProperty('--nk-cor', R.rgba(cfg.nkcor, cfg.nkopac));
       s.setProperty('--nk-pad', cfg.nkpad + 'px');
       s.setProperty('--nk-raio', cfg.nkraio + 'px');
@@ -197,6 +230,9 @@
       root.classList.toggle('ch--nk-torto', !!cfg.nkcase && cfg.nkincl !== 0);
       root.classList.toggle('ch--cb-torto', !!cfg.cbolha && cfg.cbincl !== 0);
       root.classList.toggle('ch--nk-movido', !!cfg.nkcase && (cfg.nkdx !== 0 || cfg.nkdy !== 0));
+      /* O traçado numa forma recortada precisa de outro desenho: veja o CSS. */
+      root.classList.toggle('ch--nk-tracado', !!cfg.nkcase && cfg.nkborda > 0);
+      root.classList.toggle('ch--cb-tracado', !!cfg.cbolha && cfg.cbborda > 0);
       root.classList.toggle('ch--cima', cfg.cdir === 'cima');
       root.classList.toggle('ch--nick-linha', cfg.cnickpos === 'linha');
       root.classList.toggle('ch--nick-abaixo', cfg.cnickpos === 'abaixo');
@@ -244,7 +280,9 @@
       /* Com caixa: a cor da pessoa cede lugar à legibilidade. De nada serve
          o roxo dela se o nome some no fundo verde. */
       var cor;
-      if (cfg.nkcase) cor = cfg.nkauto ? contrasteDe(cfg.nkcor) : cfg.nktxt;
+      /* Com degradê, a decisão sai da cor do MEIO das duas: escolher pela
+         primeira deixaria o texto sumir na outra ponta da caixa. */
+      if (cfg.nkcase) cor = cfg.nkauto ? contrasteDe(cfg.nkgrad ? mistura(cfg.nkcor, cfg.nkcor2) : cfg.nkcor) : cfg.nktxt;
       else cor = (cfg.cnickauto && tags.color) ? tags.color : cfg.cnickcor;
 
       var html = '';
@@ -309,7 +347,7 @@
            tudo faria a tela inteira tremer quando o OBS abre a cena. */
         el.className = 'ch__msg' + (primeira ? '' : ' ch__entra');
         el.innerHTML =
-          (cfg.cnick ? '<span class="ch__nick" style="color:' + esc(cfg.nkcase ? (cfg.nkauto ? contrasteDe(cfg.nkcor) : cfg.nktxt) : cfg.fcor) + '"><b>' + esc(e.quem)
+          (cfg.cnick ? '<span class="ch__nick" style="color:' + esc(cfg.nkcase ? (cfg.nkauto ? contrasteDe(cfg.nkgrad ? mistura(cfg.nkcor, cfg.nkcor2) : cfg.nkcor) : cfg.nktxt) : cfg.fcor) + '"><b>' + esc(e.quem)
              + (cfg.cnickpos === 'linha' ? '<i>' + esc(cfg.csep) + '</i>' : '') + '</b></span>' : '') +
           '<span class="ch__txt">' + esc(frase) + '</span>';
         pista.appendChild(el);

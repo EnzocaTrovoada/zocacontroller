@@ -53,8 +53,8 @@
 }
 
 .ch--bolha .ch__msg {
-  background: var(--ch-bolha);
-  border-radius: var(--ch-braio);
+  background: var(--cb-fundo);
+  border-radius: var(--cb-quinas);
   padding: var(--ch-bpad) calc(var(--ch-bpad) * 1.5);
   /* A bolha acompanha o texto em vez de esticar até a borda: uma mensagem
      de duas palavras numa faixa larga fica ridícula. */
@@ -128,10 +128,10 @@
 
 .ch--nkcase .ch__nick {
   display: inline-block;
-  background: var(--nk-cor);
+  background: var(--nk-fundo);
   padding: var(--nk-pad) calc(var(--nk-pad) * 2);
-  border-radius: var(--nk-raio);
-  border: var(--nk-borda) solid var(--nk-bcor);
+  border-radius: var(--nk-quinas);
+  position: relative;
 }
 
 /* TRANSFORM SÓ QUANDO PRECISA.
@@ -151,7 +151,7 @@
 .ch--cb-torto .ch__msg { transform: skewX(var(--cb-incl)); }
 .ch--cb-torto .ch__msg > * { transform: skewX(calc(var(--cb-incl) * -1)); }
 
-.ch--bolha .ch__msg { border: var(--cb-borda) solid var(--cb-bcor); }
+.ch--bolha .ch__msg { position: relative; }
 
 /* pílula: o raio grande vira cápsula em qualquer altura */
 .ch--nk-pilula .ch__nick { border-radius: 999px; }
@@ -222,3 +222,32 @@
 .ch--nkcase:not(.ch--nick-linha) .ch__msg { display: flex; flex-direction: column; align-items: var(--nk-alin); }
 .ch--nkcase.ch--nick-abaixo .ch__msg { flex-direction: column-reverse; }
 .ch--nk-movido .ch__nick { translate: var(--nk-dx) var(--nk-dy); }
+
+/* ---------------------------------------------------------------------
+   TRAÇADO
+
+   Uma borda comum é cortada junto pelo clip-path: numa seta ou numa fita ela
+   some justo nas diagonais, que é onde ela mais importa.
+
+   Tentei antes uma cópia da forma pintada atrás, com z-index negativo. Não
+   funciona: dentro de um contexto de empilhamento, o filho negativo pinta
+   DEPOIS do fundo do pai, e a cópia maior cobria o nome.
+
+   O que funciona é o halo: drop-shadow desenha a sombra recortando a forma
+   JÁ cortada, então ela acompanha qualquer polígono. Oito direções em vez de
+   quatro porque com quatro as diagonais ficam com o canto mordido.
+   --------------------------------------------------------------------- */
+.ch--nk-tracado .ch__nick {
+  filter:
+    drop-shadow( var(--nk-borda) 0 0 var(--nk-bcor))
+    drop-shadow(calc(-1 * var(--nk-borda)) 0 0 var(--nk-bcor))
+    drop-shadow(0  var(--nk-borda) 0 var(--nk-bcor))
+    drop-shadow(0 calc(-1 * var(--nk-borda)) 0 var(--nk-bcor));
+}
+.ch--cb-tracado .ch__msg {
+  filter:
+    drop-shadow( var(--cb-borda) 0 0 var(--cb-bcor))
+    drop-shadow(calc(-1 * var(--cb-borda)) 0 0 var(--cb-bcor))
+    drop-shadow(0  var(--cb-borda) 0 var(--cb-bcor))
+    drop-shadow(0 calc(-1 * var(--cb-borda)) 0 var(--cb-bcor));
+}

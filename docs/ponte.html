@@ -445,9 +445,15 @@ async function descobrir(lerGaveta = true) {
    podem — entao um comando liberado pra "sub" tambem vale pra VIP e mod. */
 const CARGOS = { chat: 0, sub: 1, vip: 2, mod: 3, supermod: 4, dono: 5 };
 
-/* Os supermods sao escolhidos pelo dono, um por um. Nao existe esse cargo na
-   Twitch: e uma camada a mais pra separar "mod que eu confio o panico" de
-   "mod que so cuida do chat". Chega na URL da fonte, em minusculas. */
+/* Moderador-chefe é cargo DA TWITCH: o Lead Moderator, que pode pôr e tirar
+   outros mods e mexer nas configurações de moderação do canal. A etiqueta
+   dele é "lead_moderator".
+
+   Detalhe que quebra quem não sabe: a etiqueta SUBSTITUI a de moderador, não
+   se soma a ela. Quem procura mod tem que aceitar as duas.
+
+   A lista escolhida à mão continua existindo, pra quem quer confiar o pânico
+   a um mod comum sem promovê-lo na Twitch. Vale qualquer uma das duas. */
 const SUPERMODS = new Set();   /* preenchido pelo painel, junto dos comandos */
 
 function cargoDe(tags) {
@@ -457,8 +463,13 @@ function cargoDe(tags) {
   /* Vem tudo de etiqueta que o SERVIDOR da Twitch escreve na mensagem.
      Ninguem digita "sou mod" e vira mod. */
   if (badges.includes('broadcaster/')) return 'dono';
-  const ehMod = tags.mod === '1' || badges.includes('moderator/');
-  if (ehMod && SUPERMODS.has(login)) return 'supermod';
+
+  const ehChefe = badges.includes('lead_moderator/');
+  /* "lead_moderator/" contém "moderator/", então a busca por mod encontra o
+     chefe também — que é o que a gente quer: chefe é mod, e mais. */
+  const ehMod = ehChefe || tags.mod === '1' || badges.includes('moderator/');
+
+  if (ehChefe || (ehMod && SUPERMODS.has(login))) return 'supermod';
   if (ehMod) return 'mod';
   if (badges.includes('vip/')) return 'vip';
   /* subscriber cobre o assinante; founder e o assinante antigo do canal, e
