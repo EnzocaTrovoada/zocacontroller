@@ -284,7 +284,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=5"></script>
+<script src="clock.js?v=6"></script>
 <script>
 'use strict';
 
@@ -421,7 +421,7 @@ const PRONTOS = {
     ['Etiqueta', 'o nome numa seta colorida', {
       nkcase: 1, nkforma: 'seta', nkcor: '#12A150', nkopac: 100, nkpad: 6, nkincl: 0,
       cbolha: 1, cbforma: 'chanfro', cbcor: '#0B0F0D', cbopac: 70, cbpad: 8,
-      cnickpos: 'linha', csep: ' ', cnickauto: 0, cnickcor: '#FFFFFF',
+      cnickpos: 'linha', csep: ' ', cnickauto: 0, nkauto: 1,
       font: 'Archivo', size: 20, sw: 0, glow: 0,
     }],
     ['Balão', 'redondinho, tipo aplicativo de conversa', {
@@ -431,7 +431,7 @@ const PRONTOS = {
     ['Fita', 'faixas inclinadas, cara de campeonato', {
       nkcase: 1, nkforma: 'fita', nkcor: '#12A150', nkincl: -10, nkpad: 5,
       cbolha: 1, cbforma: 'fita', cbcor: '#0B0F0D', cbopac: 80, cbincl: -10, cbpad: 8,
-      cnickpos: 'acima', cnickauto: 0, cnickcor: '#FFFFFF',
+      cnickpos: 'acima', cnickauto: 0, nkauto: 1,
       font: 'Archivo', size: 20, sw: 0, glow: 0,
     }],
     ['Cinema', 'deitado no horizonte, tipo Star Wars', {
@@ -559,8 +559,16 @@ const GRUPOS = [
       dica: 'a etiqueta colorida atrás do nick, separada da caixa da mensagem' },
     { k: 'nkforma', l: 'Formato', c: 'lista', se: (c) => !!c.nkcase,
       ops: [['reta', 'Retângulo'], ['pilula', 'Pílula'], ['chanfro', 'Cantos cortados'], ['fita', 'Fita'], ['seta', 'Seta']] },
-    { k: 'nkcor',   l: 'Cor', c: 'cor', se: (c) => !!c.nkcase },
+    { k: 'nkcor',   l: 'Cor da caixa', c: 'cor', se: (c) => !!c.nkcase },
     { k: 'nkopac',  l: 'Opacidade', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => !!c.nkcase },
+    { k: 'nkauto',  l: 'Cor do nome automática', c: 'chave', se: (c) => !!c.nkcase,
+      dica: 'escolhe preto ou branco pelo brilho da caixa — é o que impede nome sumir no fundo' },
+    { k: 'nktxt',   l: 'Cor do nome', c: 'cor', se: (c) => c.nkcase && !c.nkauto },
+    { k: 'nkgap',   l: 'Espaço até a mensagem', c: 'faixa', min: 0, max: 60, u: 'px', se: (c) => !!c.nkcase },
+    { k: 'nkalin',  l: 'Alinhamento', c: 'lista', se: (c) => c.nkcase && c.cnickpos !== 'linha',
+      ops: [['esquerda', 'À esquerda'], ['centro', 'No centro'], ['direita', 'À direita']] },
+    { k: 'nkdx',    l: 'Empurrar pro lado', c: 'faixa', min: -200, max: 200, u: 'px', se: (c) => !!c.nkcase },
+    { k: 'nkdy',    l: 'Empurrar pra cima', c: 'faixa', min: -100, max: 100, u: 'px', se: (c) => !!c.nkcase },
     { k: 'nkraio',  l: 'Cantos', c: 'faixa', min: 0, max: 60, u: 'px', se: (c) => c.nkcase && c.nkforma === 'reta' },
     { k: 'nkpad',   l: 'Respiro', c: 'faixa', min: 0, max: 40, u: 'px', se: (c) => !!c.nkcase },
     { k: 'nkincl',  l: 'Inclinar', c: 'faixa', min: -25, max: 25, u: '°', se: (c) => !!c.nkcase,

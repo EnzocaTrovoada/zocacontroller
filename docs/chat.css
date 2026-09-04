@@ -184,3 +184,18 @@
    desenhado por sombra, que o corte não come. */
 .ch--nk-chanfro .ch__nick, .ch--nk-fita .ch__nick, .ch--nk-seta .ch__nick,
 .ch--cb-chanfro .ch__msg, .ch--cb-fita .ch__msg, .ch--cb-seta .ch__msg { border: 0; }
+
+/* A caixa do nome precisa de um respiro à direita: com forma de seta ou de
+   fita, a ponta vai até a última coluna do elemento e o texto da mensagem
+   encostava nela. */
+.ch--nkcase.ch--nick-linha .ch__nick { margin-right: var(--nk-gap); }
+.ch--nkcase:not(.ch--nick-linha) .ch__nick { margin-bottom: calc(var(--nk-gap) / 2); }
+
+/* O NOME TEM LUGAR PRÓPRIO.
+
+   Alinhamento e um empurrãozinho de posição, separados dos da mensagem: é o
+   que deixa montar "nome recuado à direita, texto embaixo" sem que um mexa
+   no outro. */
+.ch--nkcase:not(.ch--nick-linha) .ch__msg { display: flex; flex-direction: column; align-items: var(--nk-alin); }
+.ch--nkcase.ch--nick-abaixo .ch__msg { flex-direction: column-reverse; }
+.ch--nkcase .ch__nick { translate: var(--nk-dx) var(--nk-dy); }

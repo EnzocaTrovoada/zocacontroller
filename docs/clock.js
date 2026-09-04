@@ -138,6 +138,14 @@
     nkincl:   { t: 'n', d: 0,   min: -25, max: 25 },
     nkborda:  { t: 'n', d: 0,   min: 0,  max: 8 },
     nkbcor:   { t: 'c', d: '#ffffff' },
+    /* Com caixa, a cor do nome e OUTRA decisao — e o padrao das duas era a
+       cor da marca, entao ligar a caixa apagava o nome. */
+    nkauto:   { t: 'b', d: 1 },
+    nktxt:    { t: 'c', d: '#ffffff' },
+    nkgap:    { t: 'n', d: 8,  min: 0, max: 60 },
+    nkalin:   { t: 'e', d: 'esquerda', v: ['esquerda', 'centro', 'direita'] },
+    nkdx:     { t: 'n', d: 0,  min: -400, max: 400 },
+    nkdy:     { t: 'n', d: 0,  min: -200, max: 200 },
     /* ---- o que nao entra na tela ---- */
     csemcmd:  { t: 'b', d: 1 },
     cignora:  { t: 't', d: 'nightbot,streamelements,streamlabs,moobot,fossabot', max: 200 },

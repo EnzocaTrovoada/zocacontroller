@@ -16,6 +16,22 @@
   var IRC = 'wss://irc-ws.chat.twitch.tv:443';
   var R = global.Relogio;
 
+  /* PRETO OU BRANCO, PELO BRILHO DA CAIXA.
+
+     Ligar uma caixa colorida e escolher a cor do texto sao duas decisoes, e
+     quem liga a caixa quase nunca lembra da segunda. O padrao das duas era a
+     cor da marca — verde sobre verde, nome invisivel.
+
+     A conta e a de luminancia percebida: o olho enxerga muito mais o verde
+     do que o azul, entao os tres canais nao valem igual. */
+  function contrasteDe(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    if (h.length !== 6) return '#ffffff';
+    var r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    return (r * 0.299 + g * 0.587 + b * 0.114) > 150 ? '#101010' : '#ffffff';
+  }
+
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -158,6 +174,10 @@
       s.setProperty('--nk-incl', cfg.nkincl + 'deg');
       s.setProperty('--nk-borda', cfg.nkborda + 'px');
       s.setProperty('--nk-bcor', cfg.nkbcor);
+      s.setProperty('--nk-gap', cfg.nkgap + 'px');
+      s.setProperty('--nk-dx', cfg.nkdx + 'px');
+      s.setProperty('--nk-dy', cfg.nkdy + 'px');
+      s.setProperty('--nk-alin', cfg.nkalin === 'centro' ? 'center' : (cfg.nkalin === 'direita' ? 'flex-end' : 'flex-start'));
       s.setProperty('--cb-pad', cfg.cbpad + 'px');
       s.setProperty('--cb-incl', cfg.cbincl + 'deg');
       s.setProperty('--cb-borda', cfg.cbborda + 'px');
@@ -216,7 +236,11 @@
       el.className = 'ch__msg ch__entra';
 
       var quem = tags['display-name'] || tags.login || 'alguém';
-      var cor = (cfg.cnickauto && tags.color) ? tags.color : cfg.cnickcor;
+      /* Com caixa: a cor da pessoa cede lugar à legibilidade. De nada serve
+         o roxo dela se o nome some no fundo verde. */
+      var cor;
+      if (cfg.nkcase) cor = cfg.nkauto ? contrasteDe(cfg.nkcor) : cfg.nktxt;
+      else cor = (cfg.cnickauto && tags.color) ? tags.color : cfg.cnickcor;
 
       var html = '';
       if (cfg.cnick) {
@@ -280,7 +304,7 @@
            tudo faria a tela inteira tremer quando o OBS abre a cena. */
         el.className = 'ch__msg' + (primeira ? '' : ' ch__entra');
         el.innerHTML =
-          (cfg.cnick ? '<span class="ch__nick" style="color:' + esc(cfg.fcor) + '"><b>' + esc(e.quem)
+          (cfg.cnick ? '<span class="ch__nick" style="color:' + esc(cfg.nkcase ? (cfg.nkauto ? contrasteDe(cfg.nkcor) : cfg.nktxt) : cfg.fcor) + '"><b>' + esc(e.quem)
              + (cfg.cnickpos === 'linha' ? '<i>' + esc(cfg.csep) + '</i>' : '') + '</b></span>' : '') +
           '<span class="ch__txt">' + esc(frase) + '</span>';
         pista.appendChild(el);
