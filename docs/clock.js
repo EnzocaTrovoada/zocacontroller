@@ -90,7 +90,25 @@
       'Europe/Moscow', 'Africa/Luanda', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Shanghai',
       'Asia/Dubai', 'Australia/Sydney', 'Pacific/Auckland', 'UTC'
     ] },
-    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat', 'feed'] },
+    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat', 'feed', 'musica'] },
+    /* ---- o que esta tocando ---- */
+    mcapa:    { t: 'b', d: 1 },
+    mtam:     { t: 'n', d: 72,  min: 24, max: 260 },
+    mlado:    { t: 'e', d: 'esquerda', v: ['esquerda', 'direita'] },
+    mlarg:    { t: 'n', d: 360, min: 160, max: 1200 },
+    mgap:     { t: 'n', d: 12,  min: 0,  max: 60 },
+    mbarra:   { t: 'b', d: 1 },
+    mbalt:    { t: 'n', d: 4,   min: 1,  max: 20 },
+    mbcor:    { t: 'c', d: '#1DB954' },
+    martcor:  { t: 'c', d: '#ffffff' },
+    martopac: { t: 'n', d: 70,  min: 0,  max: 100 },
+    martsize: { t: 'n', d: 70,  min: 30, max: 150 },
+    mfundo:   { t: 'e', d: 'solid', v: ['none', 'solid'] },
+    mfcor:    { t: 'c', d: '#0b0f0d' },
+    mfopac:   { t: 'n', d: 70,  min: 0,  max: 100 },
+    mfpad:    { t: 'n', d: 10,  min: 0,  max: 40 },
+    mraio:    { t: 'n', d: 12,  min: 0,  max: 80 },
+    mrola:    { t: 'b', d: 1 },
     /* ---- feed de eventos ----
        Divide as chaves com o chat: os dois sao a mesma lista com origem
        diferente, e duplicar as opcoes so criaria dois lugares pra ajustar

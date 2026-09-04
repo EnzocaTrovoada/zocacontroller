@@ -289,7 +289,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=7"></script>
+<script src="clock.js?v=8"></script>
 <script>
 'use strict';
 
@@ -359,6 +359,7 @@ const TIPOS = {
   placar:   { nome: 'Placar',   txt: 'Dois números, um contra o outro' },
   chat:     { nome: 'Chat',     txt: 'As mensagens do seu chat na tela' },
   feed:     { nome: 'Feed',     txt: 'Último sub, último follow, quem doou' },
+  musica:   { nome: 'Música',   txt: 'O que está tocando no seu Spotify' },
 };
 
 /* Padrões que já nascem bonitos. Um leigo não quer escolher opacidade de
@@ -381,6 +382,16 @@ function padraoDe(tipo) {
     return Object.assign(base, {
       modo: 'pausado', restante: 3600, horas: 1, fimtxt: 'ACABOU', titulo: 'SUBATHON',
       sanim: 'subir', spopc: '#7CE07C', spopt: 55, spulso: 1, surg: 5, surgc: '#FF4D4D', leg: 1,
+    });
+  }
+  if (tipo === 'musica') {
+    return Object.assign(base, {
+      titulo: '', font: 'Archivo', size: 18, weight: 700, color: '#FFFFFF',
+      sw: 0, glow: 0, shx: 0, shy: 2, shb: 6, sho: 70, shc: '#000000',
+      mcapa: 1, mtam: 72, mlado: 'esquerda', mlarg: 360, mgap: 12,
+      mbarra: 1, mbalt: 4, mbcor: '#1DB954',
+      martcor: '#FFFFFF', martopac: 70, martsize: 70,
+      mfundo: 'solid', mfcor: '#0B0F0D', mfopac: 70, mfpad: 10, mraio: 12, mrola: 1,
     });
   }
   if (tipo === 'feed') {
@@ -518,6 +529,34 @@ const GRUPOS = [
     { k: 'modo',   l: 'Estado', c: 'lista', se: so('subathon'),
       ops: [['pausado', 'Pausado'], ['rodando', 'Correndo']] },
     { k: '_tempo', l: 'Tempo', c: 'tempo', se: so('subathon') },
+  ] },
+
+  { t: 'A música', aberto: true, se: so('musica'), itens: [
+    { k: 'mcapa',  l: 'Mostrar a capa', c: 'chave' },
+    { k: 'mtam',   l: 'Tamanho da capa', c: 'faixa', min: 24, max: 260, u: 'px', se: (c) => !!c.mcapa },
+    { k: 'mlado',  l: 'Capa fica', c: 'lista', se: (c) => !!c.mcapa,
+      ops: [['esquerda', 'À esquerda'], ['direita', 'À direita']] },
+    { k: 'mlarg',  l: 'Largura total', c: 'faixa', min: 160, max: 1200, u: 'px' },
+    { k: 'mgap',   l: 'Espaço interno', c: 'faixa', min: 0, max: 60, u: 'px' },
+    { k: 'mrola',  l: 'Rolar título longo', c: 'chave',
+      dica: 'só rola o que não cabe — o que cabe fica parado' },
+    { k: 'martcor', l: 'Cor do artista', c: 'cor' },
+    { k: 'martopac', l: 'Opacidade do artista', c: 'faixa', min: 0, max: 100, u: '%' },
+    { k: 'martsize', l: 'Tamanho do artista', c: 'faixa', min: 30, max: 150, u: '%' },
+  ] },
+
+  { t: 'Barra de progresso', se: so('musica'), itens: [
+    { k: 'mbarra', l: 'Mostrar a barra', c: 'chave' },
+    { k: 'mbalt',  l: 'Altura', c: 'faixa', min: 1, max: 20, u: 'px', se: (c) => !!c.mbarra },
+    { k: 'mbcor',  l: 'Cor', c: 'cor', se: (c) => !!c.mbarra },
+  ] },
+
+  { t: 'Caixa da música', se: so('musica'), itens: [
+    { k: 'mfundo', l: 'Fundo', c: 'lista', ops: [['none', 'Nenhum'], ['solid', 'Sólido']] },
+    { k: 'mfcor',  l: 'Cor', c: 'cor', se: (c) => c.mfundo !== 'none' },
+    { k: 'mfopac', l: 'Opacidade', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => c.mfundo !== 'none' },
+    { k: 'mfpad',  l: 'Respiro', c: 'faixa', min: 0, max: 40, u: 'px' },
+    { k: 'mraio',  l: 'Cantos', c: 'faixa', min: 0, max: 80, u: 'px' },
   ] },
 
   { t: 'O feed', aberto: true, se: so('feed'), itens: [
@@ -824,7 +863,7 @@ function manda() {
   try { quadro.contentWindow.postMessage({ type: 'zc:config', config: cfg }, location.origin); } catch (e) {}
   /* Trocar de tipo remonta o desenhista e esvazia a lista. Repovoo depois de
      um respiro, e so uma vez por rajada de ajustes. */
-  if (cfg.tipo === 'chat' || cfg.tipo === 'feed') {
+  if (cfg.tipo === 'chat' || cfg.tipo === 'feed' || cfg.tipo === 'musica') {
     clearTimeout(exemploPendente);
     exemploPendente = setTimeout(() => {
       try { quadro.contentWindow.postMessage({ type: 'zc:exemplo' }, location.origin); } catch (e) {}
@@ -879,6 +918,21 @@ function montaBandejas() {
      inteira na barra do navegador no meio de uma live. */
   const bf = el('bandejaFerramentas');
   bf.innerHTML = '';
+  const spot = h('button', { type: 'button' }, [
+    document.createTextNode('Conectar o Spotify'),
+    h('small', { txt: 'pra overlay de música' }),
+  ]);
+  spot.onclick = async () => {
+    fechaBandejas(null);
+    try {
+      const d = await api('/spotify.php');
+      if (d.ligado) { recado('Spotify já está conectado.', 'bom'); return; }
+      /* A permissão é do Spotify, não nossa: abre na aba deles. */
+      location.href = d.entrar;
+    } catch (e) { recado(e.message, 'ruim'); }
+  };
+  bf.appendChild(spot);
+
   const tut = h('button', { type: 'button' }, [
     document.createTextNode('Como instalar'),
     h('small', { txt: 'O passo a passo no OBS' }),
@@ -1124,7 +1178,7 @@ function telaEditor(perfil, tipoNovo) {
       quadro.contentWindow.postMessage({ type: 'zc:editar', on: true }, location.origin);
       /* O chat so tem o que mostrar quando alguem fala. No editor isso
          significaria uma tela vazia, entao peco frases de mentira. */
-      if (cfg.tipo === 'chat' || cfg.tipo === 'feed') quadro.contentWindow.postMessage({ type: 'zc:exemplo' }, location.origin);
+      if (cfg.tipo === 'chat' || cfg.tipo === 'feed' || cfg.tipo === 'musica') quadro.contentWindow.postMessage({ type: 'zc:exemplo' }, location.origin);
     } catch (e) {}
   };
 

@@ -6,8 +6,9 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="clock.css?v=4">
-<link rel="stylesheet" href="chat.css?v=7">
+<link rel="stylesheet" href="clock.css?v=8">
+<link rel="stylesheet" href="chat.css?v=8">
+<link rel="stylesheet" href="musica.css?v=8">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
@@ -36,8 +37,9 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=7"></script>
-<script src="chat.js?v=2"></script>
+<script src="clock.js?v=8"></script>
+<script src="chat.js?v=8"></script>
+<script src="musica.js?v=8"></script>
 <script>
 (function () {
   'use strict';
@@ -61,13 +63,20 @@
 
   function montaPara(config) {
     var tipo = config && config.tipo;
-    var querChat = (tipo === 'chat' || tipo === 'feed');
-    if (atual === (querChat ? 'chat' : 'relogio')) return false;
+    /* Tres desenhistas: o de texto, o de lista e o da musica. Cada um tem uma
+       forma diferente demais pros outros dois — forcar um so deixaria os tres
+       piores. A pagina troca de desenhista quando o tipo muda, e o resto
+       (busca, previa, arrasto) nao precisa saber qual esta montado. */
+    var quer = (tipo === 'chat' || tipo === 'feed') ? 'chat'
+             : (tipo === 'musica' ? 'musica' : 'relogio');
+    if (atual === quer) return false;
     if (relogio) relogio.destroy();
     raiz.className = '';
     raiz.innerHTML = '';
-    relogio = querChat ? Chat.mount(raiz, config) : Relogio.mount(raiz, config);
-    atual = querChat ? 'chat' : 'relogio';
+    relogio = quer === 'chat'   ? Chat.mount(raiz, config)
+            : quer === 'musica' ? Musica.mount(raiz, config)
+            : Relogio.mount(raiz, config);
+    atual = quer;
     raiz.classList.toggle('is-editando', editando);
     poeAlca();
     return true;
@@ -116,6 +125,7 @@
     /* O chat tem uma caixa só: ela usa as mesmas chaves do número, porque
        nenhum overlay é chat E relógio ao mesmo tempo. */
     ['.ch__palco', 'nx', 'ny', 'caixa'],
+    ['.mu__caixa', 'nx', 'ny', 'caixa'],
   ];
 
   var editando = false, arrasto = null;
@@ -129,7 +139,7 @@
     alca = null;
     if (!editando) return;
 
-    var dono = raiz.querySelector('.ch__palco') || raiz.querySelector('.rl__box');
+    var dono = raiz.querySelector('.ch__palco') || raiz.querySelector('.mu__caixa') || raiz.querySelector('.rl__box');
     if (!dono) return;
     alca = document.createElement('i');
     alca.className = 'rl__alca';
@@ -269,6 +279,9 @@
         if (s !== ultimo) { ultimo = s; desenha(j.config); }
         /* O feed muda sem a config mudar: sub novo nao e edicao de overlay. */
         if (j.eventos && relogio && relogio.feed) relogio.feed(j.eventos);
+        /* undefined é "esta resposta não fala de música"; null é "não tem
+           nada tocando". Só o segundo apaga a tela. */
+        if (j.musica !== undefined && relogio && relogio.musica) relogio.musica(j.musica);
       })
       ['catch'](function () { /* servidor fora: fica com o que já está na tela */ })
       ['finally'](function () { buscando = false; });

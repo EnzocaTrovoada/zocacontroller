@@ -1,0 +1,122 @@
+/* musica.css — o que está tocando.
+   A tipografia e as cores vêm das variáveis do clock.css, iguais às dos
+   outros overlays. Aqui só mora o que é próprio da música: a capa, a barra
+   e o texto que rola quando não cabe. */
+
+.mu {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  padding: var(--rl-my) var(--rl-mx);
+  box-sizing: border-box;
+  justify-content: var(--rl-justify);
+  align-items: var(--rl-valign);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+
+/* Sem nada tocando o overlay some. Um overlay preso na última música mente,
+   e mentir na tela é pior do que não estar lá. */
+.mu--vazio .mu__caixa { opacity: 0; transform: translateY(8px); }
+
+.mu__caixa {
+  display: flex;
+  align-items: center;
+  gap: var(--mu-gap);
+  width: var(--mu-larg);
+  max-width: 100%;
+  padding: var(--mu-fpad);
+  background: var(--mu-fundo);
+  border-radius: var(--mu-raio);
+  transition: opacity .35s ease, transform .35s cubic-bezier(.22, 1, .36, 1);
+  box-sizing: border-box;
+}
+.mu--capa-direita .mu__caixa { flex-direction: row-reverse; }
+
+.mu__capa {
+  width: var(--mu-capa);
+  height: var(--mu-capa);
+  flex: none;
+  object-fit: cover;
+  border-radius: calc(var(--mu-raio) * .7);
+  background: rgba(255, 255, 255, .08);
+}
+.mu--sem-capa .mu__capa { display: none; }
+
+/* min-width:0 num filho de flex é o que permite ele ENCOLHER: sem isso o
+   texto longo estica a caixa e empurra a capa pra fora. */
+.mu__texto { flex: 1; min-width: 0; }
+
+.mu__nome, .mu__artista {
+  font-family: var(--rl-font);
+  letter-spacing: var(--rl-track);
+  white-space: nowrap;
+  overflow: hidden;
+  filter: var(--rl-filter);
+}
+.mu__nome {
+  font-size: var(--rl-size);
+  font-weight: var(--rl-weight);
+  color: var(--rl-color);
+  -webkit-text-stroke: var(--rl-sw) var(--rl-sc);
+  paint-order: stroke fill;
+}
+.mu__artista {
+  font-size: calc(var(--rl-size) * var(--mu-artsize));
+  color: var(--mu-artcor);
+  margin-top: .15em;
+}
+
+/* Texto que não cabe passa devagar de um lado pro outro. Só quem não cabe
+   ganha a classe — animar o que já cabe é movimento à toa na tela. */
+.mu--longo { text-overflow: clip; }
+.mu--longo > * { display: inline-block; }
+.mu--rola .mu--longo {
+  animation: mu-rola 12s linear infinite;
+}
+@keyframes mu-rola {
+  0%, 12%   { transform: translateX(0); }
+  88%, 100% { transform: translateX(calc(-100% + var(--mu-larg) - var(--mu-capa) - var(--mu-gap) - var(--mu-fpad) * 2)); }
+}
+
+.mu__barra {
+  height: var(--mu-balt);
+  margin-top: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .18);
+  overflow: hidden;
+}
+.mu--sem-barra .mu__barra { display: none; }
+.mu__barra > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--mu-bcor);
+  border-radius: inherit;
+  /* Curta: a barra é atualizada quatro vezes por segundo, e uma transição
+     longa faria ela sempre correr atrás do próprio valor. */
+  transition: width .25s linear;
+}
+
+.mu--entra { animation: mu-entra .5s cubic-bezier(.22, 1, .36, 1); }
+@keyframes mu-entra {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mu--entra { animation: none; }
+  .mu--rola .mu--longo { animation: none; }
+}
+
+/* Modo edição, igual ao dos outros: só existe dentro do editor. */
+.mu.is-editando { pointer-events: auto; }
+.mu.is-editando .mu__caixa {
+  outline: 1px dashed rgba(255, 255, 255, .35);
+  outline-offset: 4px;
+  cursor: move;
+}
+.mu.is-editando .mu__caixa:hover { outline-color: #45B8BF; }
+.mu.is-editando .mu__caixa.pegando { outline: 1px solid #45B8BF; }

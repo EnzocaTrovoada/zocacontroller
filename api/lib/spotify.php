@@ -1,0 +1,162 @@
+<?php
+/**
+ * A música que está tocando.
+ *
+ * O token do Spotify dá acesso à conta de quem transmite, então ele NUNCA sai
+ * daqui: o overlay pergunta a música pro nosso servidor, e o servidor é quem
+ * fala com o Spotify. Se fosse o navegador a perguntar, a chave estaria em
+ * todo print, em todo VOD e no inspecionar elemento de qualquer um.
+ */
+require_once __DIR__ . '/db.php';
+
+const SP_AUTORIZA = 'https://accounts.spotify.com/authorize';
+const SP_TOKEN    = 'https://accounts.spotify.com/api/token';
+const SP_API      = 'https://api.spotify.com/v1';
+
+/* Só leitura, e só o que a música precisa. Pedir pouco é o que faz a pessoa
+   clicar em "permitir" sem medo. */
+const SP_ESCOPOS = 'user-read-currently-playing user-read-playback-state';
+
+function sp_cfg(): array
+{
+    $c = cfg()['spotify'] ?? [];
+    if (empty($c['client_id']) || empty($c['client_secret'])) {
+        throw new RuntimeException('O Spotify não está configurado neste servidor.');
+    }
+    return $c;
+}
+
+function sp_redirect(): string
+{
+    return rtrim(cfg()['api_base'] ?? 'https://api.zocahop.com', '/') . '/spotify.php';
+}
+
+function sp_http(string $metodo, string $url, array $cabecalhos = [], $corpo = null): array
+{
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CUSTOMREQUEST  => $metodo,
+        CURLOPT_HTTPHEADER     => $cabecalhos,
+        CURLOPT_TIMEOUT        => 8,
+        CURLOPT_CONNECTTIMEOUT => 4,
+    ]);
+    if ($corpo !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, $corpo);
+
+    $resposta = curl_exec($ch);
+    $codigo   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return [$codigo, json_decode((string) $resposta, true)];
+}
+
+function sp_guardar(int $usuario_id, array $t): void
+{
+    /* Na renovação o Spotify às vezes NÃO manda refresh_token novo: quer dizer
+       "continua valendo o mesmo". Sobrescrever com vazio desconectaria a
+       pessoa sozinho, umas horas depois, sem explicação nenhuma. */
+    $temNovo = !empty($t['refresh_token']);
+
+    $sql = $temNovo
+        ? 'INSERT INTO spotify (usuario_id, access_token, refresh_token, expira_em)
+                VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND))
+           ON DUPLICATE KEY UPDATE access_token = VALUES(access_token),
+                refresh_token = VALUES(refresh_token), expira_em = VALUES(expira_em)'
+        : 'INSERT INTO spotify (usuario_id, access_token, refresh_token, expira_em)
+                VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND))
+           ON DUPLICATE KEY UPDATE access_token = VALUES(access_token),
+                expira_em = VALUES(expira_em)';
+
+    db()->prepare($sql)->execute([
+        $usuario_id,
+        (string) $t['access_token'],
+        (string) ($t['refresh_token'] ?? ''),
+        (int) ($t['expires_in'] ?? 3600),
+    ]);
+}
+
+/** Token válido, renovando se precisar. Null se a pessoa não conectou. */
+function sp_token(int $usuario_id): ?string
+{
+    $st = db()->prepare(
+        'SELECT access_token, refresh_token,
+                TIMESTAMPDIFF(SECOND, NOW(), expira_em) AS falta
+           FROM spotify WHERE usuario_id = ?'
+    );
+    $st->execute([$usuario_id]);
+    $c = $st->fetch();
+    if (!$c) return null;
+
+    /* 60 segundos de folga: renovar em cima da hora deixa a consulta seguinte
+       falhar por um token que venceu no meio do caminho. */
+    if ((int) $c['falta'] > 60) return $c['access_token'];
+    if (!$c['refresh_token']) return null;
+
+    $a = sp_cfg();
+    [$http, $t] = sp_http('POST', SP_TOKEN, [
+        'Authorization: Basic ' . base64_encode($a['client_id'] . ':' . $a['client_secret']),
+        'Content-Type: application/x-www-form-urlencoded',
+    ], http_build_query([
+        'grant_type'    => 'refresh_token',
+        'refresh_token' => $c['refresh_token'],
+    ]));
+
+    if ($http !== 200 || empty($t['access_token'])) return null;
+
+    sp_guardar($usuario_id, $t);
+    return $t['access_token'];
+}
+
+/**
+ * O que está tocando, em forma pronta pra desenhar.
+ *
+ * Null quer dizer "nada tocando", que é diferente de erro: sem nada tocando o
+ * overlay some, e com erro ele continua mostrando o que já estava lá. Trocar
+ * as duas coisas faria a música piscar toda vez que a internet tossisse.
+ */
+function sp_tocando(int $usuario_id, int $maxIdade = 5): ?array
+{
+    $st = db()->prepare(
+        'SELECT json, TIMESTAMPDIFF(SECOND, atualizado_em, NOW()) AS idade
+           FROM spotify_cache WHERE usuario_id = ?'
+    );
+    $st->execute([$usuario_id]);
+    $linha = $st->fetch();
+    $guardado = ($linha && $linha['json']) ? json_decode($linha['json'], true) : null;
+
+    if ($linha && (int) $linha['idade'] < $maxIdade) return $guardado;
+
+    $token = sp_token($usuario_id);
+    if (!$token) return $guardado;
+
+    [$http, $d] = sp_http('GET', SP_API . '/me/player/currently-playing?market=from_token',
+        ['Authorization: Bearer ' . $token]);
+
+    /* Erro de verdade não apaga o que já estava: só não renova. */
+    if ($http !== 200 && $http !== 204) return $guardado;
+
+    /* 204 é "não tem nada tocando" — resposta boa, não falha. */
+    $musica = null;
+    if ($http === 200 && !empty($d['item'])) {
+        $it = $d['item'];
+        $artistas = array_map(function ($a) { return $a['name'] ?? ''; }, $it['artists'] ?? []);
+        $capas = $it['album']['images'] ?? [];
+        $musica = [
+            'nome'    => (string) ($it['name'] ?? ''),
+            'artista' => implode(', ', array_filter($artistas)),
+            'album'   => (string) ($it['album']['name'] ?? ''),
+            /* A do meio: a maior tem 640px e pesaria à toa num overlay que
+               desenha isso com 80 pixels de lado. */
+            'capa'    => (string) ($capas[1]['url'] ?? $capas[0]['url'] ?? ''),
+            'dura'    => (int) ($it['duration_ms'] ?? 0),
+            'em'      => (int) ($d['progress_ms'] ?? 0),
+            'tocando' => !empty($d['is_playing']),
+        ];
+    }
+
+    db()->prepare(
+        'INSERT INTO spotify_cache (usuario_id, json) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE json = VALUES(json), atualizado_em = NOW()'
+    )->execute([$usuario_id, $musica ? json_encode($musica, JSON_UNESCAPED_UNICODE) : null]);
+
+    return $musica;
+}

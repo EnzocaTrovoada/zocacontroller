@@ -7,6 +7,7 @@ require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/contagem.php';
 require_once __DIR__ . '/lib/eventos.php';
+require_once __DIR__ . '/lib/spotify.php';
 
 header('Access-Control-Allow-Origin: *');   // o overlay roda dentro do OBS
 
@@ -53,6 +54,13 @@ if ($perfil['tipo'] === 'meta' && $fonte !== 'manual') {
    Os eventos vao no corpo da resposta, e nao dentro da config: config e o
    que a PESSOA escolheu, e isso aqui muda sozinho. Misturar os dois faria
    cada sub novo parecer uma edicao do overlay. */
+/* A MUSICA vai no corpo, como os eventos: ela muda sozinha, e config e o que
+   a PESSOA escolheu. Junto, cada troca de faixa pareceria uma edicao. */
+$musica = null;
+if ($perfil['tipo'] === 'musica') {
+    try { $musica = sp_tocando((int) $perfil['usuario_id']); } catch (Throwable $e) { $musica = null; }
+}
+
 $eventos = null;
 if ($perfil['tipo'] === 'feed') {
     $eventos = evento_recentes((int) $perfil['usuario_id'], max(1, min(30, (int) ($config['cmax'] ?? 8))));
@@ -63,7 +71,8 @@ if ($perfil['tipo'] === 'feed') {
    pra sempre e a meta ficaria congelada, justo a que deveria se mexer sozinha. */
 $etag = '"' . md5($perfil['atualizado_em'] . '|' . json_encode($recursos)
                   . '|' . (string) ($config['atual'] ?? '')
-                  . '|' . ($eventos === null ? '' : md5(json_encode($eventos)))) . '"';
+                  . '|' . ($eventos === null ? '' : md5(json_encode($eventos)))
+                  . '|' . ($musica === null ? '' : md5(json_encode($musica)))) . '"';
 header('ETag: ' . $etag);
 header('Cache-Control: no-cache, must-revalidate');
 
@@ -76,5 +85,6 @@ json_saida([
     'tipo'     => $perfil['tipo'],
     'config'   => $config,
     'eventos'  => $eventos,
+    'musica'   => $musica,
     'recursos' => $recursos,
 ]);

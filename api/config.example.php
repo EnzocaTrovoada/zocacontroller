@@ -44,6 +44,15 @@ return [
     // avisos do EventSub, e tem que ser https com certificado valido.
     'api_base' => 'https://api.zocahop.com',
 
+    /* Spotify, pra overlay de "tocando agora".
+       Crie um app em developer.spotify.com/dashboard e ponha como Redirect URI
+       exatamente: https://api.zocahop.com/spotify.php
+       Sem isso a overlay de musica simplesmente nao aparece nas opcoes. */
+    'spotify' => [
+        'client_id'     => '',
+        'client_secret' => '',
+    ],
+
     // Para onde mandar o streamer depois do login.
     'hub' => 'https://mods.zocahop.com/meu.html',
 
