@@ -140,7 +140,7 @@
    apareceria como quadrado.
    --------------------------------------------------------------------- */
 .mu--revelar .mu__caixa {
-  animation: mu-abre 900ms cubic-bezier(.22, 1, .36, 1) forwards;
+  animation: mu-abre var(--mu-abrir) cubic-bezier(.22, 1, .36, 1) forwards;
 }
 @keyframes mu-abre {
   0%   { opacity: 0; width: var(--mu-quad); transform: scale(.2); }
@@ -150,21 +150,26 @@
 }
 
 /* O texto entra depois que a barra já tem onde caber. */
-.mu--revelar .mu__texto { animation: mu-texto-entra 380ms ease 520ms both; }
+.mu--revelar .mu__texto {
+  animation: mu-texto-entra 380ms ease calc(var(--mu-abrir) * .58) both;
+}
 @keyframes mu-texto-entra {
   from { opacity: 0; transform: translateX(-10px); }
   to   { opacity: 1; transform: none; }
 }
 
 .mu--fechando .mu__caixa {
-  animation: mu-fecha 700ms cubic-bezier(.5, 0, .75, 0) forwards;
+  /* Saída mais demorada que a entrada, e não o contrário: sumir depressa
+      parece defeito, aparecer depressa parece resposta. */
+  animation: mu-fecha var(--mu-fechar) cubic-bezier(.45, 0, .3, 1) forwards;
 }
 @keyframes mu-fecha {
   0%   { opacity: 1; width: var(--mu-larg); transform: scale(1); }
-  55%  { opacity: 1; width: var(--mu-quad); transform: scale(1); }
+  20%  { opacity: 1; width: var(--mu-larg); transform: scale(1); }
+  70%  { opacity: 1; width: var(--mu-quad); transform: scale(1); }
   100% { opacity: 0; width: var(--mu-quad); transform: scale(.2); }
 }
-.mu--fechando .mu__texto { animation: mu-texto-sai 220ms ease forwards; }
+.mu--fechando .mu__texto { animation: mu-texto-sai 260ms ease forwards; }
 @keyframes mu-texto-sai {
   to { opacity: 0; transform: translateX(-10px); }
 }
@@ -183,4 +188,38 @@
 @media (prefers-reduced-motion: reduce) {
   .mu--revelar .mu__caixa, .mu--fechando .mu__caixa, .mu--surge .mu__caixa,
   .mu--revelar .mu__texto, .mu--fechando .mu__texto { animation: none; }
+}
+
+/* ---------------------------------------------------------------------
+   O FUNDO SAI DA CAPA
+
+   A mesma imagem, ampliada e borrada, pintando a caixa por trás. A cor
+   muda a cada música sem ninguém escolher nada — e combina sempre, porque
+   é literalmente a cor daquele disco.
+
+   Ampliada de propósito: um blur forte come as bordas da imagem, e sem a
+   sobra ficaria uma moldura clara em volta.
+   --------------------------------------------------------------------- */
+.mu__brilho { display: none; }
+
+.mu--fundo-capa .mu__brilho {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.8);
+  filter: blur(var(--mu-borrar)) saturate(1.7) brightness(var(--mu-escuro));
+  z-index: 0;
+}
+/* O conteúdo sobe pra cima do fundo. Sem z-index positivo aqui, a imagem
+   pintaria por cima do texto — ela vem depois no HTML. */
+.mu--fundo-capa .mu__capa,
+.mu--fundo-capa .mu__texto { position: relative; z-index: 1; }
+
+/* A capa da frente ganha sombra própria: sobre um fundo da mesma imagem,
+   sem ela a arte se dissolveria no borrão. */
+.mu--fundo-capa .mu__capa {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
 }

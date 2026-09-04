@@ -15,6 +15,9 @@
 
   var MOLDE =
     '<div class="mu__caixa">' +
+      /* A capa de novo, borrada e ampliada, como fundo. É a cor da própria
+         música pintando a caixa — muda a cada faixa sem ninguém escolher. */
+      '<img class="mu__brilho" alt="" aria-hidden="true">' +
       '<img class="mu__capa" alt="">' +
       '<div class="mu__texto">' +
         '<div class="mu__nome"></div>' +
@@ -29,6 +32,7 @@
 
     var caixa   = root.querySelector('.mu__caixa');
     var capa    = root.querySelector('.mu__capa');
+    var brilho  = root.querySelector('.mu__brilho');
     var elNome  = root.querySelector('.mu__nome');
     var elArt   = root.querySelector('.mu__artista');
     var barra   = root.querySelector('.mu__barra');
@@ -59,7 +63,7 @@
         fase = 'fechando';
         root.classList.remove('mu--revelar', 'mu--surge');
         root.classList.add('mu--fechando');
-        trocaEm = Date.now() + 760;
+        trocaEm = Date.now() + cfg.mfechar + 60;
       } else if (fase === 'fechando') {
         fase = 'fora';
         trocaEm = 0;
@@ -77,7 +81,7 @@
       void root.offsetWidth;
       root.classList.add(cfg.manim === 'surge' ? 'mu--surge' : 'mu--revelar');
       fase = 'abrindo';
-      trocaEm = Date.now() + (cfg.manim === 'surge' ? 440 : 920);
+      trocaEm = Date.now() + (cfg.manim === 'surge' ? 440 : cfg.mabrir + 20);
     }
 
     function aplica() {
@@ -90,7 +94,13 @@
          Sem capa, um quadrado do tamanho da altura da linha. */
       s.setProperty('--mu-quad', (cfg.mcapa ? cfg.mtam + cfg.mfpad * 2 : Math.round(cfg.size * 2.2)) + 'px');
       s.setProperty('--mu-raio', cfg.mraio + 'px');
-      s.setProperty('--mu-fundo', cfg.mfundo === 'none' ? 'transparent' : R.rgba(cfg.mfcor, cfg.mfopac));
+      /* No modo capa a cor chapada sai de cena: quem pinta é a imagem. */
+      s.setProperty('--mu-fundo', (cfg.mfundo === 'none' || cfg.mfundo === 'capa')
+        ? 'transparent' : R.rgba(cfg.mfcor, cfg.mfopac));
+      s.setProperty('--mu-borrar', cfg.mborrar + 'px');
+      s.setProperty('--mu-escuro', (1 - cfg.mescuro / 100).toFixed(2));
+      s.setProperty('--mu-abrir', cfg.mabrir + 'ms');
+      s.setProperty('--mu-fechar', cfg.mfechar + 'ms');
       s.setProperty('--mu-fpad', cfg.mfpad + 'px');
       s.setProperty('--mu-artcor', R.rgba(cfg.martcor, cfg.martopac));
       s.setProperty('--mu-artsize', (cfg.martsize / 100) + '');
@@ -101,6 +111,7 @@
       root.classList.toggle('mu--sem-barra', !cfg.mbarra);
       root.classList.toggle('mu--capa-direita', cfg.mlado === 'direita');
       root.classList.toggle('mu--rola', !!cfg.mrola);
+      root.classList.toggle('mu--fundo-capa', cfg.mfundo === 'capa');
     }
 
     /* A barra anda sozinha entre uma consulta e outra.
@@ -131,7 +142,10 @@
       if (mudou) {
         elNome.textContent = m.nome;
         elArt.textContent = m.artista;
-        if (m.capa && capa.getAttribute('src') !== m.capa) capa.setAttribute('src', m.capa);
+        if (m.capa && capa.getAttribute('src') !== m.capa) {
+          capa.setAttribute('src', m.capa);
+          brilho.setAttribute('src', m.capa);
+        }
         /* Reinicia a animação de entrada só quando a MÚSICA muda, e não a
            cada consulta: senão ela repetiria de 15 em 15 segundos. */
         abre();
@@ -177,7 +191,23 @@
       exemplo: function () {
         mostra({
           nome: 'Tempo Perdido', artista: 'Legião Urbana', album: 'Dois',
-          capa: '', dura: 292000, em: 74000, tocando: true,
+          /* Uma capa de mentira desenhada aqui mesmo: sem imagem nao da pra
+             ver o fundo tirado dela, que e metade do visual.
+
+             As cores vao CRUAS: quem escapa e o encodeURIComponent. Escrever
+             %23 aqui e deixar ele codificar de novo vira %2523, e o SVG nao
+             desenha nada. */
+          capa: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300">'
+            + '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+            + '<stop offset="0" stop-color="#1E6F8C"/>'
+            + '<stop offset="0.55" stop-color="#2F9E6B"/>'
+            + '<stop offset="1" stop-color="#C9D86B"/></linearGradient></defs>'
+            + '<rect width="300" height="300" fill="url(#g)"/>'
+            + '<circle cx="96" cy="104" r="56" fill="#FFFFFF" opacity="0.25"/>'
+            + '<rect x="146" y="168" width="118" height="96" fill="#0E2630" opacity="0.5"/>'
+            + '<rect x="34" y="214" width="86" height="18" fill="#FFFFFF" opacity="0.35"/></svg>'),
+          dura: 292000, em: 74000, tocando: true,
         });
       },
       destroy: function () {
