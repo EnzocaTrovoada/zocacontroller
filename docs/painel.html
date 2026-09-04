@@ -158,7 +158,7 @@
   <h2>Estado</h2>
   <div class="fila"><b>Cena</b><span id="vCena">—</span></div>
   <div class="fila"><b>Chat</b><span id="vChat">—</span></div>
-  <div class="fila"><b>Ponte</b><span id="vPonte">—</span></div>
+  <div class="fila"><b>Fonte do OBS</b><span id="vPonte">—</span></div>
   <div class="fila"><b>Câmera</b><span id="vOlho">—</span></div>
 
   <div class="grade um" style="margin-top:8px">
@@ -316,7 +316,7 @@ async function mandar(acao, extra) {
   let foi = false;
   try { await pedir('BroadcastCustomEvent', { eventData: cmd }); foi = true; } catch (e) {}
   try { await pedir('SetPersistentData', { realm: CAIXA, slotName: GAVETA_CMD, slotValue: cmd }); foi = true; } catch (e) {}
-  if (!foi) anotar('não consegui falar com a ponte');
+  if (!foi) anotar('não consegui falar com a fonte do OBS');
 }
 
 /* ---------- conectar ---------- */
@@ -475,7 +475,7 @@ function desenharMixer() {
 function aplicar(d, via) {
   if (!d || d.zc !== 'estado') return;
   if (d.t && Date.now() - d.t > 6000) return;      // gaveta velha: a ponte morreu
-  if (via && via !== viaAvisada) { viaAvisada = via; anotar('ponte encontrada (' + via + ')'); }
+  if (via && via !== viaAvisada) { viaAvisada = via; anotar('fonte do OBS encontrada (' + via + ')'); }
 
   temPonte = Date.now();
   micNome = d.mic || micNome;

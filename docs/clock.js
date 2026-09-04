@@ -91,6 +91,17 @@
       'Asia/Dubai', 'Australia/Sydney', 'Pacific/Auckland', 'UTC'
     ] },
     tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta'] },
+    /* Onde cada peca fica. Sai de zero, entao overlay antigo nao se mexe.
+       Quem escreve aqui e o arrasto no editor, nao a pessoa digitando. */
+    nx:       { t: 'n', d: 0, min: -2000, max: 2000 },
+    ny:       { t: 'n', d: 0, min: -2000, max: 2000 },
+    tx:       { t: 'n', d: 0, min: -2000, max: 2000 },
+    ty:       { t: 'n', d: 0, min: -2000, max: 2000 },
+    bx:       { t: 'n', d: 0, min: -2000, max: 2000 },
+    by:       { t: 'n', d: 0, min: -2000, max: 2000 },
+    /* O numero por cima da barra, em vez de acima dela. Ocupa bem menos
+       altura na tela, que e o que a maioria quer numa meta. */
+    bdentro:  { t: 'b', d: 0 },
     /* subathon: o que acontece quando entra tempo */
     sanim:    { t: 'e', d: 'subir', v: ['subir', 'rolar', 'ambos', 'nenhum'] },
     spopc:    { t: 'c', d: '#7ce07c' },
@@ -470,6 +481,15 @@
     s.setProperty('--rl-spopd', Math.round(tamPop * 1.9) + 'px');
     s.setProperty('--rl-spopc', cfg.spopc);
     s.setProperty('--rl-surgc', cfg.surgc);
+
+    /* Cada peca leva seu proprio deslocamento. Em translate, e nao em
+       margem: nao empurra as vizinhas e nao muda o tamanho da caixa. */
+    s.setProperty('--rl-nx', cfg.nx + 'px');
+    s.setProperty('--rl-ny', cfg.ny + 'px');
+    s.setProperty('--rl-tx', cfg.tx + 'px');
+    s.setProperty('--rl-ty', cfg.ty + 'px');
+    s.setProperty('--rl-bx', cfg.bx + 'px');
+    s.setProperty('--rl-by', cfg.by + 'px');
 
     s.setProperty('--rl-color', cfg.color);
     s.setProperty('--rl-c2', cfg.c2);
@@ -1013,6 +1033,9 @@
       aplicaEstilo(root, cfg);
       aplicaBarra(root, cfg);
       aplicaLegenda(root, cfg);
+      /* Com o numero por cima da barra a caixa vira grade e os dois dividem a
+         mesma celula. Nao mexe no DOM: so muda como as pecas se empilham. */
+      root.classList.toggle('is-dentro', cfg.tipo === 'meta' && !!cfg.bdentro && !!cfg.barra);
       pinta(true);
       /* na primeira carga tudo e "novo": sem isto o overlay daria um "+X"
          toda vez que o OBS abrisse a cena */

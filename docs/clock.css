@@ -309,3 +309,62 @@
   /* desconta o gap da caixa pra "Distância" valer exatamente o que diz */
   margin-top: calc(var(--rl-leggap) - var(--rl-dgap));
 }
+
+/* ---------------------------------------------------------------------
+   ONDE CADA PECA FICA
+
+   O editor deixa arrastar cada parte do overlay. O resultado vira um
+   translate por peca — nunca margem: margem empurraria as vizinhas e
+   mudaria o tamanho sugerido pro OBS, entao mover o titulo mexeria o
+   numero de lugar junto.
+   --------------------------------------------------------------------- */
+.rl__time  { transform: translate(var(--rl-nx, 0), var(--rl-ny, 0)); }
+.rl__date  { transform: translate(var(--rl-tx, 0), var(--rl-ty, 0)); }
+.rl__barra { transform: translate(var(--rl-bx, 0), var(--rl-by, 0)); }
+
+/* O baque do subathon tambem e um transform e ia cancelar o deslocamento:
+   por isso ele mora numa camada de dentro, e nao no .rl__time. */
+.rl__time.rl--baque { animation: none; }
+.rl__time.rl--baque .rl__layer { animation: rl-baque .6s cubic-bezier(.22, 1, .36, 1); }
+
+/* ---------------------------------------------------------------------
+   NUMERO DENTRO DA BARRA
+
+   Numa meta, "347 / 500" em cima e a barra embaixo ocupa quase o dobro da
+   altura. Com o numero por dentro fica uma faixa so — que e como quase
+   todo mundo usa de verdade.
+   --------------------------------------------------------------------- */
+.rl.is-dentro .rl__box { display: grid; grid-template-columns: 1fr; }
+.rl.is-dentro .rl__time,
+.rl.is-dentro .rl__barra { grid-area: 1 / 1; align-self: center; }
+.rl.is-dentro .rl__barra { margin: 0; width: 100%; }
+/* Fora do editor o numero nao intercepta clique (ele esta POR CIMA da
+   barra). Dentro do editor precisa interceptar, senao seria a unica peca
+   que nao daria pra arrastar. */
+.rl.is-dentro:not(.is-editando) .rl__time { pointer-events: none; }
+.rl.is-dentro .rl__time { z-index: 1; }
+.rl.is-dentro .rl__date { grid-area: 2 / 1; }
+.rl.is-dentro .rl__leg  { grid-area: 3 / 1; }
+
+/* ---------------------------------------------------------------------
+   MODO EDICAO
+
+   So existe dentro do editor: a fonte no OBS nunca recebe esta classe.
+   O tracejado mostra onde comeca e acaba cada peca, que e a unica forma
+   de saber o que voce esta pegando quando o fundo e transparente.
+   --------------------------------------------------------------------- */
+.rl.is-editando .rl__time,
+.rl.is-editando .rl__date,
+.rl.is-editando .rl__barra {
+  cursor: move;
+  outline: 1px dashed rgba(255, 255, 255, .35);
+  outline-offset: 3px;
+}
+.rl.is-editando .rl__time:hover,
+.rl.is-editando .rl__date:hover,
+.rl.is-editando .rl__barra:hover { outline-color: #45B8BF; }
+.rl.is-editando .rl__time.pegando,
+.rl.is-editando .rl__date.pegando,
+.rl.is-editando .rl__barra.pegando { outline: 1px solid #45B8BF; }
+.rl.is-editando .rl__date[contenteditable="true"],
+.rl.is-editando .rl__leg[contenteditable="true"] { cursor: text; outline-color: #45B8BF; }

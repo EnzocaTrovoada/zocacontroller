@@ -75,11 +75,16 @@
     box-shadow: var(--sombra); padding: 6px; display: none; z-index: 40;
   }
   .aba[aria-expanded="true"] .bandeja { display: block; }
+  /* Um item era <button> e os outros <a>. O link herdava o CAIXA ALTA da
+     aba e o botão não, então "Comandos" saía em caixa normal ao lado de
+     "SUBATHON". Fixar nos dois acaba com o desalinho. */
   .bandeja button, .bandeja a {
     display: block; width: 100%; text-align: left; text-decoration: none;
     padding: 10px 12px; border: 0; background: none; cursor: pointer;
     color: var(--tinta); font: 500 14px var(--mono); border-radius: 4px;
+    text-transform: none; letter-spacing: normal;
   }
+  .bandeja small { text-transform: none; letter-spacing: normal; }
   .bandeja button:hover, .bandeja a:hover { background: var(--verde-fraco); color: var(--verde-forte); }
   .bandeja small { display: block; font-size: 11.5px; color: var(--apagado); margin-top: 1px; }
   .bandeja button:hover small, .bandeja a:hover small { color: var(--verde); }
@@ -201,12 +206,15 @@
 
   /* Xadrez escuro tipo PNG: é o fundo honesto pra mostrar overlay, que é
      quase sempre texto claro e vive por cima da imagem do jogo. */
+  /* A grade do transparente, igual à do Photoshop: quadradinho claro e
+     escuro alternados. É ela que deixa ver onde o overlay começa e acaba, e
+     que o fundo vai sumir no OBS. */
   .xadrez {
-    background-color: #23282A;
+    background-color: #22272A;
     background-image:
-      linear-gradient(45deg, #2E3436 25%, transparent 25%, transparent 75%, #2E3436 75%),
-      linear-gradient(45deg, #2E3436 25%, transparent 25%, transparent 75%, #2E3436 75%);
-    background-size: 18px 18px; background-position: 0 0, 9px 9px;
+      linear-gradient(45deg, #30373A 25%, transparent 25%, transparent 75%, #30373A 75%),
+      linear-gradient(45deg, #30373A 25%, transparent 25%, transparent 75%, #30373A 75%);
+    background-size: 16px 16px; background-position: 0 0, 8px 8px;
   }
   .cartao .previa {
     height: 108px; margin: -15px -16px 2px; border-bottom: 1px solid var(--linha);
@@ -264,7 +272,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=1"></script>
+<script src="clock.js?v=2"></script>
 <script>
 'use strict';
 
@@ -405,7 +413,9 @@ const GRUPOS = [
     { k: 'bfundo',  l: 'Cor vazia', c: 'cor' },
     { k: 'baltura', l: 'Altura', c: 'faixa', min: 2, max: 60, u: 'px' },
     { k: 'bcantos', l: 'Cantos', c: 'faixa', min: 0, max: 40, u: 'px' },
-    { k: 'bacima',  l: 'Barra em cima', c: 'chave' },
+    { k: 'bdentro', l: 'Número dentro da barra', c: 'chave',
+      dica: 'vira uma faixa só, em vez de número em cima e barra embaixo' },
+    { k: 'bacima',  l: 'Barra acima do número', c: 'chave', se: (c) => !c.bdentro },
   ] },
 
   { t: 'Letra', aberto: true, itens: [
@@ -442,6 +452,7 @@ let perfis = [];
 let cfg = null;         /* config sendo editada */
 let editando = null;    /* perfil sendo editado */
 let quadro = null;      /* iframe do preview */
+let camposPorChave = {};/* pra dar dois cliques na peça e cair no campo dela */
 let redesenhar = [];    /* controles que somem/aparecem conforme a config */
 
 function h(tag, attrs, filhos) {
@@ -562,7 +573,7 @@ function montaBandejas() {
   bf.innerHTML = '';
   const cmd = h('button', { type: 'button' }, [
     document.createTextNode('Comandos'),
-    h('small', { txt: 'O que o chat pode mandar, e criar os seus' }),
+    h('small', { txt: 'O que o seu chat pode mandar, e criar os seus' }),
   ]);
   cmd.onclick = () => { fechaBandejas(null); vaiPara('#/comandos'); };
   bf.appendChild(cmd);
@@ -570,8 +581,8 @@ function montaBandejas() {
   [
     ['Subathon', 'Quanto cada sub, bit ou doação soma', 'subathon.html'],
     ['Moderadores', 'Criar e revogar o link de cada mod', 'convites.html'],
-    ['Ponte do OBS', 'A fonte que liga o chat no OBS', 'criar.html'],
-    ['Painel do OBS', 'A doca que fica dentro do OBS', 'painel.html'],
+    ['Fonte do OBS', 'O que liga o seu chat no OBS', 'criar.html'],
+    ['Painel', 'A janelinha de controle dentro do OBS', 'painel.html'],
   ].forEach(([n, txt, url]) => {
     bf.appendChild(h('a', { href: url }, [document.createTextNode(n), h('small', { txt })]));
   });
@@ -732,16 +743,22 @@ function telaEditor(perfil, tipoNovo) {
   const tela = el('tela');
   tela.innerHTML = '';
   redesenhar = [];
+  camposPorChave = {};
   editando = perfil;
   cfg = perfil ? Object.assign(padraoDe(perfil.tipo), perfil.config || {}) : padraoDe(tipoNovo);
 
   const tipo = cfg.tipo;
   tela.appendChild(h('h1', { txt: (perfil ? 'Editar ' : 'Novo ') + (TIPOS[tipo] || {}).nome }));
-  tela.appendChild(h('p', { cls: 'sub', txt: 'O que você vê aqui é o mesmo desenho que vai pro OBS — não é imitação.' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Arraste cada parte pra onde quiser, como no Photoshop. Segure Shift pra travar no eixo, e dê dois cliques numa peça pra pular direto pro campo dela. O que você vê aqui é o mesmo desenho que vai pro OBS — não é imitação.' }));
 
   quadro = h('iframe', { src: 'overlay.html', title: 'Prévia' });
-  const palco = h('div', { cls: 'palco' }, [quadro]);
-  quadro.onload = manda;
+  const palco = h('div', { cls: 'palco xadrez' }, [quadro]);
+  quadro.onload = () => {
+    manda();
+    /* Só a prévia entra em modo edição. A fonte que roda no OBS nunca
+       recebe esta mensagem, então lá não existe tracejado nem arrasto. */
+    try { quadro.contentWindow.postMessage({ type: 'zc:editar', on: true }, location.origin); } catch (e) {}
+  };
 
   const controles = h('div', { cls: 'controles' });
   GRUPOS.forEach((g) => {
@@ -757,7 +774,9 @@ function telaEditor(perfil, tipoNovo) {
            estado do controle nem exige remontar a tela inteira */
       }
       temAlgo = true;
-      const linha = h('div', { cls: 'campo' }, [h('label', { txt: it.l }), fab(it)]);
+      const controle = fab(it);
+      const linha = h('div', { cls: 'campo' }, [h('label', { txt: it.l }), controle]);
+      camposPorChave[it.k] = { controle, grupo: null, linha };
       const caixa = it.dica
         ? h('div', {}, [linha, h('p', { style: 'margin:-4px 0 10px;font-size:11.5px;color:var(--apagado)', txt: it.dica })])
         : linha;
@@ -771,6 +790,7 @@ function telaEditor(perfil, tipoNovo) {
 
     if (!temAlgo) return;
     const det = h('details', g.aberto ? { open: '' } : {}, [h('summary', { txt: g.t }), corpo]);
+    g.itens.forEach((it) => { if (camposPorChave[it.k]) camposPorChave[it.k].grupo = det; });
     controles.appendChild(det);
   });
 
@@ -796,6 +816,15 @@ function telaEditor(perfil, tipoNovo) {
     salvar.disabled = false;
   };
 
+  /* Dá pra arrastar uma peça pra fora da tela e não achar mais. Isto traz
+     todas de volta pro lugar de origem sem desfazer o resto. */
+  const centrar = h('button', { cls: 'bt', type: 'button', txt: 'Recentralizar' });
+  centrar.onclick = () => {
+    ['nx', 'ny', 'tx', 'ty', 'bx', 'by'].forEach((k) => { cfg[k] = 0; });
+    manda();
+    recado('Peças de volta ao lugar de origem.');
+  };
+
   const voltar = h('button', { cls: 'bt', type: 'button', txt: 'Voltar' });
   voltar.onclick = () => vaiPara('#/overlays');
 
@@ -808,7 +837,7 @@ function telaEditor(perfil, tipoNovo) {
                  txt: 'só pra você achar na lista; não aparece na live' }),
       ]),
       controles,
-      h('div', { cls: 'acoes', style: 'display:flex;gap:8px;margin-top:12px' }, [salvar, voltar]),
+      h('div', { cls: 'acoes', style: 'display:flex;gap:8px;margin-top:12px' }, [salvar, centrar, voltar]),
     ]),
   ]));
 }
@@ -828,19 +857,19 @@ function telaControlador() {
   ]);
 
   async function redefinir() {
-    const aviso = 'Trocar a chave agora?\n\nA ponte no OBS PARA de funcionar até você trocar a URL dela, e links salvos nos favoritos deixam de valer.';
+    const aviso = 'Trocar a chave agora?\n\nA fonte do OBS PARA de funcionar até você colar o endereço novo nela, e links salvos nos favoritos deixam de valer.';
     if (!confirm(aviso)) return;
     try {
       const d = await api('/chave.php', { method: 'POST', body: JSON.stringify({ acao: 'redefinir' }) });
       chave = d.chave;
       try { sessionStorage.setItem('zc:chave', chave); } catch (e) {}
       telaControlador();
-      recado('Chave trocada. Agora refaça a URL da ponte no OBS — a antiga não vale mais.', 'bom');
+      recado('Chave trocada. Agora cole o endereço novo na fonte do OBS — o antigo não vale mais.', 'bom');
     } catch (e) { recado(e.message, 'ruim'); }
   }
 
   fatiaChave.appendChild(segredo(chave, redefinir));
-  fatiaChave.appendChild(h('p', { cls: 'aviso', txt: 'Trocar a chave quebra a ponte que estiver no OBS: ela carrega a chave dentro do endereço. Só troque se ela tiver aparecido em print, em VOD ou na tela durante a live — e já deixe o OBS aberto pra colar a nova.' }));
+  fatiaChave.appendChild(h('p', { cls: 'aviso', txt: 'Trocar a chave para a fonte do OBS: o endereço dela carrega a chave dentro. Só troque se a chave tiver aparecido em print, em VOD ou na tela durante a live — e deixe o OBS aberto pra colar o endereço novo logo em seguida.' }));
   tela.appendChild(fatiaChave);
 
   /* ----- links que carregam a chave dentro ----- */
@@ -849,8 +878,8 @@ function telaControlador() {
     h('p', { cls: 'd', txt: 'Estes carregam a chave dentro do endereço, então nascem tapados. Copie e cole direto no OBS sem mostrar na tela.' }),
   ]);
   [
-    ['Ponte (Fonte de Navegador)', base + 'ponte.html?chave=' + encodeURIComponent(chave)],
-    ['Painel (doca do OBS)', base + 'painel.html?chave=' + encodeURIComponent(chave)],
+    ['Fonte do OBS', base + 'ponte.html?chave=' + encodeURIComponent(chave)],
+    ['Painel do OBS', base + 'painel.html?chave=' + encodeURIComponent(chave)],
   ].forEach(function (par) {
     fatiaLinks.appendChild(h('p', { style: 'margin:12px 0 5px;font-size:12.5px;color:var(--fraco)', txt: par[0] }));
     fatiaLinks.appendChild(segredo(par[1], null));
@@ -906,7 +935,7 @@ const DE_FABRICA = [
 
 const IDEIAS = [
   ['!morte', 'O chat soma no contador de mortes. O contador já existe como overlay — falta o comando somar nele.'],
-  ['!tempo', 'O chat pergunta quanto falta no subathon. A ponte não fala no chat hoje: precisaria de um bot com token.'],
+  ['!tempo', 'O chat pergunta quanto falta no subathon. Hoje o sistema só escuta o chat, não fala nele — responder exigiria um bot com login próprio.'],
   ['!clipe', 'Cria um clipe. Funciona, mas o crédito vai pro token que criou, não pra quem pediu — a Twitch não tem campo pra isso.'],
   ['!luz',   'Muda a cor das luzes. Precisa de um programa rodando no seu PC: o navegador do OBS não alcança aparelho na rede local.'],
 ];
@@ -960,7 +989,7 @@ function telaComandos() {
       }) });
       cNome.value = ''; cArg.value = ''; editandoCmd = null;
       salvar.textContent = 'Criar comando';
-      recado('Pronto. A ponte pega em até 5 minutos, ou na hora se você recarregar a fonte no OBS.', 'bom');
+      recado('Pronto. A fonte do OBS pega em até 5 minutos, ou na hora se você recarregar ela.', 'bom');
       pintaMeus();
     } catch (e) { recado(e.message, 'ruim'); }
     salvar.disabled = false;
@@ -1020,6 +1049,34 @@ function telaComandos() {
   });
   tela.appendChild(ideias);
 }
+
+/* A prévia devolve o arrasto por mensagem. Só aceito da mesma origem, e só
+   as chaves de posição — nada mais entra na config por este caminho. */
+const CHAVES_DE_POSICAO = ['nx', 'ny', 'tx', 'ty', 'bx', 'by'];
+const PECA_PRO_CAMPO = { numero: 'size', nome: 'titulo', barra: 'bcor' };
+
+window.addEventListener('message', (e) => {
+  if (e.origin !== location.origin || !cfg) return;
+  const d = e.data;
+  if (!d) return;
+
+  if (d.type === 'zc:moveu' && d.valores) {
+    Object.keys(d.valores).forEach((k) => {
+      if (CHAVES_DE_POSICAO.includes(k)) cfg[k] = d.valores[k];
+    });
+    return;
+  }
+
+  if (d.type === 'zc:soltou') { redesenhar.forEach((f) => f()); return; }
+
+  if (d.type === 'zc:escolheu') {
+    const alvo = camposPorChave[PECA_PRO_CAMPO[d.peca]];
+    if (!alvo) return;
+    if (alvo.grupo) alvo.grupo.open = true;
+    alvo.linha.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    try { alvo.controle.focus(); alvo.controle.select && alvo.controle.select(); } catch (err) {}
+  }
+});
 
 /* ---------------- navegação ---------------- */
 function vaiPara(hash) { if (location.hash === hash) rota(); else location.hash = hash; }

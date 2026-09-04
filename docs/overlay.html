@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="clock.css?v=1">
+<link rel="stylesheet" href="clock.css?v=2">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
@@ -17,7 +17,7 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=1"></script>
+<script src="clock.js?v=2"></script>
 <script>
 (function () {
   'use strict';
@@ -41,7 +41,100 @@
   window.addEventListener('message', function (e) {
     if (e.origin !== location.origin) return;
     var d = e.data;
-    if (d && d.type === 'zc:config') relogio.update(d.config);
+    if (!d) return;
+    if (d.type === 'zc:config') relogio.update(d.config);
+    if (d.type === 'zc:editar') ligaEdicao(!!d.on);
+  });
+
+  /* ------------------------------------------------------------------
+     ARRASTAR AS PECAS
+
+     So liga quando o editor pede. A fonte que roda no OBS nunca recebe
+     essa mensagem, entao la nada disso existe — nem o tracejado, nem o
+     cursor de mover, nem os ouvintes.
+
+     Cada peca guarda o proprio deslocamento. Durante o arrasto eu escrevo
+     direto na variavel de CSS, em vez de remontar o overlay a cada quadro:
+     remontar redesenha o texto inteiro e recarrega fonte sessenta vezes por
+     segundo pra mover uma coisa dez pixels.
+     ------------------------------------------------------------------ */
+
+  var ALVOS = [
+    ['.rl__time',  'nx', 'ny', 'numero'],
+    ['.rl__date',  'tx', 'ty', 'nome'],
+    ['.rl__barra', 'bx', 'by', 'barra'],
+  ];
+
+  var editando = false, arrasto = null;
+
+  function ligaEdicao(on) {
+    editando = on;
+    raiz.classList.toggle('is-editando', on);
+    if (!on && arrasto) soltar();
+  }
+
+  function avisa(tipo, dados) {
+    try { window.parent.postMessage(Object.assign({ type: tipo }, dados), location.origin); } catch (e) {}
+  }
+
+  function soltar() {
+    if (!arrasto) return;
+    arrasto.el.classList.remove('pegando');
+    avisa('zc:soltou', {});
+    arrasto = null;
+  }
+
+  raiz.addEventListener('pointerdown', function (e) {
+    if (!editando) return;
+    var alvo = null;
+    for (var i = 0; i < ALVOS.length; i++) {
+      var el = raiz.querySelector(ALVOS[i][0]);
+      if (el && (el === e.target || el.contains(e.target))) { alvo = ALVOS[i]; break; }
+    }
+    if (!alvo) return;
+
+    var el2 = raiz.querySelector(alvo[0]);
+    var c = relogio.config();
+    arrasto = {
+      el: el2, kx: alvo[1], ky: alvo[2],
+      x0: e.clientX, y0: e.clientY,
+      vx: c[alvo[1]] || 0, vy: c[alvo[2]] || 0,
+    };
+    el2.classList.add('pegando');
+    try { el2.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+
+  raiz.addEventListener('pointermove', function (e) {
+    if (!arrasto) return;
+    var x = Math.round(arrasto.vx + (e.clientX - arrasto.x0));
+    var y = Math.round(arrasto.vy + (e.clientY - arrasto.y0));
+    /* Segurando Shift, trava no eixo que andou mais. Copiado do Photoshop
+       porque e a forma mais rapida de alinhar sem mira nenhuma. */
+    if (e.shiftKey) {
+      if (Math.abs(e.clientX - arrasto.x0) > Math.abs(e.clientY - arrasto.y0)) y = arrasto.vy;
+      else x = arrasto.vx;
+    }
+    raiz.style.setProperty('--rl-' + arrasto.kx, x + 'px');
+    raiz.style.setProperty('--rl-' + arrasto.ky, y + 'px');
+    var d = {}; d[arrasto.kx] = x; d[arrasto.ky] = y;
+    avisa('zc:moveu', { valores: d });
+  });
+
+  raiz.addEventListener('pointerup', soltar);
+  raiz.addEventListener('pointercancel', soltar);
+
+  /* Dois cliques numa peca: o editor pula pro campo dela. E o caminho mais
+     curto entre "quero mudar isso" e o lugar onde se muda. */
+  raiz.addEventListener('dblclick', function (e) {
+    if (!editando) return;
+    for (var i = 0; i < ALVOS.length; i++) {
+      var el = raiz.querySelector(ALVOS[i][0]);
+      if (el && (el === e.target || el.contains(e.target))) {
+        avisa('zc:escolheu', { peca: ALVOS[i][3] });
+        return;
+      }
+    }
   });
   try { if (window.parent !== window) window.parent.postMessage({ type: 'zc:pronto' }, location.origin); } catch (e) {}
 

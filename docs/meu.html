@@ -109,7 +109,7 @@
     <div class="aviso">
       <b>Perdeu a chave?</b> Entre de novo com a Twitch que ela é gerada outra
       vez — mas a antiga para de valer na hora, e aí você precisa trocar o
-      endereço na fonte e na doca do OBS.
+      endereço na fonte e no painel do OBS.
     </div>
   </div>
 
@@ -144,10 +144,10 @@ const comChave = (arquivo, marca) => AQUI + arquivo + marca + 'chave=' + encodeU
    "painel" e "doca" pelo nome; decide pelo que quer fazer. */
 const NO_OBS = [
   { nome: 'Fonte de navegador', onde: 'Fontes → + → Navegador',
-    txt: 'É a ponte: o chat conversa com o OBS por ela. Sem isso nada funciona. Monte o endereço no gerador, que ele lê suas cenas sozinho.',
+    txt: 'É por ela que o chat fala com o OBS. Sem isso nada funciona. Monte o endereço no gerador, que ele lê suas cenas sozinho.',
     url: () => comChave('criar.html', '?'), botao: 'Abrir o gerador', link: true },
 
-  { nome: 'Doca do painel', onde: 'Painéis → Painéis personalizáveis com URL',
+  { nome: 'Painel do OBS', onde: 'Painéis → Painéis personalizáveis com URL',
     txt: 'Fica dentro da janela do OBS, na sua tela, e nunca aparece na transmissão. Mostra se o microfone está mudo e tem os botões de pânico, cena e palpite.',
     url: () => comChave('painel.html', '?') },
 ];
