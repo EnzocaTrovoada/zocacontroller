@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>ZocaController</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Branco e verde. O tema escuro troca só os tokens — nenhuma cor é
+     definida uma vez só lá dentro, senão o claro fica sem ela. */
+  :root {
+    color-scheme: light;
+    --fundo:#FFFFFF; --caixa:#F6F8F6; --caixa2:#EDF2EE; --linha:#DCE4DD;
+    --tinta:#101A14; --fraco:#5C6C62; --apagado:#8A9990;
+    --verde:#12A150; --verde-fraco:#E4F5EA; --verde-forte:#0B7A3B;
+    --perigo:#C4432B;
+    --disp:"Archivo",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+    --sombra:0 1px 2px rgba(16,26,20,.06), 0 8px 24px rgba(16,26,20,.06);
+  }
+  :root[data-tema="escuro"] {
+    color-scheme: dark;
+    --fundo:#0E1411; --caixa:#161F1A; --caixa2:#1D2822; --linha:#2A3830;
+    --tinta:#E4EDE7; --fraco:#93A69B; --apagado:#71857A;
+    --verde:#3DD47F; --verde-fraco:#14301F; --verde-forte:#69E39C;
+    --perigo:#E4735A;
+    --sombra:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fundo); color: var(--tinta);
+    font: 15px/1.55 var(--mono); -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--verde-forte); }
+
+  /* ---------- barra de cima ---------- */
+  .barra {
+    display: flex; align-items: stretch; gap: 0;
+    border-bottom: 1px solid var(--linha); background: var(--fundo);
+    position: sticky; top: 0; z-index: 30;
+  }
+  .marca {
+    display: flex; align-items: center; gap: 9px;
+    padding: 0 20px; border-right: 1px solid var(--linha);
+    font: 700 17px var(--disp); letter-spacing: -.02em; cursor: pointer;
+    background: none; color: var(--tinta);
+  }
+  .marca svg { display: block; }
+
+  .aba {
+    position: relative; display: flex; align-items: center; gap: 7px;
+    padding: 16px 20px; border: 0; border-right: 1px solid var(--linha);
+    background: none; color: var(--tinta); cursor: pointer;
+    font: 600 12px var(--disp); letter-spacing: .14em; text-transform: uppercase;
+  }
+  .aba:hover, .aba[aria-expanded="true"] { background: var(--verde-fraco); color: var(--verde-forte); }
+  .aba i {
+    width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid currentColor; opacity: .7;
+  }
+  .espaco { flex: 1; }
+  .lua {
+    padding: 0 20px; border: 0; border-left: 1px solid var(--linha);
+    background: none; color: var(--tinta); cursor: pointer; font-size: 17px;
+  }
+  .lua:hover { background: var(--verde-fraco); color: var(--verde-forte); }
+
+  /* a bandeja nasce colada embaixo da aba que a abriu */
+  .bandeja {
+    position: absolute; top: 100%; left: -1px; min-width: 210px;
+    background: var(--fundo); border: 1px solid var(--linha); border-top: 0;
+    box-shadow: var(--sombra); padding: 6px; display: none; z-index: 40;
+  }
+  .aba[aria-expanded="true"] .bandeja { display: block; }
+  .bandeja button, .bandeja a {
+    display: block; width: 100%; text-align: left; text-decoration: none;
+    padding: 10px 12px; border: 0; background: none; cursor: pointer;
+    color: var(--tinta); font: 500 14px var(--mono); border-radius: 4px;
+  }
+  .bandeja button:hover, .bandeja a:hover { background: var(--verde-fraco); color: var(--verde-forte); }
+  .bandeja small { display: block; font-size: 11.5px; color: var(--apagado); margin-top: 1px; }
+  .bandeja button:hover small, .bandeja a:hover small { color: var(--verde); }
+  .bandeja hr { border: 0; border-top: 1px solid var(--linha); margin: 6px 4px; }
+
+  /* ---------- conteúdo ---------- */
+  .w { max-width: 1080px; margin: 0 auto; padding: 30px 20px 90px; }
+  h1 { font: 700 clamp(24px,4vw,34px)/1.05 var(--disp); letter-spacing: -.02em; margin: 0 0 8px; }
+  .sub { color: var(--fraco); font-size: 14px; margin: 0 0 26px; max-width: 60ch; }
+  h2 { font: 600 10px var(--disp); letter-spacing: .18em; text-transform: uppercase; color: var(--fraco); margin: 26px 0 10px; }
+
+  button.bt {
+    font: 600 14px var(--disp); cursor: pointer; border-radius: 4px;
+    background: var(--caixa); color: var(--tinta); border: 1px solid var(--linha); padding: 11px 18px;
+  }
+  button.bt:hover:not(:disabled) { border-color: var(--verde); color: var(--verde-forte); }
+  button.bt:disabled { opacity: .4; cursor: default; }
+  button.bt.principal { background: var(--verde); color: #fff; border-color: var(--verde); }
+  button.bt.principal:hover:not(:disabled) { background: var(--verde-forte); border-color: var(--verde-forte); color: #fff; }
+  button.bt.mini { padding: 7px 11px; font-size: 12px; }
+  button.bt.perigo:hover:not(:disabled) { border-color: var(--perigo); color: var(--perigo); }
+
+  .cartoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .cartao {
+    border: 1px solid var(--linha); border-radius: 6px; background: var(--caixa);
+    padding: 15px 16px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .cartao .topo { display: flex; align-items: baseline; gap: 8px; }
+  .cartao b { font: 600 16px var(--disp); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .selo {
+    font: 600 10px var(--disp); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--verde-forte); background: var(--verde-fraco); padding: 3px 7px; border-radius: 3px;
+  }
+  .cartao code {
+    display: block; background: var(--fundo); border: 1px solid var(--linha); border-radius: 4px;
+    padding: 8px 9px; font-size: 11px; color: var(--fraco);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: all;
+  }
+  .cartao .acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+  .vazio {
+    border: 1px dashed var(--linha); border-radius: 6px; padding: 34px 20px;
+    text-align: center; color: var(--apagado); font-size: 14px;
+  }
+
+  /* ---------- editor ---------- */
+  .editor { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; }
+  .palco {
+    position: sticky; top: 74px;
+    border: 1px solid var(--linha); border-radius: 6px; overflow: hidden; background: var(--caixa2);
+    background-image:
+      linear-gradient(45deg, var(--linha) 25%, transparent 25%, transparent 75%, var(--linha) 75%),
+      linear-gradient(45deg, var(--linha) 25%, transparent 25%, transparent 75%, var(--linha) 75%);
+    background-size: 18px 18px; background-position: 0 0, 9px 9px;
+  }
+  /* Xadrez ESCURO mesmo no tema claro: overlay de live é quase sempre texto
+     claro, e num palco branco a barra vazia e o contorno somem — o preview
+     mentiria justo sobre o que a pessoa está ajustando. */
+  .palco {
+    background-color: #23282A;
+    background-image:
+      linear-gradient(45deg, #2E3436 25%, transparent 25%, transparent 75%, #2E3436 75%),
+      linear-gradient(45deg, #2E3436 25%, transparent 25%, transparent 75%, #2E3436 75%);
+  }
+  .palco iframe { display: block; width: 100%; height: 300px; border: 0; }
+  .controles > details {
+    border: 1px solid var(--linha); border-radius: 6px; background: var(--caixa); margin-bottom: 8px;
+  }
+  .controles summary {
+    cursor: pointer; padding: 12px 14px; list-style: none;
+    font: 600 11px var(--disp); letter-spacing: .14em; text-transform: uppercase; color: var(--fraco);
+  }
+  .controles summary::-webkit-details-marker { display: none; }
+  .controles details[open] summary { color: var(--verde-forte); border-bottom: 1px solid var(--linha); }
+  .corpo { padding: 12px 14px; }
+  /* O rótulo tinha flex:1 disputando com um controle de largura fixa e era
+     espremido até 47px — "Nome (só pra você achar)" virava cinco linhas.
+     Com piso de largura ele quebra em no máximo duas, e quando nem isso cabe
+     o controle desce pra linha de baixo em vez de esmagar o texto. */
+  .campo { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; flex-wrap: wrap; }
+  .campo > label { flex: 1 1 118px; min-width: 118px; font-size: 13px; color: var(--fraco); }
+  .campo input[type=text], .campo input[type=number], .campo select {
+    width: 130px; font: 13px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); padding: 7px 8px; border-radius: 4px;
+  }
+  .campo select { width: 150px; }
+  .campo input[type=color] {
+    width: 40px; height: 32px; padding: 2px; background: var(--fundo);
+    border: 1px solid var(--linha); border-radius: 4px; cursor: pointer;
+  }
+  .campo input[type=range] { width: 130px; accent-color: var(--verde); }
+  .campo .valor { width: 44px; text-align: right; font-size: 12px; color: var(--apagado); }
+  .chave { position: relative; width: 40px; height: 22px; flex: none; }
+  .chave input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .chave span {
+    position: absolute; inset: 0; background: var(--linha); border-radius: 22px; transition: background .15s;
+  }
+  .chave span::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+    background: var(--fundo); border-radius: 50%; transition: transform .15s;
+  }
+  .chave input:checked + span { background: var(--verde); }
+  .chave input:checked + span::after { transform: translateX(18px); }
+  .tempoBotoes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+
+  #recado { min-height: 22px; font-size: 13px; margin: 12px 0 0; }
+  #recado.bom { color: var(--verde-forte); } #recado.ruim { color: var(--perigo); }
+  .escondido { display: none !important; }
+  @media (max-width: 860px) {
+    .editor { grid-template-columns: 1fr; }
+    .palco { position: static; }
+    .aba { padding: 14px 13px; letter-spacing: .08em; }
+    .marca { padding: 0 13px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="barra">
+  <button class="marca" id="irInicio" type="button" title="Início">
+    <!-- Z e C encaixados: o Z fecha dentro da abertura do C -->
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+      <path d="M22 7.2A9.4 9.4 0 1 0 22 18.8" fill="none" stroke="var(--verde)" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M8.5 9h8l-8 8h8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    ZocaController
+  </button>
+
+  <button class="aba" id="abaOverlays" type="button" aria-expanded="false" aria-haspopup="true">
+    Overlays <i></i>
+    <span class="bandeja" id="bandejaOverlays"></span>
+  </button>
+
+  <button class="aba" id="abaFerramentas" type="button" aria-expanded="false" aria-haspopup="true">
+    Ferramentas <i></i>
+    <span class="bandeja" id="bandejaFerramentas"></span>
+  </button>
+
+  <span class="espaco"></span>
+  <button class="lua" id="btTema" type="button" title="Trocar tema" aria-label="Trocar tema">🌙</button>
+</nav>
+
+<div class="w">
+  <div id="semChave" class="escondido">
+    <h1>Falta a chave</h1>
+    <p class="sub">Entre com a Twitch pra pegar o seu link do painel.</p>
+    <p><a class="bt" href="https://api.zocahop.com/entrar.php"><button class="bt principal">Entrar com a Twitch</button></a></p>
+  </div>
+
+  <div id="tela"></div>
+  <p id="recado"></p>
+</div>
+
+<script src="clock.js?v=1"></script>
+<script>
+'use strict';
+
+const API = 'https://api.zocahop.com';
+const el = (id) => document.getElementById(id);
+
+/* ---------------- tema ---------------- */
+/* Fica no navegador de quem usa. Se o localStorage estiver bloqueado (aba
+   anônima, site sem permissão), o site abre no claro e segue funcionando. */
+function poeTema(t) {
+  document.documentElement.setAttribute('data-tema', t);
+  el('btTema').textContent = t === 'escuro' ? '☀️' : '🌙';
+  try { localStorage.setItem('zc:tema', t); } catch (e) {}
+}
+try { poeTema(localStorage.getItem('zc:tema') || 'claro'); } catch (e) { poeTema('claro'); }
+el('btTema').onclick = () => {
+  poeTema(document.documentElement.getAttribute('data-tema') === 'escuro' ? 'claro' : 'escuro');
+};
+
+/* ---------------- chave do painel ---------------- */
+let chave = '';
+try {
+  const naUrl = new URLSearchParams(location.search).get('chave');
+  if (naUrl) {
+    sessionStorage.setItem('zc:chave', naUrl.trim());
+    history.replaceState(null, '', location.pathname + location.hash);
+  }
+  chave = sessionStorage.getItem('zc:chave') || '';
+} catch (e) { chave = new URLSearchParams(location.search).get('chave') || ''; }
+
+function recado(t, tipo) { el('recado').textContent = t || ''; el('recado').className = tipo || ''; }
+
+async function api(caminho, opcoes) {
+  const o = Object.assign({ headers: {} }, opcoes || {});
+  o.headers = Object.assign({ 'X-Chave': chave, 'Content-Type': 'application/json' }, o.headers);
+  const r = await fetch(API + caminho, o);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.erro || ('falhou (' + r.status + ')'));
+  return d;
+}
+
+/* ---------------- os tipos de overlay ---------------- */
+const TIPOS = {
+  meta:     { nome: 'Meta',     txt: 'Enche sozinha com os seguidores' },
+  subathon: { nome: 'Subathon', txt: 'Cronômetro que sub e doação alimentam' },
+  relogio:  { nome: 'Relógio',  txt: 'A hora, do fuso que você escolher' },
+  contador: { nome: 'Contador', txt: 'Mortes, vitórias, o que for' },
+  placar:   { nome: 'Placar',   txt: 'Dois números, um contra o outro' },
+};
+
+/* Padrões que já nascem bonitos. Um leigo não quer escolher opacidade de
+   fundo de barra — quer um overlay que dá pra usar assim que nasce. */
+function padraoDe(tipo) {
+  const verde = '#12A150';
+  const base = {
+    tipo, titulo: '', font: 'Anton', size: 84, weight: 700, color: '#FFFFFF',
+    sw: 2, sc: '#101010', glow: 10, gc: verde, gi: 35,
+    dcolor: verde, dsize: 24, dtrack: 6, dcaps: 1,
+  };
+  if (tipo === 'meta') {
+    return Object.assign(base, {
+      fonte: 'seguidores', atual: 0, alvo: 1000, mfmt: 'fracao',
+      barra: 1, baltura: 18, bcantos: 9, bgap: 12, bfopac: 16, bcor: verde, bfundo: '#FFFFFF',
+      titulo: 'META DE SEGUIDORES', size: 72,
+    });
+  }
+  if (tipo === 'subathon') {
+    return Object.assign(base, {
+      modo: 'pausado', restante: 3600, horas: 1, fimtxt: 'ACABOU', titulo: 'SUBATHON',
+      sanim: 'subir', spopc: '#7CE07C', spopt: 55, spulso: 1, surg: 5, surgc: '#FF4D4D', leg: 1,
+    });
+  }
+  if (tipo === 'contador') return Object.assign(base, { titulo: 'MORTES', valor: 0 });
+  if (tipo === 'placar')   return Object.assign(base, { titulo: 'EU', valor: 0, titulo2: 'ELES', valor2: 0, sep: '×' });
+  return Object.assign(base, { h24: 1, sec: 1, date: 0, tz: 'auto', font: 'Orbitron', size: 96 });
+}
+
+/* ---------------- controles do editor ----------------
+   Curado de propósito: o desenhista entende 60 opções, e mostrar as 60 seria
+   o mesmo que não ter simplificado nada. Aqui ficam as que mudam o resultado
+   de verdade, com nome em português. */
+const so = (...t) => (c) => t.includes(c.tipo);
+const FUSOS = [
+  ['auto', 'Igual ao meu PC'], ['America/Sao_Paulo', 'Brasília'], ['America/Manaus', 'Manaus'],
+  ['America/New_York', 'Nova York'], ['America/Chicago', 'Chicago'], ['America/Los_Angeles', 'Los Angeles'],
+  ['America/Mexico_City', 'Cidade do México'], ['Europe/Lisbon', 'Lisboa'], ['Europe/London', 'Londres'],
+  ['Europe/Madrid', 'Madri'], ['Europe/Berlin', 'Berlim'], ['Asia/Tokyo', 'Tóquio'],
+  ['Australia/Sydney', 'Sydney'], ['UTC', 'UTC'],
+];
+
+const GRUPOS = [
+  { t: 'Conteúdo', aberto: true, itens: [
+    { k: 'fonte', l: 'Contar', c: 'lista', se: so('meta'),
+      ops: [['seguidores', 'Seguidores (automático)'], ['subs', 'Subs (automático)'], ['manual', 'Eu digito']],
+      dica: 'no automático o número vem da Twitch sozinho, a cada minuto' },
+    { k: 'atual', l: 'Já tem', c: 'num', se: (c) => c.tipo === 'meta' && c.fonte === 'manual' },
+    { k: 'alvo',  l: 'Chegar em', c: 'num', se: so('meta') },
+    { k: 'mfmt',  l: 'Mostrar', c: 'lista', se: so('meta'),
+      ops: [['fracao', '120 / 1000'], ['numero', '120'], ['porcento', '12%'], ['falta', 'faltam 880']] },
+    { k: 'valor',  l: 'Número', c: 'num', se: so('contador', 'placar') },
+    { k: 'valor2', l: 'Número da direita', c: 'num', se: so('placar') },
+    { k: 'sep',    l: 'Separador', c: 'texto', se: so('placar') },
+    { k: 'titulo', l: 'Nome na tela', c: 'texto' },
+    { k: 'titulo2', l: 'Nome da direita', c: 'texto', se: so('placar') },
+    { k: 'h24',  l: '24 horas', c: 'chave', se: so('relogio') },
+    { k: 'sec',  l: 'Segundos', c: 'chave', se: so('relogio') },
+    { k: 'date', l: 'Mostrar a data', c: 'chave', se: so('relogio') },
+    { k: 'tz',   l: 'Fuso', c: 'lista', ops: FUSOS, se: so('relogio') },
+    { k: 'horas',  l: 'Mostrar horas', c: 'chave', se: so('subathon') },
+    { k: 'fimtxt', l: 'Quando zerar', c: 'texto', se: so('subathon') },
+    { k: 'modo',   l: 'Estado', c: 'lista', se: so('subathon'),
+      ops: [['pausado', 'Pausado'], ['rodando', 'Correndo']] },
+    { k: '_tempo', l: 'Tempo', c: 'tempo', se: so('subathon') },
+  ] },
+
+  { t: 'Quando entra tempo', se: so('subathon'), itens: [
+    { k: 'sanim', l: 'Animação', c: 'lista',
+      ops: [['subir', 'Sobe um "+5 min"'], ['rolar', 'O relógio corre até lá'], ['ambos', 'As duas'], ['nenhum', 'Nada']] },
+    { k: 'spopc',  l: 'Cor do "+X"', c: 'cor' },
+    { k: 'spulso', l: 'Dá um baque', c: 'chave' },
+    { k: 'surg',   l: 'Reta final aos', c: 'faixa', min: 0, max: 60, u: 'min', dica: '0 desliga' },
+    { k: 'surgc',  l: 'Cor da reta final', c: 'cor' },
+    { k: 'leg',    l: 'Legenda "o que dá quanto"', c: 'chave',
+      dica: 'o painel do subathon preenche os valores sozinho' },
+  ] },
+
+  { t: 'Barra', se: so('meta'), itens: [
+    { k: 'barra',   l: 'Mostrar barra', c: 'chave' },
+    { k: 'bcor',    l: 'Cor cheia', c: 'cor' },
+    { k: 'bfundo',  l: 'Cor vazia', c: 'cor' },
+    { k: 'baltura', l: 'Altura', c: 'faixa', min: 2, max: 60, u: 'px' },
+    { k: 'bcantos', l: 'Cantos', c: 'faixa', min: 0, max: 40, u: 'px' },
+    { k: 'bacima',  l: 'Barra em cima', c: 'chave' },
+  ] },
+
+  { t: 'Letra', aberto: true, itens: [
+    { k: 'font',  l: 'Fonte', c: 'fontes' },
+    { k: 'size',  l: 'Tamanho', c: 'faixa', min: 20, max: 260, u: 'px' },
+    { k: 'weight', l: 'Peso', c: 'faixa', min: 100, max: 900, passo: 100 },
+    { k: 'track', l: 'Espaçamento', c: 'faixa', min: -10, max: 40, u: 'px' },
+    { k: 'caps',  l: 'MAIÚSCULAS', c: 'chave' },
+  ] },
+
+  { t: 'Cor', aberto: true, itens: [
+    { k: 'color', l: 'Cor', c: 'cor' },
+    { k: 'mode',  l: 'Pintura', c: 'lista', ops: [['solid', 'Sólida'], ['grad', 'Degradê']] },
+    { k: 'c2',    l: 'Segunda cor', c: 'cor', se: (c) => c.mode === 'grad' },
+  ] },
+
+  { t: 'Contorno e brilho', itens: [
+    { k: 'sw',   l: 'Contorno', c: 'faixa', min: 0, max: 12, u: 'px' },
+    { k: 'sc',   l: 'Cor do contorno', c: 'cor', se: (c) => c.sw > 0 },
+    { k: 'glow', l: 'Brilho', c: 'faixa', min: 0, max: 60, u: 'px' },
+    { k: 'gc',   l: 'Cor do brilho', c: 'cor', se: (c) => c.glow > 0 },
+    { k: 'gi',   l: 'Força do brilho', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => c.glow > 0 },
+  ] },
+
+  { t: 'Fundo', itens: [
+    { k: 'bg',  l: 'Caixa atrás', c: 'lista', ops: [['none', 'Nenhuma'], ['solid', 'Sólida'], ['blur', 'Desfocada']] },
+    { k: 'bgc', l: 'Cor da caixa', c: 'cor', se: (c) => c.bg !== 'none' },
+    { k: 'bga', l: 'Opacidade', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => c.bg !== 'none' },
+  ] },
+];
+
+/* ---------------- estado ---------------- */
+let perfis = [];
+let cfg = null;         /* config sendo editada */
+let editando = null;    /* perfil sendo editado */
+let quadro = null;      /* iframe do preview */
+let redesenhar = [];    /* controles que somem/aparecem conforme a config */
+
+function h(tag, attrs, filhos) {
+  const e = document.createElement(tag);
+  Object.entries(attrs || {}).forEach(([k, v]) => {
+    if (k === 'cls') e.className = v;
+    else if (k === 'txt') e.textContent = v;
+    else e.setAttribute(k, v);
+  });
+  (filhos || []).forEach((f) => e.appendChild(f));
+  return e;
+}
+
+function manda() {
+  if (!quadro || !quadro.contentWindow) return;
+  try { quadro.contentWindow.postMessage({ type: 'zc:config', config: cfg }, location.origin); } catch (e) {}
+}
+
+function mudou(k, v) {
+  cfg[k] = v;
+  manda();
+  redesenhar.forEach((f) => f());
+}
+
+/* ---------------- bandejas ---------------- */
+function fechaBandejas(menos) {
+  document.querySelectorAll('.aba').forEach((a) => {
+    if (a !== menos) a.setAttribute('aria-expanded', 'false');
+  });
+}
+function ligaAba(aba) {
+  aba.addEventListener('click', (e) => {
+    if (e.target.closest('.bandeja')) return;   /* clique num item não fecha antes da hora */
+    const abrindo = aba.getAttribute('aria-expanded') !== 'true';
+    fechaBandejas(aba);
+    aba.setAttribute('aria-expanded', String(abrindo));
+  });
+}
+ligaAba(el('abaOverlays'));
+ligaAba(el('abaFerramentas'));
+document.addEventListener('click', (e) => { if (!e.target.closest('.aba')) fechaBandejas(null); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fechaBandejas(null); });
+
+function montaBandejas() {
+  const bo = el('bandejaOverlays');
+  bo.innerHTML = '';
+  Object.entries(TIPOS).forEach(([t, info]) => {
+    const b = h('button', { type: 'button' }, [
+      document.createTextNode(info.nome), h('small', { txt: info.txt }),
+    ]);
+    b.onclick = () => { fechaBandejas(null); vaiPara('#/novo/' + t); };
+    bo.appendChild(b);
+  });
+  bo.appendChild(h('hr'));
+  const todos = h('button', { type: 'button', txt: 'Ver todos os meus overlays' });
+  todos.onclick = () => { fechaBandejas(null); vaiPara('#/overlays'); };
+  bo.appendChild(todos);
+
+  const bf = el('bandejaFerramentas');
+  bf.innerHTML = '';
+  const comChave = (p) => p + (chave ? '?chave=' + encodeURIComponent(chave) : '');
+  [
+    ['Subathon', 'Quanto cada sub, bit ou doação soma', comChave('subathon.html')],
+    ['Moderadores', 'Criar e revogar o link de cada mod', comChave('convites.html')],
+    ['Ponte do OBS', 'A fonte que liga o chat no OBS', comChave('criar.html')],
+    ['Painel do OBS', 'A doca que fica dentro do OBS', comChave('painel.html')],
+  ].forEach(([n, txt, url]) => {
+    bf.appendChild(h('a', { href: url }, [document.createTextNode(n), h('small', { txt })]));
+  });
+}
+
+/* ---------------- fábrica de controles ---------------- */
+const FABRICA = {
+  texto(it) {
+    const i = h('input', { type: 'text' });
+    i.value = cfg[it.k] || '';
+    i.oninput = () => mudou(it.k, i.value);
+    return i;
+  },
+  num(it) {
+    const i = h('input', { type: 'number' });
+    i.value = cfg[it.k] || 0;
+    i.oninput = () => mudou(it.k, parseInt(i.value, 10) || 0);
+    return i;
+  },
+  cor(it) {
+    const i = h('input', { type: 'color' });
+    i.value = cfg[it.k] || '#ffffff';
+    i.oninput = () => mudou(it.k, i.value);
+    return i;
+  },
+  chave(it) {
+    const i = h('input', { type: 'checkbox' });
+    i.checked = !!cfg[it.k];
+    i.onchange = () => mudou(it.k, i.checked ? 1 : 0);
+    return h('span', { cls: 'chave' }, [i, h('span')]);
+  },
+  lista(it) {
+    const s = h('select');
+    (it.ops || []).forEach(([v, t]) => {
+      const o = h('option', { value: v, txt: t });
+      if (String(cfg[it.k]) === String(v)) o.selected = true;
+      s.appendChild(o);
+    });
+    s.onchange = () => mudou(it.k, s.value);
+    return s;
+  },
+  fontes(it) {
+    const s = h('select');
+    (Relogio.FONTS || []).forEach((f) => {
+      const nome = typeof f === 'string' ? f : (f.n || f.nome || f.f);
+      const o = h('option', { value: nome, txt: nome });
+      if (cfg[it.k] === nome) o.selected = true;
+      s.appendChild(o);
+    });
+    s.onchange = () => mudou(it.k, s.value);
+    return s;
+  },
+  faixa(it) {
+    const i = h('input', { type: 'range' });
+    i.min = it.min; i.max = it.max; i.step = it.passo || 1;
+    i.value = cfg[it.k];
+    const v = h('span', { cls: 'valor', txt: cfg[it.k] + (it.u || '') });
+    i.oninput = () => { v.textContent = i.value + (it.u || ''); mudou(it.k, parseInt(i.value, 10)); };
+    const cx = h('span', { cls: 'campo', style: 'margin:0;gap:8px' }, [i, v]);
+    return cx;
+  },
+  /* Pausado guarda quanto FALTA; correndo guarda QUANDO acaba. São contas
+     diferentes, e somar no campo errado faria o tempo sumir. */
+  tempo() {
+    const visor = h('b', { cls: 'valor', style: 'width:auto;font:600 15px var(--disp);color:var(--tinta)' });
+    const linha = h('div', { cls: 'tempoBotoes' });
+
+    const agora = () => Math.round(Relogio.agoraServidor() / 1000);
+    const falta = () => (cfg.modo === 'rodando' ? Math.max(0, cfg.fim - agora()) : cfg.restante);
+    const pinta = () => { visor.textContent = Relogio.tempoHMS(falta(), true); };
+
+    const poe = (seg) => {
+      seg = Math.max(0, Math.min(2592000, Math.round(seg)));
+      if (cfg.modo === 'rodando') mudou('fim', agora() + seg);
+      else mudou('restante', seg);
+      pinta();
+    };
+    [['-10 min', -600], ['-1 min', -60], ['+1 min', 60], ['+10 min', 600], ['+1 h', 3600], ['Zerar', null]]
+      .forEach(([txt, d]) => {
+        const b = h('button', { cls: 'bt mini', type: 'button', txt });
+        b.onclick = () => {
+          if (d === null) { if (confirm('Zerar o tempo?')) poe(0); }
+          else poe(falta() + d);
+        };
+        linha.appendChild(b);
+      });
+    pinta();
+    redesenhar.push(pinta);
+    return h('div', {}, [visor, linha]);
+  },
+};
+
+/* ---------------- telas ---------------- */
+function telaLista(filtro) {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  const lista = filtro ? perfis.filter((p) => p.tipo === filtro) : perfis;
+
+  tela.appendChild(h('h1', { txt: filtro ? TIPOS[filtro].nome : 'Meus overlays' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: filtro
+    ? TIPOS[filtro].txt + '. Cada um vira um link fixo que atualiza sozinho no OBS.'
+    : 'Cada overlay vira um link fixo. Cola no OBS uma vez e nunca mais mexe: o que você editar aqui aparece na live em até 15 segundos.' }));
+
+  const criar = h('button', { cls: 'bt principal', type: 'button', txt: '+ Criar ' + (filtro ? TIPOS[filtro].nome.toLowerCase() : 'overlay') });
+  criar.onclick = () => vaiPara('#/novo/' + (filtro || 'meta'));
+  tela.appendChild(criar);
+
+  if (!lista.length) {
+    tela.appendChild(h('div', { cls: 'vazio', txt: 'Nenhum overlay ainda. Crie o primeiro aí em cima.', style: 'margin-top:18px' }));
+    return;
+  }
+
+  const grade = h('div', { cls: 'cartoes', style: 'margin-top:18px' });
+  lista.forEach((p) => {
+    const link = location.origin + location.pathname.replace(/[^/]*$/, '') + 'overlay.html?k=' + p.chave_publica;
+    const c = p.config || {};
+
+    const editar = h('button', { cls: 'bt mini', type: 'button', txt: 'Editar' });
+    editar.onclick = () => vaiPara('#/editar/' + p.id);
+
+    const copiar = h('button', { cls: 'bt mini', type: 'button', txt: 'Copiar link' });
+    copiar.onclick = async () => {
+      try { await navigator.clipboard.writeText(link); copiar.textContent = 'Copiado'; }
+      catch (e) { recado('Selecione o link no cartão e use Ctrl+C.', 'ruim'); }
+      setTimeout(() => { copiar.textContent = 'Copiar link'; }, 2000);
+    };
+
+    const apagar = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'Apagar' });
+    apagar.onclick = async () => {
+      if (!confirm('Apagar "' + (p.nome || 'este overlay') + '"? Quem estiver com ele no OBS fica sem nada.')) return;
+      try { await api('/perfil.php', { method: 'POST', body: JSON.stringify({ acao: 'apagar', id: p.id }) }); await carrega(); }
+      catch (e) { recado(e.message, 'ruim'); }
+    };
+
+    const extra = p.tipo === 'meta'
+      ? (c.fonte === 'manual' ? 'na mão' : (c.fonte === 'subs' ? 'subs' : 'seguidores')) + ' · alvo ' + (c.alvo || '?')
+      : (TIPOS[p.tipo] ? TIPOS[p.tipo].txt : p.tipo);
+
+    grade.appendChild(h('div', { cls: 'cartao' }, [
+      h('div', { cls: 'topo' }, [
+        h('b', { txt: p.nome || 'Sem nome' }),
+        h('span', { cls: 'selo', txt: (TIPOS[p.tipo] || {}).nome || p.tipo }),
+      ]),
+      h('span', { style: 'font-size:12.5px;color:var(--apagado)', txt: extra }),
+      h('code', { txt: link }),
+      h('div', { cls: 'acoes' }, [editar, copiar, apagar]),
+    ]));
+  });
+  tela.appendChild(grade);
+}
+
+function telaEditor(perfil, tipoNovo) {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  redesenhar = [];
+  editando = perfil;
+  cfg = perfil ? Object.assign(padraoDe(perfil.tipo), perfil.config || {}) : padraoDe(tipoNovo);
+
+  const tipo = cfg.tipo;
+  tela.appendChild(h('h1', { txt: (perfil ? 'Editar ' : 'Novo ') + (TIPOS[tipo] || {}).nome }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'O que você vê aqui é o mesmo desenho que vai pro OBS — não é imitação.' }));
+
+  quadro = h('iframe', { src: 'overlay.html', title: 'Prévia' });
+  const palco = h('div', { cls: 'palco' }, [quadro]);
+  quadro.onload = manda;
+
+  const controles = h('div', { cls: 'controles' });
+  GRUPOS.forEach((g) => {
+    if (g.se && !g.se(cfg)) return;
+    const corpo = h('div', { cls: 'corpo' });
+    let temAlgo = false;
+
+    g.itens.forEach((it) => {
+      const fab = FABRICA[it.c];
+      if (!fab) return;
+      if (it.se && !it.se(cfg) && !it.se.sempreMontar) {
+        /* monta mesmo assim e esconde: assim aparecer/sumir não perde o
+           estado do controle nem exige remontar a tela inteira */
+      }
+      temAlgo = true;
+      const linha = h('div', { cls: 'campo' }, [h('label', { txt: it.l }), fab(it)]);
+      const caixa = it.dica
+        ? h('div', {}, [linha, h('p', { style: 'margin:-4px 0 10px;font-size:11.5px;color:var(--apagado)', txt: it.dica })])
+        : linha;
+      if (it.se) {
+        const ver = () => caixa.classList.toggle('escondido', !it.se(cfg));
+        redesenhar.push(ver);
+        ver();
+      }
+      corpo.appendChild(caixa);
+    });
+
+    if (!temAlgo) return;
+    const det = h('details', g.aberto ? { open: '' } : {}, [h('summary', { txt: g.t }), corpo]);
+    controles.appendChild(det);
+  });
+
+  const nome = h('input', { type: 'text', style: 'width:100%' });
+  nome.value = perfil ? (perfil.nome || '') : ((TIPOS[tipo] || {}).nome || '');
+  const salvar = h('button', { cls: 'bt principal', type: 'button', txt: perfil ? 'Salvar' : 'Criar overlay' });
+  salvar.onclick = async () => {
+    salvar.disabled = true;
+    const corpo = { nome: nome.value.trim() || (TIPOS[tipo] || {}).nome, config: cfg };
+    try {
+      if (perfil) {
+        await api('/perfil.php', { method: 'POST', body: JSON.stringify(Object.assign({ acao: 'salvar', id: perfil.id }, corpo)) });
+        recado('Salvo. O OBS pega em até 15 s, sem mexer em nada.', 'bom');
+        await carrega();
+      } else {
+        const d = await api('/perfil.php', { method: 'POST', body: JSON.stringify(Object.assign({ acao: 'criar', tipo }, corpo)) });
+        await carrega();
+        recado('Pronto! Copie o link do cartão e cole numa Fonte de Navegador no OBS.', 'bom');
+        vaiPara('#/editar/' + d.id);
+        return;
+      }
+    } catch (e) { recado(e.message, 'ruim'); }
+    salvar.disabled = false;
+  };
+
+  const voltar = h('button', { cls: 'bt', type: 'button', txt: 'Voltar' });
+  voltar.onclick = () => vaiPara('#/overlays');
+
+  tela.appendChild(h('div', { cls: 'editor' }, [
+    palco,
+    h('div', {}, [
+      h('div', {}, [
+        h('div', { cls: 'campo' }, [h('label', { txt: 'Nome' }), nome]),
+        h('p', { style: 'margin:-4px 0 12px;font-size:11.5px;color:var(--apagado)',
+                 txt: 'só pra você achar na lista; não aparece na live' }),
+      ]),
+      controles,
+      h('div', { cls: 'acoes', style: 'display:flex;gap:8px;margin-top:12px' }, [salvar, voltar]),
+    ]),
+  ]));
+}
+
+/* ---------------- navegação ---------------- */
+function vaiPara(hash) { if (location.hash === hash) rota(); else location.hash = hash; }
+
+function rota() {
+  recado('');
+  const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/');
+  if (p[0] === 'novo' && TIPOS[p[1]]) return telaEditor(null, p[1]);
+  if (p[0] === 'editar') {
+    const perfil = perfis.find((x) => String(x.id) === String(p[1]));
+    if (perfil) return telaEditor(perfil, null);
+    return telaLista(null);
+  }
+  telaLista(TIPOS[p[1]] ? p[1] : null);
+}
+window.addEventListener('hashchange', rota);
+el('irInicio').onclick = () => vaiPara('#/overlays');
+
+async function carrega() {
+  try { perfis = (await api('/perfil.php')).perfis || []; }
+  catch (e) { recado(e.message, 'ruim'); }
+}
+
+(async function () {
+  montaBandejas();
+  if (!chave) { el('semChave').classList.remove('escondido'); return; }
+  await carrega();
+  rota();
+})();
+</script>
+</body>
+</html>

@@ -32,6 +32,19 @@
             .replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
 
   var relogio = Relogio.mount(raiz, Relogio.parseConfig());
+
+  /* PREVIEW DO EDITOR.
+     O hub mostra este mesmo arquivo num iframe e manda a config a cada
+     ajuste. É o mesmo desenhista que vai pro OBS — então o que aparece na
+     hora de editar é exatamente o que vai pro ar, e não uma imitação.
+     Só aceito da mesma origem, e tudo passa pelo sanitize antes de virar CSS. */
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin) return;
+    var d = e.data;
+    if (d && d.type === 'zc:config') relogio.update(d.config);
+  });
+  try { if (window.parent !== window) window.parent.postMessage({ type: 'zc:pronto' }, location.origin); } catch (e) {}
+
   if (!k) return;
 
   var ultimo = '', buscando = false;
