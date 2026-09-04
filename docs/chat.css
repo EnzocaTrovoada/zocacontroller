@@ -113,3 +113,74 @@
 }
 .ch.is-editando .ch__palco:hover { outline-color: #45B8BF; }
 .ch.is-editando .ch__palco.pegando { outline: 1px solid #45B8BF; }
+
+/* ---------------------------------------------------------------------
+   AS CAIXAS
+
+   O nome e a mensagem têm cada um a sua. É o que separa um chat na tela de
+   um chat bonito: quase todo overlay que presta tem uma etiqueta colorida
+   no nome e nada atrás do texto.
+
+   A forma sai de clip-path, não de imagem: acompanha o texto de qualquer
+   tamanho, em qualquer fonte, sem esticar nem pixelar.
+   --------------------------------------------------------------------- */
+.ch__nick > b { font-weight: inherit; display: inline-block; }
+
+.ch--nkcase .ch__nick {
+  display: inline-block;
+  background: var(--nk-cor);
+  padding: var(--nk-pad) calc(var(--nk-pad) * 2);
+  border-radius: var(--nk-raio);
+  border: var(--nk-borda) solid var(--nk-bcor);
+  transform: skewX(var(--nk-incl));
+}
+/* O texto desanda junto com a caixa quando ela inclina: desandar de volta é
+   o que mantém a leitura reta dentro de uma fita torta. */
+.ch--nkcase .ch__nick > b { transform: skewX(calc(var(--nk-incl) * -1)); }
+
+.ch--bolha .ch__msg { transform: skewX(var(--cb-incl)); }
+.ch--bolha .ch__msg > * { transform: skewX(calc(var(--cb-incl) * -1)); }
+.ch--bolha .ch__msg { border: var(--cb-borda) solid var(--cb-bcor); }
+
+/* pílula: o raio grande vira cápsula em qualquer altura */
+.ch--nk-pilula .ch__nick { border-radius: 999px; }
+.ch--cb-pilula .ch__msg  { border-radius: 999px; }
+
+/* chanfro: dois cantos cortados na diagonal, o corte de crachá */
+.ch--nk-chanfro .ch__nick {
+  border-radius: 0;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.ch--cb-chanfro .ch__msg {
+  border-radius: 0;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+
+/* fita: as pontas cortadas em diagonal, como faixa de prêmio */
+.ch--nk-fita .ch__nick {
+  border-radius: 0;
+  clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+  padding-left: calc(var(--nk-pad) * 2.6);
+  padding-right: calc(var(--nk-pad) * 2.6);
+}
+.ch--cb-fita .ch__msg {
+  border-radius: 0;
+  clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+}
+
+/* seta: a ponta à direita, apontando pra mensagem */
+.ch--nk-seta .ch__nick {
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
+  padding-right: calc(var(--nk-pad) * 3.4);
+}
+.ch--cb-seta .ch__msg {
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
+  padding-right: calc(var(--cb-pad) * 3.4);
+}
+
+/* O clip-path corta a borda junto: com forma, a borda vira um contorno
+   desenhado por sombra, que o corte não come. */
+.ch--nk-chanfro .ch__nick, .ch--nk-fita .ch__nick, .ch--nk-seta .ch__nick,
+.ch--cb-chanfro .ch__msg, .ch--cb-fita .ch__msg, .ch--cb-seta .ch__msg { border: 0; }

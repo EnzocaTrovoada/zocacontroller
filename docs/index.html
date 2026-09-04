@@ -137,6 +137,10 @@
   }
 
   .palco iframe { display: block; width: 100%; height: 300px; border: 0; }
+  .prontos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .prontos button { text-align: left; line-height: 1.15; }
+  .prontos small { display: block; font: 400 10.5px var(--mono); color: var(--apagado); margin-top: 2px; }
+  .prontos button:hover small { color: var(--verde); }
   .controles > details {
     border: 1px solid var(--linha); border-radius: 6px; background: var(--caixa); margin-bottom: 8px;
   }
@@ -152,7 +156,12 @@
      Com piso de largura ele quebra em no máximo duas, e quando nem isso cabe
      o controle desce pra linha de baixo em vez de esmagar o texto. */
   .campo { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; flex-wrap: wrap; }
-  .campo > label { flex: 1 1 118px; min-width: 118px; font-size: 13px; color: var(--fraco); }
+  .campo > label,
+  .campo > .rotulo { flex: 1 1 118px; min-width: 118px; font-size: 13px; color: var(--fraco); }
+  /* A linha inteira é a área de clique da chave. */
+  .campo--chave { cursor: pointer; border-radius: 5px; margin-left: -6px; padding: 3px 6px; }
+  .campo--chave:hover { background: var(--verde-fraco); }
+  .campo--chave:hover > .rotulo { color: var(--verde-forte); }
   .campo input[type=text], .campo input[type=number], .campo select {
     width: 130px; font: 13px var(--mono); color: var(--tinta);
     background: var(--fundo); border: 1px solid var(--linha); padding: 7px 8px; border-radius: 4px;
@@ -275,7 +284,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=4"></script>
+<script src="clock.js?v=5"></script>
 <script>
 'use strict';
 
@@ -395,6 +404,79 @@ function padraoDe(tipo) {
   return Object.assign(base, { h24: 1, sec: 1, date: 0, tz: 'auto', font: 'Orbitron', size: 96 });
 }
 
+/* ESTILOS PRONTOS.
+
+   Uma tela com quarenta controles e nenhum ponto de partida é o jeito mais
+   rápido de fazer alguém desistir. Cada pronto mexe SÓ na aparência: o canal,
+   o alvo, o tempo e o que a pessoa escreveu continuam onde estavam.
+
+   Um pronto é o começo da conversa, não o fim dela — depois de aplicar, tudo
+   continua ajustável. */
+const PRONTOS = {
+  chat: [
+    ['Limpo', 'só o texto, sem caixa', {
+      nkcase: 0, cbolha: 0, cnickpos: 'acima', font: 'Archivo', size: 22, weight: 600,
+      color: '#FFFFFF', sw: 0, glow: 0, shy: 2, shb: 6, sho: 75, shc: '#000000', cnickauto: 1,
+    }],
+    ['Etiqueta', 'o nome numa seta colorida', {
+      nkcase: 1, nkforma: 'seta', nkcor: '#12A150', nkopac: 100, nkpad: 6, nkincl: 0,
+      cbolha: 1, cbforma: 'chanfro', cbcor: '#0B0F0D', cbopac: 70, cbpad: 8,
+      cnickpos: 'linha', csep: ' ', cnickauto: 0, cnickcor: '#FFFFFF',
+      font: 'Archivo', size: 20, sw: 0, glow: 0,
+    }],
+    ['Balão', 'redondinho, tipo aplicativo de conversa', {
+      nkcase: 0, cbolha: 1, cbforma: 'pilula', cbcor: '#101418', cbopac: 78, cbpad: 10,
+      cbraio: 999, cnickpos: 'acima', cnickauto: 1, font: 'Archivo', size: 20, sw: 0, glow: 0,
+    }],
+    ['Fita', 'faixas inclinadas, cara de campeonato', {
+      nkcase: 1, nkforma: 'fita', nkcor: '#12A150', nkincl: -10, nkpad: 5,
+      cbolha: 1, cbforma: 'fita', cbcor: '#0B0F0D', cbopac: 80, cbincl: -10, cbpad: 8,
+      cnickpos: 'acima', cnickauto: 0, cnickcor: '#FFFFFF',
+      font: 'Archivo', size: 20, sw: 0, glow: 0,
+    }],
+    ['Cinema', 'deitado no horizonte, tipo Star Wars', {
+      c3d: 1, c3dang: 32, c3dprof: 460, nkcase: 0, cbolha: 0, cnickpos: 'linha', csep: ' ',
+      font: 'Anton', size: 26, color: '#FFE81F', sw: 0, glow: 14, gc: '#FFE81F', gi: 30,
+      cnickauto: 0, cnickcor: '#FFE81F',
+    }],
+  ],
+  meta: [
+    ['Faixa', 'o número dentro da barra, ocupa pouco', {
+      bdentro: 1, barra: 1, baltura: 46, bcantos: 23, bgap: 12, size: 30,
+      bcor: '#12A150', bfundo: '#FFFFFF', bfopac: 14, font: 'Archivo', weight: 700, sw: 0, glow: 0,
+    }],
+    ['Clássico', 'número em cima, barra fina embaixo', {
+      bdentro: 0, barra: 1, baltura: 14, bcantos: 7, bgap: 12, size: 72,
+      bcor: '#12A150', bfundo: '#FFFFFF', bfopac: 16, font: 'Anton', sw: 2, sc: '#101010', glow: 10, gi: 35,
+    }],
+    ['Neon', 'brilho forte, sem contorno', {
+      bdentro: 0, barra: 1, baltura: 10, bcantos: 5, size: 76, font: 'Orbitron', weight: 700,
+      color: '#FFFFFF', sw: 0, glow: 26, gc: '#12A150', gi: 70, bcor: '#12A150',
+    }],
+  ],
+  subathon: [
+    ['Grande', 'o cronômetro é o assunto', {
+      size: 120, font: 'Anton', color: '#FFFFFF', sw: 3, sc: '#101010',
+      glow: 14, gc: '#12A150', gi: 45, horas: 1, sanim: 'ambos', spulso: 1,
+    }],
+    ['Discreto', 'de canto, sem chamar atenção', {
+      size: 46, font: 'Archivo', weight: 700, color: '#FFFFFF', sw: 0,
+      glow: 0, shy: 2, shb: 8, sho: 70, horas: 1, sanim: 'subir', spulso: 0,
+    }],
+  ],
+  relogio: [
+    ['Digital', 'quadrado, tipo painel de LED', {
+      font: 'Orbitron', weight: 700, size: 96, color: '#FFFFFF', sw: 0, glow: 12, gc: '#12A150', gi: 45,
+    }],
+    ['Pesado', 'grosso e com contorno', {
+      font: 'Anton', size: 108, color: '#FFFFFF', sw: 3, sc: '#101010', glow: 0, shy: 4, shb: 10, sho: 60,
+    }],
+  ],
+};
+PRONTOS.feed = PRONTOS.chat;
+PRONTOS.contador = PRONTOS.relogio;
+PRONTOS.placar = PRONTOS.relogio;
+
 /* ---------------- controles do editor ----------------
    Curado de propósito: o desenhista entende 60 opções, e mostrar as 60 seria
    o mesmo que não ter simplificado nada. Aqui ficam as que mudam o resultado
@@ -472,12 +554,41 @@ const GRUPOS = [
     { k: 'cnicksize', l: 'Tamanho do nome', c: 'faixa', min: 30, max: 200, u: '%', se: (c) => !!c.cnick },
   ] },
 
-  { t: 'Balão atrás da mensagem', se: so('chat', 'feed'), itens: [
-    { k: 'cbolha', l: 'Mostrar balão', c: 'chave' },
-    { k: 'cbcor',  l: 'Cor', c: 'cor', se: (c) => !!c.cbolha },
-    { k: 'cbopac', l: 'Opacidade', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => !!c.cbolha },
-    { k: 'cbraio', l: 'Cantos', c: 'faixa', min: 0, max: 60, u: 'px', se: (c) => !!c.cbolha },
-    { k: 'cbpad',  l: 'Respiro', c: 'faixa', min: 0, max: 40, u: 'px', se: (c) => !!c.cbolha },
+  { t: 'Caixa do nome', se: so('chat', 'feed'), itens: [
+    { k: 'nkcase',  l: 'Dar uma caixa pro nome', c: 'chave',
+      dica: 'a etiqueta colorida atrás do nick, separada da caixa da mensagem' },
+    { k: 'nkforma', l: 'Formato', c: 'lista', se: (c) => !!c.nkcase,
+      ops: [['reta', 'Retângulo'], ['pilula', 'Pílula'], ['chanfro', 'Cantos cortados'], ['fita', 'Fita'], ['seta', 'Seta']] },
+    { k: 'nkcor',   l: 'Cor', c: 'cor', se: (c) => !!c.nkcase },
+    { k: 'nkopac',  l: 'Opacidade', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => !!c.nkcase },
+    { k: 'nkraio',  l: 'Cantos', c: 'faixa', min: 0, max: 60, u: 'px', se: (c) => c.nkcase && c.nkforma === 'reta' },
+    { k: 'nkpad',   l: 'Respiro', c: 'faixa', min: 0, max: 40, u: 'px', se: (c) => !!c.nkcase },
+    { k: 'nkincl',  l: 'Inclinar', c: 'faixa', min: -25, max: 25, u: '°', se: (c) => !!c.nkcase,
+      dica: 'a caixa entorta e o texto continua reto' },
+    { k: 'nkborda', l: 'Borda', c: 'faixa', min: 0, max: 8, u: 'px', se: (c) => c.nkcase && (c.nkforma === 'reta' || c.nkforma === 'pilula') },
+    { k: 'nkbcor',  l: 'Cor da borda', c: 'cor', se: (c) => c.nkcase && c.nkborda > 0 && (c.nkforma === 'reta' || c.nkforma === 'pilula') },
+  ] },
+
+  { t: 'Caixa da mensagem', se: so('chat', 'feed'), itens: [
+    { k: 'cbolha',  l: 'Dar uma caixa pra mensagem', c: 'chave' },
+    { k: 'cbforma', l: 'Formato', c: 'lista', se: (c) => !!c.cbolha,
+      ops: [['reta', 'Retângulo'], ['pilula', 'Pílula'], ['chanfro', 'Cantos cortados'], ['fita', 'Fita'], ['seta', 'Seta']] },
+    { k: 'cbcor',   l: 'Cor', c: 'cor', se: (c) => !!c.cbolha },
+    { k: 'cbopac',  l: 'Opacidade', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => !!c.cbolha },
+    { k: 'cbraio',  l: 'Cantos', c: 'faixa', min: 0, max: 60, u: 'px', se: (c) => c.cbolha && c.cbforma === 'reta' },
+    { k: 'cbpad',   l: 'Respiro', c: 'faixa', min: 0, max: 40, u: 'px', se: (c) => !!c.cbolha },
+    { k: 'cbincl',  l: 'Inclinar', c: 'faixa', min: -25, max: 25, u: '°', se: (c) => !!c.cbolha },
+    { k: 'cbborda', l: 'Borda', c: 'faixa', min: 0, max: 8, u: 'px', se: (c) => c.cbolha && (c.cbforma === 'reta' || c.cbforma === 'pilula') },
+    { k: 'cbbcor',  l: 'Cor da borda', c: 'cor', se: (c) => c.cbolha && c.cbborda > 0 && (c.cbforma === 'reta' || c.cbforma === 'pilula') },
+  ] },
+
+  { t: 'O que não entra na tela', se: so('chat'), itens: [
+    { k: 'csemcmd', l: 'Esconder comandos', c: 'chave',
+      dica: 'mensagens que começam com ! ou / — quem assiste não ganha nada vendo "!som spotify"' },
+    { k: 'cignora', l: 'Ignorar estes', c: 'texto',
+      dica: 'logins separados por vírgula; já vem com os bots mais comuns' },
+    { k: 'cmaxlen', l: 'Cortar depois de', c: 'faixa', min: 0, max: 400, u: ' letras',
+      dica: '0 não corta. Uma parede de texto empurra o resto pra fora da tela.' },
   ] },
 
   { t: 'Perspectiva', se: so('chat', 'feed'), itens: [
@@ -806,6 +917,7 @@ const FABRICA = {
     i.onchange = () => mudou(it.k, i.checked ? 1 : 0);
     const cx = h('span', { cls: 'chave' }, [i, h('span')]);
     cx.__sincroniza = () => { i.checked = !!cfg[it.k]; };
+    cx.__marcavel = true;   /* a linha inteira vira área de clique */
     return cx;
   },
   lista(it) {
@@ -950,6 +1062,27 @@ function telaEditor(perfil, tipoNovo) {
   tela.appendChild(h('h1', { txt: (perfil ? 'Editar ' : 'Novo ') + (TIPOS[tipo] || {}).nome }));
   tela.appendChild(h('p', { cls: 'sub', txt: 'Arraste cada parte pra onde quiser, como no Photoshop. Segure Shift pra travar no eixo, dê dois cliques numa peça pra pular pro campo dela, e use Ctrl+Z pra voltar atrás (Ctrl+Shift+Z refaz). O que você vê aqui é o mesmo desenho que vai pro OBS — não é imitação.' }));
 
+  /* Fica em cima da prévia, e não numa gaveta: é a primeira decisão que
+     faz sentido tomar, e escondida ninguém acharia. */
+  const fileira = h('div', { cls: 'prontos' });
+  (PRONTOS[tipo] || []).forEach((pr) => {
+    const b = h('button', { cls: 'bt mini', type: 'button' }, [
+      document.createTextNode(pr[0]), h('small', { txt: pr[2 - 1] }),
+    ]);
+    b.onclick = () => {
+      Object.keys(pr[2]).forEach((k) => { cfg[k] = pr[2][k]; });
+      manda();
+      Object.keys(camposPorChave).forEach((k) => {
+        const c = camposPorChave[k];
+        if (c && c.controle && c.controle.__sincroniza) c.controle.__sincroniza();
+      });
+      redesenhar.forEach((f) => f());
+      marcaHistorico(true);
+      recado('Estilo "' + pr[0] + '" aplicado. Ctrl+Z volta.');
+    };
+    fileira.appendChild(b);
+  });
+
   quadro = h('iframe', { src: 'overlay.html', title: 'Prévia' });
   const palco = h('div', { cls: 'palco xadrez' }, [quadro]);
   quadro.onload = () => {
@@ -979,7 +1112,15 @@ function telaEditor(perfil, tipoNovo) {
       }
       temAlgo = true;
       const controle = fab(it);
-      const linha = h('div', { cls: 'campo' }, [h('label', { txt: it.l }), controle]);
+      /* A CHAVE VIRA UM <label> DE VERDADE.
+
+         O botãozinho tem 40 por 22 pixels, e o texto ao lado não fazia nada
+         quando clicado: eram irmãos, não pai e filho. Acertar a chave virava
+         mira. Como <label>, o clique em qualquer lugar da linha vale. */
+      const ehChave = !!controle.__marcavel;
+      const linha = h(ehChave ? 'label' : 'div',
+        ehChave ? { cls: 'campo campo--chave' } : { cls: 'campo' },
+        [h('span', { cls: 'rotulo', txt: it.l }), controle]);
       camposPorChave[it.k] = { controle, grupo: null, linha };
       const caixa = it.dica
         ? h('div', {}, [linha, h('p', { style: 'margin:-4px 0 10px;font-size:11.5px;color:var(--apagado)', txt: it.dica })])
@@ -1033,7 +1174,7 @@ function telaEditor(perfil, tipoNovo) {
   voltar.onclick = () => vaiPara('#/overlays');
 
   tela.appendChild(h('div', { cls: 'editor' }, [
-    palco,
+    h('div', {}, [fileira, palco]),
     h('div', {}, [
       h('div', {}, [
         h('div', { cls: 'campo' }, [h('label', { txt: 'Nome' }), nome]),

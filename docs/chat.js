@@ -152,6 +152,25 @@
       s.setProperty('--ch-braio', cfg.cbraio + 'px');
       s.setProperty('--ch-bpad', cfg.cbpad + 'px');
 
+      s.setProperty('--nk-cor', R.rgba(cfg.nkcor, cfg.nkopac));
+      s.setProperty('--nk-pad', cfg.nkpad + 'px');
+      s.setProperty('--nk-raio', cfg.nkraio + 'px');
+      s.setProperty('--nk-incl', cfg.nkincl + 'deg');
+      s.setProperty('--nk-borda', cfg.nkborda + 'px');
+      s.setProperty('--nk-bcor', cfg.nkbcor);
+      s.setProperty('--cb-pad', cfg.cbpad + 'px');
+      s.setProperty('--cb-incl', cfg.cbincl + 'deg');
+      s.setProperty('--cb-borda', cfg.cbborda + 'px');
+      s.setProperty('--cb-bcor', cfg.cbbcor);
+
+      /* Uma classe por forma, e nao uma regra por combinacao: as formas do
+         nome e da mensagem sao independentes, e cruzar as duas na folha de
+         estilo daria vinte e cinco regras pra manter. */
+      ['reta', 'pilula', 'chanfro', 'fita', 'seta'].forEach(function (f) {
+        root.classList.toggle('ch--nk-' + f, cfg.nkcase && cfg.nkforma === f);
+        root.classList.toggle('ch--cb-' + f, cfg.cbolha && cfg.cbforma === f);
+      });
+      root.classList.toggle('ch--nkcase', !!cfg.nkcase);
       root.classList.toggle('ch--bolha', !!cfg.cbolha);
       root.classList.toggle('ch--cima', cfg.cdir === 'cima');
       root.classList.toggle('ch--nick-linha', cfg.cnickpos === 'linha');
@@ -174,7 +193,25 @@
     }
 
     /* ---------------- mensagens ---------------- */
+    /* O QUE NAO ENTRA NA TELA.
+
+       Comando de mod e resposta de bot sao ruido: quem assiste nao ganha
+       nada vendo "!som spotify" na tela. Sai antes de virar elemento, e nao
+       escondido por CSS — o que nao existe nao ocupa lugar na contagem. */
+    function passa(tags, texto) {
+      if (cfg.csemcmd && /^\s*[!\/]/.test(texto)) return false;
+      var login = String(tags.login || '').toLowerCase();
+      var fora = String(cfg.cignora || '').toLowerCase().split(/[,\s]+/).filter(Boolean);
+      if (login && fora.indexOf(login) >= 0) return false;
+      return true;
+    }
+
     function poe(tags, texto) {
+      if (!passa(tags, texto)) return;
+      if (cfg.cmaxlen > 0) {
+        var letras = Array.from(texto);
+        if (letras.length > cfg.cmaxlen) texto = letras.slice(0, cfg.cmaxlen).join('') + '…';
+      }
       var el = document.createElement('div');
       el.className = 'ch__msg ch__entra';
 
@@ -183,8 +220,10 @@
 
       var html = '';
       if (cfg.cnick) {
-        html += '<span class="ch__nick" style="color:' + esc(cor) + '">' + esc(quem)
-             +  (cfg.cnickpos === 'linha' ? '<i>' + esc(cfg.csep) + '</i>' : '') + '</span>';
+        /* O <b> existe pra desandar o texto quando a caixa esta inclinada:
+           sem ele, uma fita torta deixaria o nome torto junto. */
+        html += '<span class="ch__nick" style="color:' + esc(cor) + '"><b>' + esc(quem)
+             +  (cfg.cnickpos === 'linha' ? '<i>' + esc(cfg.csep) + '</i>' : '') + '</b></span>';
       }
       html += '<span class="ch__txt">' + comEmotes(texto, tags.emotes, cfg.cemotes) + '</span>';
       el.innerHTML = html;
@@ -241,8 +280,8 @@
            tudo faria a tela inteira tremer quando o OBS abre a cena. */
         el.className = 'ch__msg' + (primeira ? '' : ' ch__entra');
         el.innerHTML =
-          (cfg.cnick ? '<span class="ch__nick" style="color:' + esc(cfg.fcor) + '">' + esc(e.quem)
-             + (cfg.cnickpos === 'linha' ? '<i>' + esc(cfg.csep) + '</i>' : '') + '</span>' : '') +
+          (cfg.cnick ? '<span class="ch__nick" style="color:' + esc(cfg.fcor) + '"><b>' + esc(e.quem)
+             + (cfg.cnickpos === 'linha' ? '<i>' + esc(cfg.csep) + '</i>' : '') + '</b></span>' : '') +
           '<span class="ch__txt">' + esc(frase) + '</span>';
         pista.appendChild(el);
         mensagens.push({ el: el, nasceu: Date.now() });
@@ -330,6 +369,7 @@
           ['Marmota', '#8FD07A', 'primeira vez aqui, já segui'],
           ['ovniverde', '#D3A244', 'vai encarar de novo?'],
           ['Tempestade', '#B57BE0', 'clipei isso'],
+          ['Zoca', '#12A150', 'obrigado pelos 10 subs!'],
         ].forEach(function (p) {
           poe({ 'display-name': p[0], color: p[1], login: p[0].toLowerCase() }, p[2]);
         });

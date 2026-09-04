@@ -122,6 +122,26 @@
     cbopac:   { t: 'n', d: 45,  min: 0,  max: 100 },
     cbraio:   { t: 'n', d: 10,  min: 0,  max: 60 },
     cbpad:    { t: 'n', d: 8,   min: 0,  max: 40 },
+    cbforma:  { t: 'e', d: 'reta', v: ['reta', 'pilula', 'chanfro', 'fita', 'seta'] },
+    cbincl:   { t: 'n', d: 0,   min: -25, max: 25 },
+    cbborda:  { t: 'n', d: 0,   min: 0,  max: 8 },
+    cbbcor:   { t: 'c', d: '#ffffff' },
+    /* ---- a caixa do NOME, separada da caixa da mensagem ----
+       Sao duas pecas com vida propria: quase todo overlay bonito tem uma
+       etiqueta colorida no nome e nada atras do texto. */
+    nkcase:   { t: 'b', d: 0 },
+    nkforma:  { t: 'e', d: 'pilula', v: ['reta', 'pilula', 'chanfro', 'fita', 'seta'] },
+    nkcor:    { t: 'c', d: '#12a150' },
+    nkopac:   { t: 'n', d: 100, min: 0,  max: 100 },
+    nkpad:    { t: 'n', d: 5,   min: 0,  max: 40 },
+    nkraio:   { t: 'n', d: 6,   min: 0,  max: 60 },
+    nkincl:   { t: 'n', d: 0,   min: -25, max: 25 },
+    nkborda:  { t: 'n', d: 0,   min: 0,  max: 8 },
+    nkbcor:   { t: 'c', d: '#ffffff' },
+    /* ---- o que nao entra na tela ---- */
+    csemcmd:  { t: 'b', d: 1 },
+    cignora:  { t: 't', d: 'nightbot,streamelements,streamlabs,moobot,fossabot', max: 200 },
+    cmaxlen:  { t: 'n', d: 0,   min: 0,  max: 500 },
     c3d:      { t: 'b', d: 0 },
     c3dang:   { t: 'n', d: 18,  min: -60, max: 60 },
     c3dprof:  { t: 'n', d: 600, min: 120, max: 3000 },
