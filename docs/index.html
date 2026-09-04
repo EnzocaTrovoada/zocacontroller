@@ -302,6 +302,16 @@ el('btTema').onclick = () => {
    antigo. Nos dois casos ela é guardada e o endereço é reescrito na hora —
    senão bastava abrir o painel numa live pra chave inteira aparecer na tela.
    O # também é o roteador aqui: o que começa com "/" é rota, o resto é chave. */
+/* O ENDERECO NAO GUARDA SEGREDO NEM RUIDO.
+
+   Alem da chave, o "index.html" tambem sai: o servidor entrega a mesma
+   pagina em "/", e um endereco curto e o que a pessoa consegue repetir de
+   cabeca e mandar pra outra sem errar. */
+function limpaEndereco(hash) {
+  var caminho = location.pathname.replace(/index\.html$/, '');
+  try { history.replaceState(null, '', caminho + (hash || location.hash || '')); } catch (e) {}
+}
+
 let chave = '';
 try {
   const cru = decodeURIComponent((location.hash || '').slice(1));
@@ -309,9 +319,10 @@ try {
   const achada = (cru && cru[0] !== '/') ? cru : (naBusca || '');
   if (achada) {
     sessionStorage.setItem('zc:chave', achada.trim());
-    history.replaceState(null, '', location.pathname + '#/overlays');
+    limpaEndereco('#/overlays');
   }
   chave = sessionStorage.getItem('zc:chave') || '';
+  if (!achada) limpaEndereco();     /* tira o index.html mesmo sem chave */
 } catch (e) { chave = new URLSearchParams(location.search).get('chave') || ''; }
 
 function recado(t, tipo) { el('recado').textContent = t || ''; el('recado').className = tipo || ''; }
@@ -457,7 +468,8 @@ const GRUPOS = [
       ops: [['subir', 'Sobe um "+5 min"'], ['rolar', 'O relógio corre até lá'], ['ambos', 'As duas'], ['nenhum', 'Nada']] },
     { k: 'spopc',  l: 'Cor do "+X"', c: 'cor' },
     { k: 'spulso', l: 'Dá um baque', c: 'chave' },
-    { k: 'surg',   l: 'Reta final aos', c: 'faixa', min: 0, max: 60, u: 'min', dica: '0 desliga' },
+    { k: 'surg',   l: 'Reta final aos', c: 'faixa', min: 0, max: 180, u: 'min',
+      dica: 'faltando esse tanto, o tempo muda de cor e pulsa. 0 desliga.' },
     { k: 'surgc',  l: 'Cor da reta final', c: 'cor' },
     { k: 'leg',    l: 'Legenda "o que dá quanto"', c: 'chave',
       dica: 'o painel do subathon preenche os valores sozinho' },
@@ -509,6 +521,68 @@ let cfg = null;         /* config sendo editada */
 let editando = null;    /* perfil sendo editado */
 let quadro = null;      /* iframe do preview */
 let camposPorChave = {};/* pra dar dois cliques na peça e cair no campo dela */
+
+/* DESFAZER.
+
+   Guardo a config inteira em texto a cada mudança, e não a "ação" que foi
+   feita. Config de overlay é pequena — algumas centenas de bytes — e guardar
+   o estado inteiro dispensa escrever o inverso de cada operação, que é onde
+   um desfazer costuma ganhar bug.
+
+   O empurrão espera um respiro: arrastar um controle deslizante dispara
+   dezenas de mudanças, e sem isso um Ctrl+Z andaria um pixel. */
+let historico = [], futuro = [], guardando = null;
+
+function marcaHistorico(agora) {
+  clearTimeout(guardando);
+  if (agora) return empurra();
+  guardando = setTimeout(empurra, 350);
+}
+function empurra() {
+  const s = JSON.stringify(cfg);
+  if (historico.length && historico[historico.length - 1] === s) return;
+  historico.push(s);
+  if (historico.length > 80) historico.shift();
+  futuro = [];
+}
+
+function aplicaEstado(s) {
+  cfg = JSON.parse(s);
+  manda();
+  Object.keys(camposPorChave).forEach((k) => {
+    const c = camposPorChave[k];
+    if (c && c.controle && c.controle.__sincroniza) c.controle.__sincroniza();
+  });
+  redesenhar.forEach((f) => f());
+}
+
+function desfazer() {
+  clearTimeout(guardando);
+  if (historico.length < 2) { recado('Nada pra desfazer.'); return; }
+  futuro.push(historico.pop());
+  aplicaEstado(historico[historico.length - 1]);
+  recado('Desfeito.');
+}
+function refazer() {
+  if (!futuro.length) { recado('Nada pra refazer.'); return; }
+  const s = futuro.pop();
+  historico.push(s);
+  aplicaEstado(s);
+  recado('Refeito.');
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!cfg || !(e.ctrlKey || e.metaKey)) return;
+  const alvo = e.target.tagName;
+  /* Dentro de um campo de texto o Ctrl+Z é do campo, não meu: roubar ele
+     faria a pessoa perder o que estava digitando. */
+  if (alvo === 'INPUT' && e.target.type === 'text') return;
+  if (alvo === 'TEXTAREA') return;
+
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); desfazer(); }
+  else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); refazer(); }
+});
 let redesenhar = [];    /* controles que somem/aparecem conforme a config */
 
 function h(tag, attrs, filhos) {
@@ -594,6 +668,7 @@ function mudou(k, v) {
   cfg[k] = v;
   manda();
   redesenhar.forEach((f) => f());
+  marcaHistorico();
 }
 
 /* ---------------- bandejas ---------------- */
@@ -667,30 +742,38 @@ function montaBandejas() {
 }
 
 /* ---------------- fábrica de controles ---------------- */
+/* Cada controle guarda como se REDESENHAR a partir da config. Sem isso o
+   desfazer teria que remontar a tela inteira, e a pessoa perderia o grupo
+   que estava aberto e o lugar onde estava rolando. */
 const FABRICA = {
   texto(it) {
     const i = h('input', { type: 'text' });
     i.value = cfg[it.k] || '';
     i.oninput = () => mudou(it.k, i.value);
+    i.__sincroniza = () => { i.value = cfg[it.k] || ''; };
     return i;
   },
   num(it) {
     const i = h('input', { type: 'number' });
     i.value = cfg[it.k] || 0;
     i.oninput = () => mudou(it.k, parseInt(i.value, 10) || 0);
+    i.__sincroniza = () => { i.value = cfg[it.k] || 0; };
     return i;
   },
   cor(it) {
     const i = h('input', { type: 'color' });
     i.value = cfg[it.k] || '#ffffff';
     i.oninput = () => mudou(it.k, i.value);
+    i.__sincroniza = () => { i.value = cfg[it.k] || '#ffffff'; };
     return i;
   },
   chave(it) {
     const i = h('input', { type: 'checkbox' });
     i.checked = !!cfg[it.k];
     i.onchange = () => mudou(it.k, i.checked ? 1 : 0);
-    return h('span', { cls: 'chave' }, [i, h('span')]);
+    const cx = h('span', { cls: 'chave' }, [i, h('span')]);
+    cx.__sincroniza = () => { i.checked = !!cfg[it.k]; };
+    return cx;
   },
   lista(it) {
     const s = h('select');
@@ -700,6 +783,7 @@ const FABRICA = {
       s.appendChild(o);
     });
     s.onchange = () => mudou(it.k, s.value);
+    s.__sincroniza = () => { s.value = String(cfg[it.k]); };
     return s;
   },
   fontes(it) {
@@ -711,6 +795,7 @@ const FABRICA = {
       s.appendChild(o);
     });
     s.onchange = () => mudou(it.k, s.value);
+    s.__sincroniza = () => { s.value = String(cfg[it.k]); };
     return s;
   },
   faixa(it) {
@@ -720,6 +805,7 @@ const FABRICA = {
     const v = h('span', { cls: 'valor', txt: cfg[it.k] + (it.u || '') });
     i.oninput = () => { v.textContent = i.value + (it.u || ''); mudou(it.k, parseInt(i.value, 10)); };
     const cx = h('span', { cls: 'campo', style: 'margin:0;gap:8px' }, [i, v]);
+    cx.__sincroniza = () => { i.value = cfg[it.k]; v.textContent = cfg[it.k] + (it.u || ''); };
     return cx;
   },
   /* Pausado guarda quanto FALTA; correndo guarda QUANDO acaba. São contas
@@ -822,12 +908,14 @@ function telaEditor(perfil, tipoNovo) {
   tela.innerHTML = '';
   redesenhar = [];
   camposPorChave = {};
+  historico = []; futuro = [];
   editando = perfil;
   cfg = perfil ? Object.assign(padraoDe(perfil.tipo), perfil.config || {}) : padraoDe(tipoNovo);
 
   const tipo = cfg.tipo;
+  empurra();                 /* o estado de partida é o fundo da pilha */
   tela.appendChild(h('h1', { txt: (perfil ? 'Editar ' : 'Novo ') + (TIPOS[tipo] || {}).nome }));
-  tela.appendChild(h('p', { cls: 'sub', txt: 'Arraste cada parte pra onde quiser, como no Photoshop. Segure Shift pra travar no eixo, e dê dois cliques numa peça pra pular direto pro campo dela. O que você vê aqui é o mesmo desenho que vai pro OBS — não é imitação.' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Arraste cada parte pra onde quiser, como no Photoshop. Segure Shift pra travar no eixo, dê dois cliques numa peça pra pular pro campo dela, e use Ctrl+Z pra voltar atrás (Ctrl+Shift+Z refaz). O que você vê aqui é o mesmo desenho que vai pro OBS — não é imitação.' }));
 
   quadro = h('iframe', { src: 'overlay.html', title: 'Prévia' });
   const palco = h('div', { cls: 'palco xadrez' }, [quadro]);
@@ -1149,7 +1237,11 @@ window.addEventListener('message', (e) => {
     return;
   }
 
-  if (d.type === 'zc:soltou') { redesenhar.forEach((f) => f()); return; }
+  if (d.type === 'zc:soltou') {
+    redesenhar.forEach((f) => f());
+    marcaHistorico(true);     /* o arrasto inteiro é UM passo, não um por pixel */
+    return;
+  }
 
   if (d.type === 'zc:escolheu') {
     const alvo = camposPorChave[PECA_PRO_CAMPO[d.peca]];

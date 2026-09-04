@@ -11,6 +11,24 @@
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
+  /* "light dark" declara que a pagina serve nos dois esquemas.
+
+     Sem isso o Chrome pinta um fundo BRANCO OPACO quando um iframe de
+     esquema claro e embutido numa pagina escura — ele faz isso pra nao
+     deixar texto ilegivel. Resultado: no tema escuro do site, a prévia
+     aparecia branca e o quadriculado sumia atras dela.
+
+     No OBS nao muda nada: la o fundo continua transparente. */
+  :root { color-scheme: light dark; }
+  /* "light dark" declara que a pagina serve nos dois esquemas.
+
+     Sem isso o Chrome pinta um fundo BRANCO OPACO quando um iframe de
+     esquema claro e embutido numa pagina escura — ele faz isso pra nao
+     deixar texto ilegivel. Resultado: no tema escuro do site, a prévia
+     aparecia branca e o quadriculado sumia atras dela.
+
+     No OBS nao muda nada: la o fundo continua transparente. */
+  :root { color-scheme: light dark; }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 </style>
 </head>
