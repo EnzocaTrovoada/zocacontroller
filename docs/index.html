@@ -102,7 +102,8 @@
   }
   button.bt:hover:not(:disabled) { border-color: var(--verde); color: var(--verde-forte); }
   button.bt:disabled { opacity: .4; cursor: default; }
-  button.bt.principal { background: var(--verde); color: #fff; border-color: var(--verde); }
+  button.bt.principal, a.bt.principal { background: var(--verde); color: #fff; border-color: var(--verde); }
+  a.bt { font: 600 14px var(--disp); border-radius: 4px; border: 1px solid var(--linha); padding: 11px 18px; }
   button.bt.principal:hover:not(:disabled) { background: var(--verde-forte); border-color: var(--verde-forte); color: #fff; }
   button.bt.mini { padding: 7px 11px; font-size: 12px; }
   button.bt.perigo:hover:not(:disabled) { border-color: var(--perigo); color: var(--perigo); }
@@ -277,7 +278,11 @@
   <div id="semChave" class="escondido">
     <h1>Falta a chave</h1>
     <p class="sub">Entre com a Twitch pra pegar o seu link do painel.</p>
-    <p><a class="bt" href="https://api.zocahop.com/entrar.php"><button class="bt principal">Entrar com a Twitch</button></a></p>
+    <!-- <a>, e nao <button> dentro de <a>: aninhar os dois e HTML invalido e
+         cada navegador resolve de um jeito. Em alguns o clique morre no botao
+         e o login simplesmente nao acontece. -->
+    <p><a class="bt principal" href="https://api.zocahop.com/entrar.php"
+          style="display:inline-block;text-decoration:none">Entrar com a Twitch</a></p>
   </div>
 
   <div id="tela"></div>

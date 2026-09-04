@@ -192,6 +192,11 @@
       });
       root.classList.toggle('ch--nkcase', !!cfg.nkcase);
       root.classList.toggle('ch--bolha', !!cfg.cbolha);
+      /* Zero nao vira transform: um skew de zero grau ainda cria contexto de
+         empilhamento, e era isso que embaralhava as camadas. */
+      root.classList.toggle('ch--nk-torto', !!cfg.nkcase && cfg.nkincl !== 0);
+      root.classList.toggle('ch--cb-torto', !!cfg.cbolha && cfg.cbincl !== 0);
+      root.classList.toggle('ch--nk-movido', !!cfg.nkcase && (cfg.nkdx !== 0 || cfg.nkdy !== 0));
       root.classList.toggle('ch--cima', cfg.cdir === 'cima');
       root.classList.toggle('ch--nick-linha', cfg.cnickpos === 'linha');
       root.classList.toggle('ch--nick-abaixo', cfg.cnickpos === 'abaixo');

@@ -132,14 +132,25 @@
   padding: var(--nk-pad) calc(var(--nk-pad) * 2);
   border-radius: var(--nk-raio);
   border: var(--nk-borda) solid var(--nk-bcor);
-  transform: skewX(var(--nk-incl));
 }
-/* O texto desanda junto com a caixa quando ela inclina: desandar de volta é
-   o que mantém a leitura reta dentro de uma fita torta. */
-.ch--nkcase .ch__nick > b { transform: skewX(calc(var(--nk-incl) * -1)); }
 
-.ch--bolha .ch__msg { transform: skewX(var(--cb-incl)); }
-.ch--bolha .ch__msg > * { transform: skewX(calc(var(--cb-incl) * -1)); }
+/* TRANSFORM SÓ QUANDO PRECISA.
+
+   Antes o skew e o translate eram aplicados sempre, mesmo valendo zero. Um
+   transform, ainda que de zero grau, cria um contexto de empilhamento novo:
+   o elemento passa a pintar num plano próprio, e quem estava atrás ou na
+   frente troca de lugar sem nada visível ter mudado. Era daí que vinham as
+   camadas erradas.
+
+   Com classe, o zero não deixa rastro nenhum. */
+.ch--nk-torto .ch__nick { transform: skewX(var(--nk-incl)); }
+/* O texto desanda junto com a caixa: desandar de volta é o que mantém a
+   leitura reta dentro de uma fita torta. */
+.ch--nk-torto .ch__nick > b { transform: skewX(calc(var(--nk-incl) * -1)); }
+
+.ch--cb-torto .ch__msg { transform: skewX(var(--cb-incl)); }
+.ch--cb-torto .ch__msg > * { transform: skewX(calc(var(--cb-incl) * -1)); }
+
 .ch--bolha .ch__msg { border: var(--cb-borda) solid var(--cb-bcor); }
 
 /* pílula: o raio grande vira cápsula em qualquer altura */
@@ -185,10 +196,22 @@
 .ch--nk-chanfro .ch__nick, .ch--nk-fita .ch__nick, .ch--nk-seta .ch__nick,
 .ch--cb-chanfro .ch__msg, .ch--cb-fita .ch__msg, .ch--cb-seta .ch__msg { border: 0; }
 
-/* A caixa do nome precisa de um respiro à direita: com forma de seta ou de
-   fita, a ponta vai até a última coluna do elemento e o texto da mensagem
-   encostava nela. */
-.ch--nkcase.ch--nick-linha .ch__nick { margin-right: var(--nk-gap); }
+/* O ESPAÇO ENTRE AS PEÇAS É ESTRUTURA, NÃO MARGEM.
+
+   Na mesma linha, o nome e o texto passam a ser duas colunas com um vão de
+   verdade entre elas. Como margem, a ponta da seta e o corte da fita comiam
+   o vão — a forma sai da caixa de layout, e o texto seguinte não sabia
+   disso. Como vão de flex, ninguém encosta em ninguém.
+
+   baseline, e não center: nome e mensagem em tamanhos diferentes têm que
+   assentar na mesma linha de escrita, senão um flutua em relação ao outro. */
+.ch--nkcase.ch--nick-linha .ch__msg {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--nk-gap);
+}
+.ch--nkcase.ch--nick-linha .ch__nick { flex: none; }
 .ch--nkcase:not(.ch--nick-linha) .ch__nick { margin-bottom: calc(var(--nk-gap) / 2); }
 
 /* O NOME TEM LUGAR PRÓPRIO.
@@ -198,4 +221,4 @@
    no outro. */
 .ch--nkcase:not(.ch--nick-linha) .ch__msg { display: flex; flex-direction: column; align-items: var(--nk-alin); }
 .ch--nkcase.ch--nick-abaixo .ch__msg { flex-direction: column-reverse; }
-.ch--nkcase .ch__nick { translate: var(--nk-dx) var(--nk-dy); }
+.ch--nk-movido .ch__nick { translate: var(--nk-dx) var(--nk-dy); }
