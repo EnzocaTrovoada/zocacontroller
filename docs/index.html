@@ -1240,6 +1240,23 @@ function telaEditor(perfil, tipoNovo) {
   tela.appendChild(h('h1', { txt: (perfil ? 'Editar ' : 'Novo ') + (TIPOS[tipo] || {}).nome }));
   tela.appendChild(h('p', { cls: 'sub', txt: 'Arraste cada parte pra onde quiser, como no Photoshop. Segure Shift pra travar no eixo, dê dois cliques numa peça pra pular pro campo dela, e use Ctrl+Z pra voltar atrás (Ctrl+Shift+Z refaz). O que você vê aqui é o mesmo desenho que vai pro OBS — não é imitação.' }));
 
+  /* O OVERLAY DE MÚSICA SEM SPOTIFY FICA VAZIO PRA SEMPRE, E EM SILÊNCIO.
+     Na prévia aqui ele mostra a música de mentira e parece tudo certo; no OBS
+     não aparece nada, e nada em lugar nenhum diz o motivo. Este aviso é o que
+     transforma "não funciona" em "falta um passo". */
+  if (tipo === 'musica') {
+    const avisoSpot = h('p', { cls: 'aviso escondido' });
+    tela.appendChild(avisoSpot);
+    api('/spotify.php').then((d) => {
+      if (d && d.ligado) return;
+      avisoSpot.textContent = 'A sua conta do Spotify ainda não está conectada. Sem isso este overlay fica vazio no OBS, mesmo aparecendo certo aqui na prévia. ';
+      const b = h('button', { cls: 'bt mini', type: 'button', txt: 'Conectar agora' });
+      b.onclick = () => { if (d && d.entrar) location.href = d.entrar; };
+      avisoSpot.appendChild(b);
+      avisoSpot.classList.remove('escondido');
+    }).catch(() => {});
+  }
+
   /* Fica em cima da prévia, e não numa gaveta: é a primeira decisão que
      faz sentido tomar, e escondida ninguém acharia. */
   const fileira = h('div', { cls: 'prontos' });
@@ -1886,6 +1903,41 @@ async function telaMods() {
     btMus.disabled = false;
   };
   api('/musica.php').then((r) => { selMus.value = r.cargo || 'sub'; }).catch(() => {});
+
+  /* A CONTA, ANTES DAS REGRAS DELA.
+     O endpoint de desligar já existia e nenhuma tela chamava. Sem um jeito de
+     desconectar, quem trocasse de conta do Spotify ficaria preso na antiga. */
+  const estadoSpot = h('span', { cls: 'd', txt: 'vendo…' });
+  const btSpot = h('button', { cls: 'bt', type: 'button', txt: '—' });
+  btSpot.disabled = true;
+
+  const pintaSpot = (d) => {
+    const ligado = !!(d && d.ligado);
+    estadoSpot.textContent = ligado ? 'conectado' : 'não conectado';
+    /* A cor verde só existe pro #recado; aqui vai direto no elemento. */
+    estadoSpot.style.color = ligado ? 'var(--verde-forte)' : '';
+    btSpot.textContent = ligado ? 'Desconectar' : 'Conectar';
+    btSpot.disabled = false;
+    btSpot.onclick = async () => {
+      if (!ligado) { if (d && d.entrar) location.href = d.entrar; return; }
+      btSpot.disabled = true;
+      try {
+        await api('/spotify.php', { method: 'POST', body: JSON.stringify({ acao: 'desligar' }) });
+        recado('Spotify desconectado.', 'bom');
+        pintaSpot({ ligado: false, entrar: d && d.entrar });
+      } catch (e) { recado(e.message, 'ruim'); btSpot.disabled = false; }
+    };
+  };
+  api('/spotify.php').then(pintaSpot).catch(() => {
+    estadoSpot.textContent = 'não consegui perguntar';
+    btSpot.disabled = true;
+  });
+
+  tela.appendChild(h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Conta do Spotify' }),
+    h('p', { cls: 'd', txt: 'É ela que alimenta a overlay de música e os comandos. Desconectar não apaga nada — só solta a conta, pra você poder ligar outra.' }),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Estado' }), estadoSpot, btSpot]),
+  ]));
 
   tela.appendChild(h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Quem pode pedir música' }),
