@@ -6,10 +6,10 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="clock.css?v=16">
-<link rel="stylesheet" href="chat.css?v=16">
-<link rel="stylesheet" href="musica.css?v=16">
-<link rel="stylesheet" href="alerta.css?v=16">
+<link rel="stylesheet" href="clock.css?v=17">
+<link rel="stylesheet" href="chat.css?v=17">
+<link rel="stylesheet" href="musica.css?v=17">
+<link rel="stylesheet" href="alerta.css?v=17">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
@@ -38,10 +38,10 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=16"></script>
-<script src="chat.js?v=16"></script>
-<script src="musica.js?v=16"></script>
-<script src="alerta.js?v=16"></script>
+<script src="clock.js?v=17"></script>
+<script src="chat.js?v=17"></script>
+<script src="musica.js?v=17"></script>
+<script src="alerta.js?v=17"></script>
 <script>
 (function () {
   'use strict';
@@ -120,6 +120,10 @@
     /* O botão "Ouvir" do editor. Só a prévia recebe esta mensagem — a fonte
        que roda no OBS nunca toca som por pedido de ninguém. */
     if (d.type === 'zc:ouvir' && relogio && relogio.ouvir) relogio.ouvir();
+    /* Só a prévia recebe estas duas: a fonte que roda no OBS nunca é
+       comandada de fora, e é isso que a mantém previsível ao vivo. */
+    if (d.type === 'zc:repetir' && relogio && relogio.mostrarDeNovo) relogio.mostrarDeNovo();
+    if (d.type === 'zc:travar' && relogio && relogio.travar) relogio.travar(!!d.on);
   });
 
   /* ------------------------------------------------------------------

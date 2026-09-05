@@ -318,7 +318,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=16"></script>
+<script src="clock.js?v=17"></script>
 <script>
 'use strict';
 
@@ -626,6 +626,7 @@ const GRUPOS = [
     { k: 'mfechar', l: 'Demora pra sumir', c: 'faixa', min: 200, max: 4000, u: 'ms',
       se: (c) => c.manim === 'revelar' && c.mquando === 'trocou',
       dica: 'sumir depressa parece defeito; devagar parece intenção' },
+    { k: 'mtestar', l: 'Testar', c: 'testar' },
   ] },
 
   { t: 'A música', aberto: true, se: so('musica'), itens: [
@@ -1338,6 +1339,70 @@ const FABRICA = {
 
     const cx = h('div', { style: 'flex:1 1 100%;min-width:0' }, [sel, linha, aviso, arquivo]);
     cx.__sincroniza = () => pinta();
+    return cx;
+  },
+
+  /* OS BOTÕES DE TESTE.
+
+     Não guardam nada na config: são a prévia obedecendo, e só. A animação da
+     música dura alguns segundos e depois a peça some — mexer em cor, raio e
+     tamanho assim é tentar acertar um alvo que sai da tela. Dava pra trocar o
+     "quando mostrar" pra sempre enquanto edita, mas aí a pessoa mexe no que
+     VAI PRO AR só pra conseguir enxergar, e às vezes esquece de voltar. */
+  testar() {
+    let repetindo = 0;
+    let travado = false;
+
+    const manda = (msg) => {
+      const q = quadro && quadro.contentWindow;
+      if (q) try { q.postMessage(msg, location.origin); } catch (e) {}
+    };
+
+    const bRepetir = h('button', { cls: 'bt mini', type: 'button', txt: 'Mostrar de novo' });
+    bRepetir.onclick = () => manda({ type: 'zc:repetir' });
+
+    const bLoop = h('button', { cls: 'bt mini', type: 'button', txt: 'Repetir sem parar' });
+    const paraLoop = () => {
+      clearInterval(repetindo); repetindo = 0;
+      bLoop.textContent = 'Repetir sem parar';
+      bLoop.classList.remove('perigo');
+    };
+    bLoop.onclick = () => {
+      if (repetindo) return paraLoop();
+      if (travado) bTravar.onclick();          /* travado e repetindo se anulam */
+
+      const roda = () => {
+        manda({ type: 'zc:repetir' });
+        /* O intervalo sai da config a cada volta, e não uma vez só: enquanto
+           a pessoa arrasta "demora pra aparecer", o ciclo tem que acompanhar
+           — senão ela mexe no controle e o que vê na tela é o ritmo antigo. */
+        const ciclo = (cfg.manim === 'surge' ? 900 : (cfg.mabrir || 900) + (cfg.mfechar || 1400))
+                    + (cfg.mtempo || 7) * 1000 + 400;
+        clearInterval(repetindo);
+        repetindo = setInterval(roda, ciclo);
+      };
+      roda();
+      bLoop.textContent = 'Parar de repetir';
+      bLoop.classList.add('perigo');
+    };
+
+    const bTravar = h('button', { cls: 'bt mini', type: 'button', txt: 'Travar na tela' });
+    bTravar.onclick = () => {
+      travado = !travado;
+      if (travado && repetindo) paraLoop();
+      manda({ type: 'zc:travar', on: travado });
+      bTravar.textContent = travado ? 'Destravar' : 'Travar na tela';
+      bTravar.classList.toggle('perigo', travado);
+    };
+
+    const cx = h('div', { style: 'flex:1 1 100%;min-width:0' }, [
+      h('div', { cls: 'campo', style: 'margin:0;gap:6px' }, [bRepetir, bLoop, bTravar]),
+      h('p', { cls: 'd', style: 'margin:4px 0 0',
+               txt: 'Isto vale só aqui na prévia. Nada disso vai pro OBS nem fica salvo.' }),
+    ]);
+    /* Ao desfazer/refazer a tela se remonta e o loop morre junto; o botão
+       precisa voltar a dizer a verdade. */
+    cx.__sincroniza = () => { if (!repetindo) paraLoop(); };
     return cx;
   },
 

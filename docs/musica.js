@@ -93,7 +93,17 @@
       });
     }
 
+    /* TRAVAR É COISA DA PRÉVIA, NÃO DA CONFIG.
+
+        Pra mexer em cor, tamanho e raio a peça precisa ficar parada na tela —
+        e ela some sozinha depois de alguns segundos. Dava pra trocar o
+        "quando mostrar" pra sempre, mas aí a pessoa mexe no que VAI PRO AR só
+        pra conseguir enxergar, e às vezes esquece de voltar. Travar aqui não
+        toca na config: é só a prévia obedecendo. */
+    var travado = false;
+
     function ciclo() {
+      if (travado) return;
       if (cfg.manim === 'nenhum' || cfg.mquando === 'sempre') return;
       if (!trocaEm || Date.now() < trocaEm) return;
 
@@ -235,6 +245,21 @@
       config: function () { return cfg; },
       musica: mostra,
       mostrarDeNovo: function () { if (atual) abre(); },
+
+      /* Deixa a peça parada e inteira na tela, ou devolve o ciclo normal.
+         Sem as classes de animação a peça fica no estado final — que é o
+         estado aberto, porque as animações partem do zero em direção a ele. */
+      travar: function (liga) {
+        travado = !!liga;
+        if (travado) {
+          root.classList.remove('mu--vazio', 'mu--fechando', 'mu--revelar', 'mu--surge');
+          fase = 'parado';
+          trocaEm = 0;
+          mede();
+        } else if (atual) {
+          abre();
+        }
+      },
       exemplo: function () {
         mostra({
           nome: 'Tempo Perdido', artista: 'Legião Urbana', album: 'Dois',
