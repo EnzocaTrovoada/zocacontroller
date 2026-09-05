@@ -72,6 +72,11 @@ if ($perfil['tipo'] === 'musica') {
 $eventos = null;
 if ($perfil['tipo'] === 'feed') {
     $eventos = evento_recentes((int) $perfil['usuario_id'], max(1, min(30, (int) ($config['cmax'] ?? 8))));
+} elseif ($perfil['tipo'] === 'alerta') {
+    /* Poucos: o alerta mostra um de cada vez e a consulta é de 15 em 15
+       segundos. Mais que isso viraria fila do dia inteiro se a fonte ficasse
+       um tempo fora do ar. */
+    $eventos = evento_recentes((int) $perfil['usuario_id'], 12);
 }
 
 /* ETag: quase toda resposta vira um 304 de poucos bytes. O polling sai de graça.

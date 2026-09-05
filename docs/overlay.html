@@ -6,9 +6,10 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="clock.css?v=14">
-<link rel="stylesheet" href="chat.css?v=14">
-<link rel="stylesheet" href="musica.css?v=14">
+<link rel="stylesheet" href="clock.css?v=15">
+<link rel="stylesheet" href="chat.css?v=15">
+<link rel="stylesheet" href="musica.css?v=15">
+<link rel="stylesheet" href="alerta.css?v=15">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
@@ -37,9 +38,10 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=14"></script>
-<script src="chat.js?v=14"></script>
-<script src="musica.js?v=14"></script>
+<script src="clock.js?v=15"></script>
+<script src="chat.js?v=15"></script>
+<script src="musica.js?v=15"></script>
+<script src="alerta.js?v=15"></script>
 <script>
 (function () {
   'use strict';
@@ -68,13 +70,15 @@
        piores. A pagina troca de desenhista quando o tipo muda, e o resto
        (busca, previa, arrasto) nao precisa saber qual esta montado. */
     var quer = (tipo === 'chat' || tipo === 'feed') ? 'chat'
-             : (tipo === 'musica' ? 'musica' : 'relogio');
+             : tipo === 'musica' ? 'musica'
+             : tipo === 'alerta' ? 'alerta' : 'relogio';
     if (atual === quer) return false;
     if (relogio) relogio.destroy();
     raiz.className = '';
     raiz.innerHTML = '';
     relogio = quer === 'chat'   ? Chat.mount(raiz, config)
             : quer === 'musica' ? Musica.mount(raiz, config)
+            : quer === 'alerta' ? Alerta.mount(raiz, config)
             : Relogio.mount(raiz, config);
     atual = quer;
     raiz.classList.toggle('is-editando', editando);
@@ -136,6 +140,7 @@
        nenhum overlay é chat E relógio ao mesmo tempo. */
     ['.ch__palco', 'nx', 'ny', 'caixa'],
     ['.mu__caixa', 'nx', 'ny', 'caixa'],
+    ['.al__caixa', 'nx', 'ny', 'caixa'],
   ];
 
   var editando = false, arrasto = null;
@@ -305,6 +310,9 @@
         var s = JSON.stringify(j.config);
         if (s !== ultimo) { ultimo = s; desenha(j.config); }
         /* O feed muda sem a config mudar: sub novo nao e edicao de overlay. */
+        /* O mesmo canal serve o feed e o alerta: os dois vivem dos eventos.
+           O que muda é o que cada um faz com eles — o feed lista, o alerta
+           toca um de cada vez e só o que ainda não passou. */
         if (j.eventos && relogio && relogio.feed) relogio.feed(j.eventos);
         /* undefined é "esta resposta não fala de música"; null é "não tem
            nada tocando". Só o segundo apaga a tela. */

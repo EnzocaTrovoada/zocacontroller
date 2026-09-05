@@ -42,8 +42,11 @@ function evento_registrar(int $usuario_id, array $d): void
  */
 function evento_recentes(int $usuario_id, int $quantos = 12): array
 {
+    /* O id vem junto por causa do ALERTA: o feed mostra os últimos e pronto,
+       mas o alerta precisa saber o que ele JÁ mostrou, senão toda recarga da
+       fonte no OBS dispararia de novo a fila inteira de subs do dia. */
     $st = db()->prepare(
-        'SELECT tipo, quem, quantidade, detalhe,
+        'SELECT id, tipo, quem, quantidade, detalhe,
                 UNIX_TIMESTAMP(criado_em) AS quando
            FROM eventos WHERE usuario_id = ? ORDER BY id DESC LIMIT 120'
     );
@@ -62,6 +65,9 @@ function evento_recentes(int $usuario_id, int $quantos = 12): array
         }
 
         $saida[] = [
+            /* Num pacote de presentes juntado, vale o id do mais novo: é o que
+               o alerta compara pra saber se o pacote inteiro já passou. */
+            'id'         => (int) $e['id'],
             'tipo'       => $e['tipo'],
             'quem'       => $e['quem'] ?: 'alguém',
             'quantidade' => (int) $e['quantidade'],

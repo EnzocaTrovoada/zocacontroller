@@ -20,7 +20,7 @@ cors();
 /* Espelha os tipos que o desenhista sabe montar. Quando as duas listas
    divergem, o overlay novo simplesmente nao pode ser criado — e o erro que
    aparece ("tipo de overlay desconhecido") nao diz onde esta o problema. */
-const PERFIL_TIPOS = ['meta', 'relogio', 'contador', 'placar', 'subathon', 'chat', 'feed', 'musica'];
+const PERFIL_TIPOS = ['meta', 'relogio', 'contador', 'placar', 'subathon', 'chat', 'feed', 'musica', 'alerta'];
 const PERFIL_CFG_MAX = 8192;
 
 $quem = exige_painel();

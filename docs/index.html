@@ -318,7 +318,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=14"></script>
+<script src="clock.js?v=15"></script>
 <script>
 'use strict';
 
@@ -389,6 +389,7 @@ const TIPOS = {
   chat:     { nome: 'Chat',     txt: 'As mensagens do seu chat na tela' },
   feed:     { nome: 'Feed',     txt: 'Último sub, último follow, quem doou' },
   musica:   { nome: 'Música',   txt: 'O que está tocando no seu Spotify' },
+  alerta:   { nome: 'Alerta',   txt: 'Sub, follow e bits aparecendo na hora' },
 };
 
 /* Padrões que já nascem bonitos. Um leigo não quer escolher opacidade de
@@ -423,6 +424,16 @@ function padraoDe(tipo) {
       mfundo: 'capa', mborrar: 34, msatura: 170, mescuro: 22,
       mfcor: '#0B0F0D', mfopac: 70, mfpad: 12, mraio: 34, mcapraio: 16,
       mrola: 1, mabrir: 1000, mfechar: 1500, mtempo: 7,
+    });
+  }
+  if (tipo === 'alerta') {
+    return Object.assign(base, {
+      titulo: '', font: 'Anton', size: 44, weight: 700, color: '#FFFFFF',
+      sw: 0, glow: 0, shx: 0, shy: 3, shb: 10, sho: 70, shc: '#000000',
+      align: 'center', valign: 'middle',
+      afollow: 1, asub: 1, abits: 1, areal: 1,
+      abitsmin: 100, arealmin: 1,
+      atempo: 6, aentre: 'descer', anome: '#7CE07C', asom: 'sino', avol: 60,
     });
   }
   if (tipo === 'feed') {
@@ -520,6 +531,20 @@ const PRONTOS = {
     }],
   ],
 };
+PRONTOS.alerta = [
+  ['Grosso', 'pesado, com contorno', {
+    font: 'Anton', size: 46, weight: 700, color: '#FFFFFF', sw: 2, sc: '#101010',
+    glow: 0, shy: 3, shb: 10, sho: 70, anome: '#7CE07C', aentre: 'descer',
+  }],
+  ['Neon', 'brilhando, tipo letreiro', {
+    font: 'Orbitron', size: 40, weight: 800, color: '#FFFFFF', sw: 0,
+    glow: 16, gc: '#12A150', gi: 55, anome: '#8FD07A', aentre: 'zoom',
+  }],
+  ['Limpo', 'sem enfeite nenhum', {
+    font: 'Archivo', size: 36, weight: 600, color: '#FFFFFF', sw: 0, glow: 0,
+    shy: 2, shb: 8, sho: 55, anome: '#7CE07C', aentre: 'surgir',
+  }],
+];
 PRONTOS.feed = PRONTOS.chat;
 PRONTOS.contador = PRONTOS.relogio;
 PRONTOS.placar = PRONTOS.relogio;
@@ -539,6 +564,18 @@ const FUSOS = [
 
 const GRUPOS = [
   { t: 'Conteúdo', aberto: true, itens: [
+    /* O alerta abre com o que dispara: é a primeira pergunta que a pessoa
+       tem na cabeça, e o resto (letra, cor, som) só faz sentido depois. */
+    { k: 'asub',    l: 'Avisar sub', c: 'chave', se: so('alerta') },
+    { k: 'afollow', l: 'Avisar follow', c: 'chave', se: so('alerta'),
+      dica: 'precisa do EventSub ligado em Meu Controller' },
+    { k: 'abits',   l: 'Avisar bits', c: 'chave', se: so('alerta') },
+    { k: 'abitsmin', l: 'A partir de', c: 'faixa', min: 1, max: 5000, u: ' bits',
+      se: (c) => c.tipo === 'alerta' && c.abits,
+      dica: 'live movimentada com o mínimo em 1 vira um alerta a cada dois segundos' },
+    { k: 'areal',   l: 'Avisar doação', c: 'chave', se: so('alerta') },
+    { k: 'arealmin', l: 'A partir de', c: 'faixa', min: 1, max: 500, u: ' reais',
+      se: (c) => c.tipo === 'alerta' && c.areal },
     { k: 'fonte', l: 'Contar', c: 'lista', se: so('meta'),
       ops: [['seguidores', 'Seguidores (automático)'], ['subs', 'Subs (automático)'], ['manual', 'Eu digito']],
       dica: 'no automático o número vem da Twitch sozinho, a cada minuto' },
@@ -612,6 +649,34 @@ const GRUPOS = [
     { k: 'mfpad',  l: 'Respiro', c: 'faixa', min: 0, max: 40, u: 'px' },
     { k: 'mraio',  l: 'Cantos da faixa', c: 'faixa', min: 0, max: 120, u: 'px' },
     { k: 'mcapraio', l: 'Cantos da capa', c: 'faixa', min: 0, max: 80, u: 'px', se: (c) => !!c.mcapa },
+  ] },
+
+  { t: 'O que fica escrito', aberto: true, se: so('alerta'), itens: [
+    /* Molde de frase, e não texto fixo: cada canal fala de um jeito. O {quem}
+       e o {quanto} são trocados na hora. */
+    { k: 'atsub',    l: 'Sub', c: 'texto', se: (c) => !!c.asub,
+      dica: '{quem} vira o nome de quem assinou' },
+    { k: 'atpres',   l: 'Sub de presente', c: 'texto', se: (c) => !!c.asub,
+      dica: '{quanto} vira quantos subs a pessoa deu de uma vez' },
+    { k: 'atfollow', l: 'Follow', c: 'texto', se: (c) => !!c.afollow },
+    { k: 'atbits',   l: 'Bits', c: 'texto', se: (c) => !!c.abits },
+    { k: 'atreal',   l: 'Doação', c: 'texto', se: (c) => !!c.areal },
+    { k: 'anome', l: 'Cor do nome', c: 'cor',
+      dica: 'é o que o olho procura primeiro quando o alerta pisca' },
+  ] },
+
+  { t: 'Como entra e sai', aberto: true, se: so('alerta'), itens: [
+    { k: 'aentre', l: 'Entrada', c: 'lista', ops: [
+      ['descer', 'Descendo de cima'], ['zoom', 'Crescendo'],
+      ['lado', 'Entrando pelo lado'], ['surgir', 'Só aparecendo']] },
+    { k: 'atempo', l: 'Fica na tela', c: 'faixa', min: 2, max: 30, u: 's',
+      dica: 'com vários subs seguidos eles entram na fila e passam um de cada vez' },
+    { k: 'asom', l: 'Som', c: 'lista', ops: [
+      ['sino', 'Sino'], ['moeda', 'Moeda'], ['fanfarra', 'Fanfarra'],
+      ['sopro', 'Sopro'], ['nenhum', 'Nenhum']],
+      dica: 'o som é feito na hora pelo navegador — não tem arquivo pra sumir no meio da live' },
+    { k: 'avol', l: 'Volume', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => c.asom !== 'nenhum',
+      dica: 'pra você ouvir, marque "Controlar áudio pelo OBS" na fonte' },
   ] },
 
   { t: 'O feed', aberto: true, se: so('feed'), itens: [
@@ -1288,7 +1353,7 @@ function telaEditor(perfil, tipoNovo) {
       quadro.contentWindow.postMessage({ type: 'zc:editar', on: true }, location.origin);
       /* O chat so tem o que mostrar quando alguem fala. No editor isso
          significaria uma tela vazia, entao peco frases de mentira. */
-      if (cfg.tipo === 'chat' || cfg.tipo === 'feed' || cfg.tipo === 'musica') quadro.contentWindow.postMessage({ type: 'zc:exemplo' }, location.origin);
+      if (cfg.tipo === 'chat' || cfg.tipo === 'feed' || cfg.tipo === 'musica' || cfg.tipo === 'alerta') quadro.contentWindow.postMessage({ type: 'zc:exemplo' }, location.origin);
     } catch (e) {}
   };
 
@@ -2052,7 +2117,7 @@ function telaTutorial() {
     tela.appendChild(fatia);
   }
 
-  lista('Um overlay na tela', 'Vale pra meta, subathon, relógio, contador, placar, chat, feed e música — todos funcionam do mesmo jeito.', PASSOS_OBS);
+  lista('Um overlay na tela', 'Vale pra meta, subathon, relógio, contador, placar, chat, feed, música e alerta — todos funcionam do mesmo jeito.', PASSOS_OBS);
   lista('O chat controlando o OBS', 'Só se você quiser que mods usem comandos. Overlay funciona sem isso.', PASSOS_CHAT);
 
   /* A música é o único overlay que precisa de um passo FORA do OBS. Sem isso
@@ -2074,6 +2139,8 @@ function telaTutorial() {
     ['Editei e não mudou na live', 'Espere 15 segundos. Se não mudar, clique com o botão direito na fonte → Atualizar.'],
     ['O chat não controla nada', 'O servidor do WebSocket do OBS está desligado, ou a fonte da ponte não está numa cena ativa.'],
     ['A overlay de música fica vazia', 'Falta conectar o Spotify em Ferramentas, ou não tem nada tocando. Na prévia daqui aparece uma música de mentira mesmo sem conexão — no OBS, não.'],
+    ['O alerta aparece mas não toca som', 'Na fonte do alerta no OBS, marque "Controlar áudio pelo OBS". Sem isso o som existe, só não passa pelo OBS.'],
+    ['O alerta de follow não dispara', 'Follow chega por fora do chat: ligue o EventSub em Meu Controller. Sub e bits chegam pelo chat e funcionam sem isso.'],
     ['Tirei do VOD e mesmo assim deu strike', 'A trilha separada do VOD só existe no modo Avançado de saída do OBS. Em Configurações → Saída, troque para Avançado e marque "Trilha do VOD da Twitch". O painel avisa quando isso está errado.'],
   ].forEach((p) => {
     fatiaAjuda.appendChild(h('div', { cls: 'campo', style: 'align-items:flex-start' }, [

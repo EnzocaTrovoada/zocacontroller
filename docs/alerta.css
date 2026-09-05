@@ -1,0 +1,104 @@
+/* alerta.css — sub, follow, bits e doação aparecendo na tela.
+   ---------------------------------------------------------------------
+   A tipografia e as cores vêm das variáveis do clock.css, iguais às dos
+   outros overlays: um alerta que não combina com o resto da tela não parece
+   do canal, parece um aviso de outro site. Aqui mora só o movimento. */
+
+.al {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  padding: var(--rl-my) var(--rl-mx);
+  box-sizing: border-box;
+  justify-content: var(--rl-justify);
+  align-items: var(--rl-valign);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+
+/* Sem nada na fila, some. Um alerta parado na tela deixa de ser alerta e
+   vira legenda — e legenda de um sub que aconteceu meia hora atrás mente. */
+.al--vazio .al__caixa { opacity: 0; }
+
+.al__caixa {
+  max-width: 100%;
+  text-align: var(--rl-align);
+}
+
+.al__linha {
+  font-family: var(--rl-font);
+  font-size: var(--rl-size);
+  font-weight: var(--rl-weight);
+  font-style: var(--rl-style);
+  letter-spacing: var(--rl-track);
+  color: var(--rl-color);
+  line-height: 1.2;
+  -webkit-text-stroke: var(--rl-sw) var(--rl-sc);
+  paint-order: stroke fill;
+  filter: var(--rl-filter);
+  /* Quebra em vez de vazar: "fulaninha_de_tal_2003 presenteou 20 subs" não
+     cabe em uma linha e cortar o nome de quem pagou é o pior corte possível. */
+  word-break: break-word;
+}
+
+/* O nome ganha cor própria: é o que o olho procura primeiro. */
+.al__quem { color: var(--al-nome); font-weight: 800; }
+
+/* ---------------------------------------------------------------------
+   AS ENTRADAS
+
+   Quatro formas, e todas terminam paradas. O alerta some pelo mesmo caminho
+   em que entrou, o que faz a peça parecer uma coisa só indo e voltando em
+   vez de dois efeitos diferentes colados.
+   --------------------------------------------------------------------- */
+.al--entrando .al__caixa { animation: al-entra 520ms cubic-bezier(.22, 1, .36, 1) both; }
+.al--saindo   .al__caixa { animation: al-sai 400ms cubic-bezier(.5, 0, .75, 0) both; }
+
+.al--descer.al--entrando .al__caixa { animation-name: al-descer; }
+.al--descer.al--saindo   .al__caixa { animation-name: al-descer-sai; }
+@keyframes al-descer     { from { opacity: 0; transform: translateY(-46px); }
+                           to   { opacity: 1; transform: none; } }
+@keyframes al-descer-sai { to   { opacity: 0; transform: translateY(-46px); } }
+
+.al--zoom.al--entrando .al__caixa { animation-name: al-zoom; }
+.al--zoom.al--saindo   .al__caixa { animation-name: al-zoom-sai; }
+/* Passa um pouco de 1 e volta: é o "pop" que faz o olho virar pra lá. */
+@keyframes al-zoom     { 0%   { opacity: 0; transform: scale(.4); }
+                         70%  { opacity: 1; transform: scale(1.08); }
+                         100% { opacity: 1; transform: scale(1); } }
+@keyframes al-zoom-sai { to   { opacity: 0; transform: scale(.4); } }
+
+.al--lado.al--entrando .al__caixa { animation-name: al-lado; }
+.al--lado.al--saindo   .al__caixa { animation-name: al-lado-sai; }
+@keyframes al-lado     { from { opacity: 0; transform: translateX(-70px); }
+                         to   { opacity: 1; transform: none; } }
+@keyframes al-lado-sai { to   { opacity: 0; transform: translateX(70px); } }
+
+.al--surgir.al--entrando .al__caixa { animation-name: al-surgir; }
+.al--surgir.al--saindo   .al__caixa { animation-name: al-surgir-sai; }
+@keyframes al-surgir     { from { opacity: 0; } to { opacity: 1; } }
+@keyframes al-surgir-sai { to   { opacity: 0; } }
+
+@keyframes al-entra { from { opacity: 0; } to { opacity: 1; } }
+@keyframes al-sai   { to   { opacity: 0; } }
+
+/* Quem pediu menos movimento recebe menos movimento: o alerta continua
+   aparecendo e sumindo, só que sem deslocamento nem escala. */
+@media (prefers-reduced-motion: reduce) {
+  .al--entrando .al__caixa, .al--saindo .al__caixa {
+    animation-name: al-entra;
+  }
+  .al--saindo .al__caixa { animation-name: al-sai; }
+}
+
+/* Modo edição, igual ao dos outros: só existe dentro do editor. */
+.al.is-editando { pointer-events: auto; }
+.al.is-editando .al__caixa {
+  outline: 1px dashed rgba(255, 255, 255, .35);
+  outline-offset: 6px;
+  cursor: move;
+}
+.al.is-editando .al__caixa:hover { outline-color: #45B8BF; }
+.al.is-editando .al__caixa.pegando { outline: 1px solid #45B8BF; }

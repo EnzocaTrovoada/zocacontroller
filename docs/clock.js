@@ -90,7 +90,7 @@
       'Europe/Moscow', 'Africa/Luanda', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Shanghai',
       'Asia/Dubai', 'Australia/Sydney', 'Pacific/Auckland', 'UTC'
     ] },
-    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat', 'feed', 'musica'] },
+    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat', 'feed', 'musica', 'alerta'] },
     /* ---- o que esta tocando ---- */
     mcapa:    { t: 'b', d: 1 },
     mtam:     { t: 'n', d: 132, min: 24, max: 400 },
@@ -99,6 +99,27 @@
     mgap:     { t: 'n', d: 12,  min: 0,  max: 60 },
     mbarra:   { t: 'b', d: 1 },
     mbalt:    { t: 'n', d: 4,   min: 1,  max: 20 },
+
+    /* ---------------- alerta ----------------
+       O que dispara, o que está escrito, e como soa. A tipografia e as cores
+       são as MESMAS chaves dos outros overlays (font, size, color, glow...):
+       um alerta que não combina com o resto da tela não parece do canal. */
+    afollow:  { t: 'b', d: 1 },
+    asub:     { t: 'b', d: 1 },
+    abits:    { t: 'b', d: 1 },
+    areal:    { t: 'b', d: 1 },
+    abitsmin: { t: 'n', d: 100, min: 1, max: 100000 },
+    arealmin: { t: 'n', d: 1,   min: 1, max: 100000 },
+    atfollow: { t: 's', d: '{quem} seguiu!' },
+    atsub:    { t: 's', d: '{quem} assinou!' },
+    atpres:   { t: 's', d: '{quem} presenteou {quanto} subs!' },
+    atbits:   { t: 's', d: '{quem} mandou {quanto} bits!' },
+    atreal:   { t: 's', d: '{quem} doou R$ {quanto}!' },
+    atempo:   { t: 'n', d: 6, min: 2, max: 30 },
+    aentre:   { t: 'e', d: 'descer', v: ['descer', 'zoom', 'surgir', 'lado'] },
+    anome:    { t: 'c', d: '#7CE07C' },
+    asom:     { t: 'e', d: 'sino', v: ['nenhum', 'sino', 'moeda', 'fanfarra', 'sopro'] },
+    avol:     { t: 'n', d: 60, min: 0, max: 100 },
     mbcor:    { t: 'c', d: '#1DB954' },
     martcor:  { t: 'c', d: '#ffffff' },
     martopac: { t: 'n', d: 70,  min: 0,  max: 100 },
