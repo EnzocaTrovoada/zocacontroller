@@ -215,7 +215,12 @@ function sp_curtir(int $usuario_id): array
     $m = sp_tocando($usuario_id, 0);
     if (!$m || empty($m['id'])) return ['ok' => false, 'erro' => 'Não tem nada tocando agora.'];
 
-    [$http] = sp_chamar($usuario_id, 'PUT', '/me/tracks?ids=' . urlencode($m['id']), []);
+    /* O corpo documentado, e não um array vazio com o id na query. O Spotify
+       aceita as duas formas de mandar o id, mas mandar um corpo `[]` junto de
+       um id na query é pedir pra alguma das duas ser ignorada. Não deu pra
+       conferir contra uma conta real daqui — o que dá pra garantir é que esta
+       é a forma que a documentação descreve. */
+    [$http] = sp_chamar($usuario_id, 'PUT', '/me/tracks', ['ids' => [$m['id']]]);
     if ($http >= 200 && $http < 300) return ['ok' => true, 'faixa' => $m['nome']];
     return ['ok' => false, 'erro' => sp_erro($http, 'Curtir')];
 }
