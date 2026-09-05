@@ -157,13 +157,28 @@
 }
 
 /* Texto que não cabe passa devagar de um lado pro outro. Só quem não cabe
-   ganha a classe — animar o que já cabe é movimento à toa na tela. */
+   ganha a classe — animar o que já cabe é movimento à toa na tela.
+
+   O <i> de dentro é que anda; a caixa fica parada fazendo de janela. Antes a
+   animação era na própria caixa, que tem overflow:hidden — o corte andava
+   junto com o texto e não revelava nada, só empurrava a linha pra fora. E a
+   regra que preparava o filho (`.mu--longo > *`) não pegava ninguém, porque
+   o texto entrava por textContent e não havia filho nenhum. */
+.mu__nome > i, .mu__artista > i {
+  display: inline-block;
+  font-style: normal;          /* é <i> por ser curto, não por ser itálico */
+  white-space: nowrap;
+  will-change: transform;
+}
 .mu--longo { text-overflow: clip; }
-.mu--longo > * { display: inline-block; }
-.mu--rola .mu--longo { animation: mu-rola 14s linear infinite; }
+.mu--rola .mu--longo > i {
+  animation: mu-rola 14s ease-in-out infinite alternate;
+}
+/* Anda exatamente o que sobra (medido em JS), com uma pausa em cada ponta
+   pra dar tempo de ler o começo e o fim. */
 @keyframes mu-rola {
-  0%, 10%   { transform: translateX(0); }
-  90%, 100% { transform: translateX(calc(-100% + var(--mu-larg) * .55)); }
+  0%, 18%   { transform: translateX(0); }
+  82%, 100% { transform: translateX(var(--mu-corre, -40px)); }
 }
 
 .mu__prog {
@@ -266,7 +281,7 @@
   .mu--revelar .mu__capa, .mu--revelar .mu__faixa, .mu--revelar .mu__texto,
   .mu--revelar .mu__prog, .mu--fechando .mu__capa, .mu--fechando .mu__faixa,
   .mu--fechando .mu__texto, .mu--fechando .mu__prog,
-  .mu--surge .mu__caixa, .mu--rola .mu--longo { animation: none; }
+  .mu--surge .mu__caixa, .mu--rola .mu--longo > i { animation: none; }
 }
 
 /* Modo edição, igual ao dos outros: só existe dentro do editor. */

@@ -429,7 +429,7 @@ async function descobrir(lerGaveta = true) {
     estado.sons = achados;
   } catch (e) {}
 
-  if (lerGaveta) await lerOcultos();
+  if (lerGaveta) { await lerOcultos(); await lerVod(); await reaplicaVod(); }
   estado.sons = estado.sons.filter(s => !escondida(s.nome));
   await lerFontesDaCena();
 
@@ -611,6 +611,49 @@ async function lerOcultos() {
 }
 
 const escondida = (nome) => estado.ocultos.some(n => n.toLowerCase() === (nome || '').toLowerCase());
+
+/* ------------------------------------------------------------------ *
+ *  O SPOTIFY FORA DO VOD, SOZINHO
+ *
+ *  A escolha é feita no painel e mora numa gaveta do próprio OBS. Aqui ela é
+ *  RELIDA e REAPLICADA a cada conexão — que é o que faz disto uma opção e
+ *  não um comando: se o OBS reabre, se a fonte é recriada, se a pessoa
+ *  refaz a cena, a música continua fora do VOD sem ninguém digitar nada.
+ * ------------------------------------------------------------------ */
+
+const GAVETA_VOD = 'zocacontroller_vod';
+let vod = { fonte: '', trilha: 2, ligado: false };
+
+async function lerVod() {
+  try {
+    const r = await pedir('GetPersistentData', { realm: CAIXA, slotName: GAVETA_VOD });
+    const v = r && r.slotValue;
+    if (v && typeof v === 'object') {
+      vod = { fonte: String(v.fonte || ''), trilha: parseInt(v.trilha, 10) || 2, ligado: !!v.ligado };
+    }
+  } catch (e) {}
+}
+
+/** Põe a fonte fora (ou de volta) na trilha do VOD. Devolve o que aconteceu. */
+async function poeForaDoVod(nome, trilha, fora) {
+  const atual = await pedir('GetInputAudioTracks', { inputName: nome });
+  const trilhas = Object.assign({}, atual.inputAudioTracks);
+  /* Só as duas que interessam: o resto do que a pessoa configurou fica. */
+  trilhas['1'] = true;
+  trilhas[String(trilha)] = !fora;
+  await pedir('SetInputAudioTracks', { inputName: nome, inputAudioTracks: trilhas });
+}
+
+async function reaplicaVod() {
+  if (!vod.ligado || !vod.fonte) return;
+  try {
+    await poeForaDoVod(vod.fonte, vod.trilha, true);
+  } catch (e) {
+    /* A fonte sumiu ou mudou de nome. Avisa, porque o silêncio aqui custa
+       um strike de copyright: a pessoa acha que está protegida e não está. */
+    recado('Atenção: não achei "' + vod.fonte + '" pra tirar do VOD. Escolha de novo no painel.', 30000);
+  }
+}
 
 /** As fontes da cena que está no ar, com o estado do olhinho de cada uma. */
 async function lerFontesDaCena() {
@@ -896,16 +939,23 @@ ACOES.musica = {
 ACOES.vod = {
   minimo: 'dono', espera: 5000,
   async fazer(quem, arg) {
-    const nome = arg || cfg.fonteAudioMusica;
-    if (!nome) return recado('Use: ' + cfg.prefixo + 'vod nome da fonte de áudio do Spotify');
+    /* Sem argumento vale a escolha do painel. Antes valia só um parâmetro
+       colado no endereço da fonte à mão, que ninguém colava. */
+    const querVoltar = /^(voltar|devolver|desfazer|off)$/i.test((arg || '').trim());
+    const nome = (querVoltar ? '' : (arg || '').trim()) || vod.fonte || cfg.fonteAudioMusica;
+    if (!nome) {
+      return recado('Escolha a fonte de áudio do Spotify no painel, em "Fora do VOD".', 15000);
+    }
+    const trilha = vod.trilha || 2;
     try {
-      const atual = await pedir('GetInputAudioTracks', { inputName: nome });
-      const trilhas = Object.assign({}, atual.inputAudioTracks);
-      /* Fica na 1 (o que vai ao vivo) e sai da 2 (o que vira VOD). */
-      trilhas['1'] = true;
-      trilhas['2'] = false;
-      await pedir('SetInputAudioTracks', { inputName: nome, inputAudioTracks: trilhas });
-      recado('"' + nome + '" saiu da trilha do VOD. A live continua com som.', 15000);
+      await poeForaDoVod(nome, trilha, !querVoltar);
+      vod = { fonte: nome, trilha: trilha, ligado: !querVoltar };
+      try {
+        await pedir('SetPersistentData', { realm: CAIXA, slotName: GAVETA_VOD, slotValue: vod });
+      } catch (e) {}
+      recado(querVoltar
+        ? '"' + nome + '" voltou pra trilha ' + trilha + '.'
+        : '"' + nome + '" saiu da trilha ' + trilha + '. A live continua com som.', 15000);
     } catch (e) { recado('Não consegui: ' + e.message, 15000); }
   },
 };
@@ -1294,6 +1344,12 @@ document.addEventListener('visibilitychange', () => {
 const EU = 'p' + Math.random().toString(36).slice(2, 8);
 
 async function doPainel(d) {
+  /* O painel mudou a opção do VOD: a ponte guarda a mesma escolha, senão o
+     !vod sem argumento continuaria usando a fonte antiga. */
+  if (d && d.zc === 'vod') {
+    vod = { fonte: String(d.fonte || ''), trilha: parseInt(d.trilha, 10) || 2, ligado: !!d.ligado };
+    return;
+  }
   if (d && d.zc === 'ocultos') {
     estado.ocultos = Array.isArray(d.nomes) ? d.nomes : [];
     await descobrir(false);

@@ -27,9 +27,12 @@
       '<img class="mu__capa" alt="">' +
       '<div class="mu__faixa">' +
         '<img class="mu__brilho" alt="" aria-hidden="true">' +
+        /* QUEM CORRE É O <i> DE DENTRO, NÃO A CAIXA.
+           A caixa é a janela que corta; se ela mesma andasse, o corte andava
+           junto e nada era revelado — só a linha inteira saindo de cena. */
         '<div class="mu__texto">' +
-          '<div class="mu__nome"></div>' +
-          '<div class="mu__artista"></div>' +
+          '<div class="mu__nome"><i></i></div>' +
+          '<div class="mu__artista"><i></i></div>' +
         '</div>' +
         '<div class="mu__prog"><i></i></div>' +
       '</div>' +
@@ -43,6 +46,8 @@
     var brilho  = root.querySelector('.mu__brilho');
     var elNome  = root.querySelector('.mu__nome');
     var elArt   = root.querySelector('.mu__artista');
+    var txNome  = elNome.firstElementChild;
+    var txArt   = elArt.firstElementChild;
     var dentro  = root.querySelector('.mu__prog > i');
 
     var cfg = R.sanitize(cfgInicial);
@@ -77,8 +82,14 @@
     function mede() {
       mediuLargura = true;
       var cabe = larguraUtil();
-      [elNome, elArt].forEach(function (el) {
-        el.classList.toggle('mu--longo', !!cfg.mrola && el.scrollWidth > cabe + 2);
+      /* Mede o texto de dentro, não a caixa: a caixa tem a largura da faixa
+         e nunca "transborda", então perguntar a ela sempre daria não. */
+      [[elNome, txNome], [elArt, txArt]].forEach(function (par) {
+        var sobra = par[1].scrollWidth - cabe;
+        par[0].classList.toggle('mu--longo', !!cfg.mrola && sobra > 2);
+        /* Quanto ANDAR é quanto sobra, e não uma fração chutada da largura:
+           título que passa dez pixels anda dez, não meia caixa. */
+        if (sobra > 2) par[0].style.setProperty('--mu-corre', '-' + Math.ceil(sobra + 8) + 'px');
       });
     }
 
@@ -176,8 +187,8 @@
       if (cfg.mquando === 'sempre' || cfg.manim === 'nenhum') root.classList.remove('mu--vazio');
 
       if (mudou) {
-        elNome.textContent = m.nome;
-        elArt.textContent = m.artista;
+        txNome.textContent = m.nome;
+        txArt.textContent = m.artista;
         if (m.capa && capa.getAttribute('src') !== m.capa) {
           capa.setAttribute('src', m.capa);
           brilho.setAttribute('src', m.capa);

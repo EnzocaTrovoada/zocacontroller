@@ -170,6 +170,26 @@
      A fonte continua no OBS funcionando — isso não é o olhinho.</p>
   <div id="mixer"></div>
 
+  <h2>Fora do VOD</h2>
+  <p class="dica">A Twitch grava o VOD numa trilha de áudio separada da que vai ao vivo.
+     Tirando o Spotify dessa trilha, quem assiste ao vivo continua ouvindo e o vídeo
+     gravado fica sem a música — que é o que evita o strike.</p>
+  <select id="vodFonte"><option value="">escolha a fonte de áudio do Spotify</option></select>
+  <div class="fila" style="margin-top:6px">
+    <b>Trilha do VOD</b>
+    <select id="vodTrilha" style="width:auto">
+      <option value="2" selected>2 (padrão do OBS)</option>
+      <option value="3">3</option><option value="4">4</option>
+      <option value="5">5</option><option value="6">6</option>
+    </select>
+  </div>
+  <div class="grade" style="margin-top:6px">
+    <button id="btVodLigar">Tirar do VOD</button>
+    <button id="btVodDesligar" class="fraco">Devolver</button>
+  </div>
+  <p class="dica escondido" id="vodAviso"></p>
+  <div class="fila"><b>Agora</b><span id="vVod">—</span></div>
+
   <div id="secaoFontes" class="escondido">
     <h2>Fontes da cena</h2>
     <div id="fontes"></div>
@@ -421,6 +441,7 @@ async function inicial() {
   try { const esp = await pedir('GetSpecialInputs'); micNome = esp.mic1 || esp.mic2 || ''; } catch (e) {}
   await lerOcultos();
   await carregarMixer();
+  await lerVod();
   await lerFontes();
   pintar();
 }
@@ -495,6 +516,9 @@ function desenharMixer() {
     cx.appendChild(linha);
   }
   if (!sons.length) cx.innerHTML = '<div class="fila"><b>nenhuma fonte com áudio</b></div>';
+  /* A lista do VOD sai das mesmas fontes: se o OBS ganhou ou perdeu uma,
+     as duas listas mudam juntas. */
+  desenharVod();
 }
 
 /* ---------- estado que vem da ponte ---------- */
@@ -830,6 +854,150 @@ el('btEditarSons').addEventListener('click', () => {
   el('dicaSons').classList.toggle('escondido', !editandoSons);
   desenharMixer();
 });
+
+/* ------------------------------------------------------------------ *
+ *  O SPOTIFY FORA DO VOD
+ *
+ *  Existia só como comando de chat, e o nome da fonte de áudio tinha que ser
+ *  colado à mão no endereço da fonte do OBS. Ninguém leigo faz isso — e o
+ *  pedido era uma OPÇÃO, não um comando.
+ *
+ *  A escolha mora numa gaveta do próprio OBS, então a ponte lê a mesma coisa
+ *  e reaplica sozinha quando o OBS reabre ou a fonte é recriada.
+ * ------------------------------------------------------------------ */
+
+const GAVETA_VOD = 'zocacontroller_vod';
+let vod = { fonte: '', trilha: 2, ligado: false };
+
+async function lerVod() {
+  try {
+    const r = await pedir('GetPersistentData', { realm: CAIXA, slotName: GAVETA_VOD });
+    const v = r && r.slotValue;
+    if (v && typeof v === 'object') {
+      vod = { fonte: String(v.fonte || ''), trilha: parseInt(v.trilha, 10) || 2, ligado: !!v.ligado };
+    }
+  } catch (e) {}
+  desenharVod();
+}
+
+async function salvarVod() {
+  try {
+    await pedir('SetPersistentData', { realm: CAIXA, slotName: GAVETA_VOD, slotValue: vod });
+    await pedir('BroadcastCustomEvent', { eventData: { zc: 'vod', ...vod } });
+  } catch (e) { anotar('não consegui guardar: ' + e.message); }
+}
+
+/* Liga = fica na 1 e sai da trilha do VOD. Desliga = devolve.
+   Só mexe nas duas trilhas que interessam: o resto do que a pessoa
+   configurou no OBS continua como estava. */
+async function aplicarVod(ligar) {
+  if (!vod.fonte) return anotar('escolha primeiro a fonte de áudio do Spotify');
+  try {
+    const atual = await pedir('GetInputAudioTracks', { inputName: vod.fonte });
+    const trilhas = Object.assign({}, atual.inputAudioTracks);
+    trilhas['1'] = true;
+    trilhas[String(vod.trilha)] = !ligar;
+    await pedir('SetInputAudioTracks', { inputName: vod.fonte, inputAudioTracks: trilhas });
+    vod.ligado = ligar;
+    await salvarVod();
+    desenharVod();
+    anotar(ligar
+      ? '"' + vod.fonte + '" saiu da trilha ' + vod.trilha + '. A live continua com som.'
+      : '"' + vod.fonte + '" voltou pra trilha ' + vod.trilha + '.');
+  } catch (e) { anotar('não deu: ' + e.message); }
+}
+
+function desenharVod() {
+  const sel = el('vodFonte');
+  if (sel) {
+    const antes = vod.fonte;
+    sel.innerHTML = '<option value="">escolha a fonte de áudio do Spotify</option>';
+    for (const s of sons) {
+      const o = document.createElement('option');
+      o.value = s.nome; o.textContent = s.nome;
+      if (s.nome === antes) o.selected = true;
+      sel.appendChild(o);
+    }
+    /* A fonte guardada sumiu do OBS: não finge que está valendo. */
+    if (antes && !sons.some(s => s.nome === antes)) {
+      const o = document.createElement('option');
+      o.value = antes; o.textContent = antes + ' (não achei no OBS)';
+      o.selected = true;
+      sel.appendChild(o);
+    }
+  }
+  const t = el('vodTrilha'); if (t) t.value = String(vod.trilha);
+  conferirTrilhaVod();
+  const v = el('vVod');
+  if (v) {
+    v.textContent = !vod.fonte ? '—'
+      : (vod.ligado ? 'fora do VOD (trilha ' + vod.trilha + ')' : 'no VOD');
+    v.className = vod.ligado ? 'viva' : '';
+  }
+}
+
+/* A TRILHA DO VOD PODE NEM EXISTIR.
+   Ela só existe no modo Avançado de saída do OBS. No modo Simples, mexer nas
+   trilhas não faz nada — e dizer "saiu do VOD" nesse caso é mentir pra quem
+   está confiando nisso pra não tomar strike.
+
+   Isto é uma conferência de boa-fé: só avisa quando consegue LER que está
+   errado. Se o OBS não responder ou o nome do parâmetro mudar numa versão
+   nova, fica calado em vez de inventar um alerta falso. */
+async function conferirTrilhaVod() {
+  const aviso = el('vodAviso');
+  if (!aviso) return;
+  aviso.textContent = '';
+  aviso.classList.add('escondido');
+
+  const ler = async (cat, par) => {
+    try {
+      const r = await pedir('GetProfileParameter', { parameterCategory: cat, parameterName: par });
+      const v = (r && (r.parameterValue != null ? r.parameterValue : r.defaultParameterValue));
+      return v == null ? null : String(v);
+    } catch (e) { return null; }
+  };
+
+  const modo = await ler('Output', 'Mode');
+  if (modo === 'Simple') {
+    aviso.textContent = 'Seu OBS está no modo Simples de saída. A trilha separada do VOD só existe '
+      + 'no modo Avançado — do jeito que está, tirar da trilha não protege nada. '
+      + 'Configurações → Saída → Modo de saída: Avançado, e marque "Trilha do VOD da Twitch".';
+    aviso.classList.remove('escondido');
+    return;
+  }
+  if (modo !== 'Advanced') return;      /* não consegui ler: não invento aviso */
+
+  const ligada = await ler('AdvOut', 'VodTrackEnabled');
+  if (ligada === 'false' || ligada === '0') {
+    aviso.textContent = 'A "Trilha do VOD da Twitch" está desmarcada no OBS. '
+      + 'Configurações → Saída → Transmissão. Sem ela, tirar da trilha não protege nada.';
+    aviso.classList.remove('escondido');
+    return;
+  }
+
+  const idx = await ler('AdvOut', 'VodTrackIndex');
+  const n = parseInt(idx, 10);
+  if (n && n !== vod.trilha) {
+    aviso.textContent = 'O seu OBS grava o VOD na trilha ' + n + ', e aqui está escolhida a '
+      + vod.trilha + '. Troque acima pra ' + n + '.';
+    aviso.classList.remove('escondido');
+  }
+}
+
+el('vodFonte').addEventListener('change', async () => {
+  vod.fonte = el('vodFonte').value;
+  vod.ligado = false;          /* fonte nova, estado desconhecido até aplicar */
+  await salvarVod();
+  desenharVod();
+});
+el('vodTrilha').addEventListener('change', async () => {
+  vod.trilha = parseInt(el('vodTrilha').value, 10) || 2;
+  await salvarVod();
+  desenharVod();
+});
+el('btVodLigar').addEventListener('click', () => aplicarVod(true));
+el('btVodDesligar').addEventListener('click', () => aplicarVod(false));
 
 /* ---------- fontes da cena (o olhinho de verdade) ---------- */
 
