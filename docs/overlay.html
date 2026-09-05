@@ -6,10 +6,10 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="clock.css?v=15">
-<link rel="stylesheet" href="chat.css?v=15">
-<link rel="stylesheet" href="musica.css?v=15">
-<link rel="stylesheet" href="alerta.css?v=15">
+<link rel="stylesheet" href="clock.css?v=16">
+<link rel="stylesheet" href="chat.css?v=16">
+<link rel="stylesheet" href="musica.css?v=16">
+<link rel="stylesheet" href="alerta.css?v=16">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
@@ -38,10 +38,10 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=15"></script>
-<script src="chat.js?v=15"></script>
-<script src="musica.js?v=15"></script>
-<script src="alerta.js?v=15"></script>
+<script src="clock.js?v=16"></script>
+<script src="chat.js?v=16"></script>
+<script src="musica.js?v=16"></script>
+<script src="alerta.js?v=16"></script>
 <script>
 (function () {
   'use strict';
@@ -117,6 +117,9 @@
     /* Sem isso o editor do chat abre vazio e a pessoa nao ve o que esta
        ajustando ate alguem falar no chat naquele instante. */
     if (d.type === 'zc:exemplo' && relogio && relogio.exemplo) relogio.exemplo();
+    /* O botão "Ouvir" do editor. Só a prévia recebe esta mensagem — a fonte
+       que roda no OBS nunca toca som por pedido de ninguém. */
+    if (d.type === 'zc:ouvir' && relogio && relogio.ouvir) relogio.ouvir();
   });
 
   /* ------------------------------------------------------------------
@@ -313,6 +316,7 @@
         /* O mesmo canal serve o feed e o alerta: os dois vivem dos eventos.
            O que muda é o que cada um faz com eles — o feed lista, o alerta
            toca um de cada vez e só o que ainda não passou. */
+        if (j.som !== undefined && relogio && relogio.som) relogio.som(j.som);
         if (j.eventos && relogio && relogio.feed) relogio.feed(j.eventos);
         /* undefined é "esta resposta não fala de música"; null é "não tem
            nada tocando". Só o segundo apaga a tela. */

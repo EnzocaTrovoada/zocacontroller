@@ -318,7 +318,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=15"></script>
+<script src="clock.js?v=16"></script>
 <script>
 'use strict';
 
@@ -433,7 +433,15 @@ function padraoDe(tipo) {
       align: 'center', valign: 'middle',
       afollow: 1, asub: 1, abits: 1, areal: 1,
       abitsmin: 100, arealmin: 1,
-      atempo: 6, aentre: 'descer', anome: '#7CE07C', asom: 'sino', avol: 60,
+      /* As frases entram aqui e não só no esquema: o editor monta a tela a
+         partir DESTE objeto, então chave que falta aqui vira campo vazio —
+         e campo vazio parece defeito mesmo quando o padrão existe. */
+      atsub:    '{quem} assinou!',
+      atpres:   '{quem} presenteou {quanto} subs!',
+      atfollow: '{quem} seguiu!',
+      atbits:   '{quem} mandou {quanto} bits!',
+      atreal:   '{quem} doou R$ {quanto}!',
+      atempo: 6, aentre: 'descer', anome: '#7CE07C', asom: 'sino', asomid: 0, avol: 60,
     });
   }
   if (tipo === 'feed') {
@@ -564,17 +572,20 @@ const FUSOS = [
 
 const GRUPOS = [
   { t: 'Conteúdo', aberto: true, itens: [
-    /* O alerta abre com o que dispara: é a primeira pergunta que a pessoa
-       tem na cabeça, e o resto (letra, cor, som) só faz sentido depois. */
-    { k: 'asub',    l: 'Avisar sub', c: 'chave', se: so('alerta') },
-    { k: 'afollow', l: 'Avisar follow', c: 'chave', se: so('alerta'),
-      dica: 'precisa do EventSub ligado em Meu Controller' },
-    { k: 'abits',   l: 'Avisar bits', c: 'chave', se: so('alerta') },
-    { k: 'abitsmin', l: 'A partir de', c: 'faixa', min: 1, max: 5000, u: ' bits',
+    /* O alerta abre por aqui porque "o que faz ele aparecer" é a primeira
+       pergunta que a pessoa tem na cabeça. Letra, cor e som só fazem sentido
+       depois de existir alerta pra enfeitar. */
+    { k: 'asub',    l: 'Aparecer quando alguém assinar', c: 'chave', se: so('alerta') },
+    { k: 'afollow', l: 'Aparecer quando alguém seguir', c: 'chave', se: so('alerta'),
+      dica: 'o follow só chega se você tiver ligado os avisos da Twitch em Meu Controller' },
+    { k: 'abits',   l: 'Aparecer quando mandarem bits', c: 'chave', se: so('alerta') },
+    { k: 'abitsmin', l: 'Ignorar abaixo de', c: 'faixa', min: 1, max: 5000,
+      u: (n) => n === 1 ? ' bit' : ' bits',
       se: (c) => c.tipo === 'alerta' && c.abits,
-      dica: 'live movimentada com o mínimo em 1 vira um alerta a cada dois segundos' },
-    { k: 'areal',   l: 'Avisar doação', c: 'chave', se: so('alerta') },
-    { k: 'arealmin', l: 'A partir de', c: 'faixa', min: 1, max: 500, u: ' reais',
+      dica: 'numa live cheia, avisar a partir de 1 bit vira alerta em cima de alerta' },
+    { k: 'areal',   l: 'Aparecer quando alguém doar', c: 'chave', se: so('alerta') },
+    { k: 'arealmin', l: 'Ignorar abaixo de', c: 'faixa', min: 1, max: 500,
+      u: (n) => n === 1 ? ' real' : ' reais',
       se: (c) => c.tipo === 'alerta' && c.areal },
     { k: 'fonte', l: 'Contar', c: 'lista', se: so('meta'),
       ops: [['seguidores', 'Seguidores (automático)'], ['subs', 'Subs (automático)'], ['manual', 'Eu digito']],
@@ -586,7 +597,9 @@ const GRUPOS = [
     { k: 'valor',  l: 'Número', c: 'num', se: so('contador', 'placar') },
     { k: 'valor2', l: 'Número da direita', c: 'num', se: so('placar') },
     { k: 'sep',    l: 'Separador', c: 'texto', se: so('placar') },
-    { k: 'titulo', l: 'Nome na tela', c: 'texto' },
+    { k: 'titulo', l: 'Nome na tela', c: 'texto',
+      se: so('meta', 'subathon', 'relogio', 'contador', 'placar'),
+      dica: 'a palavra que fica acima do número — deixe vazio pra não aparecer nada' },
     { k: 'titulo2', l: 'Nome da direita', c: 'texto', se: so('placar') },
     { k: 'h24',  l: '24 horas', c: 'chave', se: so('relogio') },
     { k: 'sec',  l: 'Segundos', c: 'chave', se: so('relogio') },
@@ -651,32 +664,32 @@ const GRUPOS = [
     { k: 'mcapraio', l: 'Cantos da capa', c: 'faixa', min: 0, max: 80, u: 'px', se: (c) => !!c.mcapa },
   ] },
 
-  { t: 'O que fica escrito', aberto: true, se: so('alerta'), itens: [
-    /* Molde de frase, e não texto fixo: cada canal fala de um jeito. O {quem}
-       e o {quanto} são trocados na hora. */
-    { k: 'atsub',    l: 'Sub', c: 'texto', se: (c) => !!c.asub,
-      dica: '{quem} vira o nome de quem assinou' },
-    { k: 'atpres',   l: 'Sub de presente', c: 'texto', se: (c) => !!c.asub,
-      dica: '{quanto} vira quantos subs a pessoa deu de uma vez' },
-    { k: 'atfollow', l: 'Follow', c: 'texto', se: (c) => !!c.afollow },
-    { k: 'atbits',   l: 'Bits', c: 'texto', se: (c) => !!c.abits },
-    { k: 'atreal',   l: 'Doação', c: 'texto', se: (c) => !!c.areal },
-    { k: 'anome', l: 'Cor do nome', c: 'cor',
-      dica: 'é o que o olho procura primeiro quando o alerta pisca' },
+  { t: 'A frase de cada aviso', aberto: true, se: so('alerta'),
+    intro: 'Escreva do jeito que você fala. Onde você puser {quem} entra o nome da pessoa, '
+         + 'e onde puser {quanto} entra o número — quantos subs, quantos bits, quantos reais.',
+    itens: [
+    { k: 'atsub',    l: 'Alguém assinou', c: 'texto', se: (c) => !!c.asub },
+    { k: 'atpres',   l: 'Alguém deu subs de presente', c: 'texto', se: (c) => !!c.asub,
+      dica: 'aqui o {quanto} é quantos subs a pessoa deu de uma vez' },
+    { k: 'atfollow', l: 'Alguém começou a seguir', c: 'texto', se: (c) => !!c.afollow },
+    { k: 'atbits',   l: 'Alguém mandou bits', c: 'texto', se: (c) => !!c.abits },
+    { k: 'atreal',   l: 'Alguém doou', c: 'texto', se: (c) => !!c.areal },
+    { k: 'anome', l: 'Cor do nome da pessoa', c: 'cor',
+      dica: 'o nome sai nesta cor e o resto da frase na cor da letra, lá embaixo' },
   ] },
 
-  { t: 'Como entra e sai', aberto: true, se: so('alerta'), itens: [
-    { k: 'aentre', l: 'Entrada', c: 'lista', ops: [
+  { t: 'Movimento e som', aberto: true, se: so('alerta'), itens: [
+    { k: 'aentre', l: 'Como o alerta entra', c: 'lista', ops: [
       ['descer', 'Descendo de cima'], ['zoom', 'Crescendo'],
-      ['lado', 'Entrando pelo lado'], ['surgir', 'Só aparecendo']] },
-    { k: 'atempo', l: 'Fica na tela', c: 'faixa', min: 2, max: 30, u: 's',
-      dica: 'com vários subs seguidos eles entram na fila e passam um de cada vez' },
-    { k: 'asom', l: 'Som', c: 'lista', ops: [
-      ['sino', 'Sino'], ['moeda', 'Moeda'], ['fanfarra', 'Fanfarra'],
-      ['sopro', 'Sopro'], ['nenhum', 'Nenhum']],
-      dica: 'o som é feito na hora pelo navegador — não tem arquivo pra sumir no meio da live' },
-    { k: 'avol', l: 'Volume', c: 'faixa', min: 0, max: 100, u: '%', se: (c) => c.asom !== 'nenhum',
-      dica: 'pra você ouvir, marque "Controlar áudio pelo OBS" na fonte' },
+      ['lado', 'Entrando pelo lado'], ['surgir', 'Só aparecendo']],
+      dica: 'ele sai pelo mesmo caminho que entrou' },
+    { k: 'atempo', l: 'Quanto tempo fica na tela', c: 'faixa', min: 2, max: 30,
+      u: (n) => n === 1 ? ' segundo' : ' segundos',
+      dica: 'se vierem vários seguidos, eles esperam a vez em vez de aparecer em cima um do outro' },
+    { k: 'asom', l: 'Som que toca', c: 'som' },
+    { k: 'avol', l: 'Volume', c: 'faixa', min: 0, max: 100, u: '%',
+      se: (c) => c.asom !== 'nenhum',
+      dica: 'pra quem assiste ouvir, marque "Controlar áudio pelo OBS" nas propriedades da fonte' },
   ] },
 
   { t: 'O feed', aberto: true, se: so('feed'), itens: [
@@ -1202,14 +1215,144 @@ const FABRICA = {
     cx.__sincroniza = () => { s.value = String(cfg[it.k]); pinta(); };
     return cx;
   },
+  /* O SOM DO ALERTA.
+
+     Um controle só em vez de dois: a pergunta da pessoa é "qual som toca",
+     não "som pronto ou som meu". A lista junta os quatro de fábrica e os
+     arquivos que ela mandou; embaixo ficam o botão de ouvir, o de mandar
+     outro e o de apagar.
+
+     Os quatro de fábrica são desenhados na hora pelo navegador — não têm
+     arquivo pra sumir nem pra carregar. Os seus são arquivos de verdade. */
+  som(it) {
+    const sel = h('select');
+    const linha = h('div', { cls: 'campo', style: 'margin:6px 0 0;gap:6px' });
+    const aviso = h('p', { cls: 'd', style: 'margin:4px 0 0' });
+
+    const PRONTOS_SOM = [
+      ['sino', 'Sino'], ['moeda', 'Moeda'],
+      ['fanfarra', 'Fanfarra'], ['sopro', 'Sopro'], ['nenhum', 'Nenhum'],
+    ];
+    let meus = [];
+
+    const valorAtual = () => (cfg.asom === 'proprio' ? 'meu:' + cfg.asomid : cfg.asom);
+
+    function pinta() {
+      const antes = valorAtual();
+      sel.innerHTML = '';
+      const gP = h('optgroup'); gP.label = 'Prontos';
+      PRONTOS_SOM.forEach(([v, r]) => gP.appendChild(h('option', { value: v, txt: r })));
+      sel.appendChild(gP);
+
+      if (meus.length) {
+        const gM = h('optgroup'); gM.label = 'Seus';
+        meus.forEach((s) => gM.appendChild(h('option', { value: 'meu:' + s.id, txt: s.nome })));
+        sel.appendChild(gM);
+      }
+      sel.value = antes;
+      /* O som escolhido foi apagado: não finge que ainda está lá. */
+      if (!sel.value) { sel.value = 'sino'; aplicaEscolha(); }
+      pintaBotoes();
+    }
+
+    function aplicaEscolha() {
+      const v = sel.value;
+      if (v.indexOf('meu:') === 0) {
+        cfg.asomid = parseInt(v.slice(4), 10) || 0;
+        mudou('asom', 'proprio');
+      } else {
+        cfg.asomid = 0;
+        mudou('asom', v);
+      }
+      pintaBotoes();
+    }
+    sel.onchange = aplicaEscolha;
+
+    function pintaBotoes() {
+      linha.innerHTML = '';
+      const ehMeu = sel.value.indexOf('meu:') === 0;
+
+      const ouvir = h('button', { cls: 'bt mini', type: 'button', txt: 'Ouvir' });
+      ouvir.onclick = () => {
+        /* Toca na prévia, que é onde a pessoa está olhando. O de fábrica o
+           próprio desenhista faz; o seu é um arquivo, e o arquivo só existe
+           depois de salvar — por isso o aviso. */
+        const q = quadro && quadro.contentWindow;
+        if (q) try { q.postMessage({ type: 'zc:ouvir' }, location.origin); } catch (e) {}
+      };
+      linha.appendChild(ouvir);
+
+      const mandar = h('button', { cls: 'bt mini', type: 'button', txt: 'Mandar um som meu' });
+      mandar.onclick = () => arquivo.click();
+      linha.appendChild(mandar);
+
+      if (ehMeu) {
+        const apagar = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'Apagar este' });
+        apagar.onclick = async () => {
+          const id = parseInt(sel.value.slice(4), 10);
+          try {
+            const r = await api('/som.php', { method: 'POST', body: JSON.stringify({ acao: 'apagar', id }) });
+            meus = r.sons || [];
+            sel.value = 'sino'; aplicaEscolha(); pinta();
+            recado('Som apagado.', 'bom');
+          } catch (e) { recado(e.message, 'ruim'); }
+        };
+        linha.appendChild(apagar);
+      }
+
+      aviso.textContent = ehMeu
+        ? 'O som seu só toca no OBS depois que você salvar o overlay.'
+        : 'Os prontos são feitos na hora pelo navegador — não têm arquivo pra falhar.';
+    }
+
+    /* O input de arquivo fica escondido: "Escolher arquivo / Nenhum arquivo
+       selecionado" em inglês do navegador não combina com o resto da tela. */
+    const arquivo = h('input', { type: 'file', accept: 'audio/*', style: 'display:none' });
+    arquivo.onchange = async () => {
+      const f = arquivo.files && arquivo.files[0];
+      arquivo.value = '';
+      if (!f) return;
+      if (f.size > 1048576) {
+        return recado('Esse arquivo tem ' + Math.round(f.size / 1024) + ' KB. O limite é 1 MB — alerta é um toque curto.', 'ruim');
+      }
+      recado('Mandando…');
+      try {
+        const fd = new FormData();
+        fd.append('som', f);
+        fd.append('nome', (f.name || 'som').replace(/\.[^.]+$/, ''));
+        /* Sem Content-Type na mão: o navegador precisa pôr o boundary do
+           multipart, e escrever o cabeçalho aqui quebraria isso. */
+        const r = await fetch(API + '/som.php', { method: 'POST', headers: { 'X-Chave': chave }, body: fd });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.erro || 'não deu');
+        meus = d.sons || [];
+        const novo = meus[meus.length - 1];
+        if (novo) { cfg.asomid = novo.id; mudou('asom', 'proprio'); }
+        pinta();
+        recado('Som guardado. Salve o overlay pra ele valer na live.', 'bom');
+      } catch (e) { recado(e.message, 'ruim'); }
+    };
+
+    api('/som.php').then((d) => { meus = d.sons || []; pinta(); }).catch(() => pinta());
+    pinta();
+
+    const cx = h('div', { style: 'flex:1 1 100%;min-width:0' }, [sel, linha, aviso, arquivo]);
+    cx.__sincroniza = () => pinta();
+    return cx;
+  },
+
   faixa(it) {
     const i = h('input', { type: 'range' });
     i.min = it.min; i.max = it.max; i.step = it.passo || 1;
     i.value = cfg[it.k];
-    const v = h('span', { cls: 'valor', txt: cfg[it.k] + (it.u || '') });
-    i.oninput = () => { v.textContent = i.value + (it.u || ''); mudou(it.k, parseInt(i.value, 10)); };
+    /* A unidade pode ser função pra concordar com o número: "1 real" e
+       "2 reais". Texto errado em português é o tipo de coisa que faz o
+       produto parecer amador mesmo quando o resto está certo. */
+    const un = (n) => (typeof it.u === 'function' ? it.u(n) : (it.u || ''));
+    const v = h('span', { cls: 'valor', txt: cfg[it.k] + un(cfg[it.k]) });
+    i.oninput = () => { v.textContent = i.value + un(parseInt(i.value, 10)); mudou(it.k, parseInt(i.value, 10)); };
     const cx = h('span', { cls: 'campo', style: 'margin:0;gap:8px' }, [i, v]);
-    cx.__sincroniza = () => { i.value = cfg[it.k]; v.textContent = cfg[it.k] + (it.u || ''); };
+    cx.__sincroniza = () => { i.value = cfg[it.k]; v.textContent = cfg[it.k] + un(cfg[it.k]); };
     return cx;
   },
   /* Pausado guarda quanto FALTA; correndo guarda QUANDO acaba. São contas
@@ -1378,6 +1521,11 @@ function telaEditor(perfil, tipoNovo) {
     if (g.se && !g.se(cfg)) return;
     const corpo = h('div', { cls: 'corpo' });
     let temAlgo = false;
+
+    /* Uma explicação por SEÇÃO, e não uma dica repetida embaixo de cada campo.
+       Quando cinco campos compartilham a mesma regra, repetir a regra cinco
+       vezes não ensina mais — só empurra os campos pra baixo. */
+    if (g.intro) corpo.appendChild(h('p', { cls: 'd', style: 'margin:0 0 12px', txt: g.intro }));
 
     g.itens.forEach((it) => {
       const fab = FABRICA[it.c];

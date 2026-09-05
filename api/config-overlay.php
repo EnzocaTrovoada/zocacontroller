@@ -79,13 +79,26 @@ if ($perfil['tipo'] === 'feed') {
     $eventos = evento_recentes((int) $perfil['usuario_id'], 12);
 }
 
+/* O ENDEREÇO DO SOM PRÓPRIO.
+
+   Vai montado daqui porque quem sabe onde a API mora é o servidor, não a
+   fonte dentro do OBS. E vai só o endereço de tocar, com a chave PÚBLICA do
+   overlay: a fonte não tem a chave do painel, e não deveria ter. */
+$som = null;
+if ($perfil['tipo'] === 'alerta' && !empty($config['asomid'])) {
+    $som = rtrim(cfg()['api_base'] ?? '', '/')
+         . '/som.php?a=tocar&k=' . rawurlencode($chave)
+         . '&id=' . (int) $config['asomid'];
+}
+
 /* ETag: quase toda resposta vira um 304 de poucos bytes. O polling sai de graça.
    O número automático entra na conta — sem ele o 304 devolveria o valor velho
    pra sempre e a meta ficaria congelada, justo a que deveria se mexer sozinha. */
 $etag = '"' . md5($perfil['atualizado_em'] . '|' . json_encode($recursos)
                   . '|' . (string) ($config['atual'] ?? '')
                   . '|' . ($eventos === null ? '' : md5(json_encode($eventos)))
-                  . '|' . ($musica === null ? '' : md5(json_encode($musica)))) . '"';
+                  . '|' . ($musica === null ? '' : md5(json_encode($musica)))
+                  . '|' . (string) $som) . '"';
 header('ETag: ' . $etag);
 header('Cache-Control: no-cache, must-revalidate');
 
@@ -99,5 +112,6 @@ json_saida([
     'config'   => $config,
     'eventos'  => $eventos,
     'musica'   => $musica,
+    'som'      => $som,
     'recursos' => $recursos,
 ]);

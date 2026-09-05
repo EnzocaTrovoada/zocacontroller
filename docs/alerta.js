@@ -118,6 +118,7 @@
     var vistoAte = -1;        /* -1 = ainda não sei onde estamos */
     var som = null;
     var pulso = null, reserva = null;
+    var somProprio = null;      /* <audio> do arquivo que a pessoa mandou */
 
     function audio() {
       try {
@@ -129,6 +130,38 @@
         if (som && som.state === 'suspended') som.resume();
       } catch (e) { som = null; }
       return som;
+    }
+
+    /* O ENDEREÇO DO SOM PRÓPRIO VEM DO SERVIDOR, NÃO DA CONFIG.
+        A config guarda só qual som foi escolhido; montar a URL aqui exigiria
+        que a fonte do OBS soubesse onde a API mora e qual é a chave — e ela
+        não tem por que saber nem uma coisa nem outra. */
+    function poeSom(url) {
+      if (!url) { somProprio = null; return; }
+      if (somProprio && somProprio.src === url) return;
+      somProprio = new Audio(url);
+      /* Carrega antes de precisar: buscar o arquivo no instante do sub
+         atrasaria o som em relação ao que aparece na tela. */
+      somProprio.preload = 'auto';
+      try { somProprio.load(); } catch (e) {}
+    }
+
+    function tocaSom() {
+      if (cfg.asom === 'nenhum' || cfg.avol <= 0) return;
+
+      if (cfg.asom === 'proprio') {
+        if (!somProprio) return;
+        try {
+          somProprio.volume = Math.max(0, Math.min(1, cfg.avol / 100));
+          /* Volta pro começo: dois alertas seguidos com o mesmo arquivo, sem
+             isto, o segundo não tocaria — o áudio já estava no fim. */
+          somProprio.currentTime = 0;
+          var p = somProprio.play();
+          if (p && p.catch) p.catch(function () {});
+        } catch (e) {}
+        return;
+      }
+      fazSom(audio(), cfg.asom, cfg.avol / 100);
     }
 
     function aplica() {
@@ -205,7 +238,7 @@
       void root.offsetWidth;
       root.classList.add('al--entrando');
 
-      if (cfg.asom !== 'nenhum') fazSom(audio(), cfg.asom, cfg.avol / 100);
+      tocaSom();
       trocaEm = Date.now() + cfg.atempo * 1000;
     }
 
@@ -257,6 +290,8 @@
       update: update,
       config: function () { return cfg; },
       feed: eventos,          /* o overlay.html entrega os eventos por aqui */
+      som: poeSom,            /* e o endereço do som próprio, por aqui */
+      ouvir: tocaSom,         /* o botão "Ouvir" do editor */
       exemplo: function () {
         vistoAte = 0;
         fila.push({ id: 1, tipo: 'sub1', quem: 'fulaninha', quantidade: 1, presente: false });
