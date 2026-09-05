@@ -429,7 +429,12 @@ async function descobrir(lerGaveta = true) {
     estado.sons = achados;
   } catch (e) {}
 
-  if (lerGaveta) { await lerOcultos(); await lerVod(); await reaplicaVod(); }
+  if (lerGaveta) {
+    await lerOcultos();
+    await lerVod();
+    await reaplicaVod();
+    await acharOverlays();
+  }
   estado.sons = estado.sons.filter(s => !escondida(s.nome));
   await lerFontesDaCena();
 
@@ -653,6 +658,53 @@ async function reaplicaVod() {
        um strike de copyright: a pessoa acha que está protegida e não está. */
     recado('Atenção: não achei "' + vod.fonte + '" pra tirar do VOD. Escolha de novo no painel.', 30000);
   }
+}
+
+/* ------------------------------------------------------------------ *
+ *  ACHAR AS OVERLAYS SOZINHO
+ *
+ *  O !musica precisava de ?fonteMusica= colado à mão no endereço da ponte —
+ *  e nenhuma tela do site jamais emitia esse parâmetro, então o comando
+ *  respondia "falta o parâmetro" pra sempre. Era um comando morto.
+ *
+ *  Em vez de pedir pra pessoa configurar, a ponte descobre: percorre as
+ *  fontes de navegador do OBS, pega a chave que está no endereço de cada
+ *  uma, e pergunta ao servidor de que tipo é aquele overlay. Uma vez por
+ *  conexão, e nunca mais.
+ * ------------------------------------------------------------------ */
+
+let overlaysDoObs = {};      /* tipo -> nome da fonte no OBS */
+
+async function acharOverlays() {
+  const achados = {};
+  let lista;
+  try { lista = (await pedir('GetInputList')).inputs || []; } catch (e) { return; }
+
+  for (const i of lista) {
+    if (!/browser/i.test(i.inputKind || '')) continue;
+    let url = '';
+    try {
+      const s = await pedir('GetInputSettings', { inputName: i.inputName });
+      url = String((s.inputSettings || {}).url || '');
+    } catch (e) { continue; }
+
+    /* O k pode ser o primeiro parâmetro ou vir depois de outros. Escrever
+       [?&]k= exigiria um separador extra e justamente o endereço comum
+       (overlay.html?k=...) não casaria — testado. */
+    const m = url.match(/overlay\.html\?(?:[^#]*&)?k=([A-Za-z0-9_-]{10,64})/);
+    if (!m) continue;
+    try {
+      const r = await fetch(cfg.api + '/config-overlay.php?k=' + encodeURIComponent(m[1]),
+                            { cache: 'no-cache' });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const tipo = j && j.config && j.config.tipo;
+      /* O primeiro de cada tipo vence: dois overlays de música na mesma cena
+         é caso raro, e escolher o primeiro é melhor do que não escolher. */
+      if (tipo && !achados[tipo]) achados[tipo] = i.inputName;
+    } catch (e) {}
+  }
+  overlaysDoObs = achados;
 }
 
 /** As fontes da cena que está no ar, com o estado do olhinho de cada uma. */
@@ -921,8 +973,14 @@ ACOES.playlist = {
 ACOES.musica = {
   minimo: 'mod', espera: 4000,
   async fazer(quem, arg) {
-    if (!cfg.fonteMusica) return recado('Falta ?fonteMusica= no endereço da fonte.');
-    return ACOES.fonte.fazer(quem, cfg.fonteMusica);
+    /* Argumento manda; depois o endereço, se alguém o usou; e por último o
+       que a ponte achou sozinha, que é o caso normal. */
+    const nome = (arg || '').trim() || cfg.fonteMusica || overlaysDoObs.musica;
+    if (!nome) {
+      return recado('Não achei a overlay de música nas suas fontes do OBS. '
+        + 'Se ela existe com outro nome, use: ' + cfg.prefixo + 'musica NOME DA FONTE', 15000);
+    }
+    return ACOES.fonte.fazer(quem, nome);
   },
 };
 
