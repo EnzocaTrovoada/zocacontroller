@@ -2052,8 +2052,17 @@ function telaTutorial() {
     tela.appendChild(fatia);
   }
 
-  lista('Um overlay na tela', 'Vale pra meta, subathon, relógio, contador, placar, chat e feed — todos funcionam do mesmo jeito.', PASSOS_OBS);
+  lista('Um overlay na tela', 'Vale pra meta, subathon, relógio, contador, placar, chat, feed e música — todos funcionam do mesmo jeito.', PASSOS_OBS);
   lista('O chat controlando o OBS', 'Só se você quiser que mods usem comandos. Overlay funciona sem isso.', PASSOS_CHAT);
+
+  /* A música é o único overlay que precisa de um passo FORA do OBS. Sem isso
+     ela fica vazia na live sem dizer por quê, e a pessoa culpa o overlay. */
+  lista('A overlay de música', 'Só pra quem vai usar o Spotify. Os outros overlays não precisam disto.', [
+    ['Conecte o Spotify', 'Ferramentas → Conectar o Spotify. Abre no site deles, você aprova e volta pra cá.'],
+    ['Crie a overlay de música', 'Overlays → Música. Os mesmos seis passos do OBS de cima.'],
+    ['Ponha o Spotify fora do VOD', 'No painel dentro do OBS, seção "Fora do VOD": escolha a fonte de áudio do Spotify e clique em Tirar do VOD. A live continua com som, o vídeo gravado fica sem — é o que evita o strike.'],
+    ['Se quiser, libere os comandos', 'Comandos → o !musica, !pular, !like, !playlist, !adicionar e !fila. O !pular e o !fila precisam de Spotify Premium; os outros funcionam em conta grátis.'],
+  ]);
 
   const fatiaAjuda = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Quando não funciona' }),
@@ -2064,6 +2073,8 @@ function telaTutorial() {
     ['Fica um retângulo preto atrás', 'Não é o overlay: é a Fonte de Navegador com "Fundo personalizado". Deixe vazio.'],
     ['Editei e não mudou na live', 'Espere 15 segundos. Se não mudar, clique com o botão direito na fonte → Atualizar.'],
     ['O chat não controla nada', 'O servidor do WebSocket do OBS está desligado, ou a fonte da ponte não está numa cena ativa.'],
+    ['A overlay de música fica vazia', 'Falta conectar o Spotify em Ferramentas, ou não tem nada tocando. Na prévia daqui aparece uma música de mentira mesmo sem conexão — no OBS, não.'],
+    ['Tirei do VOD e mesmo assim deu strike', 'A trilha separada do VOD só existe no modo Avançado de saída do OBS. Em Configurações → Saída, troque para Avançado e marque "Trilha do VOD da Twitch". O painel avisa quando isso está errado.'],
   ].forEach((p) => {
     fatiaAjuda.appendChild(h('div', { cls: 'campo', style: 'align-items:flex-start' }, [
       h('div', { style: 'flex:1 1 240px' }, [
