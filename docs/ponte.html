@@ -173,6 +173,13 @@ const estado = {
   mic: '', desktop: '', cena: '', cenaAntes: '',
   micMudo: false, nivel: 0,
   panico: false,
+  /* COMO O ÁUDIO ESTAVA ANTES DO PÂNICO.
+     Sem isto, sair do pânico LIGAVA o microfone — mesmo se o streamer o
+     tivesse mudado de propósito antes. É o defeito que o pânico existe pra
+     evitar, só que ao contrário: em vez de vazar por descuido, vaza na hora
+     em que a pessoa acha que está voltando ao normal. A cena já era lembrada
+     (cenaAntes); o áudio não era. */
+  mudoAntes: null,
   mudoDesde: 0,          // performance.now() de quando começou a falar mudo
   cenasConhecidas: [],
   sons: [],                // fontes com áudio, para os mods poderem mutar
@@ -431,6 +438,7 @@ async function descobrir(lerGaveta = true) {
 
   if (lerGaveta) {
     await lerOcultos();
+    await lerPanico();
     await lerVod();
     await reaplicaVod();
     await acharOverlays();
@@ -492,6 +500,45 @@ async function mutar(nome, mudo) {
   await pedir('SetInputMute', { inputName: nome, inputMuted: mudo });
 }
 
+/** Como estão o microfone e o áudio do sistema agora, pra poder devolver. */
+async function comoEstaOAudio() {
+  const ler = async (nome) => {
+    if (!nome) return false;
+    try { return !!(await pedir('GetInputMute', { inputName: nome })).inputMuted; }
+    catch (e) { return true; }      /* na dúvida, "estava mudo": devolve calado */
+  };
+  return { mic: await ler(estado.mic), desktop: await ler(estado.desktop) };
+}
+
+/* O PÂNICO PRECISA SOBREVIVER A UM RELOAD.
+   A fonte do OBS recarrega sozinha (OBS reaberto, botão de atualizar, troca de
+   cena com "desligar quando não visível"). Se o pânico morresse junto, o
+   microfone continuaria mudo — mas a trava sumiria, e qualquer mod poderia
+   desmutar com !mute. Quem sai do pânico é o dono, e só. */
+const GAVETA_PANICO = 'zocacontroller_panico';
+
+async function guardaPanico() {
+  try {
+    await pedir('SetPersistentData', {
+      realm: CAIXA, slotName: GAVETA_PANICO,
+      slotValue: { panico: estado.panico, mudoAntes: estado.mudoAntes, cenaAntes: estado.cenaAntes },
+    });
+  } catch (e) {}
+}
+
+async function lerPanico() {
+  try {
+    const r = await pedir('GetPersistentData', { realm: CAIXA, slotName: GAVETA_PANICO });
+    const v = r && r.slotValue;
+    if (v && v.panico) {
+      estado.panico = true;
+      estado.mudoAntes = v.mudoAntes || null;
+      estado.cenaAntes = v.cenaAntes || '';
+      recado('A live voltou ainda em pânico. Só ' + cfg.prefixo + 'voltar tira.', 30000);
+    }
+  } catch (e) {}
+}
+
 const ACOES = {
   panico: {
     minimo: 'mod', espera: 10000,
@@ -499,8 +546,10 @@ const ACOES = {
       if (estado.panico) return recado('Já está em pânico. Só ' + cfg.canal + ' sai.');
       estado.panico = true;
       estado.cenaAntes = estado.cena;
+      estado.mudoAntes = await comoEstaOAudio();
       await mutar(estado.mic, true);
       await mutar(estado.desktop, true);
+      await guardaPanico();
       if (cfg.cenaPanico) await pedir('SetCurrentProgramScene', { sceneName: cfg.cenaPanico });
       recado('PÂNICO ativado por ' + quem + '. Só o streamer sai, com ' + cfg.prefixo + 'voltar.', 60000);
       pintar();
@@ -513,8 +562,14 @@ const ACOES = {
     async fazer(quem) {
       if (!estado.panico) return;
       estado.panico = false;
-      await mutar(estado.mic, false);
-      await mutar(estado.desktop, false);
+      /* Devolve como estava, e não "ligado". Se não deu pra saber como estava,
+         o padrão seguro é DEIXAR MUDO: silêncio a mais é constrangimento,
+         som a mais é o acidente. */
+      const antes = estado.mudoAntes;
+      await mutar(estado.mic, antes ? !!antes.mic : true);
+      await mutar(estado.desktop, antes ? !!antes.desktop : true);
+      estado.mudoAntes = null;
+      await guardaPanico();
       if (estado.cenaAntes) await pedir('SetCurrentProgramScene', { sceneName: estado.cenaAntes });
       recado('Pânico encerrado por ' + quem + '.');
       pintar();
@@ -581,7 +636,11 @@ ACOES.som = {
     const alvo = estado.sons.find(s => s.nome.toLowerCase() === arg.toLowerCase())
               || estado.sons.find(s => s.nome.toLowerCase().includes(arg.toLowerCase()));
     if (!alvo) return recado('Não achei uma fonte de áudio chamada "' + arg + '".');
-    if (estado.panico && alvo.nome === estado.mic && alvo.mudo) {
+    /* O pânico muta o microfone E o áudio do sistema. A trava só olhava o
+       microfone, então em pânico um mod ainda desmutava o desktop pelo !som —
+       justo o que o pânico tinha acabado de calar. */
+    const trancada = alvo.nome === estado.mic || alvo.nome === estado.desktop;
+    if (estado.panico && trancada && alvo.mudo) {
       return recado('Em pânico o áudio não volta. Só ' + cfg.prefixo + 'voltar.');
     }
     const r = await pedir('ToggleInputMute', { inputName: alvo.nome });
