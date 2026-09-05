@@ -19,6 +19,13 @@ cors();
 
 /* Espelha o registro da ponte. Se as duas listas divergirem, um comando
    apontaria pro nada — então o servidor recusa o que a ponte não conhece. */
+/* O QUE PODE DISPARAR UM GATILHO.
+   Os mesmos nomes que a tabela de eventos usa, com 'presente' separado de
+   'sub': quem quer festa quando alguém dá dez subs raramente quer a mesma
+   festa a cada sub avulso. */
+const EVENTOS_VALIDOS = ['sub', 'presente', 'bits', 'follow', 'real', 'raid'];
+const GATILHOS_MAX = 20;
+
 const ACOES_VALIDAS = [
     'panico', 'voltar', 'mute', 'cena', 'replay', 'camera', 'som', 'fonte',
     'aposta', 'fechar', 'cancelar', 'ganhou', 'marcar', 'titulo', 'categoria',
@@ -52,9 +59,28 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         return $c;
     }, $st->fetchAll());
 
+    /* Os gatilhos vêm na MESMA resposta dos comandos. A ponte já faz essa
+       requisição; fazer outra só pra isso seria uma consulta a mais em toda
+       fonte do OBS aberta, pra sempre. */
+    $g = db()->prepare(
+        'SELECT id, evento, minimo, espera, ligado, passos FROM gatilhos
+          WHERE usuario_id = ? ORDER BY id'
+    );
+    $g->execute([$quem['usuario_id']]);
+    $gatilhos = array_map(function (array $x): array {
+        $p = $x['passos'] ? json_decode($x['passos'], true) : null;
+        $x['passos'] = is_array($p) ? $p : [];
+        $x['minimo'] = (int) $x['minimo'];
+        $x['espera'] = (int) $x['espera'];
+        $x['ligado'] = (int) $x['ligado'];
+        return $x;
+    }, $g->fetchAll());
+
     json_saida([
         'comandos'  => $lista,
+        'gatilhos'  => $gatilhos,
         'acoes'     => ACOES_VALIDAS,
+        'eventos'   => EVENTOS_VALIDOS,
         'supermods' => (string) ($sm->fetchColumn() ?: ''),
     ]);
 }
@@ -79,6 +105,68 @@ if ($acao === 'supermods') {
         ->execute([implode(',', $lista) ?: null, $quem['usuario_id']]);
 
     json_saida(['ok' => true, 'supermods' => implode(', ', $lista)]);
+}
+
+/* ---------- gatilhos: quando acontecer X, faça Y ---------- */
+if ($acao === 'gatilho' || $acao === 'gatilho-apagar') {
+    if ($acao === 'gatilho-apagar') {
+        $st = db()->prepare('DELETE FROM gatilhos WHERE id = ? AND usuario_id = ?');
+        $st->execute([(int) ($d['id'] ?? 0), $quem['usuario_id']]);
+        json_saida(['ok' => (bool) $st->rowCount()]);
+    }
+
+    $evento = (string) ($d['evento'] ?? '');
+    if (!in_array($evento, EVENTOS_VALIDOS, true)) {
+        json_saida(['erro' => 'Esse evento não existe.'], 400);
+    }
+
+    $passos = [];
+    foreach ((array) ($d['passos'] ?? []) as $passo) {
+        $a = strtolower(trim((string) ($passo['acao'] ?? '')));
+        if (!in_array($a, ACOES_VALIDAS, true)) continue;
+        $passos[] = [
+            'acao'      => $a,
+            'argumento' => mb_substr(trim((string) ($passo['argumento'] ?? '')), 0, 100),
+        ];
+        if (count($passos) >= 8) break;
+    }
+    if (!$passos) json_saida(['erro' => 'Escolha pelo menos uma ação pro gatilho fazer.'], 400);
+
+    /* NÃO EXISTE CARGO AQUI: quem "digita" é o evento, e evento não tem
+       moderação. Por isso as ações fortes ficam de fora — um gatilho de
+       pânico no follow seria uma live derrubada por qualquer um que clicasse
+       em seguir. */
+    foreach ($passos as $passo) {
+        if (in_array($passo['acao'], ['panico', 'voltar', 'ganhou'], true)) {
+            json_saida(['erro' => 'O "' . $passo['acao'] . '" não pode ser disparado por evento — só por gente.'], 400);
+        }
+    }
+
+    $minimo = max(1, min(1000000, (int) ($d['minimo'] ?? 1)));
+    $espera = max(0, min(3600, (int) ($d['espera'] ?? 10)));
+    $ligado = empty($d['ligado']) ? 0 : 1;
+    $json   = json_encode($passos, JSON_UNESCAPED_UNICODE);
+
+    $id = (int) ($d['id'] ?? 0);
+    if ($id > 0) {
+        db()->prepare(
+            'UPDATE gatilhos SET evento = ?, minimo = ?, espera = ?, ligado = ?, passos = ?
+              WHERE id = ? AND usuario_id = ?'
+        )->execute([$evento, $minimo, $espera, $ligado, $json, $id, $quem['usuario_id']]);
+        json_saida(['ok' => true, 'id' => $id]);
+    }
+
+    $st = db()->prepare('SELECT COUNT(*) FROM gatilhos WHERE usuario_id = ?');
+    $st->execute([$quem['usuario_id']]);
+    if ((int) $st->fetchColumn() >= GATILHOS_MAX) {
+        json_saida(['erro' => 'Você já tem ' . GATILHOS_MAX . ' gatilhos.'], 400);
+    }
+
+    db()->prepare(
+        'INSERT INTO gatilhos (usuario_id, evento, minimo, espera, ligado, passos)
+              VALUES (?, ?, ?, ?, ?, ?)'
+    )->execute([$quem['usuario_id'], $evento, $minimo, $espera, $ligado, $json]);
+    json_saida(['ok' => true, 'id' => (int) db()->lastInsertId()]);
 }
 
 if ($acao === 'apagar') {

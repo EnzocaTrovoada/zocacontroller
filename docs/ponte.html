@@ -1243,6 +1243,7 @@ function olhaUsernotice(m) {
 
   if (id === 'sub' || id === 'resub') {
     contaNoSubathon({ tipo: planoDoSub(t), chave: t.id, quem: quem, quantidade: 1, detalhe: id });
+    dispararGatilhos('sub', { quem: quem, quantidade: 1 });
     return;
   }
 
@@ -1253,6 +1254,12 @@ function olhaUsernotice(m) {
     contaNoSubathon({
       tipo: planoDoSub(t), chave: t.id, quem: quem, quantidade: 1,
       detalhe: 'presente para ' + (t['msg-param-recipient-display-name'] || '?'),
+    });
+    /* O tamanho do pacote vem na etiqueta do anúncio, não neste evento — cada
+       presente chega separado. Sem ela, vale 1. */
+    dispararGatilhos('presente', {
+      quem: quem,
+      quantidade: parseInt(t['msg-param-mass-gift-count'], 10) || 1,
     });
   }
 }
@@ -1266,6 +1273,9 @@ function tratar(m) {
     contaNoSubathon({
       tipo: 'bits', chave: m.tags.id, quantidade: bits,
       quem: m.tags['display-name'] || m.tags.login || 'alguém', detalhe: bits + ' bits',
+    });
+    dispararGatilhos('bits', {
+      quem: m.tags['display-name'] || m.tags.login || 'alguém', quantidade: bits,
     });
   }
 
@@ -1587,6 +1597,10 @@ async function subirEstado(forcar) {
     cenas: cfg.cenas.length ? cfg.cenas : estado.cenasConhecidas,
     sons: estado.sons,
     fontes: estado.fontes,
+    /* -1 na primeira vez: pede a marca sem receber o histórico. Se um dia a
+       ponte reiniciar no meio da live, ela recomeça do agora e não dispara
+       os follows da manhã inteira. */
+    eventos_desde: eventosDesde,
   };
 
   const assinatura = JSON.stringify([corpo.cena, corpo.mudo, corpo.mic, corpo.panico,
@@ -1607,6 +1621,16 @@ async function subirEstado(forcar) {
     if (r.status === 401) {
       recado('A chave do relé não vale. Gere outra.', 60000);
       releQuieto = Date.now() + 300000;
+    }
+    if (r.ok) {
+      const d = await r.json().catch(() => null);
+      if (d) {
+        for (const e of (d.eventos || [])) {
+          dispararGatilhos(e.tipo === 'real' ? 'real' : 'follow',
+                           { quem: e.quem, quantidade: e.quantidade });
+        }
+        if (typeof d.eventos_ate === 'number') eventosDesde = d.eventos_ate;
+      }
     }
   } catch (e) {
     releQuieto = Date.now() + 5000;
@@ -1667,6 +1691,55 @@ async function lacoDoRele() {
  *  Os de fábrica não podem ser sobrescritos: !panico é !panico.
  * ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ *
+ *  GATILHOS — quando acontecer X, faça Y
+ *
+ *  O comando customizado já sabia fazer várias ações em sequência. A única
+ *  coisa que faltava era o disparo vir de um EVENTO em vez de alguém digitar.
+ *
+ *  De onde vem cada evento:
+ *    sub, presente, bits  — a própria ponte vê passar no chat, na hora
+ *    follow, doação       — chegam por webhook no servidor e voltam de
+ *                           carona na resposta do relé de estado
+ *
+ *  Não existe cargo aqui: quem "digita" é o evento, e evento não se modera.
+ *  Por isso o servidor recusa pânico como passo de gatilho.
+ * ------------------------------------------------------------------ */
+
+let GATILHOS = [];
+const gatilhoQuieto = {};        /* id -> quando pode disparar de novo */
+
+async function dispararGatilhos(evento, dados) {
+  const quanto = Math.max(1, Math.round(dados.quantidade || 1));
+
+  for (const g of GATILHOS) {
+    if (!g.ligado || g.evento !== evento) continue;
+    if (quanto < (g.minimo || 1)) continue;
+
+    /* A espera é por gatilho, não por evento: dez subs seguidos não podem
+       virar dez trocas de cena. */
+    const agora = Date.now();
+    if (agora < (gatilhoQuieto[g.id] || 0)) continue;
+    gatilhoQuieto[g.id] = agora + (g.espera || 0) * 1000;
+
+    const quem = dados.quem || 'alguém';
+    for (const p of (g.passos || [])) {
+      const acao = ACOES[p.acao];
+      if (!acao) continue;
+      /* Um passo que falha não derruba os outros: meio gatilho feito é
+         melhor que nenhum quando o sub já aconteceu. */
+      try {
+        await acao.fazer(quem, (p.argumento || '')
+          .replace(/\{quem\}/g, quem)
+          .replace(/\{quanto\}/g, String(quanto)), 'dono');
+      } catch (e) {
+        recado('Gatilho de ' + evento + ' — ' + p.acao + ': ' + e.message, 12000);
+      }
+    }
+  }
+}
+
+let eventosDesde = -1;    /* -1 = ainda não sei onde a live está */
 let comandosEm = 0;
 
 async function carregarComandos() {
@@ -1687,6 +1760,9 @@ async function carregarComandos() {
     SUPERMODS.clear();
     String(d.supermods || '').toLowerCase().split(/[,\s]+/).filter(Boolean)
       .forEach((n) => SUPERMODS.add(n));
+
+    /* Vêm na mesma resposta dos comandos: uma requisição só. */
+    GATILHOS = (d.gatilhos || []).filter((g) => (g.passos || []).length);
 
     for (const c of (d.comandos || [])) {
       if (ACOES[c.nome]) continue;               // nome de fábrica não se troca

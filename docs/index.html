@@ -1699,6 +1699,173 @@ function telaComandos() {
   }
   pintaMeus();
 
+  /* ================= GATILHOS: quando acontecer X, faca Y =================
+
+     A mesma sequencia de passos dos comandos, so que quem "digita" e o
+     evento. Fica nesta tela de proposito: pra quem esta criando um !brb, a
+     ideia de "e se isso acontecesse sozinho quando alguem assina" so ocorre
+     se as duas coisas estiverem lado a lado. */
+
+  const EVENTOS = [
+    ['sub',      'Alguem assinou',              'assinaturas'],
+    ['presente', 'Alguem deu subs de presente', 'subs de uma vez'],
+    ['bits',     'Alguem mandou bits',          'bits'],
+    ['follow',   'Alguem comecou a seguir',     'seguidores'],
+    ['real',     'Alguem doou',                 'reais'],
+    ['raid',     'Chegou um raid',              'pessoas'],
+  ];
+  const unidadeDe = (e) => {
+    const achou = EVENTOS.find((x) => x[0] === e);
+    return achou ? achou[2] : '';
+  };
+  const rotuloDe = (e) => {
+    const achou = EVENTOS.find((x) => x[0] === e);
+    return achou ? achou[1] : e;
+  };
+
+  const gat = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Sozinho, quando acontecer' }),
+    h('p', { cls: 'd', txt: 'E o mesmo comando de cima, so que ninguem precisa digitar: o evento dispara. Serve pra trocar de cena quando alguem da dez subs, ou mostrar uma fonte quando chega um raid. No argumento, {quem} vira o nome da pessoa e {quanto} vira o numero.' }),
+  ]);
+  const listaGat = h('div');
+  gat.appendChild(listaGat);
+
+  const gEvento = h('select');
+  EVENTOS.forEach((e) => gEvento.appendChild(h('option', { value: e[0], txt: e[1] })));
+
+  const gMin = h('input', { type: 'number', min: '1', value: '1', style: 'flex:0 0 90px' });
+  const gUnid = h('span', { cls: 'd' });
+  const gEspera = h('input', { type: 'number', min: '0', value: '10', style: 'flex:0 0 90px' });
+
+  const listaGPassos = h('div');
+  let gPassos = [{ acao: 'cena', argumento: '' }];
+  let editandoGat = 0;
+
+  function pintaGPassos() {
+    listaGPassos.innerHTML = '';
+    gPassos.forEach((pp, i) => {
+      const sel = h('select', { style: 'flex:0 0 130px' });
+      /* Panico e companhia nao aparecem: o servidor recusa, e oferecer o que
+         vai ser recusado e armadilha. Evento nao se modera — um gatilho de
+         panico no follow seria a live derrubada por quem clicasse em seguir. */
+      DE_FABRICA.filter((c) => ['panico', 'voltar', 'ganhou'].indexOf(c[0]) === -1).forEach((c) => {
+        const o = h('option', { value: c[0], txt: c[0] });
+        if (c[0] === pp.acao) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = () => { pp.acao = sel.value; };
+
+      const arg = h('input', { type: 'text', placeholder: 'sem argumento', style: 'flex:1 1 130px' });
+      arg.value = pp.argumento || '';
+      arg.oninput = () => { pp.argumento = arg.value; };
+
+      const tirar = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'x', title: 'Tirar este passo' });
+      tirar.onclick = () => {
+        gPassos.splice(i, 1);
+        if (!gPassos.length) gPassos = [{ acao: 'cena', argumento: '' }];
+        pintaGPassos();
+      };
+
+      listaGPassos.appendChild(h('div', { cls: 'campo' }, [
+        h('span', { style: 'flex:0 0 20px;font-size:12px;color:var(--apagado)', txt: (i + 1) + '.' }),
+        sel, arg, tirar,
+      ]));
+    });
+    const mais = h('button', { cls: 'bt mini', type: 'button', txt: '+ mais uma acao' });
+    mais.disabled = gPassos.length >= 8;
+    mais.onclick = () => { gPassos.push({ acao: 'fonte', argumento: '' }); pintaGPassos(); };
+    listaGPassos.appendChild(h('p', { style: 'margin:4px 0 0' }, [mais]));
+  }
+  pintaGPassos();
+
+  const pintaUnidade = () => { gUnid.textContent = unidadeDe(gEvento.value); };
+  gEvento.onchange = pintaUnidade;
+  pintaUnidade();
+
+  const gSalvar = h('button', { cls: 'bt', type: 'button', txt: 'Criar gatilho' });
+  const gLimpar = h('button', { cls: 'bt fraco escondido', type: 'button', txt: 'Cancelar' });
+
+  const gLimpaForm = () => {
+    editandoGat = 0;
+    gEvento.value = 'sub'; gMin.value = '1'; gEspera.value = '10';
+    gPassos = [{ acao: 'cena', argumento: '' }];
+    pintaGPassos(); pintaUnidade();
+    gSalvar.textContent = 'Criar gatilho';
+    gLimpar.classList.add('escondido');
+  };
+  gLimpar.onclick = gLimpaForm;
+
+  gSalvar.onclick = async () => {
+    gSalvar.disabled = true;
+    try {
+      await api('/comandos.php', { method: 'POST', body: JSON.stringify({
+        acao: 'gatilho', id: editandoGat, evento: gEvento.value,
+        minimo: parseInt(gMin.value, 10) || 1,
+        espera: parseInt(gEspera.value, 10) || 0,
+        ligado: 1, passos: gPassos,
+      }) });
+      recado('Gatilho salvo. A ponte pega em ate um minuto.', 'bom');
+      gLimpaForm();
+      pintaGatilhos();
+    } catch (e) { recado(e.message, 'ruim'); }
+    gSalvar.disabled = false;
+  };
+
+  async function pintaGatilhos() {
+    listaGat.innerHTML = '';
+    let d;
+    try { d = await api('/comandos.php'); } catch (e) { return; }
+
+    const gs = d.gatilhos || [];
+    if (!gs.length) {
+      listaGat.appendChild(h('p', { cls: 'd', txt: 'Nenhum ainda.' }));
+      return;
+    }
+    gs.forEach((g) => {
+      const quando = rotuloDe(g.evento)
+        + (g.minimo > 1 ? ' (a partir de ' + g.minimo + ' ' + unidadeDe(g.evento) + ')' : '');
+      const oQue = (g.passos || [])
+        .map((pp) => pp.acao + (pp.argumento ? ' ' + pp.argumento : '')).join(' -> ');
+
+      const mexer = h('button', { cls: 'bt mini', type: 'button', txt: 'Editar' });
+      mexer.onclick = () => {
+        editandoGat = g.id;
+        gEvento.value = g.evento; gMin.value = g.minimo; gEspera.value = g.espera;
+        gPassos = (g.passos || []).map((pp) => ({ acao: pp.acao, argumento: pp.argumento || '' }));
+        if (!gPassos.length) gPassos = [{ acao: 'cena', argumento: '' }];
+        pintaGPassos(); pintaUnidade();
+        gSalvar.textContent = 'Salvar gatilho';
+        gLimpar.classList.remove('escondido');
+      };
+
+      const apagar = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'Apagar' });
+      apagar.onclick = async () => {
+        try {
+          await api('/comandos.php', { method: 'POST', body: JSON.stringify({ acao: 'gatilho-apagar', id: g.id }) });
+          pintaGatilhos();
+        } catch (e) { recado(e.message, 'ruim'); }
+      };
+
+      listaGat.appendChild(h('div', { cls: 'campo' }, [
+        h('span', { cls: 'selo', txt: quando }),
+        h('label', { style: 'flex:1 1 200px', txt: oQue }),
+        mexer, apagar,
+      ]));
+    });
+  }
+  pintaGatilhos();
+
+  gat.appendChild(h('div', { cls: 'campo' }, [h('label', { txt: 'Quando' }), gEvento]));
+  gat.appendChild(h('div', { cls: 'campo' }, [h('label', { txt: 'A partir de' }), gMin, gUnid]));
+  gat.appendChild(h('p', { cls: 'd', style: 'margin:-4px 0 10px', txt: 'Com o minimo em 1, uma live movimentada dispara o tempo todo. Dez subs de presente valem "10" de uma vez.' }));
+  gat.appendChild(h('div', { cls: 'campo' }, [h('label', { txt: 'Faca' })]));
+  gat.appendChild(listaGPassos);
+  gat.appendChild(h('div', { cls: 'campo' }, [
+    h('label', { txt: 'Espera entre disparos' }), gEspera, h('span', { cls: 'd', txt: 'segundos' }),
+  ]));
+  gat.appendChild(h('p', { cls: 'd', style: 'margin:-4px 0 10px', txt: 'Dez subs seguidos nao podem virar dez trocas de cena.' }));
+  gat.appendChild(h('div', { cls: 'acoes', style: 'display:flex;gap:8px' }, [gSalvar, gLimpar]));
+  tela.appendChild(gat);
 }
 
 /* A prévia devolve o arrasto por mensagem. Só aceito da mesma origem, e só

@@ -63,7 +63,45 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
          ON DUPLICATE KEY UPDATE estado = VALUES(estado), atualizado_em = NOW()'
     )->execute([$quem['usuario_id'], json_encode($limpo, JSON_UNESCAPED_UNICODE)]);
 
-    json_saida(['ok' => true]);
+    /* DE VOLTA PRA PONTE: O QUE ACONTECEU FORA DO CHAT.
+
+       Sub e bits a ponte vê sozinha, porque chegam pelo próprio chat. Follow
+       e doação não passam por lá — chegam por webhook, do lado do servidor.
+       Sem este caminho de volta, gatilho de follow nunca dispararia.
+
+       Vai de carona nesta requisição de propósito: a ponte já publica estado
+       a cada poucos segundos, então isto não é uma consulta a mais. E vem só
+       o que é mais novo que o último id que ela disse ter visto — na primeira
+       vez ela manda -1 e recebe só a marca, sem disparar o dia inteiro. */
+    $desde = (int) ($estado['eventos_desde'] ?? -1);
+    $volta = ['ok' => true];
+
+    if ($desde >= 0) {
+        $ev = db()->prepare(
+            'SELECT id, tipo, quem, quantidade,
+                    UNIX_TIMESTAMP(criado_em) AS quando
+               FROM eventos
+              WHERE usuario_id = ? AND id > ? AND tipo IN (?, ?)
+              ORDER BY id LIMIT 20'
+        );
+        /* Só o que o chat não vê. Sub e bits chegariam em dobro: a ponte já
+           os viu passar no próprio chat. */
+        $ev->execute([$quem['usuario_id'], $desde, 'follow', 'real']);
+        $volta['eventos'] = array_map(fn($e) => [
+            'id'         => (int) $e['id'],
+            'tipo'       => (string) $e['tipo'],
+            'quem'       => (string) ($e['quem'] ?: 'alguém'),
+            'quantidade' => (int) $e['quantidade'],
+        ], $ev->fetchAll());
+    }
+
+    /* A marca de onde a ponte deve começar a olhar, pra ela não precisar
+       adivinhar nem receber o histórico inteiro na primeira vez. */
+    $ultimo = db()->prepare('SELECT COALESCE(MAX(id), 0) FROM eventos WHERE usuario_id = ?');
+    $ultimo->execute([$quem['usuario_id']]);
+    $volta['eventos_ate'] = (int) $ultimo->fetchColumn();
+
+    json_saida($volta);
 }
 
 // ---------- leitura ----------
