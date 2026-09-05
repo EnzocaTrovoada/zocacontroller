@@ -1193,6 +1193,7 @@
        pra divergir com o tempo. */
     rgba: rgba,
     aplicaEstilo: aplicaEstilo,
+    limpaCor: limpaCor,
     TZ: TZ,
     FONTS: FONTS,
     SCHEMA: SCHEMA,

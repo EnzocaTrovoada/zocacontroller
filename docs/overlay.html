@@ -273,7 +273,24 @@
   function buscar() {
     if (buscando) return;
     buscando = true;
-    fetch(API + '/config-overlay.php?k=' + encodeURIComponent(k), { cache: 'no-store' })
+    /* 'no-cache' E NAO 'no-store' — a diferença aqui vale banda de verdade.
+       Os dois pedem ao servidor toda vez; a diferença é que o no-store não
+       GUARDA a resposta, e sem cópia guardada o navegador não tem ETag pra
+       mandar de volta. Resultado: o 304 que o servidor monta com tanto
+       cuidado nunca acontecia, e cada pulso baixava o JSON inteiro.
+
+       Com no-cache o navegador revalida sozinho: manda o If-None-Match, o
+       servidor responde 304 vazio e ele entrega a cópia guardada. Medido:
+       o primeiro pulso 200, todos os seguintes 304.
+
+       Mandar o If-None-Match na mão parece mais direto e é uma armadilha —
+       vira requisição não-simples, exige preflight, e sem Allow-Headers no
+       servidor o overlay inteiro para de carregar.
+
+       O status que chega aqui é 200 mesmo nos 304, porque o navegador
+       devolve a cópia guardada como se fosse resposta nova. Sem problema:
+       quem decide redesenhar é a comparação do JSON logo abaixo. */
+    fetch(API + '/config-overlay.php?k=' + encodeURIComponent(k), { cache: 'no-cache' })
       .then(function (r) {
         /* O cabeçalho Date da própria resposta diz a hora do servidor. É de
            graça, não depende de site de terceiro, e é o que mantém o subathon

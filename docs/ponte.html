@@ -1336,14 +1336,30 @@ setInterval(anunciar, 1000);
 let ultimoComando = '';
 async function buscarComando() {
   if (!estado.obs) return;
+
+  let c = null;
   try {
     const r = await pedir('GetPersistentData', { realm: CAIXA, slotName: GAVETA_CMD });
-    const c = r && r.slotValue;
+    c = r && r.slotValue;
     if (!c || !c.id || c.id === ultimoComando) return;
     if (Date.now() - (c.t || 0) > 15000) return;   // pedido velho, ignora
     ultimoComando = c.id;
-    doPainel(c);
-  } catch (e) {}
+  } catch (e) { return; }        // OBS engasgou: tenta de novo no próximo pulso
+
+  /* O AWAIT AQUI NÃO É ENFEITE.
+     A doPainel é async, e antes ela era chamada sem await de dentro do try
+     acima. Uma promessa rejeitada não é exceção síncrona: escapava do catch
+     e virava erro solto no console. Como o id já tinha avançado, o comando
+     não era repetido — quem pediu !panico via o chat responder e nada
+     acontecer no OBS, sem nenhuma pista do motivo.
+
+     Agora a falha é falha: aparece escrita, com o nome do comando. */
+  try {
+    await doPainel(c);
+  } catch (e) {
+    recado('Não consegui executar "' + (c.acao || 'comando') + '": '
+           + (e && e.message ? e.message : e), 8000);
+  }
 }
 setInterval(buscarComando, 600);
 

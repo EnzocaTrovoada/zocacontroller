@@ -11,6 +11,14 @@ require_once __DIR__ . '/lib/spotify.php';
 
 header('Access-Control-Allow-Origin: *');   // o overlay roda dentro do OBS
 
+/* SEM ESTA LINHA, OS DOIS CABEÇALHOS ABAIXO SÃO INVISÍVEIS PRO OVERLAY.
+   Resposta de outra origem só entrega ao JavaScript os cabeçalhos da lista
+   curta do CORS, e nem Date nem ETag estão nela. Faltando o Expose, o
+   r.headers.get('Date') do overlay voltava null e a sincronia de relógio do
+   subathon nunca rodou uma vez sequer: o cronômetro seguia o relógio da
+   máquina de quem transmite — justamente o que ele tentava não fazer. */
+header('Access-Control-Expose-Headers: ETag, Date');
+
 $chave = $_GET['k'] ?? '';
 if (!preg_match('/^[A-Za-z0-9_-]{10,64}$/', $chave)) {
     json_saida(['erro' => 'Link inválido. Gere um novo no painel.'], 400);

@@ -283,7 +283,12 @@
       /* Com degradê, a decisão sai da cor do MEIO das duas: escolher pela
          primeira deixaria o texto sumir na outra ponta da caixa. */
       if (cfg.nkcase) cor = cfg.nkauto ? contrasteDe(cfg.nkgrad ? mistura(cfg.nkcor, cfg.nkcor2) : cfg.nkcor) : cfg.nktxt;
-      else cor = (cfg.cnickauto && tags.color) ? tags.color : cfg.cnickcor;
+      /* A cor do nick vem de fora (é a que a pessoa escolheu na Twitch), e
+         tudo que vem de fora passa pelo mesmo filtro de cor das outras: só
+         hexadecimal, ou cai no padrão. O esc() já impedia sair do atributo,
+         mas isso aqui impede escrever CSS qualquer dentro dele. */
+      else cor = (cfg.cnickauto && tags.color)
+        ? R.limpaCor(tags.color, cfg.cnickcor) : cfg.cnickcor;
 
       var html = '';
       if (cfg.cnick) {
