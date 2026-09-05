@@ -289,6 +289,54 @@ function sp_playlist(int $usuario_id): ?string
     return (string) $pl['id'];
 }
 
+/**
+ * DE ONDE A MÚSICA ESTÁ SAINDO AGORA.
+ *
+ * O Spotify chama de "contexto" a playlist, álbum ou artista de onde a faixa
+ * toca. Ele vem junto da resposta do que está tocando — mas só com o endereço,
+ * sem o nome. Daí a segunda chamada: o chat quer o nome, não a URL da API.
+ *
+ * Isto NÃO entra no sp_tocando. Aquele roda a cada poucos segundos pra todo
+ * overlay aberto; este só roda quando alguém digita o comando.
+ */
+function sp_playlist_atual(int $usuario_id): array
+{
+    $token = sp_token($usuario_id);
+    if (!$token) return ['ok' => false, 'erro' => sp_erro(0, 'Ver a playlist')];
+
+    [$http, $d] = sp_http('GET', SP_API . '/me/player/currently-playing?market=from_token',
+        ['Authorization: Bearer ' . $token]);
+    if ($http !== 200 && $http !== 204) {
+        return ['ok' => false, 'erro' => sp_erro($http, 'Ver a playlist')];
+    }
+
+    $ctx = ($http === 200) ? ($d['context'] ?? null) : null;
+    if ($ctx && !empty($ctx['href'])) {
+        [$h2, $c] = sp_http('GET', (string) $ctx['href'], ['Authorization: Bearer ' . $token]);
+        if ($h2 === 200 && !empty($c['name'])) {
+            return [
+                'ok'   => true,
+                'de'   => 'tocando',
+                'tipo' => (string) ($ctx['type'] ?? 'playlist'),
+                'nome' => (string) $c['name'],
+                'link' => (string) ($ctx['external_urls']['spotify'] ?? ''),
+            ];
+        }
+    }
+
+    /* Sem contexto — faixa solta, ou tocando as curtidas. O que ainda serve
+       pro chat é a playlist de pedidos, que é do chat mesmo. */
+    $pl = sp_playlist($usuario_id);
+    if (!$pl) return ['ok' => false, 'erro' => 'Não está tocando de nenhuma playlist agora.'];
+    return [
+        'ok'   => true,
+        'de'   => 'pedidos',
+        'tipo' => 'playlist',
+        'nome' => 'Pedidos do chat',
+        'link' => 'https://open.spotify.com/playlist/' . $pl,
+    ];
+}
+
 function sp_playlist_por(int $usuario_id, string $uri): array
 {
     $pl = sp_playlist($usuario_id);

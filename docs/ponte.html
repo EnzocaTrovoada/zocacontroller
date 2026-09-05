@@ -857,6 +857,22 @@ ACOES.fila = {
   },
 };
 
+/* De onde a música está saindo. Mostra o NOME, não o endereço: um link do
+   Spotify tem sessenta caracteres e ninguém copia isso da tela de uma live.
+   O endereço só aparece quando é a playlist de pedidos, que é a única que
+   alguém de fato vai querer abrir. */
+ACOES.playlist = {
+  minimo: 'chat', espera: 20000,
+  async fazer(quem, arg, cargo) {
+    const d = await pedirMusica({ acao: 'playlist' }, quem, cargo);
+    if (!d.ok) return recado('Playlist: ' + (d.erro || 'não deu'), 12000);
+    recado(d.de === 'pedidos'
+      ? 'Playlist do chat: ' + d.link
+      : 'Tocando de ' + (d.tipo === 'album' ? 'um álbum' : 'uma playlist') + ': "' + d.nome + '"',
+      20000);
+  },
+};
+
 /* Mostra e esconde a overlay de música na cena atual. É o !fonte com um nome
    que a pessoa lembra — e o nome da fonte vem da URL, não do chat. */
 ACOES.musica = {

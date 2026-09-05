@@ -68,6 +68,12 @@ if ($acao === 'curtir') {
     json_saida(sp_curtir($uid));
 }
 
+/* Só lê, não muda nada — por isso o chat inteiro pode. Quem segura o volume
+   de chamadas é a espera do comando na ponte e a trava geral acima. */
+if ($acao === 'playlist') {
+    json_saida(sp_playlist_atual($uid));
+}
+
 if ($acao === 'pedir' || $acao === 'fila') {
     /* De qual cargo pra cima o chat pode pedir é escolha de quem transmite. */
     $st = db()->prepare('SELECT musica_cargo FROM usuarios WHERE id = ?');
