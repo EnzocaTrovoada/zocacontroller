@@ -132,8 +132,23 @@
 
   /* ---------- editor ---------- */
   .editor { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; }
+
+  /* O LADO DA PRÉVIA PRECISA SER ALTO, MESMO VAZIO.
+
+     O .palco já era sticky e mesmo assim sumia ao rolar. O motivo não é o
+     sticky: é que um elemento grudento só desliza dentro da caixa do PAI, e
+     o pai aqui só tinha a altura da prévia — medido, 312px contra 1709px da
+     coluna de controles. Ou seja, ele grudava por 10 pixels e ia embora.
+
+     O align-self: stretch estica este lado até a altura da linha inteira do
+     grid. Agora o palco tem 1400px de trilho pra deslizar, e fica na tela o
+     tempo todo enquanto a direita rola. */
+  .lado { align-self: stretch; }
+
   .palco {
-    position: sticky; top: 74px;
+    /* 47 é a altura medida da barra de cima, que também é grudenta; o resto
+       é respiro pra prévia não encostar nela. */
+    position: sticky; top: 59px;
     border: 1px solid var(--linha); border-radius: 6px; overflow: hidden;
   }
 
@@ -152,6 +167,20 @@
   .controles summary::-webkit-details-marker { display: none; }
   .controles details[open] summary { color: var(--verde-forte); border-bottom: 1px solid var(--linha); }
   .corpo { padding: 12px 14px; }
+  /* A prévia da fonte ocupa a linha toda: numa linha estreita ao lado do
+     rótulo não daria pra ver o desenho da letra. */
+  .campoFonte { display: flex; flex-direction: column; gap: 6px; flex: 1 1 100%; min-width: 0; }
+  .campoFonte .selFonte { width: 100%; }
+  .amostraFonte {
+    font-size: 20px; line-height: 1.35; color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); border-radius: 5px;
+    padding: 7px 10px;
+    /* QUEBRA, NÃO CORTA. Fonte pixelada ocupa o dobro da largura de uma
+       condensada — medido, 419px contra 269px na mesma caixa. Com corte, a
+       Press Start 2P aparecia pela metade, justo a que a pessoa mais quer
+       ver inteira. */
+    white-space: normal; word-break: break-word;
+  }
   /* O rótulo tinha flex:1 disputando com um controle de largura fixa e era
      espremido até 47px — "Nome (só pra você achar)" virava cinco linhas.
      Com piso de largura ele quebra em no máximo duas, e quando nem isso cabe
@@ -1042,17 +1071,55 @@ const FABRICA = {
     s.__sincroniza = () => { s.value = String(cfg[it.k]); };
     return s;
   },
+  /* A BANDEJA MOSTRA A LETRA, NÃO SÓ O NOME.
+
+     "Michroma", "Teko", "Doto" não dizem nada pra quem não é de design — e o
+     usuário tinha que escolher no escuro, aplicar, olhar a prévia e voltar.
+     Agora cada linha da lista está escrita na própria fonte, e embaixo fica
+     uma amostra grande da escolhida.
+
+     As opções também vão agrupadas pelo estilo (tech, pixel, neon...), que é
+     como alguém procura de verdade: "quero uma pixelada", não "quero a
+     Silkscreen". */
   fontes(it) {
-    const s = h('select');
+    Relogio.carregaTodasAsFontes(document);
+
+    const s = h('select', { cls: 'selFonte' });
+    const grupos = {};
     (Relogio.FONTS || []).forEach((f) => {
       const nome = typeof f === 'string' ? f : (f.n || f.nome || f.f);
+      const g = (typeof f === 'object' && f.g) ? f.g : 'Outras';
+      if (!grupos[g]) {
+        grupos[g] = h('optgroup');
+        grupos[g].label = g;
+        s.appendChild(grupos[g]);
+      }
       const o = h('option', { value: nome, txt: nome });
+      /* Cada opção escrita na própria fonte. O Chrome no Windows respeita
+         font-family em <option>; onde não respeitar, a amostra de baixo
+         continua mostrando a letra — por isso as duas coisas existem. */
+      o.style.fontFamily = Relogio.familiaDe(nome);
+      o.style.fontSize = '15px';
       if (cfg[it.k] === nome) o.selected = true;
-      s.appendChild(o);
+      grupos[g].appendChild(o);
     });
-    s.onchange = () => mudou(it.k, s.value);
-    s.__sincroniza = () => { s.value = String(cfg[it.k]); };
-    return s;
+
+    const amostra = h('div', { cls: 'amostraFonte' });
+    const pinta = () => {
+      const nome = String(cfg[it.k] || '');
+      amostra.style.fontFamily = Relogio.familiaDe(nome);
+      /* Números e letras juntos: num relógio o que importa é o algarismo, e
+         tem fonte bonita de letra e horrível de número. */
+      amostra.textContent = 'AaBbCc 012 12:34:56';
+      amostra.title = nome;
+      Relogio.carregaFonte(document, nome);   /* garante os pesos reais */
+    };
+    pinta();
+
+    s.onchange = () => { mudou(it.k, s.value); pinta(); };
+    const cx = h('div', { cls: 'campoFonte' }, [s, amostra]);
+    cx.__sincroniza = () => { s.value = String(cfg[it.k]); pinta(); };
+    return cx;
   },
   faixa(it) {
     const i = h('input', { type: 'range' });
@@ -1285,7 +1352,7 @@ function telaEditor(perfil, tipoNovo) {
   voltar.onclick = () => vaiPara('#/overlays');
 
   tela.appendChild(h('div', { cls: 'editor' }, [
-    h('div', {}, [fileira, palco]),
+    h('div', { cls: 'lado' }, [fileira, palco]),
     h('div', {}, [
       h('div', {}, [
         h('div', { cls: 'campo' }, [h('label', { txt: 'Nome' }), nome]),

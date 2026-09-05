@@ -566,6 +566,38 @@
     doc.head.appendChild(l);
   }
 
+  /* A FAMÍLIA COMPLETA, COM A RESERVA CERTA.
+
+     O nome sozinho não basta: se a fonte da Google não carregar, o navegador
+     precisa cair numa parecida, e "parecida" é diferente pra uma pixelada e
+     pra uma condensada. */
+  function familiaDe(nome) {
+    var info = fonteInfo(nome);
+    return '"' + limpaFonte(nome) + '", ' + STACKS[info ? info.f : 'sans'];
+  }
+
+  /* TODAS AS FAMÍLIAS DE UMA VEZ, PRA PRÉVIA DO EDITOR.
+
+     Uma folha por fonte seriam 39 pedidos. Aqui vai um só, e sem peso
+     nenhum no pedido: a prévia mostra a letra normal, que é o que interessa
+     pra reconhecer o desenho da fonte. Os pesos de verdade continuam vindo
+     pelo carregaFonte quando a fonte é de fato usada.
+
+     O navegador só baixa o arquivo de uma fonte quando ela aparece na tela,
+     então listar as 39 aqui não custa 39 downloads — custa os que a pessoa
+     abrir. */
+  function carregaTodasAsFontes(doc) {
+    var id = 'rl-fontes-previa';
+    if (doc.getElementById(id)) return;
+    var nomes = [];
+    for (var i = 0; i < FONTS.length; i++) nomes.push(FONTS[i].n.replace(/ /g, '+'));
+    var l = doc.createElement('link');
+    l.rel = 'stylesheet';
+    l.id = id;
+    l.href = 'https://fonts.googleapis.com/css2?family=' + nomes.join('&family=') + '&display=swap';
+    doc.head.appendChild(l);
+  }
+
   var ALIGN_FLEX = { left: 'flex-start', center: 'center', right: 'flex-end' };
   var VALIGN_FLEX = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
 
@@ -1194,6 +1226,9 @@
     rgba: rgba,
     aplicaEstilo: aplicaEstilo,
     limpaCor: limpaCor,
+    familiaDe: familiaDe,
+    carregaFonte: carregaFonte,
+    carregaTodasAsFontes: carregaTodasAsFontes,
     TZ: TZ,
     FONTS: FONTS,
     SCHEMA: SCHEMA,
