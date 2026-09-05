@@ -1053,6 +1053,22 @@ function montaBandejas() {
   };
   bf.appendChild(spot);
 
+  /* O Kick fica ao lado do Spotify porque a pergunta é a mesma: "ligar uma
+     conta de fora". Quem transmite nos dois lugares liga os dois e pronto. */
+  const kick = h('button', { type: 'button' }, [
+    document.createTextNode('Conectar o Kick'),
+    h('small', { txt: 'pro chat e os alertas valerem lá também' }),
+  ]);
+  kick.onclick = async () => {
+    fechaBandejas(null);
+    try {
+      const d = await api('/kick.php');
+      if (d.ligado) { recado('Kick já está conectado' + (d.canal ? ' (' + d.canal + ').' : '.'), 'bom'); return; }
+      location.href = d.entrar;
+    } catch (e) { recado(e.message, 'ruim'); }
+  };
+  bf.appendChild(kick);
+
   const tut = h('button', { type: 'button' }, [
     document.createTextNode('Como instalar'),
     h('small', { txt: 'O passo a passo no OBS' }),

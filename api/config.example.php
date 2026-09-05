@@ -53,6 +53,18 @@ return [
         'client_secret' => '',
     ],
 
+    /* Kick. Crie o app em kick.com > Configuracoes > Developer.
+       Redirect URL:  https://api.zocahop.com/kick.php
+       Webhook URL:   https://api.zocahop.com/kick-eventos.php
+       Escopos: user:read channel:read events:subscribe chat:write
+
+       O Kick usa OAuth 2.1 com PKCE. O secret continua sendo necessario
+       porque o cliente aqui e o SERVIDOR, e servidor guarda segredo. */
+    'kick' => [
+        'client_id'     => '01M1S27GS0SKR83KMJZY8C0J5R',
+        'client_secret' => '',
+    ],
+
     // Para onde mandar o streamer depois do login.
     'hub' => 'https://mods.zocahop.com/meu.html',
 
