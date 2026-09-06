@@ -12,6 +12,36 @@ require_once __DIR__ . '/subathon-somar.php';
 
 const CONTAGEM_FONTES = ['seguidores', 'subs', 'viewers'];
 
+/* O QUE CADA PLATAFORMA SABE RESPONDER.
+   Isto nao e opiniao: e o que a API oficial de cada uma expoe hoje.
+
+   Kick nao tem contagem de seguidores em endpoint nenhum — da pra somar os
+   webhooks de follow, mas sem evento de unfollow e sem valor absoluto pra
+   re-sincronizar esse numero so sobe e nunca corrige. Contador que mente
+   devagar e pior do que contador nenhum.
+
+   YouTube nao tem "seguidor" nem "espectador ao vivo" por aqui; tem inscrito,
+   e ARREDONDADO em tres algarismos significativos, inclusive pro dono do
+   canal. Acima de mil ele anda de dez em dez; acima de cem mil, de mil em
+   mil. Quem escolhe essa meta precisa saber disso na hora de escolher. */
+const CONTAGEM_PLATAFORMAS = [
+    'twitch'  => ['seguidores', 'subs', 'viewers'],
+    'youtube' => ['subs'],
+    'kick'    => ['subs', 'viewers'],
+];
+
+/** A chave que vai pro banco: a Twitch fica sem prefixo, pelo que ja existe. */
+function contagem_chave(string $plataforma, string $fonte): string
+{
+    return $plataforma === 'twitch' ? $fonte : $plataforma . ':' . $fonte;
+}
+
+function contagem_vale(string $plataforma, string $fonte): bool
+{
+    return isset(CONTAGEM_PLATAFORMAS[$plataforma])
+        && in_array($fonte, CONTAGEM_PLATAFORMAS[$plataforma], true);
+}
+
 /**
  * Devolve o número, ou null se nunca deu pra saber.
  *
@@ -91,15 +121,16 @@ function viewers_meta(int $usuario_id, int $agora): void
     meta_bateu($usuario_id, 'viewers', $agora);
 }
 
-function contagem(int $usuario_id, string $fonte, int $maxIdade = 60): ?int
+function contagem(int $usuario_id, string $fonte, int $maxIdade = 60, string $plataforma = 'twitch'): ?int
 {
-    if (!in_array($fonte, CONTAGEM_FONTES, true)) return null;
+    if (!contagem_vale($plataforma, $fonte)) return null;
+    $chave = contagem_chave($plataforma, $fonte);
 
     $st = db()->prepare(
         'SELECT valor, TIMESTAMPDIFF(SECOND, atualizado_em, NOW()) AS idade
            FROM contagens WHERE usuario_id = ? AND fonte = ?'
     );
-    $st->execute([$usuario_id, $fonte]);
+    $st->execute([$usuario_id, $chave]);
     $linha = $st->fetch();
 
     if ($linha && (int) $linha['idade'] < $maxIdade) {
@@ -108,6 +139,19 @@ function contagem(int $usuario_id, string $fonte, int $maxIdade = 60): ?int
     $anterior = $linha ? (int) $linha['valor'] : null;
 
     try {
+        if ($plataforma === 'youtube') {
+            require_once __DIR__ . '/youtube.php';
+            $corpo = ['total' => yt_inscritos($usuario_id)];
+            $ok = true;
+            $http = 200;
+        } elseif ($plataforma === 'kick') {
+            require_once __DIR__ . '/kick.php';
+            $n = ($fonte === 'viewers') ? kick_viewers($usuario_id) : kick_subs($usuario_id);
+            if ($n === null) throw new RuntimeException('O Kick não está conectado, ou recusou a leitura.');
+            $corpo = ['total' => $n];
+            $ok = true;
+            $http = 200;
+        } else {
         $bid = tw_broadcaster_id($usuario_id);
         if ($fonte === 'viewers') {
             /* Fora do ar a Helix devolve lista vazia, e isso NAO e falha: e
@@ -121,6 +165,7 @@ function contagem(int $usuario_id, string $fonte, int $maxIdade = 60): ?int
                 ? tw_helix($usuario_id, 'GET', '/channels/followers', ['broadcaster_id' => $bid, 'first' => 1])
                 : tw_helix($usuario_id, 'GET', '/subscriptions',      ['broadcaster_id' => $bid, 'first' => 1]);
             $ok = ($http === 200 && isset($corpo['total']));
+        }
         }
     } catch (Throwable $e) {
         /* GUARDAR A MENSAGEM, E NÃO SÓ "deu erro".
@@ -158,7 +203,7 @@ function contagem(int $usuario_id, string $fonte, int $maxIdade = 60): ?int
         db()->prepare(
             'INSERT INTO contagens (usuario_id, fonte, valor, erro) VALUES (?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE atualizado_em = NOW(), erro = VALUES(erro)'
-        )->execute([$usuario_id, $fonte, $anterior ?? 0, $motivo]);
+        )->execute([$usuario_id, $chave, $anterior ?? 0, $motivo]);
 
         return $anterior;
     }
@@ -167,10 +212,12 @@ function contagem(int $usuario_id, string $fonte, int $maxIdade = 60): ?int
     db()->prepare(
         'INSERT INTO contagens (usuario_id, fonte, valor, erro) VALUES (?, ?, ?, \'\')
          ON DUPLICATE KEY UPDATE valor = VALUES(valor), atualizado_em = NOW(), erro = \'\''
-    )->execute([$usuario_id, $fonte, $valor]);
+    )->execute([$usuario_id, $chave, $valor]);
 
-    /* Bateu a meta? Vale pras tres fontes agora, nao so pra viewers. */
-    meta_bateu($usuario_id, $fonte, $valor);
+    /* Bateu a meta? Só a Twitch alimenta o subathon por enquanto: as colunas
+       de alvo sao <fonte>_alvo, sem plataforma, e misturar duas plataformas
+       no mesmo alvo daria um numero que nao quer dizer nada. */
+    if ($plataforma === 'twitch') meta_bateu($usuario_id, $fonte, $valor);
 
     return $valor;
 }
@@ -178,15 +225,15 @@ function contagem(int $usuario_id, string $fonte, int $maxIdade = 60): ?int
 /**
  * Como esta a contagem, pra tela poder explicar em vez de ficar muda.
  */
-function contagem_estado(int $usuario_id, string $fonte): array
+function contagem_estado(int $usuario_id, string $fonte, string $plataforma = 'twitch'): array
 {
-    if (!in_array($fonte, CONTAGEM_FONTES, true)) return ['erro' => 'fonte'];
+    if (!contagem_vale($plataforma, $fonte)) return ['erro' => 'fonte'];
 
     $st = db()->prepare(
         'SELECT valor, erro, TIMESTAMPDIFF(SECOND, atualizado_em, NOW()) AS idade
            FROM contagens WHERE usuario_id = ? AND fonte = ?'
     );
-    $st->execute([$usuario_id, $fonte]);
+    $st->execute([$usuario_id, contagem_chave($plataforma, $fonte)]);
     $l = $st->fetch();
 
     return [

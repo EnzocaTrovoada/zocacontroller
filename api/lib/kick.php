@@ -392,3 +392,53 @@ function kick_tratar(int $usuario_id, string $tipo, array $d, string $msgId): vo
         return;
     }
 }
+
+/* ------------------------------------------------------------------ *
+ *  Os números do canal no Kick
+ *
+ *  O QUE NÃO EXISTE: contagem de seguidores. A API pública do Kick não
+ *  expõe isso em endpoint nenhum — conferido no schema do /channels, que
+ *  tem dez campos e nenhum de seguidor. Dá pra somar os webhooks de follow,
+ *  mas como não existe evento de unfollow nem valor absoluto pra
+ *  re-sincronizar, esse número só sobe e nunca corrige. Um contador que
+ *  mente devagar é pior do que contador nenhum, então não tem.
+ *
+ *  O QUE EXISTE, e é exato: assinantes e quem está assistindo.
+ * ------------------------------------------------------------------ */
+function kick_canal(int $usuario_id): ?array
+{
+    [$http, $d] = kick_chamar($usuario_id, 'GET', '/channels');
+    if ($http !== 200) return null;
+    $c = $d['data'][0] ?? null;
+    return is_array($c) ? $c : null;
+}
+
+/**
+ * Quantos assinantes ativos.
+ *
+ * Os presenteados vêm num campo separado e entram na conta: pra quem faz
+ * meta, um sub de presente é um sub.
+ */
+function kick_subs(int $usuario_id): ?int
+{
+    $c = kick_canal($usuario_id);
+    if (!$c) return null;
+    return (int) ($c['active_subscribers_count'] ?? 0)
+         + (int) ($c['active_gifted_subscribers_count'] ?? 0);
+}
+
+/**
+ * Quantos estão assistindo agora.
+ *
+ * Fora do ar devolve 0, e isso é zero de verdade. Mas a doc avisa que quem
+ * escolhe esconder a contagem também aparece como 0 — por isso o is_live vai
+ * junto de quem chama, pra não confundir "ninguém assistindo" com "não quis
+ * mostrar".
+ */
+function kick_viewers(int $usuario_id): ?int
+{
+    $c = kick_canal($usuario_id);
+    if (!$c) return null;
+    if (empty($c['stream']['is_live'])) return 0;
+    return (int) ($c['stream']['viewer_count'] ?? 0);
+}

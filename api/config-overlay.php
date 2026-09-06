@@ -72,12 +72,15 @@ if ($perfil['tipo'] === 'subathon') {
 }
 
 if ($perfil['tipo'] === 'meta' && $fonte !== 'manual') {
-    $auto = contagem((int) $perfil['usuario_id'], $fonte);
+    /* De qual plataforma. Sem isso a meta de um canal do Kick perguntaria à
+       Twitch e mostraria o número errado sem nunca reclamar. */
+    $plat = (string) ($config['plataforma'] ?? 'twitch');
+    $auto = contagem((int) $perfil['usuario_id'], $fonte, 60, $plat);
     if ($auto !== null) {
         $config['atual'] = $auto;
         /* A meta de viewers vive de saber quantos estao assistindo AGORA.
            Aproveito a consulta que ja foi feita em vez de pedir de novo. */
-        if ($fonte === 'viewers') viewers_meta((int) $perfil['usuario_id'], $auto);
+        if ($fonte === 'viewers' && $plat === 'twitch') viewers_meta((int) $perfil['usuario_id'], $auto);
     }
 }
 

@@ -16,14 +16,15 @@ $quem = exige_painel();
 $uid  = (int) $quem['usuario_id'];
 
 $fonte = (string) ($_GET['fonte'] ?? 'seguidores');
-if (!in_array($fonte, CONTAGEM_FONTES, true)) {
-    json_saida(['erro' => 'Fonte desconhecida.'], 400);
+$plat  = (string) ($_GET['plataforma'] ?? 'twitch');
+if (!contagem_vale($plat, $fonte)) {
+    json_saida(['erro' => 'Essa plataforma não responde esse número.'], 400);
 }
 
 /* Pergunta de verdade, sem esperar o minuto do cache: quem abriu esta tela
    quer saber se funciona AGORA, não se funcionava há um minuto. */
-$valor = contagem($uid, $fonte, 0);
-$e = contagem_estado($uid, $fonte);
+$valor = contagem($uid, $fonte, 0, $plat);
+$e = contagem_estado($uid, $fonte, $plat);
 
 /* O escopo que a Twitch exige pra contar seguidores. Se ele não está gravado,
    dá pra dizer isso antes mesmo de a chamada falhar. */
@@ -31,9 +32,11 @@ $st = db()->prepare('SELECT tw_escopos FROM usuarios WHERE id = ?');
 $st->execute([$uid]);
 $escopos = explode(' ', (string) $st->fetchColumn());
 
-$precisa = ['seguidores' => 'moderator:read:followers',
+/* Escopo só existe pra Twitch: o Kick vem por OAuth próprio e o YouTube
+   nem token de usuário usa. */
+$precisa = $plat !== 'twitch' ? '' : (['seguidores' => 'moderator:read:followers',
             'subs'       => 'channel:read:subscriptions',
-            'viewers'    => ''][$fonte] ?? '';
+            'viewers'    => ''][$fonte] ?? '');
 $faltaEscopo = $precisa !== '' && !in_array($precisa, $escopos, true);
 
 /* A mensagem da exceção passa direto: ela já é uma frase em português e diz
@@ -57,6 +60,7 @@ if (!in_array($e['erro'], $conhecidos, true) && strpos($e['erro'], 'erro-') !== 
 }
 
 json_saida([
+    'plataforma'   => $plat,
     /* O código cru vai junto. Não é bonito na tela, mas quando a explicação
        não bastar é ele que diz o que aconteceu de verdade. */
     'codigo'       => $e['erro'],

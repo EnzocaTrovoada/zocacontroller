@@ -65,6 +65,18 @@ return [
         'client_secret' => '',
     ],
 
+    /* YouTube. So a chave de API — a contagem de inscritos e dado publico e
+       nao precisa de OAuth. Crie em console.cloud.google.com, ative a YouTube
+       Data API v3 e restrinja a chave a ela.
+
+       Cada leitura custa 1 unidade e a cota padrao e 10.000 por dia, para
+       TODOS os usuarios juntos: com atualizacao de minuto em minuto isso da
+       umas sete pessoas transmitindo seis horas. Se crescer, aumente o
+       intervalo antes de pedir cota extra ao Google. */
+    'youtube' => [
+        'api_key' => '',
+    ],
+
     // Para onde mandar o streamer depois do login.
     'hub' => 'https://mods.zocahop.com/meu.html',
 

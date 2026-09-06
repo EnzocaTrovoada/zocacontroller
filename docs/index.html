@@ -306,7 +306,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=25"></script>
+<script src="clock.js?v=26"></script>
 <script>
 'use strict';
 
@@ -420,7 +420,7 @@ function padraoDe(tipo) {
   };
   if (tipo === 'meta') {
     return Object.assign(base, {
-      fonte: 'seguidores', atual: 0, alvo: 1000, mfmt: 'fracao',
+      plataforma: 'twitch', fonte: 'seguidores', atual: 0, alvo: 1000, mfmt: 'fracao',
       barra: 1, baltura: 18, bcantos: 9, bgap: 12, bfopac: 16, bcor: verde, bfundo: '#FFFFFF',
       titulo: 'META DE SEGUIDORES', size: 72,
     });
@@ -597,9 +597,11 @@ const GRUPOS = [
     { k: 'arealmin', l: 'Ignorar abaixo de', c: 'faixa', min: 1, max: 500,
       u: (n) => n === 1 ? ' real' : ' reais',
       se: (c) => c.tipo === 'alerta' && c.areal },
-    { k: 'fonte', l: 'Contar', c: 'lista', se: so('meta'),
-      ops: [['seguidores', 'Seguidores (automático)'], ['subs', 'Subs (automático)'], ['manual', 'Eu digito']],
-      dica: 'no automático o número vem da Twitch sozinho, a cada minuto' },
+    { k: 'plataforma', l: 'Plataforma', c: 'lista', se: so('meta'),
+      ops: [['twitch', 'Twitch'], ['youtube', 'YouTube'], ['kick', 'Kick']],
+      dica: 'de onde o número vem — cada uma responde coisas diferentes' },
+    { k: 'fonte', l: 'Contar', c: 'fontemeta', se: so('meta'),
+      dica: 'no automático o número vem sozinho, a cada minuto' },
     { k: 'atual', l: 'Já tem', c: 'num', se: (c) => c.tipo === 'meta' && c.fonte === 'manual' },
     { k: 'alvo',  l: 'Chegar em', c: 'num', se: so('meta') },
     { k: 'mfmt',  l: 'Mostrar', c: 'lista', se: so('meta'),
@@ -1445,6 +1447,53 @@ const FABRICA = {
      troca, o "quando acaba" seguia no lugar. Na volta, o tempo que passou
      durante a pausa tinha sumido: pra quem transmite, o relógio continuou
      correndo escondido. */
+  /* O QUE CADA PLATAFORMA SABE RESPONDER.
+
+     Não é escolha de produto, é o que a API oficial de cada uma expõe hoje.
+     O Kick não tem contagem de seguidores em endpoint nenhum, e o YouTube não
+     tem "seguidor" nem espectador por aqui. Oferecer o que vai falhar seria
+     empurrar o usuário pra um overlay que nunca enche. */
+  fontemeta(it) {
+    const POR_PLATAFORMA = {
+      twitch:  [['seguidores', 'Seguidores'], ['subs', 'Subs'], ['viewers', 'Gente assistindo']],
+      youtube: [['subs', 'Inscritos']],
+      kick:    [['subs', 'Assinantes'], ['viewers', 'Gente assistindo']],
+    };
+    const s = h('select');
+
+    const pinta = () => {
+      const ops = (POR_PLATAFORMA[cfg.plataforma] || POR_PLATAFORMA.twitch).slice();
+      ops.push(['manual', 'Eu digito']);
+      s.innerHTML = '';
+      ops.forEach(([v, r]) => {
+        const o = h('option', { value: v, txt: r });
+        if (cfg[it.k] === v) o.selected = true;
+        s.appendChild(o);
+      });
+      /* A fonte antiga pode não existir na plataforma nova — cair no
+         silêncio deixaria a meta apontando pra um número que ninguém
+         responde.
+
+         Escreve no cfg direto em vez de chamar mudou(): esta função roda
+         DENTRO do ciclo de redesenho, e mudou() dispara outro ciclo por
+         dentro dele. O valor se perdia nessa reentrada. */
+      /* Comparar com a LISTA, e não com s.value: um select sem opção
+         correspondente não fica vazio — o navegador escolhe a primeira
+         sozinho, então s.value nunca denunciava a troca. */
+      if (!ops.some(([v2]) => v2 === cfg[it.k])) cfg[it.k] = s.value;
+    };
+    pinta();
+
+    s.onchange = () => mudou(it.k, s.value);
+    s.__sincroniza = pinta;
+    /* O __sincroniza sozinho não basta: ele só roda no desfazer. Quem é
+       chamado a cada mudança é o redesenhar — e esta lista PRECISA mudar
+       quando a plataforma muda, senão ela continua oferecendo seguidores
+       num Kick que não conta seguidores. */
+    redesenhar.push(pinta);
+    return s;
+  },
+
   pausa(it) {
     const s = h('select');
     [['pausado', 'Pausado'], ['rodando', 'Correndo']].forEach(([v2, r]) => {
@@ -1605,11 +1654,59 @@ function telaEditor(perfil, tipoNovo) {
     }).catch(() => {});
   }
 
+  /* CADA PLATAFORMA TEM UM PORÉM, E ELE PRECISA APARECER NA HORA DA ESCOLHA.
+
+     Descobrir depois de montar o overlay que o número do YouTube anda de cem
+     em cem, ou que o Kick não conta seguidor, é descobrir tarde. */
+  if (tipo === 'meta') {
+    const avisoPlat = h('p', { cls: 'aviso escondido' });
+    tela.appendChild(avisoPlat);
+
+    const ytHandle = h('input', { type: 'text', placeholder: '@seucanal', style: 'flex:0 0 200px' });
+    const ytBt = h('button', { cls: 'bt mini', type: 'button', txt: 'Ligar canal' });
+    const ytLinha = h('div', { cls: 'campo escondido', style: 'margin-top:6px' },
+      [h('label', { txt: 'Canal do YouTube' }), ytHandle, ytBt]);
+    tela.appendChild(ytLinha);
+
+    ytBt.onclick = async () => {
+      ytBt.disabled = true;
+      try {
+        const r = await api('/youtube.php', { method: 'POST', body: JSON.stringify({ handle: ytHandle.value }) });
+        recado('Canal ligado: ' + (r.inscritos === null ? 'inscritos escondidos no YouTube' : r.inscritos.toLocaleString('pt-BR') + ' inscritos'), 'bom');
+        if (typeof r.inscritos === 'number') { cfg.atual = r.inscritos; redesenhar.forEach((f) => f()); manda(); }
+      } catch (e) { recado(e.message, 'ruim'); }
+      ytBt.disabled = false;
+    };
+
+    const verPlataforma = () => {
+      const p2 = cfg.plataforma || 'twitch';
+      ytLinha.classList.toggle('escondido', p2 !== 'youtube');
+
+      if (p2 === 'youtube') {
+        avisoPlat.textContent = 'O YouTube arredonda o número de inscritos: acima de mil ele anda de dez em dez, '
+          + 'acima de cem mil, de mil em mil. Isso é regra do YouTube e vale até pro dono do canal — '
+          + 'a meta vai andar aos saltos, não de um em um.';
+        avisoPlat.classList.remove('escondido');
+        api('/youtube.php').then((r) => { if (r.handle) ytHandle.value = '@' + r.handle; }).catch(() => {});
+      } else if (p2 === 'kick') {
+        avisoPlat.textContent = 'O Kick não expõe contagem de seguidores em lugar nenhum da API — '
+          + 'por isso ela não aparece na lista. Assinantes e gente assistindo funcionam normalmente, '
+          + 'e você precisa ter conectado o Kick em Ferramentas.';
+        avisoPlat.classList.remove('escondido');
+      } else {
+        avisoPlat.classList.add('escondido');
+      }
+    };
+    redesenhar.push(verPlataforma);
+    verPlataforma();
+  }
+
   /* A PRÉVIA DA META MOSTRAVA ZERO: o número automático é injetado pelo
      servidor quando o OVERLAY pergunta, e o editor nunca perguntava — então
      aqui aparecia "0 / 1000" enquanto no OBS apareceria o número certo. */
   if (tipo === 'meta' && cfg.fonte !== 'manual') {
-    api('/contagem.php?fonte=' + encodeURIComponent(cfg.fonte)).then((r) => {
+    api('/contagem.php?fonte=' + encodeURIComponent(cfg.fonte)
+        + '&plataforma=' + encodeURIComponent(cfg.plataforma || 'twitch')).then((r) => {
       if (!r || typeof r.valor !== 'number') return;
       cfg.atual = r.valor;
       redesenhar.forEach((f) => f());
@@ -2922,8 +3019,11 @@ async function carrega() {
       el('tela').innerHTML = '';
       return false;
     }
+    /* Falha que NÃO é de chave não pode apagar a tela: um soluço do servidor
+        deixaria a pessoa olhando pra nada, sem nem saber o que houve. Avisa e
+        segue com a lista vazia, que é recuperável. */
     recado(e.message, 'ruim');
-    return false;
+    return true;
   }
 }
 
