@@ -91,8 +91,38 @@ if ($acao === 'criar') {
     db()->prepare(
         'INSERT INTO perfis (usuario_id, tipo, nome, config, chave_publica) VALUES (?, ?, ?, ?, ?)'
     )->execute([$quem['usuario_id'], $tipo, perfil_nome($d), perfil_config($d), $chave]);
+    $novo = (int) db()->lastInsertId();
 
-    json_saida(['ok' => true, 'id' => (int) db()->lastInsertId(), 'chave_publica' => $chave]);
+    /* SUBATHON NASCE LIGADO.
+
+       Criar o overlay e ver um cronômetro parado, sem nada dizendo que falta
+       um segundo passo escondido em Ferramentas, é o caminho mais curto pra
+       pessoa achar que o site não funciona. Quem cria um overlay de subathon
+       quer um subathon — então ele já sai apontado e ligado, com os valores
+       padrão que a própria tabela define.
+
+       Só quando ainda não existe um: quem já configurou não pode ter o
+       cronômetro apontado pra outro overlay por ter criado mais um. */
+    $ligou = false;
+    if ($tipo === 'subathon') {
+        try {
+            $tem = db()->prepare('SELECT perfil_id FROM subathon WHERE usuario_id = ?');
+            $tem->execute([$quem['usuario_id']]);
+            $atual = $tem->fetch();
+
+            if (!$atual) {
+                db()->prepare('INSERT INTO subathon (usuario_id, perfil_id, ligado) VALUES (?, ?, 1)')
+                    ->execute([$quem['usuario_id'], $novo]);
+                $ligou = true;
+            } elseif (empty($atual['perfil_id'])) {
+                db()->prepare('UPDATE subathon SET perfil_id = ?, ligado = 1 WHERE usuario_id = ?')
+                    ->execute([$novo, $quem['usuario_id']]);
+                $ligou = true;
+            }
+        } catch (Throwable $e) { /* o overlay já foi criado: isto é extra */ }
+    }
+
+    json_saida(['ok' => true, 'id' => $novo, 'chave_publica' => $chave, 'subathon_ligado' => $ligou]);
 }
 
 /* Daqui pra baixo tudo mexe num overlay que já existe, e o WHERE carrega o

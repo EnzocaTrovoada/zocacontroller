@@ -306,7 +306,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=22"></script>
+<script src="clock.js?v=23"></script>
 <script>
 'use strict';
 
@@ -1514,6 +1514,37 @@ function telaEditor(perfil, tipoNovo) {
   tela.appendChild(h('h1', { txt: (perfil ? 'Editar ' : 'Novo ') + (TIPOS[tipo] || {}).nome }));
   tela.appendChild(h('p', { cls: 'sub', txt: 'Arraste cada parte pra onde quiser, como no Photoshop. Segure Shift pra travar no eixo, dê dois cliques numa peça pra pular pro campo dela, e use Ctrl+Z pra voltar atrás (Ctrl+Shift+Z refaz). O que você vê aqui é o mesmo desenho que vai pro OBS — não é imitação.' }));
 
+  /* O CRONÔMETRO PARADO E NINGUÉM SABE POR QUÊ.
+
+     Criar o overlay de subathon é metade: o que soma tempo é uma configuração
+     que mora em Ferramentas. Quem não sabe disso vê um cronômetro parado e
+     conclui que está quebrado. Agora o próprio editor diz em que pé está. */
+  if (tipo === 'subathon') {
+    const est = h('p', { cls: 'aviso escondido' });
+    tela.appendChild(est);
+
+    api('/subathon.php').then((s) => {
+      const meu = perfil && s.perfil_id && String(s.perfil_id) === String(perfil.id);
+      const ir = h('button', { cls: 'bt mini', type: 'button', txt: 'Abrir configuração do subathon' });
+      ir.onclick = () => vaiPara('#/subathon');
+
+      if (!s.configurado) {
+        est.textContent = 'O cronômetro ainda não está ligado a nada. Salve este overlay e ele liga sozinho — ou ajuste os valores agora. ';
+      } else if (!s.ligado) {
+        est.textContent = 'O subathon está DESLIGADO: o cronômetro não vai somar tempo com sub, bits nem doação. ';
+      } else if (perfil && !meu) {
+        est.textContent = 'Atenção: o tempo está indo pra OUTRO overlay de subathon, não pra este. ';
+      } else {
+        est.textContent = 'O subathon está ligado e somando tempo neste overlay. ';
+        est.classList.remove('aviso');
+        est.className = 'd';
+        est.style.color = 'var(--verde-forte)';
+      }
+      est.appendChild(ir);
+      est.classList.remove('escondido');
+    }).catch(() => {});
+  }
+
   /* A PRÉVIA DA META MOSTRAVA ZERO: o número automático é injetado pelo
      servidor quando o OVERLAY pergunta, e o editor nunca perguntava — então
      aqui aparecia "0 / 1000" enquanto no OBS apareceria o número certo. */
@@ -1636,7 +1667,9 @@ function telaEditor(perfil, tipoNovo) {
       } else {
         const d = await api('/perfil.php', { method: 'POST', body: JSON.stringify(Object.assign({ acao: 'criar', tipo }, corpo)) });
         await carrega();
-        recado('Pronto! Copie o link do cartão e cole numa Fonte de Navegador no OBS.', 'bom');
+        recado(d.subathon_ligado
+          ? 'Pronto! O subathon já está ligado neste overlay e vai somar tempo sozinho. Copie o link do cartão e cole numa Fonte de Navegador no OBS.'
+          : 'Pronto! Copie o link do cartão e cole numa Fonte de Navegador no OBS.', 'bom');
         vaiPara('#/editar/' + d.id);
         return;
       }
