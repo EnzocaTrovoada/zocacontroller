@@ -27,6 +27,7 @@
   --rl-bdc: transparent;
   --rl-blur: none;
   --rl-dsize: 26px;
+  --rl-dfont: var(--rl-font);
   --rl-dcolor: rgba(255, 255, 255, .85);
   --rl-dweight: 500;
   --rl-dtrack: 2px;
@@ -136,7 +137,7 @@
 .rl.is-date-off .rl__date { display: none; }
 
 .rl__date .rl__layer {
-  font-family: var(--rl-font);
+  font-family: var(--rl-dfont);
   font-size: var(--rl-dsize);
   font-weight: var(--rl-dweight);
   font-style: var(--rl-style);

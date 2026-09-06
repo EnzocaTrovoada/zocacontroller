@@ -43,7 +43,7 @@ function recursos_do_plano(string $plano): array
             'pokebot'         => true,
             'multiplataforma' => true,
             'temas'           => 'todos',
-            'perfis_max'      => 20,
+            'perfis_max'      => 50,
         ];
     }
 
@@ -52,6 +52,9 @@ function recursos_do_plano(string $plano): array
         'pokebot'         => false,
         'multiplataforma' => false,
         'temas'           => 'basicos',
-        'perfis_max'      => 2,
+        /* Dois era pouco demais: existem NOVE tipos de overlay, e quem chega
+           quer experimentar antes de decidir. O teto existe pra impedir abuso,
+           não pra impedir uso — e a hospedagem está em 5% com tudo junto. */
+        'perfis_max'      => 8,
     ];
 }

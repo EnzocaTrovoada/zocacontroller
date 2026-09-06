@@ -145,10 +145,13 @@
     follow:  function ()  { return 'seguiu'; },
     bits:    function (e) { return 'mandou ' + e.quantidade + ' bits'; },
     real:    function (e) { return 'doou R$ ' + e.quantidade; },
-    viewers: function (e) { return 'a live bateu a meta de gente'; },
+    viewers:  function ()  { return 'a live bateu a meta de gente'; },
+    metaseg:  function ()  { return 'o canal bateu a meta de seguidores'; },
+    metasubs: function ()  { return 'o canal bateu a meta de subs'; },
   };
 
-  var LIGA = { sub1: 'fsub', sub2: 'fsub', sub3: 'fsub', follow: 'fseg', bits: 'fbits', real: 'freal', viewers: 'fseg' };
+  var LIGA = { sub1: 'fsub', sub2: 'fsub', sub3: 'fsub', follow: 'fseg', bits: 'fbits',
+               real: 'freal', viewers: 'fseg', metaseg: 'fseg', metasubs: 'fsub' };
 
   var MOLDE =
     '<div class="ch__palco">' +

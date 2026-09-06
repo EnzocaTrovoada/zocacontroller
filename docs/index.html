@@ -318,7 +318,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=18"></script>
+<script src="clock.js?v=19"></script>
 <script>
 'use strict';
 
@@ -399,6 +399,9 @@ function padraoDe(tipo) {
   const base = {
     tipo, titulo: '', font: 'Anton', size: 84, weight: 700, color: '#FFFFFF',
     sw: 2, sc: '#101010', glow: 10, gc: verde, gi: 35,
+    /* O texto que a pessoa escreve. Nasce combinando com o número — quem não
+       pediu nada não devia precisar escolher nada. */
+    dsync: 0, dfont: 'Archivo', dweight: 500, dopacity: 85, dgap: 6, dpos: 'below',
     dcolor: verde, dsize: 24, dtrack: 6, dcaps: 1,
   };
   if (tipo === 'meta') {
@@ -827,7 +830,33 @@ const GRUPOS = [
     { k: 'bacima',  l: 'Barra acima do número', c: 'chave', se: (c) => !c.bdentro },
   ] },
 
-  { t: 'Letra', aberto: true, itens: [
+  /* O TEXTO QUE VOCÊ ESCREVEU, COM BANDEJA PRÓPRIA.
+
+     Ele existia na tela e não existia no editor: dava pra digitar a palavra
+     e não dava pra mudar cor, tamanho nem nada. As chaves já estavam no
+     esquema — só nunca tinham sido oferecidas.
+
+     A seção "Letra" logo abaixo é a do NÚMERO. Esta é a do texto, e por isso
+     vem antes: quem chega aqui procurando "por que não consigo mudar a cor
+     daquele texto" acha antes de passar pela outra e se confundir de novo. */
+  { t: 'O texto que você escreveu', se: so('meta', 'subathon', 'relogio', 'contador', 'placar'),
+    itens: [
+    { k: 'dsync', l: 'Combinar com o número', c: 'chave',
+      dica: 'ligado, o texto usa a mesma letra e a mesma cor do número — mexer num leva o outro junto' },
+    { k: 'dfont',  l: 'Letra do texto', c: 'fontes', se: (c) => !c.dsync },
+    { k: 'dweight', l: 'Peso', c: 'faixa', min: 100, max: 900, passo: 100, se: (c) => !c.dsync },
+    { k: 'dcolor', l: 'Cor do texto', c: 'cor', se: (c) => !c.dsync },
+    { k: 'dsize',  l: 'Tamanho', c: 'faixa', min: 5, max: 200, u: '%',
+      dica: 'em relação ao número: 26% quer dizer um quarto da altura dele' },
+    { k: 'dopacity', l: 'Opacidade', c: 'faixa', min: 0, max: 100, u: '%' },
+    { k: 'dtrack', l: 'Espaçamento', c: 'faixa', min: -20, max: 60, u: 'px' },
+    { k: 'dcaps',  l: 'MAIÚSCULAS', c: 'chave' },
+    { k: 'dgap',   l: 'Distância do número', c: 'faixa', min: -100, max: 200, u: 'px' },
+    { k: 'dpos',   l: 'Fica', c: 'lista',
+      ops: [['below', 'Abaixo do número'], ['above', 'Acima do número']] },
+  ] },
+
+  { t: 'Letra do número', aberto: true, itens: [
     { k: 'font',  l: 'Fonte', c: 'fontes' },
     { k: 'size',  l: 'Tamanho', c: 'faixa', min: 20, max: 260, u: 'px' },
     { k: 'weight', l: 'Peso', c: 'faixa', min: 100, max: 900, passo: 100 },
@@ -2231,6 +2260,73 @@ async function telaSubathon() {
   ]);
   tela.appendChild(fatiaViewers);
 
+  /* ----- metas de seguidores e de subs -----
+
+     Mesma forma da de viewers, e por isso saem da mesma função em vez de
+     três blocos quase iguais. A diferença que importa: estas duas o próprio
+     subathon confere, sem precisar de um overlay de meta aberto — quem tem
+     subathon e nenhuma meta na tela também vê o tempo somar. */
+  function fatiaMeta(chave, titulo, explica, unidade) {
+    const alvo = h('input', { type: 'number', min: '0' });
+    const seg = h('input', { type: 'number', min: '0' });
+    const passo = h('input', { type: 'number', min: '0' });
+    alvo.value = d[chave + '_alvo'] || 0;
+    seg.value = Math.round((d[chave + '_seg'] || 0) / 60 * 100) / 100;
+    passo.value = d[chave + '_passo'] || 0;
+
+    const unid = (txt) => h('span', { style: 'flex:0 0 60px;font-size:12px;color:var(--apagado)', txt });
+
+    tela.appendChild(h('div', { cls: 'fatia' }, [
+      h('h3', { txt: titulo }),
+      h('p', { cls: 'd', txt: explica }),
+      h('div', { cls: 'campo' }, [h('label', { txt: 'Bater em' }), alvo, unid(unidade)]),
+      h('div', { cls: 'campo' }, [h('label', { txt: 'Soma' }), seg, unid('min')]),
+      h('div', { cls: 'campo' }, [h('label', { txt: 'E o próximo alvo sobe' }), passo, unid(unidade)]),
+    ]));
+    return { alvo, seg, passo };
+  }
+
+  const mSeg = fatiaMeta('seguidores', 'Meta de seguidores',
+    'Chegou no número de seguidores, soma tempo — e o alvo sobe sozinho pro próximo. Deixe em 0 pra desligar.', 'seguidores');
+  const mSub = fatiaMeta('subs', 'Meta de subs',
+    'Chegou no número de assinantes, soma tempo — e o alvo sobe sozinho pro próximo. Deixe em 0 pra desligar.', 'subs');
+
+  /* O DIAGNÓSTICO DA CONTAGEM.
+
+     Sem isto, quando a Twitch recusa a leitura de seguidores a meta fica
+     parada no número antigo e a pessoa acha que o overlay quebrou. O caso
+     comum é ela ter entrado no site antes de a permissão existir — e isso
+     não se resolve sozinho: precisa entrar de novo. */
+  const diag = h('p', { cls: 'd' });
+  const fatiaDiag = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'A Twitch está respondendo?' }),
+    diag,
+  ]);
+  tela.appendChild(fatiaDiag);
+
+  (async () => {
+    diag.textContent = 'Perguntando…';
+    try {
+      const r = await api('/contagem.php?fonte=seguidores');
+      if (r.ok && r.valor !== null) {
+        diag.textContent = 'Sim: o canal tem ' + r.valor.toLocaleString('pt-BR')
+          + (r.valor === 1 ? ' seguidor.' : ' seguidores.');
+        diag.style.color = 'var(--verde-forte)';
+        return;
+      }
+      diag.textContent = r.explica || 'Não consegui ler os seguidores agora.';
+      diag.style.color = 'var(--perigo)';
+      if (r.falta_escopo) {
+        const b = h('button', { cls: 'bt mini', type: 'button', txt: 'Entrar de novo na Twitch' });
+        b.onclick = () => { location.href = API + '/entrar.php'; };
+        fatiaDiag.appendChild(h('p', { style: 'margin:8px 0 0' }, [b]));
+      }
+    } catch (e) {
+      diag.textContent = 'Não consegui perguntar: ' + e.message;
+      diag.style.color = 'var(--perigo)';
+    }
+  })();
+
   /* ----- follow ----- */
   const fatiaFollow = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Aviso de follow' }),
@@ -2279,6 +2375,11 @@ async function telaSubathon() {
     corpo.viewers_alvo = Math.max(0, parseInt(vAlvo.value, 10) || 0);
     corpo.viewers_seg = paraSeg(vSeg.value);
     corpo.viewers_passo = Math.max(0, parseInt(vPasso.value, 10) || 0);
+    for (const [nome, campos] of [['seguidores', mSeg], ['subs', mSub]]) {
+      corpo[nome + '_alvo'] = Math.max(0, parseInt(campos.alvo.value, 10) || 0);
+      corpo[nome + '_seg'] = paraSeg(campos.seg.value);
+      corpo[nome + '_passo'] = Math.max(0, parseInt(campos.passo.value, 10) || 0);
+    }
     if (cronos.length) corpo.perfil_id = parseInt(selAlvo.value, 10);
     else if (d.slug) { corpo.slug = d.slug; corpo.token = d.token || ''; }
     if (!ligado) corpo.desligar = 1;

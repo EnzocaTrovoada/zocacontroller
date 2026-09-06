@@ -43,6 +43,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         'viewers_alvo'  => (int) ($c['viewers_alvo'] ?? 0),
         'viewers_seg'   => (int) ($c['viewers_seg'] ?? 0),
         'viewers_passo' => (int) ($c['viewers_passo'] ?? 0),
+        'seguidores_alvo'  => (int) ($c['seguidores_alvo'] ?? 0),
+        'seguidores_seg'   => (int) ($c['seguidores_seg'] ?? 0),
+        'seguidores_passo' => (int) ($c['seguidores_passo'] ?? 0),
+        'subs_alvo'  => (int) ($c['subs_alvo'] ?? 0),
+        'subs_seg'   => (int) ($c['subs_seg'] ?? 0),
+        'subs_passo' => (int) ($c['subs_passo'] ?? 0),
         'slug'        => $c['slug'],
         'regras'      => array_map('intval', array_intersect_key($c, array_flip(CAMPOS))),
         'eventos'     => $st->fetchAll(),
@@ -103,10 +109,14 @@ if ($perfil_id > 0) {
     json_saida(['erro' => 'Escolha qual overlay de subathon o tempo vai alimentar.'], 400);
 }
 
-/* A meta de viewers: quantos, quanto soma, e de quanto sobe o próximo alvo. */
-$vAlvo  = max(0, min(1000000, (int) ($d['viewers_alvo'] ?? 0)));
-$vSeg   = max(0, min(86400, (int) ($d['viewers_seg'] ?? 0)));
-$vPasso = max(0, min(1000000, (int) ($d['viewers_passo'] ?? 0)));
+/* As metas: quantos, quanto soma, e de quanto sobe o próximo alvo.
+   Três fontes com a mesma forma, então a leitura é uma só. */
+$metas = [];
+foreach (['viewers', 'seguidores', 'subs'] as $f) {
+    $metas[$f . '_alvo']  = max(0, min(10000000, (int) ($d[$f . '_alvo'] ?? 0)));
+    $metas[$f . '_seg']   = max(0, min(86400,    (int) ($d[$f . '_seg'] ?? 0)));
+    $metas[$f . '_passo'] = max(0, min(10000000, (int) ($d[$f . '_passo'] ?? 0)));
+}
 
 $valores = [];
 foreach (CAMPOS as $campo) {
@@ -116,11 +126,17 @@ foreach (CAMPOS as $campo) {
 db()->prepare(
     'INSERT INTO subathon (usuario_id, perfil_id, slug, token, ligado, seg_sub1, seg_sub2, seg_sub3,
                            seg_bits, seg_follow, seg_real, teto_evento,
-                           viewers_alvo, viewers_seg, viewers_passo)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           viewers_alvo, viewers_seg, viewers_passo,
+                           seguidores_alvo, seguidores_seg, seguidores_passo,
+                           subs_alvo, subs_seg, subs_passo)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE perfil_id = VALUES(perfil_id),
           viewers_alvo = VALUES(viewers_alvo), viewers_seg = VALUES(viewers_seg),
           viewers_passo = VALUES(viewers_passo),
+          seguidores_alvo = VALUES(seguidores_alvo), seguidores_seg = VALUES(seguidores_seg),
+          seguidores_passo = VALUES(seguidores_passo),
+          subs_alvo = VALUES(subs_alvo), subs_seg = VALUES(subs_seg),
+          subs_passo = VALUES(subs_passo),
           slug = VALUES(slug), token = VALUES(token), ligado = VALUES(ligado),
           seg_sub1 = VALUES(seg_sub1), seg_sub2 = VALUES(seg_sub2), seg_sub3 = VALUES(seg_sub3),
           seg_bits = VALUES(seg_bits), seg_follow = VALUES(seg_follow), seg_real = VALUES(seg_real),
@@ -130,7 +146,9 @@ db()->prepare(
     $valores['seg_sub1'], $valores['seg_sub2'], $valores['seg_sub3'],
     $valores['seg_bits'], $valores['seg_follow'], $valores['seg_real'],
     $valores['teto_evento'] ?: 7200,
-    $vAlvo, $vSeg, $vPasso,
+    $metas['viewers_alvo'], $metas['viewers_seg'], $metas['viewers_passo'],
+    $metas['seguidores_alvo'], $metas['seguidores_seg'], $metas['seguidores_passo'],
+    $metas['subs_alvo'], $metas['subs_seg'], $metas['subs_passo'],
 ]);
 
 /* A legenda do overlay vem daqui: quem define quanto vale uma sub é esta

@@ -296,6 +296,15 @@
     dweight:  { t: 'n', d: 500, min: 100,  max: 900 },
     dtrack:   { t: 'n', d: 2,   min: -20,  max: 60 },
     dcaps:    { t: 'b', d: 0 },
+    /* Ligado, o texto pega fonte, cor e peso do número. Desligado, escolhe
+       os seus. Tamanho e espaçamento ficam sempre por conta dele: um rótulo
+       do tamanho do número deixa de ser rótulo. */
+    /* Nasce DESLIGADO de propósito. Overlay que já existe não tem esta
+       chave gravada, então ele receberia o padrão — e se o padrão fosse
+       "combinar", o texto verde de todo mundo virava branco de uma vez, sem
+       ninguém ter mexido em nada. Combinar é opção, não surpresa. */
+    dsync:    { t: 'b', d: 0 },
+    dfont:    { t: 'f', d: 'Archivo' },
     dgap:     { t: 'n', d: 6,   min: -100, max: 200 },
     /* tipografia */
     font:     { t: 'f', d: 'Orbitron' },
@@ -699,8 +708,19 @@
     s.setProperty('--rl-leggap', cfg.leggap + 'px');
 
     s.setProperty('--rl-dsize', 'calc(' + cfg.size + 'px * ' + (cfg.dsize / 100) + ')');
-    s.setProperty('--rl-dcolor', rgba(cfg.dcolor, cfg.dopacity));
-    s.setProperty('--rl-dweight', String(cfg.dweight));
+    /* Sincronizado: a letra e a cor vêm do número, e mexer no número leva o
+       texto junto — que é o que a pessoa espera quando não pediu o contrário.
+       Solto: cada um com o seu. */
+    if (cfg.dsync) {
+      s.setProperty('--rl-dfont', familiaDe(cfg.font));
+      s.setProperty('--rl-dcolor', rgba(cfg.color, cfg.dopacity));
+      s.setProperty('--rl-dweight', String(cfg.weight));
+    } else {
+      carregaFonte(root.ownerDocument, cfg.dfont);
+      s.setProperty('--rl-dfont', familiaDe(cfg.dfont));
+      s.setProperty('--rl-dcolor', rgba(cfg.dcolor, cfg.dopacity));
+      s.setProperty('--rl-dweight', String(cfg.dweight));
+    }
     s.setProperty('--rl-dtrack', cfg.dtrack + 'px');
     s.setProperty('--rl-dcaps', cfg.dcaps ? 'uppercase' : 'none');
     s.setProperty('--rl-dgap', cfg.dgap + 'px');

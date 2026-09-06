@@ -47,6 +47,30 @@ $config = json_decode($perfil['config'], true) ?: [];
    Se a Twitch não responder, contagem() devolve o último número conhecido em
    vez de zero: uma meta que despenca no meio da live é pior que uma parada. */
 $fonte = (string) ($config['fonte'] ?? 'manual');
+/* AS METAS DO SUBATHON NÃO PODEM DEPENDER DE UM OVERLAY DE META ABERTO.
+
+   A conferência de "bateu o alvo" morava só no caminho do overlay de meta.
+   Quem tivesse subathon e nenhuma meta na tela nunca via o tempo somar — e
+   não teria como desconfiar do motivo. Aqui o próprio subathon confere as
+   suas, e só as que ele configurou: sem alvo, nenhuma chamada é feita. */
+if ($perfil['tipo'] === 'subathon') {
+    try {
+        $sub = db()->prepare(
+            'SELECT seguidores_alvo, subs_alvo FROM subathon WHERE usuario_id = ? AND ligado = 1'
+        );
+        $sub->execute([(int) $perfil['usuario_id']]);
+        if ($alvos = $sub->fetch()) {
+            foreach (['seguidores', 'subs'] as $f) {
+                if (empty($alvos[$f . '_alvo'])) continue;
+                /* O contagem() já dispara o meta_bateu por dentro, e ele
+                   guarda a resposta por um minuto — então isto não vira uma
+                   chamada à Twitch a cada batida do OBS. */
+                contagem((int) $perfil['usuario_id'], $f);
+            }
+        }
+    } catch (Throwable $e) { /* meta é extra: não derruba o subathon */ }
+}
+
 if ($perfil['tipo'] === 'meta' && $fonte !== 'manual') {
     $auto = contagem((int) $perfil['usuario_id'], $fonte);
     if ($auto !== null) {
