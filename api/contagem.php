@@ -36,19 +36,30 @@ $precisa = ['seguidores' => 'moderator:read:followers',
             'viewers'    => ''][$fonte] ?? '';
 $faltaEscopo = $precisa !== '' && !in_array($precisa, $escopos, true);
 
+/* A mensagem da exceção passa direto: ela já é uma frase em português e diz
+   mais do que qualquer tradução minha por cima. */
+$conhecidos = ['', 'nunca', 'permissao', 'proibido', 'espera', 'sem-resposta'];
 $explica = '';
-if ($faltaEscopo || $e['erro'] === 'permissao') {
+
+if (!in_array($e['erro'], $conhecidos, true) && strpos($e['erro'], 'erro-') !== 0) {
+    $explica = $e['erro'];
+} elseif ($faltaEscopo || $e['erro'] === 'permissao') {
     $explica = 'A sua conta da Twitch foi ligada antes desta permissão existir. '
              . 'Saia e entre de novo no site pra liberar — leva dez segundos e não desfaz nada.';
 } elseif ($e['erro'] === 'proibido') {
     $explica = 'A Twitch recusou a leitura. Se este canal não é seu, só o dono consegue ver isso.';
 } elseif ($e['erro'] === 'espera') {
     $explica = 'A Twitch pediu pra esperar um pouco. Costuma se resolver sozinho em minutos.';
+} elseif ($e['erro'] === 'sem-resposta') {
+    $explica = 'Não cheguei a falar com a Twitch. Pode ser rede do servidor, ou a conta não estar ligada.';
 } elseif ($e['erro'] !== '' && $e['erro'] !== 'nunca') {
-    $explica = 'Não consegui falar com a Twitch agora. O número na tela é o último que deu certo.';
+    $explica = 'A Twitch respondeu com um erro que eu não esperava (' . $e['erro'] . ').';
 }
 
 json_saida([
+    /* O código cru vai junto. Não é bonito na tela, mas quando a explicação
+       não bastar é ele que diz o que aconteceu de verdade. */
+    'codigo'       => $e['erro'],
     'fonte'        => $fonte,
     'valor'        => $valor,
     'idade'        => $e['idade'],

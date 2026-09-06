@@ -318,7 +318,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=19"></script>
+<script src="clock.js?v=20"></script>
 <script>
 'use strict';
 
@@ -2316,6 +2316,12 @@ async function telaSubathon() {
       }
       diag.textContent = r.explica || 'Não consegui ler os seguidores agora.';
       diag.style.color = 'var(--perigo)';
+      /* O código cru embaixo, pequeno. Feio, mas é o que me deixa consertar
+         sem ficar adivinhando pelo print de quem reportou. */
+      if (r.codigo) {
+        fatiaDiag.appendChild(h('p', { cls: 'd', style: 'margin:6px 0 0;opacity:.6;font-size:11px',
+                                       txt: 'código: ' + r.codigo }));
+      }
       if (r.falta_escopo) {
         const b = h('button', { cls: 'bt mini', type: 'button', txt: 'Entrar de novo na Twitch' });
         b.onclick = () => { location.href = API + '/entrar.php'; };

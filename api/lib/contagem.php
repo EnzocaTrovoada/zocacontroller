@@ -113,8 +113,16 @@ function contagem(int $usuario_id, string $fonte, int $maxIdade = 60): ?int
             $ok = ($http === 200 && isset($corpo['total']));
         }
     } catch (Throwable $e) {
+        /* GUARDAR A MENSAGEM, E NÃO SÓ "deu erro".
+
+           As três coisas que estouram aqui já dizem exatamente o que houve —
+           "este canal ainda não entrou com a Twitch", "o acesso expirou",
+           "canal sem id da Twitch" — e eu jogava as três fora, virando todas
+           num "não consegui falar com a Twitch agora" que não ajuda ninguém a
+           consertar nada. */
         $ok = false;
         $http = 0;
+        $excecao = $e->getMessage();
     }
 
     if (!$ok) {
@@ -125,13 +133,15 @@ function contagem(int $usuario_id, string $fonte, int $maxIdade = 60): ?int
            comum e o 401: a pessoa entrou no site antes de a permissao de
            seguidores existir, e o token dela nao tem o escopo. Isso nao se
            resolve sozinho: ela precisa entrar de novo. */
-        $motivo = match ((int) $http) {
-            401     => 'permissao',   /* token velho ou sem o escopo */
-            403     => 'proibido',    /* escopo existe mas a Twitch recusou */
-            429     => 'espera',
-            0       => 'sem-resposta',
-            default => 'erro-' . (int) $http,
-        };
+        $motivo = isset($excecao) && $excecao !== ''
+            ? mb_substr($excecao, 0, 80)
+            : match ((int) $http) {
+                401     => 'permissao',   /* token velho ou sem o escopo */
+                403     => 'proibido',    /* escopo existe mas a Twitch recusou */
+                429     => 'espera',
+                0       => 'sem-resposta',
+                default => 'erro-' . (int) $http,
+            };
 
         /* Adia a próxima tentativa sem mexer no valor: com a Twitch fora do ar,
            tentar a cada batida do OBS seria bater na porta dela sem parar. */
