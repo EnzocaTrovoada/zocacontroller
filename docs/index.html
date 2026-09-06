@@ -306,7 +306,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=23"></script>
+<script src="clock.js?v=24"></script>
 <script>
 'use strict';
 
@@ -587,8 +587,8 @@ const GRUPOS = [
     { k: 'tz',   l: 'Fuso', c: 'lista', ops: FUSOS, se: so('relogio') },
     { k: 'horas',  l: 'Mostrar horas', c: 'chave', se: so('subathon') },
     { k: 'fimtxt', l: 'Quando zerar', c: 'texto', se: so('subathon') },
-    { k: 'modo',   l: 'Estado', c: 'lista', se: so('subathon'),
-      ops: [['pausado', 'Pausado'], ['rodando', 'Correndo']] },
+    { k: 'modo',   l: 'Estado', c: 'pausa', se: so('subathon'),
+      dica: 'pausar congela o tempo de verdade — na volta ele continua de onde parou' },
     { k: '_tempo', l: 'Tempo', c: 'tempo', se: so('subathon') },
   ] },
 
@@ -1407,6 +1407,36 @@ const FABRICA = {
   },
   /* Pausado guarda quanto FALTA; correndo guarda QUANDO acaba. São contas
      diferentes, e somar no campo errado faria o tempo sumir. */
+  /* PAUSAR TEM QUE CONGELAR O TEMPO, NÃO SÓ O RÓTULO.
+
+     Era uma lista comum: trocar pra "Pausado" mudava só a palavra. O
+     cronômetro guarda duas coisas diferentes — correndo guarda QUANDO acaba,
+     pausado guarda QUANTO FALTA — e sem converter uma na outra na hora da
+     troca, o "quando acaba" seguia no lugar. Na volta, o tempo que passou
+     durante a pausa tinha sumido: pra quem transmite, o relógio continuou
+     correndo escondido. */
+  pausa(it) {
+    const s = h('select');
+    [['pausado', 'Pausado'], ['rodando', 'Correndo']].forEach(([v2, r]) => {
+      const o = h('option', { value: v2, txt: r });
+      if (cfg[it.k] === v2) o.selected = true;
+      s.appendChild(o);
+    });
+
+    const agora = () => Math.round(Relogio.agoraServidor() / 1000);
+
+    s.onchange = () => {
+      if (s.value === 'pausado') {
+        cfg.restante = Math.max(0, (cfg.fim || 0) - agora());
+      } else {
+        cfg.fim = agora() + Math.max(0, cfg.restante || 0);
+      }
+      mudou(it.k, s.value);
+    };
+    s.__sincroniza = () => { s.value = String(cfg[it.k]); };
+    return s;
+  },
+
   tempo() {
     const visor = h('b', { cls: 'valor', style: 'width:auto;font:600 15px var(--disp);color:var(--tinta)' });
     const linha = h('div', { cls: 'tempoBotoes' });
@@ -2289,6 +2319,82 @@ async function telaSubathon() {
     'Chegou no número de seguidores, soma tempo — e o alvo sobe sozinho pro próximo. Deixe em 0 pra desligar.', 'seguidores');
   const mSub = fatiaMeta('subs', 'Meta de subs',
     'Chegou no número de assinantes, soma tempo — e o alvo sobe sozinho pro próximo. Deixe em 0 pra desligar.', 'subs');
+
+  /* O LIVEPIX MORAVA SÓ NA TELA ANTIGA.
+
+     Quem usa o hub nunca via onde configurar a doação — e então testava, o
+     tempo não subia, e a conclusão era "o subathon não funciona com LivePix".
+     Funciona; faltava a tela. O estado aparece junto porque "conectado mas
+     nenhum aviso chegou" e "nem conectado" pedem coisas diferentes. */
+  const lpEstado = h('p', { cls: 'd', txt: 'vendo…' });
+  const lpId = h('input', { type: 'text', placeholder: 'Client ID' });
+  const lpSec = h('input', { type: 'password', placeholder: 'Client Secret' });
+  const lpBt = h('button', { cls: 'bt', type: 'button', txt: 'Conectar' });
+  const lpUrl = h('div', { cls: 'escondido' });
+
+  const lpMostraUrl = (url) => {
+    lpUrl.innerHTML = '';
+    if (!url) return;
+    lpUrl.appendChild(h('p', { cls: 'd', style: 'margin:10px 0 4px',
+      txt: 'Cole este endereço no webhook do LivePix (evento de pagamento):' }));
+    lpUrl.appendChild(segredo(url));
+    lpUrl.classList.remove('escondido');
+  };
+
+  async function lpVer() {
+    try {
+      const d = await api('/livepix.php');
+      if (!d.configurado) {
+        lpEstado.textContent = 'Não conectado. Sem isso, doação não soma tempo.';
+        lpEstado.style.color = '';
+        return;
+      }
+      lpId.value = d.client_id || '';
+      lpBt.textContent = 'Trocar credenciais';
+      lpMostraUrl(d.url);
+
+      if (!d.ligado) {
+        lpEstado.textContent = 'Desligado.';
+        lpEstado.style.color = 'var(--perigo)';
+      } else if (!d.ultimo_ok) {
+        /* Este é o caso que o seu amigo viveu: as credenciais estão certas e
+           mesmo assim nada chega, porque o webhook não foi criado lá. */
+        lpEstado.textContent = 'Conectado, mas nenhuma doação chegou ainda. Se você já testou e não somou, o webhook não foi criado no LivePix — é o endereço aqui embaixo.';
+        lpEstado.style.color = 'var(--perigo)';
+      } else {
+        lpEstado.textContent = 'Conectado, e a última doação chegou em '
+          + new Date(String(d.ultimo_ok).replace(' ', 'T')).toLocaleString('pt-BR') + '.';
+        lpEstado.style.color = 'var(--verde-forte)';
+      }
+    } catch (e) {
+      lpEstado.textContent = 'Não consegui perguntar: ' + e.message;
+    }
+  }
+
+  lpBt.onclick = async () => {
+    const cid = lpId.value.trim(), sec = lpSec.value.trim();
+    if (!cid || !sec) return recado('Cole o Client ID e o Client Secret.', 'ruim');
+    lpBt.disabled = true;
+    try {
+      const d = await api('/livepix.php', { method: 'POST', body: JSON.stringify({ client_id: cid, client_secret: sec }) });
+      lpSec.value = '';
+      lpMostraUrl(d.url);
+      recado('LivePix conectado. Agora crie o webhook lá com o endereço que apareceu.', 'bom');
+    } catch (e) { recado(e.message, 'ruim'); }
+    lpBt.disabled = false;
+    lpVer();
+  };
+
+  tela.appendChild(h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Doação pelo LivePix' }),
+    h('p', { cls: 'd', txt: 'São dois passos, e o segundo é o que costuma faltar: conectar a conta aqui, e depois criar o webhook no painel do LivePix com o endereço que vai aparecer. Sem o webhook o LivePix não avisa ninguém, e o tempo não sobe.' }),
+    lpEstado,
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Client ID' }), lpId]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Client Secret' }), lpSec]),
+    h('div', { cls: 'acoes', style: 'display:flex;gap:8px' }, [lpBt]),
+    lpUrl,
+  ]));
+  lpVer();
 
   /* O DIAGNÓSTICO DA CONTAGEM: Sem isto, quando a Twitch recusa a leitura
      de seguidores a meta fica parada no número antigo e a pessoa acha que
