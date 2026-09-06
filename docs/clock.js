@@ -1,22 +1,16 @@
-/* =====================================================================
-   RELÓGIO DO ZOCA — núcleo compartilhado
-   Usado pelo overlay.html (o que vai no OBS) e pelo index.html (o
-   personalizador). Sem servidor, sem rede, sem banco: a hora vem do
-   relógio do PC convertida pro fuso America/Sao_Paulo pelo Intl — acerta
-   mesmo com o PC em outro fuso e sobrevive a um eventual retorno do
-   horário de verão. Toda a configuração viaja na própria URL.
-   ===================================================================== */
+/* RELÓGIO DO ZOCA — núcleo compartilhado Usado pelo overlay.html (o que
+   vai no OBS) e pelo index.html (o personalizador). Sem servidor, sem
+   rede, sem banco: a hora vem do relógio do PC convertida pro fuso
+   America/Sao_Paulo pelo Intl — acerta mesmo com o PC em outro fuso e
+   sobrevive a um eventual retorno do horário de verão. Toda a
+   configuração viaja na própria URL. */
 (function (global) {
   'use strict';
 
   var TZ = 'America/Sao_Paulo';
   var LOCALE = 'pt-BR';
 
-  /* ---------------------------------------------------------------
-     FONTES — todas verificadas na API css2 do Google Fonts.
-     spec = o que vai depois de "family=" (pesos que existem de verdade).
-     f    = pilha de fallback caso a fonte não carregue (OBS sem internet).
-     --------------------------------------------------------------- */
+  /* FONTES — todas verificadas na API css2 do Google Fonts. */
   var FONTS = [
     { n: 'Orbitron',              spec: 'Orbitron:wght@400..900', f: 'sans',    g: 'Tech / futurista' },
     { n: 'Audiowide',             spec: 'Audiowide',              f: 'sans',    g: 'Tech / futurista' },
@@ -70,10 +64,7 @@
     display: 'Impact, "Arial Black", system-ui, sans-serif'
   };
 
-  /* ---------------------------------------------------------------
-     ESQUEMA — define os padrões, valida o que vem da URL e monta a URL.
-     t: b = liga/desliga · n = número · c = cor · e = lista fechada · f = fonte
-     --------------------------------------------------------------- */
+  /* ESQUEMA — define os padrões, valida o que vem da URL e monta a URL. */
   var SCHEMA = {
     /* que conteúdo este overlay mostra. 'relogio' é o padrão de propósito:
        toda config que já existe por aí não tem esta chave e continua igual. */
@@ -100,10 +91,8 @@
     mbarra:   { t: 'b', d: 1 },
     mbalt:    { t: 'n', d: 4,   min: 1,  max: 20 },
 
-    /* ---------------- alerta ----------------
-       O que dispara, o que está escrito, e como soa. A tipografia e as cores
-       são as MESMAS chaves dos outros overlays (font, size, color, glow...):
-       um alerta que não combina com o resto da tela não parece do canal. */
+    /* ---------------- alerta ---------------- O que dispara, o que está
+       escrito, e como soa. */
     afollow:  { t: 'b', d: 1 },
     asub:     { t: 'b', d: 1 },
     abits:    { t: 'b', d: 1 },
@@ -141,19 +130,18 @@
     mtempo:   { t: 'n', d: 7, min: 2, max: 120 },
     mabrir:   { t: 'n', d: 900,  min: 200, max: 4000 },
     mfechar:  { t: 'n', d: 1400, min: 200, max: 4000 },
-    /* ---- feed de eventos ----
-       Divide as chaves com o chat: os dois sao a mesma lista com origem
-       diferente, e duplicar as opcoes so criaria dois lugares pra ajustar
-       a mesma coisa. */
+    /* ---- feed de eventos ---- Divide as chaves com o chat: os dois sao
+       a mesma lista com origem diferente, e duplicar as opcoes so criaria
+       dois lugares pra ajustar a mesma coisa. */
     fcor:     { t: 'c', d: '#8fd07a' },
     fseg:     { t: 'b', d: 1 },
     fsub:     { t: 'b', d: 1 },
     fbits:    { t: 'b', d: 1 },
     freal:    { t: 'b', d: 1 },
-    /* ---- chat na tela ----
-       Mora no mesmo esquema dos outros de proposito: assim o chatbox herda
-       fonte, cor, contorno, sombra, brilho e caixa de fundo sem existir um
-       segundo sistema de aparencia pra divergir com o tempo. */
+    /* ---- chat na tela ---- Mora no mesmo esquema dos outros de
+       proposito: assim o chatbox herda fonte, cor, contorno, sombra,
+       brilho e caixa de fundo sem existir um segundo sistema de aparencia
+       pra divergir com o tempo. */
     canal:    { t: 't', d: '', max: 25 },
     cmax:     { t: 'n', d: 8,   min: 1,  max: 40 },
     cdir:     { t: 'e', d: 'baixo', v: ['baixo', 'cima'] },
@@ -299,10 +287,7 @@
     /* Ligado, o texto pega fonte, cor e peso do número. Desligado, escolhe
        os seus. Tamanho e espaçamento ficam sempre por conta dele: um rótulo
        do tamanho do número deixa de ser rótulo. */
-    /* Nasce DESLIGADO de propósito. Overlay que já existe não tem esta
-       chave gravada, então ele receberia o padrão — e se o padrão fosse
-       "combinar", o texto verde de todo mundo virava branco de uma vez, sem
-       ninguém ter mexido em nada. Combinar é opção, não surpresa. */
+    /* Nasce DESLIGADO de propósito. */
     dsync:    { t: 'b', d: 0 },
     dfont:    { t: 'f', d: 'Archivo' },
     dgap:     { t: 'n', d: 6,   min: -100, max: 200 },
@@ -414,10 +399,8 @@
     }
   };
 
-  /* ------------------------- validação -------------------------
-     Tudo que chega pela URL passa por aqui antes de virar CSS. É isso
-     que impede alguém de injetar estilo/script numa URL compartilhada.
-     ------------------------------------------------------------- */
+  /* ------------------------- validação ------------------------- Tudo
+     que chega pela URL passa por aqui antes de virar CSS. */
 
   function limpaFonte(v) {
     var s = String(v || '').replace(/[^A-Za-z0-9 +_-]/g, '').replace(/\s+/g, ' ').trim();
@@ -598,26 +581,17 @@
     doc.head.appendChild(l);
   }
 
-  /* A FAMÍLIA COMPLETA, COM A RESERVA CERTA.
-
-     O nome sozinho não basta: se a fonte da Google não carregar, o navegador
-     precisa cair numa parecida, e "parecida" é diferente pra uma pixelada e
-     pra uma condensada. */
+  /* A FAMÍLIA COMPLETA, COM A RESERVA CERTA: O nome sozinho não basta: se
+     a fonte da Google não carregar, o navegador precisa cair numa
+     parecida, e "parecida" é diferente pra uma pixelada e pra uma
+     condensada. */
   function familiaDe(nome) {
     var info = fonteInfo(nome);
     return '"' + limpaFonte(nome) + '", ' + STACKS[info ? info.f : 'sans'];
   }
 
-  /* TODAS AS FAMÍLIAS DE UMA VEZ, PRA PRÉVIA DO EDITOR.
-
-     Uma folha por fonte seriam 39 pedidos. Aqui vai um só, e sem peso
-     nenhum no pedido: a prévia mostra a letra normal, que é o que interessa
-     pra reconhecer o desenho da fonte. Os pesos de verdade continuam vindo
-     pelo carregaFonte quando a fonte é de fato usada.
-
-     O navegador só baixa o arquivo de uma fonte quando ela aparece na tela,
-     então listar as 39 aqui não custa 39 downloads — custa os que a pessoa
-     abrir. */
+  /* TODAS AS FAMÍLIAS DE UMA VEZ, PRA PRÉVIA DO EDITOR: Uma folha por
+     fonte seriam 39 pedidos. */
   function carregaTodasAsFontes(doc) {
     var id = 'rl-fontes-previa';
     if (doc.getElementById(id)) return;
@@ -740,27 +714,7 @@
     root.classList.toggle('has-bg', cfg.bg !== 'none');
   }
 
-  /* ---------------------------------------------------------------
-     BATIDA — o coração do relógio, dentro de um Web Worker.
-
-     Por quê: numa Fonte de Navegador do OBS, quando a fonte não está
-     visível em lugar nenhum o OBS chama WasHidden(true) no navegador
-     embutido (obs-browser-source.cpp, SetShowing). Aí o Chromium trata
-     a página como aba de segundo plano:
-        · requestAnimationFrame PARA de vez (não desacelera: para);
-        · setTimeout/setInterval caem pra 1x por segundo, e pra 1x por
-          MINUTO depois de 5 minutos escondida.
-     Isso mata o tique do relógio e mata junto a busca periódica do
-     estilo publicado — os dois defeitos vinham daí.
-
-     Temporizador dentro de um dedicated Worker não sofre esse freio: a
-     trava existe no Blink (kDedicatedWorkerThrottling) mas vem
-     DESLIGADA de fábrica. Medido: página escondida, worker manteve
-     200ms cravados enquanto a thread principal caiu pra ~1000ms.
-
-     O worker nasce de um Blob, então não há arquivo novo pra subir nem
-     cache novo pra furar.
-     --------------------------------------------------------------- */
+  /* BATIDA — o coração do relógio, dentro de um Web Worker. */
 
   var FONTE_BATIDA =
     'var t=null;' +
@@ -785,19 +739,12 @@
 
   /* --------------------------- montagem --------------------------- */
 
-  /* ------------------------- conteúdos -------------------------
-     O motor de aparência (fonte, traçado, sombra, brilho, fundo) não sabe o
-     que está escrito — e é justamente isso que deixa reaproveitar tudo. Cada
-     conteúdo só diz o que vai na linha de cima e o que vai na de baixo.
+  /* ------------------------- conteúdos ------------------------- O motor
+     de aparência (fonte, traçado, sombra, brilho, fundo) não sabe o que
+     está escrito — e é justamente isso que deixa reaproveitar tudo. */
 
-     'principal' devolve HTML (por causa do relogio, que precisa de <span>
-     separando hora e minuto). 'secundario' devolve texto puro.
-     ---------------------------------------------------------------- */
-
-  /* O relogio do servidor, em milissegundos de diferenca para o da maquina.
-     Quem preenche e o overlay.html, lendo o cabecalho Date da resposta. Sem
-     isso, maquina com relogio torto mostraria um subathon errado — e relogio
-     torto e mais comum do que parece. */
+  /* O relogio do servidor, em milissegundos de diferenca para o da
+     maquina. */
   var desvioServidor = 0;
   function agoraServidor() { return Date.now() + desvioServidor; }
 
@@ -903,11 +850,9 @@
     return h + 'h' + (m ? (m < 10 ? '0' : '') + m : '');
   }
 
-  /* A LINHA "O QUE DA QUANTO".
-     Quem chega no meio da live nao faz ideia de que uma sub vale 5 minutos —
-     e quem nao sabe disso nao tem motivo pra assinar. Zerado nao aparece:
-     anunciar "follow = 0" so faz o quadro parecer quebrado.
-     Os tiers 2 e 3 so entram quando valem diferente do tier 1. */
+  /* A LINHA "O QUE DA QUANTO": Quem chega no meio da live nao faz ideia
+     de que uma sub vale 5 minutos — e quem nao sabe disso nao tem motivo
+     pra assinar. */
   function legendaTexto(cfg) {
     var p = [];
     if (cfg.vsub1)   p.push('sub = ' + porExtenso(cfg.vsub1));
@@ -1053,20 +998,12 @@
       if (onSize) medir();
     }
 
-    /* --------------------------------------------------------------
-       QUANDO ENTRA TEMPO NO SUBATHON
-
-       Nada aqui fala com servidor: o overlay ja recebe o estilo novo de
-       15 em 15 segundos. Se o "quando acaba" pulou pra frente, entrou
-       tempo — e e so isso que precisa saber pra fazer o "+X" subir.
-       -------------------------------------------------------------- */
+    /* QUANDO ENTRA TEMPO NO SUBATHON: Nada aqui fala com servidor: o
+       overlay ja recebe o estilo novo de 15 em 15 segundos. */
 
     var nPop = 0, estaUrgente = false, primeiraCarga = true, rol = null;
 
-    /* ROLAGEM — o numero corre pra frente ate o novo tempo.
-       Guardo um ATRASO em segundos que anda ate zero, em vez de guardar
-       "de onde ate onde": assim o relogio continua descontando o segundo
-       normalmente por baixo, e a rolagem so monta em cima disso. */
+    /* ROLAGEM — o numero corre pra frente ate o novo tempo. */
     function rolAtual() {
       if (!rol) return 0;
       var t = (Date.now() - rol.inicio) / rol.dur;
@@ -1171,18 +1108,7 @@
       if (k !== ultimoTam) { ultimoTam = k; onSize({ w: w, h: h }); }
     }
 
-    /* MOTOR DO RELÓGIO — três fontes de tique, todas no mesmo funil.
-
-       1) BATIDA (Web Worker, 200ms) — a única que sobrevive quando o OBS
-          esconde a fonte. É a principal.
-       2) requestAnimationFrame — o mais preciso quando a página está
-          visível (erro de ~16ms), mas morre quando ela é escondida.
-       3) setTimeout alinhado à virada do segundo — rede de segurança se
-          o worker não puder ser criado.
-
-       Todas chamam bateu(). Como pinta() sai fora quando o segundo não
-       mudou, chamar demais não custa nada — e basta UMA das três estar
-       viva pra tudo continuar funcionando. */
+    /* MOTOR DO RELÓGIO — três fontes de tique, todas no mesmo funil. */
 
     function bateu() {
       /* Enquanto rola, o numero muda muitas vezes por segundo: o corte por

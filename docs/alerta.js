@@ -1,27 +1,8 @@
-/**
- * alerta.js — sub, follow, bits e doação aparecendo na tela.
- *
- * ---------------------------------------------------------------------
- * DE ONDE VÊM OS EVENTOS
- *
- * Da mesma tabela que alimenta o feed. O feed mostra os últimos e pronto; o
- * alerta precisa saber o que JÁ mostrou, senão toda recarga da fonte no OBS
- * dispararia de novo a fila de subs do dia inteiro na cara de quem assiste.
- * Por isso cada evento vem com id, e a primeira resposta só serve pra marcar
- * onde estávamos — ela não toca nada.
- *
- * UM DE CADA VEZ
- *
- * Dez subs de presente não podem virar dez alertas empilhados. Eles entram
- * numa fila e passam um atrás do outro, com um respiro entre eles. (O pacote
- * de presentes já chega junto do servidor como uma linha só.)
- *
- * O SOM É FEITO NA HORA
- *
- * Nada de arquivo pra hospedar, subir ou dar 404 no meio da live: os quatro
- * sons são desenhados em WebAudio na hora de tocar. Também é o único jeito
- * de o alerta funcionar antes de existir uma tela de upload.
- */
+/* alerta.js — sub, follow, bits e doação aparecendo na tela. DE ONDE VÊM
+   OS EVENTOS Da mesma tabela que alimenta o feed. O feed mostra os
+   últimos e pronto; o alerta precisa saber o que JÁ mostrou, senão toda
+   recarga da fonte no OBS dispararia de novo a fila de subs do dia
+   inteiro na cara de quem assiste. */
 (function (global) {
   'use strict';
 
@@ -60,14 +41,7 @@
     return true;
   }
 
-  /* ------------------------------------------------------------------
-     O SOM
-
-     Quatro timbres desenhados na hora. O contexto de áudio nasce suspenso em
-     navegador comum e só destrava depois de um clique — dentro do OBS não há
-     clique nenhum, então tentamos destravar a cada alerta. Se não destravar,
-     o alerta continua aparecendo: som é enfeite, a mensagem é o recado.
-     ------------------------------------------------------------------ */
+  /* O SOM: Quatro timbres desenhados na hora. */
   var TIMBRES = {
     /* [frequência inicial, frequência final, duração, forma de onda] por nota */
     sino:     [[880, 880, 0.5, 'sine'], [1320, 1320, 0.6, 'sine']],
@@ -132,10 +106,10 @@
       return som;
     }
 
-    /* O ENDEREÇO DO SOM PRÓPRIO VEM DO SERVIDOR, NÃO DA CONFIG.
-        A config guarda só qual som foi escolhido; montar a URL aqui exigiria
-        que a fonte do OBS soubesse onde a API mora e qual é a chave — e ela
-        não tem por que saber nem uma coisa nem outra. */
+    /* O ENDEREÇO DO SOM PRÓPRIO VEM DO SERVIDOR, NÃO DA CONFIG: A config
+       guarda só qual som foi escolhido; montar a URL aqui exigiria que a
+       fonte do OBS soubesse onde a API mora e qual é a chave — e ela não
+       tem por que saber nem uma coisa nem outra. */
     function poeSom(url) {
       if (!url) { somProprio = null; return; }
       if (somProprio && somProprio.src === url) return;
@@ -183,17 +157,8 @@
         return;
       }
 
-      /* PACOTE DE PRESENTES AINDA CHEGANDO: ESPERA A PRÓXIMA CONSULTA.
-
-         Dez subs de presente entram na tabela um a um. Se a consulta cai no
-         meio, o servidor junta só os que chegaram e o alerta diz "presenteou
-         4 subs" — e na consulta seguinte, com o pacote fechado, o id do grupo
-         mudou e ele dispara DE NOVO dizendo 10. Dois alertas para um presente
-         só, e o primeiro com o número errado.
-
-         Segurar os presentes recém-chegados resolve: a consulta é de 15 em 15
-         segundos, então esperar um ciclo é esperar o pacote fechar. A hora vem
-         do servidor, não da máquina de quem transmite. */
+      /* PACOTE DE PRESENTES AINDA CHEGANDO: ESPERA A PRÓXIMA CONSULTA:
+         Dez subs de presente entram na tabela um a um. */
       var agora = Math.floor(R.agoraServidor() / 1000);
       var novos = [];
       var ateAqui = vistoAte;

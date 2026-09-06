@@ -6,30 +6,16 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="clock.css?v=20">
-<link rel="stylesheet" href="chat.css?v=20">
-<link rel="stylesheet" href="musica.css?v=20">
-<link rel="stylesheet" href="alerta.css?v=20">
+<link rel="stylesheet" href="clock.css?v=21">
+<link rel="stylesheet" href="chat.css?v=21">
+<link rel="stylesheet" href="musica.css?v=21">
+<link rel="stylesheet" href="alerta.css?v=21">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
-  /* "light dark" declara que a pagina serve nos dois esquemas.
-
-     Sem isso o Chrome pinta um fundo BRANCO OPACO quando um iframe de
-     esquema claro e embutido numa pagina escura — ele faz isso pra nao
-     deixar texto ilegivel. Resultado: no tema escuro do site, a prévia
-     aparecia branca e o quadriculado sumia atras dela.
-
-     No OBS nao muda nada: la o fundo continua transparente. */
+  /* "light dark" declara que a pagina serve nos dois esquemas. */
   :root { color-scheme: light dark; }
-  /* "light dark" declara que a pagina serve nos dois esquemas.
-
-     Sem isso o Chrome pinta um fundo BRANCO OPACO quando um iframe de
-     esquema claro e embutido numa pagina escura — ele faz isso pra nao
-     deixar texto ilegivel. Resultado: no tema escuro do site, a prévia
-     aparecia branca e o quadriculado sumia atras dela.
-
-     No OBS nao muda nada: la o fundo continua transparente. */
+  /* "light dark" declara que a pagina serve nos dois esquemas. */
   :root { color-scheme: light dark; }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 </style>
@@ -38,10 +24,10 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=20"></script>
-<script src="chat.js?v=20"></script>
-<script src="musica.js?v=20"></script>
-<script src="alerta.js?v=20"></script>
+<script src="clock.js?v=21"></script>
+<script src="chat.js?v=21"></script>
+<script src="musica.js?v=21"></script>
+<script src="alerta.js?v=21"></script>
 <script>
 (function () {
   'use strict';
@@ -55,20 +41,14 @@
   var k = (new URLSearchParams(location.search).get('k') || '')
             .replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
 
-  /* DOIS DESENHISTAS, UMA PAGINA.
-     O chat e uma LISTA que cresce; os outros sao um texto que se reescreve.
-     Forcar os dois no mesmo motor deixaria os dois piores — entao a pagina
-     troca de desenhista quando o tipo muda, e o resto (busca, previa,
-     arrasto) nao precisa saber qual dos dois esta montado. */
+  /* DOIS DESENHISTAS, UMA PAGINA: O chat e uma LISTA que cresce; os
+     outros sao um texto que se reescreve. */
   var atual = null;
   var relogio = null;
 
   function montaPara(config) {
     var tipo = config && config.tipo;
-    /* Tres desenhistas: o de texto, o de lista e o da musica. Cada um tem uma
-       forma diferente demais pros outros dois — forcar um so deixaria os tres
-       piores. A pagina troca de desenhista quando o tipo muda, e o resto
-       (busca, previa, arrasto) nao precisa saber qual esta montado. */
+    /* Tres desenhistas: o de texto, o de lista e o da musica. */
     var quer = (tipo === 'chat' || tipo === 'feed') ? 'chat'
              : tipo === 'musica' ? 'musica'
              : tipo === 'alerta' ? 'alerta' : 'relogio';
@@ -91,23 +71,14 @@
     if (!montaPara(config)) relogio.update(config);
   }
 
-  /* NADA NA TELA ATÉ SABER O QUE DESENHAR.
-
-     Antes eu montava o desenhista já na carga, com a config que viesse na
-     URL — e no modo link fixo não vem nenhuma, então o padrão valia: um
-     RELÓGIO. Resultado: todo overlay piscava um relógio por um instante
-     antes de virar o que era de verdade, e ao vivo isso aparece.
-
-     Com ?k= a resposta do servidor é que decide, e ela chega em milissegundos.
-     Sem ?k= a config está na própria URL e dá pra montar na hora. */
+  /* NADA NA TELA ATÉ SABER O QUE DESENHAR: Antes eu montava o desenhista
+     já na carga, com a config que viesse na URL — e no modo link fixo não
+     vem nenhuma, então o padrão valia: um RELÓGIO. */
   if (k) raiz.innerHTML = '';
   else montaPara(Relogio.parseConfig());
 
-  /* PREVIEW DO EDITOR.
-     O hub mostra este mesmo arquivo num iframe e manda a config a cada
-     ajuste. É o mesmo desenhista que vai pro OBS — então o que aparece na
-     hora de editar é exatamente o que vai pro ar, e não uma imitação.
-     Só aceito da mesma origem, e tudo passa pelo sanitize antes de virar CSS. */
+  /* PREVIEW DO EDITOR: O hub mostra este mesmo arquivo num iframe e manda
+     a config a cada ajuste. */
   window.addEventListener('message', function (e) {
     if (e.origin !== location.origin) return;
     var d = e.data;
@@ -126,18 +97,7 @@
     if (d.type === 'zc:travar' && relogio && relogio.travar) relogio.travar(!!d.on);
   });
 
-  /* ------------------------------------------------------------------
-     ARRASTAR AS PECAS
-
-     So liga quando o editor pede. A fonte que roda no OBS nunca recebe
-     essa mensagem, entao la nada disso existe — nem o tracejado, nem o
-     cursor de mover, nem os ouvintes.
-
-     Cada peca guarda o proprio deslocamento. Durante o arrasto eu escrevo
-     direto na variavel de CSS, em vez de remontar o overlay a cada quadro:
-     remontar redesenha o texto inteiro e recarrega fonte sessenta vezes por
-     segundo pra mover uma coisa dez pixels.
-     ------------------------------------------------------------------ */
+  /* ARRASTAR AS PECAS: So liga quando o editor pede. */
 
   var ALVOS = [
     ['.rl__time',  'nx', 'ny', 'numero'],
@@ -285,23 +245,8 @@
   function buscar() {
     if (buscando) return;
     buscando = true;
-    /* 'no-cache' E NAO 'no-store' — a diferença aqui vale banda de verdade.
-       Os dois pedem ao servidor toda vez; a diferença é que o no-store não
-       GUARDA a resposta, e sem cópia guardada o navegador não tem ETag pra
-       mandar de volta. Resultado: o 304 que o servidor monta com tanto
-       cuidado nunca acontecia, e cada pulso baixava o JSON inteiro.
-
-       Com no-cache o navegador revalida sozinho: manda o If-None-Match, o
-       servidor responde 304 vazio e ele entrega a cópia guardada. Medido:
-       o primeiro pulso 200, todos os seguintes 304.
-
-       Mandar o If-None-Match na mão parece mais direto e é uma armadilha —
-       vira requisição não-simples, exige preflight, e sem Allow-Headers no
-       servidor o overlay inteiro para de carregar.
-
-       O status que chega aqui é 200 mesmo nos 304, porque o navegador
-       devolve a cópia guardada como se fosse resposta nova. Sem problema:
-       quem decide redesenhar é a comparação do JSON logo abaixo. */
+    /* 'no-cache' E NAO 'no-store' — a diferença aqui vale banda de
+       verdade. */
     fetch(API + '/config-overlay.php?k=' + encodeURIComponent(k), { cache: 'no-cache' })
       .then(function (r) {
         /* O cabeçalho Date da própria resposta diz a hora do servidor. É de
@@ -330,10 +275,7 @@
       ['finally'](function () { buscando = false; });
   }
 
-  /* Quem chama a busca é a BATIDA do relógio (Web Worker). O setInterval comum
-     congela quando o OBS esconde a fonte — e aí o overlay para de atualizar
-     justamente enquanto ninguém está olhando pra perceber. O intervalo aqui
-     embaixo é só a reserva, pro caso do worker não nascer. */
+  /* Quem chama a busca é a BATIDA do relógio (Web Worker). */
   var ultimaBusca = 0;
   function talvezBuscar() {
     if (Date.now() - ultimaBusca < 15000) return;
@@ -341,16 +283,8 @@
     buscar();
   }
 
-  /* O PULSO É DESTA PÁGINA, NÃO DO DESENHISTA.
-
-     Antes o laço de busca pegava carona no tique do relógio. Só que o
-     desenhista é TROCADO quando o tipo é chat, feed ou música — e o ouvinte
-     ficava registrado no relógio já destruído. Esses três overlays estavam
-     rodando só no setInterval de reserva, que o Chromium freia pra uma vez
-     por minuto quando o OBS não pinta a fonte.
-
-     Um Worker próprio resolve pros oito tipos de uma vez, e não depende de
-     qual desenhista está montado agora. */
+  /* O PULSO É DESTA PÁGINA, NÃO DO DESENHISTA: Antes o laço de busca
+     pegava carona no tique do relógio. */
   buscar();
 
   (function () {

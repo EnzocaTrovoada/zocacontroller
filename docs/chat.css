@@ -1,9 +1,7 @@
-/* chat.css — o chat na tela.
-   ---------------------------------------------------------------------
-   A tipografia, a cor, o contorno, a sombra e o brilho vêm das variáveis
-   do clock.css: o overlay carrega os dois, e a raiz leva as classes .ch e
-   .rl juntas. Assim existe UM sistema de aparência, e não dois que
-   divergem com o tempo. */
+/* chat.css — o chat na tela. A tipografia, a cor, o contorno, a sombra e
+   o brilho vêm das variáveis do clock.css: o overlay carrega os dois, e a
+   raiz leva as classes .ch e .rl juntas. Assim existe UM sistema de
+   aparência, e não dois que divergem com o tempo. */
 
 .ch {
   display: flex;
@@ -114,16 +112,7 @@
 .ch.is-editando .ch__palco:hover { outline-color: #45B8BF; }
 .ch.is-editando .ch__palco.pegando { outline: 1px solid #45B8BF; }
 
-/* ---------------------------------------------------------------------
-   AS CAIXAS
-
-   O nome e a mensagem têm cada um a sua. É o que separa um chat na tela de
-   um chat bonito: quase todo overlay que presta tem uma etiqueta colorida
-   no nome e nada atrás do texto.
-
-   A forma sai de clip-path, não de imagem: acompanha o texto de qualquer
-   tamanho, em qualquer fonte, sem esticar nem pixelar.
-   --------------------------------------------------------------------- */
+/* AS CAIXAS: O nome e a mensagem têm cada um a sua. */
 .ch__nick > b { font-weight: inherit; display: inline-block; }
 
 .ch--nkcase .ch__nick {
@@ -134,15 +123,8 @@
   position: relative;
 }
 
-/* TRANSFORM SÓ QUANDO PRECISA.
-
-   Antes o skew e o translate eram aplicados sempre, mesmo valendo zero. Um
-   transform, ainda que de zero grau, cria um contexto de empilhamento novo:
-   o elemento passa a pintar num plano próprio, e quem estava atrás ou na
-   frente troca de lugar sem nada visível ter mudado. Era daí que vinham as
-   camadas erradas.
-
-   Com classe, o zero não deixa rastro nenhum. */
+/* TRANSFORM SÓ QUANDO PRECISA: Antes o skew e o translate eram aplicados
+   sempre, mesmo valendo zero. */
 .ch--nk-torto .ch__nick { transform: skewX(var(--nk-incl)); }
 /* O texto desanda junto com a caixa: desandar de volta é o que mantém a
    leitura reta dentro de uma fita torta. */
@@ -196,15 +178,8 @@
 .ch--nk-chanfro .ch__nick, .ch--nk-fita .ch__nick, .ch--nk-seta .ch__nick,
 .ch--cb-chanfro .ch__msg, .ch--cb-fita .ch__msg, .ch--cb-seta .ch__msg { border: 0; }
 
-/* O ESPAÇO ENTRE AS PEÇAS É ESTRUTURA, NÃO MARGEM.
-
-   Na mesma linha, o nome e o texto passam a ser duas colunas com um vão de
-   verdade entre elas. Como margem, a ponta da seta e o corte da fita comiam
-   o vão — a forma sai da caixa de layout, e o texto seguinte não sabia
-   disso. Como vão de flex, ninguém encosta em ninguém.
-
-   baseline, e não center: nome e mensagem em tamanhos diferentes têm que
-   assentar na mesma linha de escrita, senão um flutua em relação ao outro. */
+/* O ESPAÇO ENTRE AS PEÇAS É ESTRUTURA, NÃO MARGEM: Na mesma linha, o nome
+   e o texto passam a ser duas colunas com um vão de verdade entre elas. */
 .ch--nkcase.ch--nick-linha .ch__msg {
   display: flex;
   align-items: baseline;
@@ -214,29 +189,15 @@
 .ch--nkcase.ch--nick-linha .ch__nick { flex: none; }
 .ch--nkcase:not(.ch--nick-linha) .ch__nick { margin-bottom: calc(var(--nk-gap) / 2); }
 
-/* O NOME TEM LUGAR PRÓPRIO.
-
-   Alinhamento e um empurrãozinho de posição, separados dos da mensagem: é o
-   que deixa montar "nome recuado à direita, texto embaixo" sem que um mexa
-   no outro. */
+/* O NOME TEM LUGAR PRÓPRIO: Alinhamento e um empurrãozinho de posição,
+   separados dos da mensagem: é o que deixa montar "nome recuado à
+   direita, texto embaixo" sem que um mexa no outro. */
 .ch--nkcase:not(.ch--nick-linha) .ch__msg { display: flex; flex-direction: column; align-items: var(--nk-alin); }
 .ch--nkcase.ch--nick-abaixo .ch__msg { flex-direction: column-reverse; }
 .ch--nk-movido .ch__nick { translate: var(--nk-dx) var(--nk-dy); }
 
-/* ---------------------------------------------------------------------
-   TRAÇADO
-
-   Uma borda comum é cortada junto pelo clip-path: numa seta ou numa fita ela
-   some justo nas diagonais, que é onde ela mais importa.
-
-   Tentei antes uma cópia da forma pintada atrás, com z-index negativo. Não
-   funciona: dentro de um contexto de empilhamento, o filho negativo pinta
-   DEPOIS do fundo do pai, e a cópia maior cobria o nome.
-
-   O que funciona é o halo: drop-shadow desenha a sombra recortando a forma
-   JÁ cortada, então ela acompanha qualquer polígono. Oito direções em vez de
-   quatro porque com quatro as diagonais ficam com o canto mordido.
-   --------------------------------------------------------------------- */
+/* TRAÇADO: Uma borda comum é cortada junto pelo clip-path: numa seta ou
+   numa fita ela some justo nas diagonais, que é onde ela mais importa. */
 .ch--nk-tracado .ch__nick {
   filter:
     drop-shadow( var(--nk-borda) 0 0 var(--nk-bcor))

@@ -1,29 +1,16 @@
-/**
- * chat.js — o chat na tela.
- * ---------------------------------------------------------------------
- * Lê o chat da Twitch direto, sem token e sem bot: entra como espectador
- * anônimo (justinfan) no IRC deles. Por isso não precisa de permissão
- * nenhuma, e por isso também não dá pra FALAR no chat por aqui — só ouvir.
- *
- * A aparência (fonte, cor, contorno, sombra, brilho, caixa de fundo) vem do
- * mesmo lugar que a dos outros overlays: as variáveis do clock.css. Assim
- * um ajuste de tipografia vale pra tudo, em vez de existirem dois sistemas
- * de cor que divergem com o tempo.
- */
+/* chat.js — o chat na tela. Lê o chat da Twitch direto, sem token e sem
+   bot: entra como espectador anônimo (justinfan) no IRC deles. Por isso
+   não precisa de permissão nenhuma, e por isso também não dá pra FALAR no
+   chat por aqui — só ouvir. */
 (function (global) {
   'use strict';
 
   var IRC = 'wss://irc-ws.chat.twitch.tv:443';
   var R = global.Relogio;
 
-  /* PRETO OU BRANCO, PELO BRILHO DA CAIXA.
-
-     Ligar uma caixa colorida e escolher a cor do texto sao duas decisoes, e
-     quem liga a caixa quase nunca lembra da segunda. O padrao das duas era a
-     cor da marca — verde sobre verde, nome invisivel.
-
-     A conta e a de luminancia percebida: o olho enxerga muito mais o verde
-     do que o azul, entao os tres canais nao valem igual. */
+  /* PRETO OU BRANCO, PELO BRILHO DA CAIXA: Ligar uma caixa colorida e
+     escolher a cor do texto sao duas decisoes, e quem liga a caixa quase
+     nunca lembra da segunda. */
   /* O ponto do meio entre duas cores. */
   function mistura(a, b) {
     function n(h) {
@@ -51,12 +38,8 @@
     });
   }
 
-  /* ------------------------------------------------------------------
-     LER UMA LINHA DE IRC
-
-     As etiquetas vêm escapadas pelo protocolo: \s é espaço, \: é ponto e
-     vírgula. Sem desfazer isso, um nome com espaço chega quebrado.
-     ------------------------------------------------------------------ */
+  /* LER UMA LINHA DE IRC: As etiquetas vêm escapadas pelo protocolo: \s é
+     espaço, \: é ponto e vírgula. */
   function analisar(linha) {
     var resto = linha, tags = {};
 
@@ -84,15 +67,8 @@
     return { tags: tags, texto: dois === -1 ? '' : resto.slice(dois + 2) };
   }
 
-  /* ------------------------------------------------------------------
-     EMOTES
-
-     A Twitch manda as posições, não as imagens: "25:0-4,12-16" quer dizer
-     que o emote 25 ocupa os caracteres 0 a 4 e 12 a 16. As posições contam
-     PONTOS DE CÓDIGO, não bytes nem unidades de UTF-16 — então quebro o
-     texto com Array.from, senão qualquer emoji antes de um emote desloca
-     tudo e as imagens saem no lugar errado.
-     ------------------------------------------------------------------ */
+  /* EMOTES: A Twitch manda as posições, não as imagens: "25:0-4,12-16"
+     quer dizer que o emote 25 ocupa os caracteres 0 a 4 e 12 a 16. */
   function comEmotes(texto, tagEmotes, mostrar) {
     var letras = Array.from(texto);
     if (!mostrar || !tagEmotes) return esc(letras.join(''));
@@ -171,9 +147,7 @@
     /* ---------------- aparência ---------------- */
     function aplica() {
       /* A tipografia, a cor, o contorno, a sombra, o brilho e a caixa de
-         fundo saem daqui — o mesmo desenhista dos outros overlays. Sem esta
-         chamada as variaveis do clock.css ficam no padrao de seguranca, e o
-         chat aparece com 96px numa fonte que ninguem escolheu. */
+         fundo saem daqui — o mesmo desenhista dos outros overlays. */
       R.aplicaEstilo(root, cfg);
 
       var s = root.style;
@@ -241,10 +215,7 @@
       root.classList.toggle('ch--nick-abaixo', cfg.cnickpos === 'abaixo');
       root.classList.toggle('ch--sem-nick', !cfg.cnick);
 
-      /* A PERSPECTIVA.
-         perspective() menor = deformação mais forte. Fica no palco e não em
-         cada mensagem: aplicada por mensagem, cada uma teria a própria fuga
-         e o conjunto não pareceria um plano só. */
+      /* A PERSPECTIVA: perspective() menor = deformação mais forte. */
       var t = [];
       /* O deslocamento do arrasto vem PRIMEIRO: transform aplica da direita
          pra esquerda, e translate depois do rotate faria a caixa andar no
@@ -257,11 +228,8 @@
     }
 
     /* ---------------- mensagens ---------------- */
-    /* O QUE NAO ENTRA NA TELA.
-
-       Comando de mod e resposta de bot sao ruido: quem assiste nao ganha
-       nada vendo "!som spotify" na tela. Sai antes de virar elemento, e nao
-       escondido por CSS — o que nao existe nao ocupa lugar na contagem. */
+    /* O QUE NAO ENTRA NA TELA: Comando de mod e resposta de bot sao
+       ruido: quem assiste nao ganha nada vendo "!som spotify" na tela. */
     function passa(tags, texto) {
       if (cfg.csemcmd && /^\s*[!\/]/.test(texto)) return false;
       var login = String(tags.login || '').toLowerCase();
@@ -286,10 +254,9 @@
       /* Com degradê, a decisão sai da cor do MEIO das duas: escolher pela
          primeira deixaria o texto sumir na outra ponta da caixa. */
       if (cfg.nkcase) cor = cfg.nkauto ? contrasteDe(cfg.nkgrad ? mistura(cfg.nkcor, cfg.nkcor2) : cfg.nkcor) : cfg.nktxt;
-      /* A cor do nick vem de fora (é a que a pessoa escolheu na Twitch), e
-         tudo que vem de fora passa pelo mesmo filtro de cor das outras: só
-         hexadecimal, ou cai no padrão. O esc() já impedia sair do atributo,
-         mas isso aqui impede escrever CSS qualquer dentro dele. */
+      /* A cor do nick vem de fora (é a que a pessoa escolheu na Twitch),
+         e tudo que vem de fora passa pelo mesmo filtro de cor das outras:
+         só hexadecimal, ou cai no padrão. */
       else cor = (cfg.cnickauto && tags.color)
         ? R.limpaCor(tags.color, cfg.cnickcor) : cfg.cnickcor;
 

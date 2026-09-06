@@ -1,8 +1,8 @@
-/* alerta.css — sub, follow, bits e doação aparecendo na tela.
-   ---------------------------------------------------------------------
-   A tipografia e as cores vêm das variáveis do clock.css, iguais às dos
-   outros overlays: um alerta que não combina com o resto da tela não parece
-   do canal, parece um aviso de outro site. Aqui mora só o movimento. */
+/* alerta.css — sub, follow, bits e doação aparecendo na tela. A
+   tipografia e as cores vêm das variáveis do clock.css, iguais às dos
+   outros overlays: um alerta que não combina com o resto da tela não
+   parece do canal, parece um aviso de outro site. Aqui mora só o
+   movimento. */
 
 .al {
   display: flex;
@@ -46,13 +46,7 @@
 /* O nome ganha cor própria: é o que o olho procura primeiro. */
 .al__quem { color: var(--al-nome); font-weight: 800; }
 
-/* ---------------------------------------------------------------------
-   AS ENTRADAS
-
-   Quatro formas, e todas terminam paradas. O alerta some pelo mesmo caminho
-   em que entrou, o que faz a peça parecer uma coisa só indo e voltando em
-   vez de dois efeitos diferentes colados.
-   --------------------------------------------------------------------- */
+/* AS ENTRADAS: Quatro formas, e todas terminam paradas. */
 .al--entrando .al__caixa { animation: al-entra 520ms cubic-bezier(.22, 1, .36, 1) both; }
 .al--saindo   .al__caixa { animation: al-sai 400ms cubic-bezier(.5, 0, .75, 0) both; }
 

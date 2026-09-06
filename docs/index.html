@@ -133,16 +133,8 @@
   /* ---------- editor ---------- */
   .editor { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; }
 
-  /* O LADO DA PRÉVIA PRECISA SER ALTO, MESMO VAZIO.
-
-     O .palco já era sticky e mesmo assim sumia ao rolar. O motivo não é o
-     sticky: é que um elemento grudento só desliza dentro da caixa do PAI, e
-     o pai aqui só tinha a altura da prévia — medido, 312px contra 1709px da
-     coluna de controles. Ou seja, ele grudava por 10 pixels e ia embora.
-
-     O align-self: stretch estica este lado até a altura da linha inteira do
-     grid. Agora o palco tem 1400px de trilho pra deslizar, e fica na tela o
-     tempo todo enquanto a direita rola. */
+  /* O LADO DA PRÉVIA PRECISA SER ALTO, MESMO VAZIO: O .palco já era
+     sticky e mesmo assim sumia ao rolar. */
   .lado { align-self: stretch; }
 
   .palco {
@@ -175,16 +167,12 @@
     font-size: 20px; line-height: 1.35; color: var(--tinta);
     background: var(--fundo); border: 1px solid var(--linha); border-radius: 5px;
     padding: 7px 10px;
-    /* QUEBRA, NÃO CORTA. Fonte pixelada ocupa o dobro da largura de uma
-       condensada — medido, 419px contra 269px na mesma caixa. Com corte, a
-       Press Start 2P aparecia pela metade, justo a que a pessoa mais quer
-       ver inteira. */
+    /* QUEBRA, NÃO CORTA. */
     white-space: normal; word-break: break-word;
   }
-  /* O rótulo tinha flex:1 disputando com um controle de largura fixa e era
-     espremido até 47px — "Nome (só pra você achar)" virava cinco linhas.
-     Com piso de largura ele quebra em no máximo duas, e quando nem isso cabe
-     o controle desce pra linha de baixo em vez de esmagar o texto. */
+  /* O rótulo tinha flex:1 disputando com um controle de largura fixa e
+     era espremido até 47px — "Nome (só pra você achar)" virava cinco
+     linhas. */
   .campo { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; flex-wrap: wrap; }
   .campo > label,
   .campo > .rotulo { flex: 1 1 118px; min-width: 118px; font-size: 13px; color: var(--fraco); }
@@ -318,7 +306,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=20"></script>
+<script src="clock.js?v=21"></script>
 <script>
 'use strict';
 
@@ -339,17 +327,13 @@ el('btTema').onclick = () => {
 };
 
 /* ---------------- chave do painel ---------------- */
-/* A CHAVE NUNCA FICA NA BARRA DE ENDEREÇOS.
-   Ela chega de dois jeitos: no # (é assim que o entrar.php manda, porque o #
-   não chega ao servidor e não entra em log nenhum) ou no ?chave= de um link
-   antigo. Nos dois casos ela é guardada e o endereço é reescrito na hora —
-   senão bastava abrir o painel numa live pra chave inteira aparecer na tela.
-   O # também é o roteador aqui: o que começa com "/" é rota, o resto é chave. */
-/* O ENDERECO NAO GUARDA SEGREDO NEM RUIDO.
-
-   Alem da chave, o "index.html" tambem sai: o servidor entrega a mesma
-   pagina em "/", e um endereco curto e o que a pessoa consegue repetir de
-   cabeca e mandar pra outra sem errar. */
+/* A CHAVE NUNCA FICA NA BARRA DE ENDEREÇOS: Ela chega de dois jeitos: no
+   # (é assim que o entrar.php manda, porque o # não chega ao servidor e
+   não entra em log nenhum) ou no ?chave= de um link antigo. */
+/* O ENDERECO NAO GUARDA SEGREDO NEM RUIDO: Alem da chave, o "index.html"
+   tambem sai: o servidor entrega a mesma pagina em "/", e um endereco
+   curto e o que a pessoa consegue repetir de cabeca e mandar pra outra
+   sem errar. */
 function limpaEndereco(hash) {
   var caminho = location.pathname.replace(/index\.html$/, '');
   try { history.replaceState(null, '', caminho + (hash || location.hash || '')); } catch (e) {}
@@ -473,14 +457,8 @@ function padraoDe(tipo) {
   return Object.assign(base, { h24: 1, sec: 1, date: 0, tz: 'auto', font: 'Orbitron', size: 96 });
 }
 
-/* ESTILOS PRONTOS.
-
-   Uma tela com quarenta controles e nenhum ponto de partida é o jeito mais
-   rápido de fazer alguém desistir. Cada pronto mexe SÓ na aparência: o canal,
-   o alvo, o tempo e o que a pessoa escreveu continuam onde estavam.
-
-   Um pronto é o começo da conversa, não o fim dela — depois de aplicar, tudo
-   continua ajustável. */
+/* ESTILOS PRONTOS: Uma tela com quarenta controles e nenhum ponto de
+   partida é o jeito mais rápido de fazer alguém desistir. */
 const PRONTOS = {
   chat: [
     ['Limpo', 'só o texto, sem caixa', {
@@ -560,10 +538,9 @@ PRONTOS.feed = PRONTOS.chat;
 PRONTOS.contador = PRONTOS.relogio;
 PRONTOS.placar = PRONTOS.relogio;
 
-/* ---------------- controles do editor ----------------
-   Curado de propósito: o desenhista entende 60 opções, e mostrar as 60 seria
-   o mesmo que não ter simplificado nada. Aqui ficam as que mudam o resultado
-   de verdade, com nome em português. */
+/* ---------------- controles do editor ---------------- Curado de
+   propósito: o desenhista entende 60 opções, e mostrar as 60 seria o
+   mesmo que não ter simplificado nada. */
 const so = (...t) => (c) => t.includes(c.tipo);
 const FUSOS = [
   ['auto', 'Igual ao meu PC'], ['America/Sao_Paulo', 'Brasília'], ['America/Manaus', 'Manaus'],
@@ -830,15 +807,9 @@ const GRUPOS = [
     { k: 'bacima',  l: 'Barra acima do número', c: 'chave', se: (c) => !c.bdentro },
   ] },
 
-  /* O TEXTO QUE VOCÊ ESCREVEU, COM BANDEJA PRÓPRIA.
-
-     Ele existia na tela e não existia no editor: dava pra digitar a palavra
-     e não dava pra mudar cor, tamanho nem nada. As chaves já estavam no
-     esquema — só nunca tinham sido oferecidas.
-
-     A seção "Letra" logo abaixo é a do NÚMERO. Esta é a do texto, e por isso
-     vem antes: quem chega aqui procurando "por que não consigo mudar a cor
-     daquele texto" acha antes de passar pela outra e se confundir de novo. */
+  /* O TEXTO QUE VOCÊ ESCREVEU, COM BANDEJA PRÓPRIA: Ele existia na tela e
+     não existia no editor: dava pra digitar a palavra e não dava pra
+     mudar cor, tamanho nem nada. */
   { t: 'O texto que você escreveu', se: so('meta', 'subathon', 'relogio', 'contador', 'placar'),
     itens: [
     { k: 'dsync', l: 'Combinar com o número', c: 'chave',
@@ -892,15 +863,8 @@ let editando = null;    /* perfil sendo editado */
 let quadro = null;      /* iframe do preview */
 let camposPorChave = {};/* pra dar dois cliques na peça e cair no campo dela */
 
-/* DESFAZER.
-
-   Guardo a config inteira em texto a cada mudança, e não a "ação" que foi
-   feita. Config de overlay é pequena — algumas centenas de bytes — e guardar
-   o estado inteiro dispensa escrever o inverso de cada operação, que é onde
-   um desfazer costuma ganhar bug.
-
-   O empurrão espera um respiro: arrastar um controle deslizante dispara
-   dezenas de mudanças, e sem isso um Ctrl+Z andaria um pixel. */
+/* DESFAZER: Guardo a config inteira em texto a cada mudança, e não a
+   "ação" que foi feita. */
 let historico = [], futuro = [], guardando = null;
 
 function marcaHistorico(agora) {
@@ -1075,10 +1039,7 @@ function montaBandejas() {
   todos.onclick = () => { fechaBandejas(null); vaiPara('#/overlays'); };
   bo.appendChild(todos);
 
-  /* SEM ?chave= NO LINK.
-     Estas páginas moram no mesmo domínio, então já enxergam a mesma chave no
-     sessionStorage. Pendurar a chave no endereço só servia pra ela aparecer
-     inteira na barra do navegador no meio de uma live. */
+  /* SEM ?chave= NO LINK. */
   const bf = el('bandejaFerramentas');
   bf.innerHTML = '';
   const spot = h('button', { type: 'button' }, [
@@ -1195,16 +1156,9 @@ const FABRICA = {
     s.__sincroniza = () => { s.value = String(cfg[it.k]); };
     return s;
   },
-  /* A BANDEJA MOSTRA A LETRA, NÃO SÓ O NOME.
-
-     "Michroma", "Teko", "Doto" não dizem nada pra quem não é de design — e o
-     usuário tinha que escolher no escuro, aplicar, olhar a prévia e voltar.
-     Agora cada linha da lista está escrita na própria fonte, e embaixo fica
-     uma amostra grande da escolhida.
-
-     As opções também vão agrupadas pelo estilo (tech, pixel, neon...), que é
-     como alguém procura de verdade: "quero uma pixelada", não "quero a
-     Silkscreen". */
+  /* A BANDEJA MOSTRA A LETRA, NÃO SÓ O NOME: "Michroma", "Teko", "Doto"
+     não dizem nada pra quem não é de design — e o usuário tinha que
+     escolher no escuro, aplicar, olhar a prévia e voltar. */
   fontes(it) {
     Relogio.carregaTodasAsFontes(document);
 
@@ -1245,15 +1199,8 @@ const FABRICA = {
     cx.__sincroniza = () => { s.value = String(cfg[it.k]); pinta(); };
     return cx;
   },
-  /* O SOM DO ALERTA.
-
-     Um controle só em vez de dois: a pergunta da pessoa é "qual som toca",
-     não "som pronto ou som meu". A lista junta os quatro de fábrica e os
-     arquivos que ela mandou; embaixo ficam o botão de ouvir, o de mandar
-     outro e o de apagar.
-
-     Os quatro de fábrica são desenhados na hora pelo navegador — não têm
-     arquivo pra sumir nem pra carregar. Os seus são arquivos de verdade. */
+  /* O SOM DO ALERTA: Um controle só em vez de dois: a pergunta da pessoa
+     é "qual som toca", não "som pronto ou som meu". */
   som(it) {
     const sel = h('select');
     const linha = h('div', { cls: 'campo', style: 'margin:6px 0 0;gap:6px' });
@@ -1371,13 +1318,8 @@ const FABRICA = {
     return cx;
   },
 
-  /* OS BOTÕES DE TESTE.
-
-     Não guardam nada na config: são a prévia obedecendo, e só. A animação da
-     música dura alguns segundos e depois a peça some — mexer em cor, raio e
-     tamanho assim é tentar acertar um alvo que sai da tela. Dava pra trocar o
-     "quando mostrar" pra sempre enquanto edita, mas aí a pessoa mexe no que
-     VAI PRO AR só pra conseguir enxergar, e às vezes esquece de voltar. */
+  /* OS BOTÕES DE TESTE: Não guardam nada na config: são a prévia
+     obedecendo, e só. */
   testar() {
     let repetindo = 0;
     let travado = false;
@@ -1558,10 +1500,9 @@ function telaEditor(perfil, tipoNovo) {
   tela.appendChild(h('h1', { txt: (perfil ? 'Editar ' : 'Novo ') + (TIPOS[tipo] || {}).nome }));
   tela.appendChild(h('p', { cls: 'sub', txt: 'Arraste cada parte pra onde quiser, como no Photoshop. Segure Shift pra travar no eixo, dê dois cliques numa peça pra pular pro campo dela, e use Ctrl+Z pra voltar atrás (Ctrl+Shift+Z refaz). O que você vê aqui é o mesmo desenho que vai pro OBS — não é imitação.' }));
 
-  /* O OVERLAY DE MÚSICA SEM SPOTIFY FICA VAZIO PRA SEMPRE, E EM SILÊNCIO.
-     Na prévia aqui ele mostra a música de mentira e parece tudo certo; no OBS
-     não aparece nada, e nada em lugar nenhum diz o motivo. Este aviso é o que
-     transforma "não funciona" em "falta um passo". */
+  /* O OVERLAY DE MÚSICA SEM SPOTIFY FICA VAZIO PRA SEMPRE, E EM SILÊNCIO:
+     Na prévia aqui ele mostra a música de mentira e parece tudo certo; no
+     OBS não aparece nada, e nada em lugar nenhum diz o motivo. */
   if (tipo === 'musica') {
     const avisoSpot = h('p', { cls: 'aviso escondido' });
     tela.appendChild(avisoSpot);
@@ -1630,11 +1571,9 @@ function telaEditor(perfil, tipoNovo) {
       }
       temAlgo = true;
       const controle = fab(it);
-      /* A CHAVE VIRA UM <label> DE VERDADE.
-
-         O botãozinho tem 40 por 22 pixels, e o texto ao lado não fazia nada
-         quando clicado: eram irmãos, não pai e filho. Acertar a chave virava
-         mira. Como <label>, o clique em qualquer lugar da linha vale. */
+      /* A CHAVE VIRA UM <label> DE VERDADE: O botãozinho tem 40 por 22
+         pixels, e o texto ao lado não fazia nada quando clicado: eram
+         irmãos, não pai e filho. */
       const ehChave = !!controle.__marcavel;
       const linha = h(ehChave ? 'label' : 'div',
         ehChave ? { cls: 'campo campo--chave' } : { cls: 'campo' },
@@ -1735,6 +1674,25 @@ function telaControlador() {
   fatiaChave.appendChild(h('p', { cls: 'aviso', txt: 'Trocar a chave para a fonte do OBS: o endereço dela carrega a chave dentro. Só troque se a chave tiver aparecido em print, em VOD ou na tela durante a live — e deixe o OBS aberto pra colar o endereço novo logo em seguida.' }));
   tela.appendChild(fatiaChave);
 
+  /* ----- conta da Twitch ----- */
+  const btEntrarDeNovo = h('button', { cls: 'bt', type: 'button', txt: 'Entrar de novo na Twitch' });
+  btEntrarDeNovo.onclick = () => { location.href = API + '/entrar.php'; };
+
+  const btSair = h('button', { cls: 'bt fraco', type: 'button', txt: 'Sair deste computador' });
+  btSair.onclick = () => {
+    /* Só apaga a chave guardada aqui. A conta continua ligada no servidor:
+       "sair" não pode desligar overlay que está no ar numa live. */
+    try { sessionStorage.removeItem('zc:chave'); } catch (e) {}
+    location.href = 'index.html';
+  };
+
+  tela.appendChild(h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Conta da Twitch' }),
+    h('p', { cls: 'd', txt: 'Entrar de novo renova a permissão e o acesso — é o que resolve quando a Twitch para de responder ou quando uma permissão nova foi adicionada ao site. Não desfaz nada: seus overlays, comandos e subathon continuam como estão.' }),
+    h('div', { cls: 'acoes', style: 'display:flex;gap:8px;flex-wrap:wrap' }, [btEntrarDeNovo, btSair]),
+    h('p', { cls: 'd', style: 'margin-top:8px', txt: 'Sair só apaga a chave guardada neste navegador. Os overlays que já estão no OBS continuam funcionando.' }),
+  ]));
+
   /* ----- links que carregam a chave dentro ----- */
   const fatiaLinks = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Meus links com chave' }),
@@ -1833,14 +1791,8 @@ function telaComandos() {
 
   const cNome = h('input', { type: 'text', placeholder: 'brb' });
 
-  /* OS PASSOS.
-
-     Um comando não é mais um apelido pra uma ação: é uma sequência. Na
-     prática o que a pessoa quer é "sair da mesa" — mutar E esconder a câmera
-     E trocar de cena, com um comando só.
-
-     A ordem importa e é a que está na tela: mutar antes de trocar de cena,
-     senão o microfone fica aberto no meio do corte. */
+  /* OS PASSOS: Um comando não é mais um apelido pra uma ação: é uma
+     sequência. */
   const listaPassos = h('div');
   let passos = [{ acao: 'cena', argumento: '' }];
 
@@ -1957,12 +1909,9 @@ function telaComandos() {
   }
   pintaMeus();
 
-  /* ================= GATILHOS: quando acontecer X, faca Y =================
-
-     A mesma sequencia de passos dos comandos, so que quem "digita" e o
-     evento. Fica nesta tela de proposito: pra quem esta criando um !brb, a
-     ideia de "e se isso acontecesse sozinho quando alguem assina" so ocorre
-     se as duas coisas estiverem lado a lado. */
+  /* ================= GATILHOS: quando acontecer X, faca Y
+     ================= A mesma sequencia de passos dos comandos, so que
+     quem "digita" e o evento. */
 
   const EVENTOS = [
     ['sub',      'Alguem assinou',              'assinaturas'],
@@ -2159,12 +2108,7 @@ window.addEventListener('message', (e) => {
 });
 
 
-/* ==================================================================
-   SUBATHON
-
-   Quanto cada coisa soma no cronometro. Em MINUTOS na tela e segundos no
-   servidor: ninguem pensa "300 segundos por sub", pensa "5 minutos".
-   ================================================================== */
+/* SUBATHON: Quanto cada coisa soma no cronometro. */
 const REGRAS = [
   { k: 'seg_sub1',   nome: 'Sub',        obs: 'e Prime também',    padrao: 300 },
   { k: 'seg_sub2',   nome: 'Sub tier 2', obs: '',                  padrao: 600 },
@@ -2260,12 +2204,8 @@ async function telaSubathon() {
   ]);
   tela.appendChild(fatiaViewers);
 
-  /* ----- metas de seguidores e de subs -----
-
-     Mesma forma da de viewers, e por isso saem da mesma função em vez de
-     três blocos quase iguais. A diferença que importa: estas duas o próprio
-     subathon confere, sem precisar de um overlay de meta aberto — quem tem
-     subathon e nenhuma meta na tela também vê o tempo somar. */
+  /* ----- metas de seguidores e de subs ----- Mesma forma da de viewers,
+     e por isso saem da mesma função em vez de três blocos quase iguais. */
   function fatiaMeta(chave, titulo, explica, unidade) {
     const alvo = h('input', { type: 'number', min: '0' });
     const seg = h('input', { type: 'number', min: '0' });
@@ -2291,12 +2231,9 @@ async function telaSubathon() {
   const mSub = fatiaMeta('subs', 'Meta de subs',
     'Chegou no número de assinantes, soma tempo — e o alvo sobe sozinho pro próximo. Deixe em 0 pra desligar.', 'subs');
 
-  /* O DIAGNÓSTICO DA CONTAGEM.
-
-     Sem isto, quando a Twitch recusa a leitura de seguidores a meta fica
-     parada no número antigo e a pessoa acha que o overlay quebrou. O caso
-     comum é ela ter entrado no site antes de a permissão existir — e isso
-     não se resolve sozinho: precisa entrar de novo. */
+  /* O DIAGNÓSTICO DA CONTAGEM: Sem isto, quando a Twitch recusa a leitura
+     de seguidores a meta fica parada no número antigo e a pessoa acha que
+     o overlay quebrou. */
   const diag = h('p', { cls: 'd' });
   const fatiaDiag = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'A Twitch está respondendo?' }),

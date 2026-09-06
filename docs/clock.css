@@ -1,9 +1,7 @@
-/* =====================================================================
-   RELÓGIO DO ZOCA — aparência do relógio
-   Todo valor ajustável é uma variável CSS que o clock.js escreve. Isso
-   vale tanto pro overlay do OBS quanto pro preview do personalizador —
-   os dois usam ESTE arquivo, então o que você vê é o que vai no ar.
-   ===================================================================== */
+/* RELÓGIO DO ZOCA — aparência do relógio Todo valor ajustável é uma
+   variável CSS que o clock.js escreve. Isso vale tanto pro overlay do OBS
+   quanto pro preview do personalizador — os dois usam ESTE arquivo, então
+   o que você vê é o que vai no ar. */
 
 .rl {
   /* padrões de segurança: se o JS não rodar, ainda dá pra ver alguma coisa */
@@ -73,12 +71,7 @@
   -webkit-backdrop-filter: var(--rl-blur);
 }
 
-/* ---------------------------------------------------------------------
-   As duas camadas empilhadas (traçado atrás, preenchimento na frente).
-   O grid com as duas no MESMO slot garante alinhamento perfeito sem
-   position:absolute e sem depender de paint-order (que o Chromium do
-   OBS nem sempre respeita em texto HTML).
-   --------------------------------------------------------------------- */
+/* As duas camadas empilhadas (traçado atrás, preenchimento na frente). */
 .rl__time,
 .rl__date {
   display: grid;
@@ -192,15 +185,8 @@
 }
 @media (prefers-reduced-motion: reduce) { .rl__barra > i { transition: none; } }
 
-/* =====================================================================
-   SUBATHON — o que acontece quando entra tempo
-   ---------------------------------------------------------------------
-   Um número que só anda pra trás não conta história nenhuma. O sub que
-   acabou de entrar tem que APARECER: é o "+1UP" do Mario, sobe e some.
-
-   Tudo aqui é CSS puro e sai do fluxo (position:absolute). Um efeito nunca
-   pode empurrar o relógio de lugar no meio da live.
-   ===================================================================== */
+/* SUBATHON — o que acontece quando entra tempo Um número que só anda pra
+   trás não conta história nenhuma. */
 
 .rl__box { position: relative; }
 
@@ -289,13 +275,9 @@
    verde em volta fica pior do que halo nenhum. */
 .rl--urgente .rl__time { filter: var(--rl-urgfilter); }
 
-/* ---------------------------------------------------------------------
-   LEGENDA — "o que dá quanto"
-
-   Quem chega no meio da live não faz ideia de que uma sub vale 5 minutos,
-   e quem não sabe disso não tem motivo pra assinar. Fica pequena embaixo:
-   é informação de consulta, não é o assunto.
-   --------------------------------------------------------------------- */
+/* LEGENDA — "o que dá quanto" Quem chega no meio da live não faz ideia de
+   que uma sub vale 5 minutos, e quem não sabe disso não tem motivo pra
+   assinar. */
 .rl__leg {
   display: none;
   order: 2;
@@ -311,14 +293,7 @@
   margin-top: calc(var(--rl-leggap) - var(--rl-dgap));
 }
 
-/* ---------------------------------------------------------------------
-   ONDE CADA PECA FICA
-
-   O editor deixa arrastar cada parte do overlay. O resultado vira um
-   translate por peca — nunca margem: margem empurraria as vizinhas e
-   mudaria o tamanho sugerido pro OBS, entao mover o titulo mexeria o
-   numero de lugar junto.
-   --------------------------------------------------------------------- */
+/* ONDE CADA PECA FICA: O editor deixa arrastar cada parte do overlay. */
 .rl__time  { transform: translate(var(--rl-nx, 0), var(--rl-ny, 0)); }
 .rl__date  { transform: translate(var(--rl-tx, 0), var(--rl-ty, 0)); }
 .rl__barra { transform: translate(var(--rl-bx, 0), var(--rl-by, 0)); }
@@ -328,13 +303,8 @@
 .rl__time.rl--baque { animation: none; }
 .rl__time.rl--baque .rl__layer { animation: rl-baque .6s cubic-bezier(.22, 1, .36, 1); }
 
-/* ---------------------------------------------------------------------
-   NUMERO DENTRO DA BARRA
-
-   Numa meta, "347 / 500" em cima e a barra embaixo ocupa quase o dobro da
-   altura. Com o numero por dentro fica uma faixa so — que e como quase
-   todo mundo usa de verdade.
-   --------------------------------------------------------------------- */
+/* NUMERO DENTRO DA BARRA: Numa meta, "347 / 500" em cima e a barra
+   embaixo ocupa quase o dobro da altura. */
 .rl.is-dentro .rl__box { display: grid; grid-template-columns: 1fr; }
 .rl.is-dentro .rl__time,
 .rl.is-dentro .rl__barra { grid-area: 1 / 1; align-self: center; }
@@ -347,13 +317,8 @@
 .rl.is-dentro .rl__date { grid-area: 2 / 1; }
 .rl.is-dentro .rl__leg  { grid-area: 3 / 1; }
 
-/* ---------------------------------------------------------------------
-   MODO EDICAO
-
-   So existe dentro do editor: a fonte no OBS nunca recebe esta classe.
-   O tracejado mostra onde comeca e acaba cada peca, que e a unica forma
-   de saber o que voce esta pegando quando o fundo e transparente.
-   --------------------------------------------------------------------- */
+/* MODO EDICAO: So existe dentro do editor: a fonte no OBS nunca recebe
+   esta classe. */
 .rl.is-editando .rl__time,
 .rl.is-editando .rl__date,
 .rl.is-editando .rl__barra {
@@ -370,25 +335,14 @@
 .rl.is-editando .rl__date[contenteditable="true"],
 .rl.is-editando .rl__leg[contenteditable="true"] { cursor: text; outline-color: #45B8BF; }
 
-/* ---------------------------------------------------------------------
-   O .rl inteiro tem pointer-events:none, porque no OBS ele nao pode
-   interceptar clique nenhum. Isso e certo la e fatal aqui: sem devolver o
-   clique, o arrasto do editor nunca recebe nem o primeiro pointerdown.
-
-   Volta so no modo edicao, que so existe dentro do editor.
-   --------------------------------------------------------------------- */
+/* O .rl inteiro tem pointer-events:none, porque no OBS ele nao pode
+   interceptar clique nenhum. */
 .rl.is-editando { pointer-events: auto; }
 .rl.is-editando .rl__time,
 .rl.is-editando .rl__date,
 .rl.is-editando .rl__barra { pointer-events: auto; }
 
-/* ---------------------------------------------------------------------
-   ALÇA DE TAMANHO
-
-   Só no editor. Fica no canto de baixo à direita, como em qualquer
-   programa de desenho: puxar pro lado alarga, puxar pra baixo aumenta a
-   letra. É o gesto que a pessoa já sabe sem ninguém explicar.
-   --------------------------------------------------------------------- */
+/* ALÇA DE TAMANHO: Só no editor. */
 .rl__alca {
   position: absolute;
   width: 16px;

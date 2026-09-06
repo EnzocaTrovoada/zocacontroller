@@ -383,12 +383,7 @@ function conectar(senha, porta) {
 
     if (msg.op === 0) {
       clearTimeout(limite);
-      /* 65536 = InputVolumeMeters. Sem ele, o nível do microfone tinha que
-         vir relayado pela fonte do OBS até o servidor e voltar — e o que se
-         via aqui era sempre o som de um segundo atrás.
-
-         Este painel fala com o OBS por um cano direto. Ler o medidor daqui é
-         instantâneo, e é o único caminho que não tem atraso pra ter. */
+      /* 65536 = InputVolumeMeters. */
       const ident = { rpcVersion: 1, eventSubscriptions: 1 | 4 | 8 | 128 | 65536 };
       if (msg.d.authentication) {
         if (!senha) { el('aviso').textContent = 'Seu OBS pede senha e o campo está vazio.'; return; }
@@ -812,16 +807,7 @@ async function resolver(opcao) {
 /* Enquanto tem palpite aberto, os números mudam sozinhos. */
 setInterval(() => { if (chavePainel && palpiteAtual) lerPalpite(); }, 5000);
 
-/* ------------------------------------------------------------------ *
- *  O que aparece aqui, e o que aparece na live.
- *
- *  Ocultar do controller NÃO é o olhinho do OBS: a fonte continua lá,
- *  funcionando, só não polui esta tela nem a dos mods. O olhinho é a seção
- *  de baixo, e esse sim tira da transmissão.
- *
- *  A lista do que está oculto mora numa gaveta do próprio OBS, então a ponte
- *  lê a mesma coisa sem servidor no meio.
- * ------------------------------------------------------------------ */
+/* O que aparece aqui, e o que aparece na live. */
 
 const GAVETA_OCULTOS = 'zocacontroller_ocultos';
 let ocultos = [];
@@ -855,16 +841,8 @@ el('btEditarSons').addEventListener('click', () => {
   desenharMixer();
 });
 
-/* ------------------------------------------------------------------ *
- *  O SPOTIFY FORA DO VOD
- *
- *  Existia só como comando de chat, e o nome da fonte de áudio tinha que ser
- *  colado à mão no endereço da fonte do OBS. Ninguém leigo faz isso — e o
- *  pedido era uma OPÇÃO, não um comando.
- *
- *  A escolha mora numa gaveta do próprio OBS, então a ponte lê a mesma coisa
- *  e reaplica sozinha quando o OBS reabre ou a fonte é recriada.
- * ------------------------------------------------------------------ */
+/* O SPOTIFY FORA DO VOD: Existia só como comando de chat, e o nome da
+   fonte de áudio tinha que ser colado à mão no endereço da fonte do OBS. */
 
 const GAVETA_VOD = 'zocacontroller_vod';
 let vod = { fonte: '', trilha: 2, ligado: false };
@@ -936,14 +914,8 @@ function desenharVod() {
   }
 }
 
-/* A TRILHA DO VOD PODE NEM EXISTIR.
-   Ela só existe no modo Avançado de saída do OBS. No modo Simples, mexer nas
-   trilhas não faz nada — e dizer "saiu do VOD" nesse caso é mentir pra quem
-   está confiando nisso pra não tomar strike.
-
-   Isto é uma conferência de boa-fé: só avisa quando consegue LER que está
-   errado. Se o OBS não responder ou o nome do parâmetro mudar numa versão
-   nova, fica calado em vez de inventar um alerta falso. */
+/* A TRILHA DO VOD PODE NEM EXISTIR: Ela só existe no modo Avançado de
+   saída do OBS. */
 async function conferirTrilhaVod() {
   const aviso = el('vodAviso');
   if (!aviso) return;
@@ -1045,12 +1017,7 @@ function desenharFontes() {
   }
 }
 
-/* ------------------------------------------------------------------ *
- *  Momentos.
- *
- *  Quem grava é a ponte, porque só ela sabe há quanto tempo a live está no
- *  ar — e é esse número que bate com o VOD.
- * ------------------------------------------------------------------ */
+/* Momentos. */
 
 async function lerMomentos() {
   if (!chavePainel) return;
@@ -1130,12 +1097,8 @@ el('cenas').addEventListener('change', async (e) => {
 });
 
 /* ---------- entra sozinho se já tem senha guardada ---------- */
-/*
- * A doca guarda a senha e reconecta sozinha, então a tela de conexão some
- * depois da primeira vez — e com ela sumia o campo da chave. Aceitar pela URL
- * resolve sem obrigar ninguém a limpar dado do navegador, e a URL da doca fica
- * dentro das configurações do OBS, não na transmissão.
- */
+/* A doca guarda a senha e reconecta sozinha, então a tela de conexão some
+   depois da primeira vez — e com ela sumia o campo da chave. */
 const naUrl = new URLSearchParams(location.search);
 if (naUrl.get('chave')) { chavePainel = naUrl.get('chave').trim(); guardar('zc:chave', chavePainel); }
 if (naUrl.get('senha') !== null) guardar('zc:senha', naUrl.get('senha'));

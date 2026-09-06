@@ -1,14 +1,6 @@
-/* musica.css — o que está tocando.
-   ---------------------------------------------------------------------
-   A tipografia e as cores vêm das variáveis do clock.css, iguais às dos
-   outros overlays. Aqui mora só o que é próprio da música.
-
-   A PEÇA TEM DUAS PARTES INDEPENDENTES: a capa, que é um quadrado de
-   tamanho fixo, e a faixa, que estica pra direita por TRÁS dela.
-
-   Antes a capa vivia dentro da faixa, e por isso encolhia junto quando a
-   faixa encolhia — a animação inteira era uma caixa só mudando de largura.
-   Separadas, a capa aparece primeiro e FICA, e a faixa sai de trás dela. */
+/* musica.css — o que está tocando. A tipografia e as cores vêm das
+   variáveis do clock.css, iguais às dos outros overlays. Aqui mora só o
+   que é próprio da música. */
 
 .mu {
   display: flex;
@@ -35,13 +27,7 @@
   flex: none;
 }
 
-/* ---------------------------------------------------------------------
-   A CAPA
-
-   Fica POR CIMA e à esquerda, saindo um pouco pra fora da faixa. É essa
-   saliência que dá profundidade e faz a peça parecer montada, em vez de um
-   retângulo com uma imagem dentro.
-   --------------------------------------------------------------------- */
+/* A CAPA: Fica POR CIMA e à esquerda, saindo um pouco pra fora da faixa. */
 .mu__capa {
   position: relative;
   z-index: 2;
@@ -55,13 +41,7 @@
 }
 .mu--sem-capa .mu__capa { display: none; }
 
-/* ---------------------------------------------------------------------
-   A FAIXA
-
-   Entra por baixo da capa e estica pra direita. A margem negativa é o que a
-   enfia atrás; o padding devolve o espaço por dentro, pra que o texto comece
-   depois da capa e não embaixo dela.
-   --------------------------------------------------------------------- */
+/* A FAIXA: Entra por baixo da capa e estica pra direita. */
 .mu__faixa {
   position: relative;
   z-index: 1;
@@ -92,16 +72,8 @@
   text-align: right;
 }
 
-/* ---------------------------------------------------------------------
-   O FUNDO SAI DA CAPA
-
-   A mesma imagem, ampliada e borrada, pintando a faixa por trás. A cor muda
-   a cada música sem ninguém escolher nada, e combina sempre — porque é
-   literalmente a cor daquele disco.
-
-   Ampliada de propósito: um blur forte come as bordas da imagem, e sem a
-   sobra ficaria uma moldura clara em volta.
-   --------------------------------------------------------------------- */
+/* O FUNDO SAI DA CAPA: A mesma imagem, ampliada e borrada, pintando a
+   faixa por trás. */
 .mu__brilho { display: none; }
 
 .mu--fundo-capa .mu__brilho {
@@ -156,14 +128,7 @@
   line-height: 1.2;
 }
 
-/* Texto que não cabe passa devagar de um lado pro outro. Só quem não cabe
-   ganha a classe — animar o que já cabe é movimento à toa na tela.
-
-   O <i> de dentro é que anda; a caixa fica parada fazendo de janela. Antes a
-   animação era na própria caixa, que tem overflow:hidden — o corte andava
-   junto com o texto e não revelava nada, só empurrava a linha pra fora. E a
-   regra que preparava o filho (`.mu--longo > *`) não pegava ninguém, porque
-   o texto entrava por textContent e não havia filho nenhum. */
+/* Texto que não cabe passa devagar de um lado pro outro. */
 .mu__nome > i, .mu__artista > i {
   display: inline-block;
   font-style: normal;          /* é <i> por ser curto, não por ser itálico */
@@ -200,31 +165,12 @@
   transition: width .25s linear;
 }
 
-/* ---------------------------------------------------------------------
-   A ENTRADA EM QUATRO TEMPOS
-
-   Nada → a capa cresce → a faixa estica pra direita → o nome aparece.
-   Pra sumir, o mesmo de trás pra frente.
-
-   Cada parte anima a SUA propriedade: a capa a escala, a faixa a largura, o
-   texto a opacidade. Uma animação só não daria conta, porque a capa não pode
-   encolher quando a faixa encolhe — ela é justamente o que fica.
-   --------------------------------------------------------------------- */
-/* A LINHA DO TEMPO, EM TRÊS TEMPOS QUE NÃO SE PISAM.
-
-   Antes a faixa começava em 0,34 e a capa só terminava em 0,42: as duas
-   cresciam juntas por um pedaço, e o olho lê isso como "tudo ao mesmo tempo"
-   em vez de "primeiro uma, depois a outra". O texto ainda terminava em 1,08,
-   ou seja, depois do fim da própria abertura.
-
-   Agora cada tempo começa onde o anterior acabou, e o último fecha em 1:
-
-     capa   0     -> 0,34
-     faixa  0,34  -> 0,72
-     texto  0,72  -> 1
-
-   A capa passa um pouco de 1 e volta (é a curva com o 1.56), mas isso
-   acontece DENTRO da fatia dela — não empurra a faixa. */
+/* A ENTRADA EM QUATRO TEMPOS: Nada → a capa cresce → a faixa estica pra
+   direita → o nome aparece. */
+/* A LINHA DO TEMPO, EM TRÊS TEMPOS QUE NÃO SE PISAM: Antes a faixa
+   começava em 0,34 e a capa só terminava em 0,42: as duas cresciam juntas
+   por um pedaço, e o olho lê isso como "tudo ao mesmo tempo" em vez de
+   "primeiro uma, depois a outra". */
 .mu--revelar .mu__capa {
   animation: mu-capa-entra calc(var(--mu-abrir) * .34) cubic-bezier(.34, 1.56, .64, 1) both;
 }
@@ -237,21 +183,10 @@
   animation: mu-faixa-entra calc(var(--mu-abrir) * .38) cubic-bezier(.22, 1, .36, 1)
              calc(var(--mu-abrir) * .34) both;
 }
-/* REVELAR COM CORTE, E NÃO COM LARGURA.
-
-   Animar a largura parecia o caminho óbvio e não funciona: a faixa tem
-   padding dos dois lados e box-sizing de borda, então ela NÃO encolhe abaixo
-   do próprio padding — medido, ela parava em 99px com "width: 0". Resultado:
-   um toco verde ao lado da capa desde o primeiro quadro, antes de a capa
-   sequer terminar de crescer.
-
-   Zerar o padding junto resolveria, mas o padding é diferente quando a capa
-   está à direita e quando não tem capa — o quadro brigaria com as três
-   regras. O corte não briga com nenhuma: a faixa já está do tamanho final o
-   tempo todo, e o que anda é quanto dela aparece.
-
-   Como a esquerda da faixa mora atrás da capa, os primeiros pixels revelados
-   ficam escondidos — e o que se vê é a faixa saindo DE TRÁS da capa. */
+/* REVELAR COM CORTE, E NÃO COM LARGURA: Animar a largura parecia o
+   caminho óbvio e não funciona: a faixa tem padding dos dois lados e
+   box-sizing de borda, então ela NÃO encolhe abaixo do próprio padding —
+   medido, ela parava em 99px com "width: 0". */
 @keyframes mu-faixa-entra {
   from { clip-path: inset(0 100% 0 0 round var(--mu-raio)); }
   to   { clip-path: inset(0 0 0 0 round var(--mu-raio)); }

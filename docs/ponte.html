@@ -107,11 +107,7 @@
 <script>
 "use strict";
 
-/* ------------------------------------------------------------------ *
- *  Configuração — modo A: tudo dentro do link.
- *  A senha também fica no localStorage do browser source, para poder
- *  sair da URL depois do primeiro carregamento.
- * ------------------------------------------------------------------ */
+/* Configuração — modo A: tudo dentro do link. */
 
 const q = new URLSearchParams(location.search);
 const guardado = (c) => { try { return localStorage.getItem(c); } catch (e) { return null; } };
@@ -173,12 +169,9 @@ const estado = {
   mic: '', desktop: '', cena: '', cenaAntes: '',
   micMudo: false, nivel: 0,
   panico: false,
-  /* COMO O ÁUDIO ESTAVA ANTES DO PÂNICO.
-     Sem isto, sair do pânico LIGAVA o microfone — mesmo se o streamer o
-     tivesse mudado de propósito antes. É o defeito que o pânico existe pra
-     evitar, só que ao contrário: em vez de vazar por descuido, vaza na hora
-     em que a pessoa acha que está voltando ao normal. A cena já era lembrada
-     (cenaAntes); o áudio não era. */
+  /* COMO O ÁUDIO ESTAVA ANTES DO PÂNICO: Sem isto, sair do pânico LIGAVA
+     o microfone — mesmo se o streamer o tivesse mudado de propósito
+     antes. */
   mudoAntes: null,
   mudoDesde: 0,          // performance.now() de quando começou a falar mudo
   cenasConhecidas: [],
@@ -228,13 +221,7 @@ let ws = null, pendentes = new Map(), seq = 0, esperaObs = 1000;
 // General | Scenes | Inputs | InputVolumeMeters
 const ASSINATURAS = 1 | 4 | 8 | 128 | 65536;   // General, Scenes, Inputs, SceneItems, medidores
 
-/*
- * SHA-256 em JS puro.
- *
- * Existe porque crypto.subtle só é oferecido em contexto seguro — https ou
- * localhost. Numa página http comum ele não está lá, e sem isso a conta da
- * autenticação do obs-websocket não teria como ser feita.
- */
+/* SHA-256 em JS puro. */
 const K256 = [
   0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
   0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
@@ -392,10 +379,7 @@ function evento(tipo, d) {
   }
 }
 
-/**
- * Descobre sozinho o microfone, o áudio do sistema e a cena de pânico.
- * Regra dos usuários leigos: se dá para adivinhar, não pergunte.
- */
+/* Descobre sozinho o microfone, o áudio do sistema e a cena de pânico. */
 /* lerGaveta = false quando quem chamou JÁ sabe a lista nova: senão a
  * releitura sobrescreve o aviso que acabou de chegar do painel. */
 async function descobrir(lerGaveta = true) {
@@ -453,24 +437,14 @@ async function descobrir(lerGaveta = true) {
   }
 }
 
-/* ------------------------------------------------------------------ *
- *  Ações — registro com permissão explícita. O que não está aqui,
- *  não existe: negar por padrão é o que segura mod novo e tenant curioso.
- * ------------------------------------------------------------------ */
+/* Ações — registro com permissão explícita. */
 
 /* Quem manda mais, em ordem. Quem esta em cima pode tudo que os de baixo
    podem — entao um comando liberado pra "sub" tambem vale pra VIP e mod. */
 const CARGOS = { chat: 0, sub: 1, vip: 2, mod: 3, supermod: 4, dono: 5 };
 
-/* Moderador-chefe é cargo DA TWITCH: o Lead Moderator, que pode pôr e tirar
-   outros mods e mexer nas configurações de moderação do canal. A etiqueta
-   dele é "lead_moderator".
-
-   Detalhe que quebra quem não sabe: a etiqueta SUBSTITUI a de moderador, não
-   se soma a ela. Quem procura mod tem que aceitar as duas.
-
-   A lista escolhida à mão continua existindo, pra quem quer confiar o pânico
-   a um mod comum sem promovê-lo na Twitch. Vale qualquer uma das duas. */
+/* Moderador-chefe é cargo DA TWITCH: o Lead Moderator, que pode pôr e
+   tirar outros mods e mexer nas configurações de moderação do canal. */
 const SUPERMODS = new Set();   /* preenchido pelo painel, junto dos comandos */
 
 function cargoDe(tags) {
@@ -510,11 +484,9 @@ async function comoEstaOAudio() {
   return { mic: await ler(estado.mic), desktop: await ler(estado.desktop) };
 }
 
-/* O PÂNICO PRECISA SOBREVIVER A UM RELOAD.
-   A fonte do OBS recarrega sozinha (OBS reaberto, botão de atualizar, troca de
-   cena com "desligar quando não visível"). Se o pânico morresse junto, o
-   microfone continuaria mudo — mas a trava sumiria, e qualquer mod poderia
-   desmutar com !mute. Quem sai do pânico é o dono, e só. */
+/* O PÂNICO PRECISA SOBREVIVER A UM RELOAD: A fonte do OBS recarrega
+   sozinha (OBS reaberto, botão de atualizar, troca de cena com "desligar
+   quando não visível"). */
 const GAVETA_PANICO = 'zocacontroller_panico';
 
 async function guardaPanico() {
@@ -649,20 +621,7 @@ ACOES.som = {
   },
 };
 
-/* ------------------------------------------------------------------ *
- *  Fontes da cena e o que fica escondido do controller.
- *
- *  Duas coisas diferentes de propósito:
- *
- *  OCULTAR DO CONTROLLER — a fonte continua no OBS, funcionando; ela só não
- *  aparece no painel nem para os mods. Serve para tirar da frente o que
- *  ninguém precisa ver (áudio de teste, fonte de sistema, coisa antiga).
- *
- *  VISIBILIDADE NO OBS — é o olhinho de verdade, o que some da transmissão.
- *
- *  A lista do que está oculto mora numa gaveta do próprio OBS, então a ponte
- *  e o painel leem a mesma coisa sem precisar de servidor no meio.
- * ------------------------------------------------------------------ */
+/* Fontes da cena e o que fica escondido do controller. */
 
 const GAVETA_OCULTOS = 'zocacontroller_ocultos';
 
@@ -676,14 +635,8 @@ async function lerOcultos() {
 
 const escondida = (nome) => estado.ocultos.some(n => n.toLowerCase() === (nome || '').toLowerCase());
 
-/* ------------------------------------------------------------------ *
- *  O SPOTIFY FORA DO VOD, SOZINHO
- *
- *  A escolha é feita no painel e mora numa gaveta do próprio OBS. Aqui ela é
- *  RELIDA e REAPLICADA a cada conexão — que é o que faz disto uma opção e
- *  não um comando: se o OBS reabre, se a fonte é recriada, se a pessoa
- *  refaz a cena, a música continua fora do VOD sem ninguém digitar nada.
- * ------------------------------------------------------------------ */
+/* O SPOTIFY FORA DO VOD, SOZINHO: A escolha é feita no painel e mora numa
+   gaveta do próprio OBS. */
 
 const GAVETA_VOD = 'zocacontroller_vod';
 let vod = { fonte: '', trilha: 2, ligado: false };
@@ -719,18 +672,9 @@ async function reaplicaVod() {
   }
 }
 
-/* ------------------------------------------------------------------ *
- *  ACHAR AS OVERLAYS SOZINHO
- *
- *  O !musica precisava de ?fonteMusica= colado à mão no endereço da ponte —
- *  e nenhuma tela do site jamais emitia esse parâmetro, então o comando
- *  respondia "falta o parâmetro" pra sempre. Era um comando morto.
- *
- *  Em vez de pedir pra pessoa configurar, a ponte descobre: percorre as
- *  fontes de navegador do OBS, pega a chave que está no endereço de cada
- *  uma, e pergunta ao servidor de que tipo é aquele overlay. Uma vez por
- *  conexão, e nunca mais.
- * ------------------------------------------------------------------ */
+/* ACHAR AS OVERLAYS SOZINHO: O !musica precisava de ?fonteMusica= colado
+   à mão no endereço da ponte — e nenhuma tela do site jamais emitia esse
+   parâmetro, então o comando respondia "falta o parâmetro" pra sempre. */
 
 let overlaysDoObs = {};      /* tipo -> nome da fonte no OBS */
 
@@ -799,17 +743,7 @@ ACOES.fonte = {
 
 ACOES.clip = ACOES.replay;
 
-/* ------------------------------------------------------------------ *
- *  Palpites pelo chat.
- *
- *  Usa os Palpites nativos da Twitch, com pontos de canal de verdade — a
- *  Twitch guarda, paga sozinha e o viewer vê na interface que já conhece.
- *  Inventar uma segunda moeda só deixaria o espectador com duas coisas que
- *  ele não entende.
- *
- *  A assimetria é a mesma do pânico: o lado seguro é dos mods, o
- *  irreversível é do dono. Abrir e cancelar devolve tudo; pagar não tem volta.
- * ------------------------------------------------------------------ */
+/* Palpites pelo chat. */
 
 async function apiRele(caminho, corpo) {
   if (!cfg.chave) throw new Error('esta ponte não tem a chave do ZocaController');
@@ -892,17 +826,7 @@ ACOES.ganhou = {
   },
 };
 
-/* ------------------------------------------------------------------ *
- *  Marcador de momento.
- *
- *  O que faz isso valer não é a hora do relógio: é o TEMPO DECORRIDO da
- *  transmissão, que o obs-websocket sabe e que bate com o VOD. "23h41" não
- *  ajuda ninguém a achar o trecho depois; "01:23:45 de live" ajuda.
- *
- *  Se não estiver transmitindo, tenta a gravação. Se não houver nenhum dos
- *  dois, grava mesmo assim com a hora — melhor do que recusar e o momento
- *  passar.
- * ------------------------------------------------------------------ */
+/* Marcador de momento. */
 
 async function tempoDaLive() {
   try {
@@ -948,17 +872,9 @@ ACOES.titulo = {
   },
 };
 
-/* ------------------------------------------------------------------ *
- *  MÚSICA
- *
- *  Quem fala com o Spotify é o servidor: o token dele dá acesso à conta de
- *  quem transmite, e aqui é o navegador — qualquer um que abrisse a fonte
- *  veria a chave. Esta parte só manda "o chat pediu isto" e conta o que
- *  voltou.
- *
- *  O cargo vai junto e é conferido LÁ TAMBÉM. Barrar aqui é conforto; a
- *  regra de verdade não pode morar na parte que dá pra editar.
- * ------------------------------------------------------------------ */
+/* MÚSICA: Quem fala com o Spotify é o servidor: o token dele dá acesso à
+   conta de quem transmite, e aqui é o navegador — qualquer um que abrisse
+   a fonte veria a chave. */
 
 async function pedirMusica(corpo, quem, cargo) {
   if (!cfg.chave) return recado('Sem a chave, a música não funciona.');
@@ -1011,10 +927,7 @@ ACOES.fila = {
   },
 };
 
-/* De onde a música está saindo. Mostra o NOME, não o endereço: um link do
-   Spotify tem sessenta caracteres e ninguém copia isso da tela de uma live.
-   O endereço só aparece quando é a playlist de pedidos, que é a única que
-   alguém de fato vai querer abrir. */
+/* De onde a música está saindo. */
 ACOES.playlist = {
   minimo: 'chat', espera: 20000,
   async fazer(quem, arg, cargo) {
@@ -1043,16 +956,8 @@ ACOES.musica = {
   },
 };
 
-/* ------------------------------------------------------------------ *
- *  TIRAR O SPOTIFY DO VOD
- *
- *  A Twitch grava o VOD numa trilha de áudio SEPARADA da que vai ao vivo.
- *  Quem tira a música dessa trilha não perde nada na live e não toma
- *  strike depois — é o mesmo botão que a doca do OBS tem, feito daqui.
- *
- *  Qual trilha é a do VOD sai das configurações do OBS (Saída → Avançado);
- *  a padrão é a 2, e é a que a gente desliga.
- * ------------------------------------------------------------------ */
+/* TIRAR O SPOTIFY DO VOD: A Twitch grava o VOD numa trilha de áudio
+   SEPARADA da que vai ao vivo. */
 ACOES.vod = {
   minimo: 'dono', espera: 5000,
   async fazer(quem, arg) {
@@ -1116,10 +1021,7 @@ async function executar(nome, arg, tags) {
   catch (err) { recado('Falhou: ' + err.message); }
 }
 
-/* ------------------------------------------------------------------ *
- *  Chat da Twitch — IRC anônimo, sem token, sem backend.
- *  As tags vêm do servidor da Twitch: mod=1 não se forja digitando.
- * ------------------------------------------------------------------ */
+/* Chat da Twitch — IRC anônimo, sem token, sem backend. */
 
 let irc = null, esperaChat = 1000;
 
@@ -1182,16 +1084,7 @@ function analisar(linha) {
   return { cmd: comando, tags: tags, texto: dois === -1 ? '' : resto.slice(dois + 2).trim() };
 }
 
-/* ------------------------------------------------------------------ *
- *  Subathon automático.
- *
- *  Sub, resub, sub de presente e bits chegam pelo PRÓPRIO CHAT — o IRC
- *  anônimo que a ponte já lê. Não precisa de token, nem de escopo, nem de
- *  EventSub. Follow e doação não passam por aqui e ficam para depois.
- *
- *  Quem decide quanto cada coisa vale é o servidor, não esta página: a regra
- *  mora no painel e o overlay é gravado lá, onde o código de dono não vaza.
- * ------------------------------------------------------------------ */
+/* Subathon automático. */
 
 let subathonQuieto = 0;
 
@@ -1213,12 +1106,7 @@ async function contaNoSubathon(dados) {
     });
     const d = await r.json().catch(() => ({}));
 
-    /* Três respostas diferentes, três reações diferentes.
-
-       Antes qualquer 400 calava o subathon por dez minutos — e o servidor
-       mandava 400 até quando era só o overlay demorando pra responder. Um
-       soluço de oito segundos custava dez minutos de subs. Num raid, o raid
-       inteiro. */
+    /* Três respostas diferentes, três reações diferentes. */
     if (r.status === 401 || d.parar) {
       subathonQuieto = Date.now() + 600000;   /* chave errada ou nem configurado */
       return;
@@ -1287,17 +1175,7 @@ function tratar(m) {
   executar(nome, arg, m.tags);
 }
 
-/* ------------------------------------------------------------------ *
- *  Você sumiu da câmera?
- *
- *  Não abrimos a câmera: o OBS já está com ela, e no Windows quem pega
- *  primeiro pega sozinho. Em vez disso pedimos um print pequeno da fonte
- *  pelo próprio obs-websocket e procuramos um rosto nele.
- *
- *  A regra que manda aqui é: detector quebrado NUNCA troca de cena.
- *  Cortar a live de alguém no meio de uma frase por causa de um modelo
- *  que não carregou é pior do que não ter o recurso.
- * ------------------------------------------------------------------ */
+/* Você sumiu da câmera? */
 
 const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 
@@ -1407,15 +1285,7 @@ async function olhar() {
 prepararOlho();
 setInterval(olhar, cfg.intervaloOlho);
 
-/* ------------------------------------------------------------------ *
- *  Detector de mudo acidental.
- *  Se entra som no microfone e a fonte está muda, avisa.
- *
- *  ATENÇÃO: depende do OBS continuar mandando medidores de uma fonte
- *  muda. Se o medidor no HUD ficar zerado ao falar mudo, é porque ele
- *  não manda — e aí este detector não funciona. Dá pra conferir em
- *  dez segundos: mute o microfone e fale.
- * ------------------------------------------------------------------ */
+/* Detector de mudo acidental. */
 
 function avaliar() {
   const agora = performance.now();
@@ -1426,10 +1296,8 @@ function avaliar() {
     estado.mudoDesde = 0;
   }
 
-  /* Para quem ve de fora, o numero do medidor nao serve: ele muda toda hora
-     e mandar isso pela rede seria uma requisicao por respiracao. O que o mod
-     precisa saber e binario — esta saindo som ou nao — e isso muda devagar.
-     A cauda de 1,2 s existe para nao piscar entre palavras. */
+  /* Para quem ve de fora, o numero do medidor nao serve: ele muda toda
+     hora e mandar isso pela rede seria uma requisicao por respiracao. */
   if (estado.nivel > cfg.limiar) estado.falouAte = agora + 1200;
   estado.falando = agora < estado.falouAte;
 
@@ -1441,12 +1309,7 @@ function avaliar() {
   pintar();
 }
 
-/*
- * Dois relógios de propósito. requestAnimationFrame dá o desenho fluido do
- * medidor, mas PARA quando a fonte não está sendo renderizada — e é justamente
- * aí que o streamer não está olhando. O setInterval é o que garante que o
- * detector continua contando. Nenhum dos dois sozinho serve.
- */
+/* Dois relógios de propósito. */
 function quadro() { avaliar(); requestAnimationFrame(quadro); }
 
 requestAnimationFrame(quadro);
@@ -1459,14 +1322,7 @@ document.addEventListener('visibilitychange', () => {
   if (!irc || irc.readyState > 1) esperaChat = 500;
 });
 
-/* ------------------------------------------------------------------ *
- *  Conversa com o painel (a doca do OBS).
- *
- *  O caminho é o próprio obs-websocket: BroadcastCustomEvent manda um
- *  recado para todos os outros clientes conectados. Some a necessidade de
- *  servidor, e some a aposta de que localStorage é compartilhado entre a
- *  fonte de navegador e a doca — que são contextos diferentes.
- * ------------------------------------------------------------------ */
+/* Conversa com o painel (a doca do OBS). */
 
 const EU = 'p' + Math.random().toString(36).slice(2, 8);
 
@@ -1505,12 +1361,7 @@ const CAIXA  = 'OBS_WEBSOCKET_DATA_REALM_GLOBAL';
 const GAVETA = 'zocacontroller_estado';
 const GAVETA_CMD = 'zocacontroller_comando';
 
-/*
- * Dois caminhos de propósito. BroadcastCustomEvent é instantâneo, mas depende
- * de o outro lado estar inscrito na categoria certa de eventos. A gaveta do
- * SetPersistentData é só requisição comum — mais lenta, porém não tem como
- * não funcionar. Se um falhar, o painel enxerga pelo outro.
- */
+/* Dois caminhos de propósito. */
 async function anunciar() {
   if (!estado.obs) return;
 
@@ -1545,14 +1396,8 @@ async function buscarComando() {
     ultimoComando = c.id;
   } catch (e) { return; }        // OBS engasgou: tenta de novo no próximo pulso
 
-  /* O AWAIT AQUI NÃO É ENFEITE.
-     A doPainel é async, e antes ela era chamada sem await de dentro do try
-     acima. Uma promessa rejeitada não é exceção síncrona: escapava do catch
-     e virava erro solto no console. Como o id já tinha avançado, o comando
-     não era repetido — quem pediu !panico via o chat responder e nada
-     acontecer no OBS, sem nenhuma pista do motivo.
-
-     Agora a falha é falha: aparece escrita, com o nome do comando. */
+  /* O AWAIT AQUI NÃO É ENFEITE: A doPainel é async, e antes ela era
+     chamada sem await de dentro do try acima. */
   try {
     await doPainel(c);
   } catch (e) {
@@ -1562,13 +1407,7 @@ async function buscarComando() {
 }
 setInterval(buscarComando, 600);
 
-/* ------------------------------------------------------------------ *
- *  Relé — o caminho até os moderadores.
- *
- *  A ponte EMPURRA o estado e PUXA os comandos. O servidor nunca inicia
- *  conversa, e por isso tudo isso cabe em hospedagem compartilhada, sem
- *  WebSocket do lado de lá.
- * ------------------------------------------------------------------ */
+/* Relé — o caminho até os moderadores. */
 
 const dorme = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -1576,13 +1415,7 @@ let releQuieto = 0;          // depois de erro, espaça as tentativas
 let ultimaAssinatura = '';
 let ultimoEnvio = 0;
 
-/*
- * Publica quando MUDA, não por relógio.
- *
- * O nível do medidor fica oscilando o tempo todo e não entra na conta —
- * senão toda respiração virava requisição. Fora isso, um batimento a cada
- * 5 s serve para o outro lado saber que a ponte continua viva.
- */
+/* Publica quando MUDA, não por relógio. */
 async function subirEstado(forcar) {
   if (!cfg.chave || !estado.obs || Date.now() < releQuieto) return;
 
@@ -1638,11 +1471,7 @@ async function subirEstado(forcar) {
   }
 }
 
-/*
- * Espera longa: uma requisição fica pendurada até aparecer comando. O mod
- * aperta e a ponte reage em menos de um segundo — e mesmo assim são menos
- * requisições do que perguntar de dois em dois segundos.
- */
+/* Espera longa: uma requisição fica pendurada até aparecer comando. */
 async function lacoDoRele() {
   while (cfg.chave) {
     if (!estado.obs || Date.now() < releQuieto) { await dorme(1000); continue; }
@@ -1657,17 +1486,7 @@ async function lacoDoRele() {
         await doPainel({ zc: 'comando', acao: c.acao, arg: c.argumento || '', quem: c.quem || 'mod' });
       }
 
-      /*
-       * O batimento sai daqui, e não de um setInterval, de propósito.
-       *
-       * Fonte de navegador em cena inativa o OBS não pinta, e aí o Chromium
-       * freia temporizador para 1x por minuto. O relógio congela, o estado
-       * envelhece e o painel do mod diz "sem sinal" com a live no ar.
-       *
-       * Este laço não depende de relógio nenhum: ele anda quando o fetch
-       * anterior volta. Forçado quando houve comando, para o mod ver o
-       * resultado na hora.
-       */
+      /* O batimento sai daqui, e não de um setInterval, de propósito. */
       await subirEstado(lista.length > 0);
 
       /* De cinco em cinco minutos relê os comandos do painel. Pega carona
@@ -1679,32 +1498,10 @@ async function lacoDoRele() {
   }
 }
 
-/* ------------------------------------------------------------------ *
- *  Comandos que o dono inventou.
- *
- *  Não são código novo: cada um é um apelido pra uma ação que já existe
- *  aqui em cima, com o argumento já preenchido. "!brb" vira "cena Cenário
- *  BRB". Por isso a ação vem do registro local e nunca da resposta do
- *  servidor — se um dia a resposta fosse forjada, o pior que daria pra
- *  fazer é chamar algo que a ponte já sabia fazer.
- *
- *  Os de fábrica não podem ser sobrescritos: !panico é !panico.
- * ------------------------------------------------------------------ */
+/* Comandos que o dono inventou. */
 
-/* ------------------------------------------------------------------ *
- *  GATILHOS — quando acontecer X, faça Y
- *
- *  O comando customizado já sabia fazer várias ações em sequência. A única
- *  coisa que faltava era o disparo vir de um EVENTO em vez de alguém digitar.
- *
- *  De onde vem cada evento:
- *    sub, presente, bits  — a própria ponte vê passar no chat, na hora
- *    follow, doação       — chegam por webhook no servidor e voltam de
- *                           carona na resposta do relé de estado
- *
- *  Não existe cargo aqui: quem "digita" é o evento, e evento não se modera.
- *  Por isso o servidor recusa pânico como passo de gatilho.
- * ------------------------------------------------------------------ */
+/* GATILHOS — quando acontecer X, faça Y O comando customizado já sabia
+   fazer várias ações em sequência. */
 
 let GATILHOS = [];
 const gatilhoQuieto = {};        /* id -> quando pode disparar de novo */
@@ -1777,9 +1574,8 @@ async function carregarComandos() {
         espera: Math.max(1, c.espera || 5) * 1000,
         fazer: async (quem, arg, cargo) => {
           /* Em sequência, e não todas de uma vez: "!sumir" precisa mutar
-             ANTES de trocar de cena, senão o microfone fica aberto no meio
-             do corte. E um passo que falha não derruba os outros — meio
-             comando feito é melhor que nenhum quando você quer sumir. */
+             ANTES de trocar de cena, senão o microfone fica aberto no
+             meio do corte. */
           for (const p of passos) {
             try { await ACOES[p.acao].fazer(quem, p.argumento || arg, cargo); }
             catch (e) { recado('!' + c.nome + ' — ' + p.acao + ': ' + e.message); }
