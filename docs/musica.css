@@ -210,8 +210,23 @@
    texto a opacidade. Uma animação só não daria conta, porque a capa não pode
    encolher quando a faixa encolhe — ela é justamente o que fica.
    --------------------------------------------------------------------- */
+/* A LINHA DO TEMPO, EM TRÊS TEMPOS QUE NÃO SE PISAM.
+
+   Antes a faixa começava em 0,34 e a capa só terminava em 0,42: as duas
+   cresciam juntas por um pedaço, e o olho lê isso como "tudo ao mesmo tempo"
+   em vez de "primeiro uma, depois a outra". O texto ainda terminava em 1,08,
+   ou seja, depois do fim da própria abertura.
+
+   Agora cada tempo começa onde o anterior acabou, e o último fecha em 1:
+
+     capa   0     -> 0,34
+     faixa  0,34  -> 0,72
+     texto  0,72  -> 1
+
+   A capa passa um pouco de 1 e volta (é a curva com o 1.56), mas isso
+   acontece DENTRO da fatia dela — não empurra a faixa. */
 .mu--revelar .mu__capa {
-  animation: mu-capa-entra calc(var(--mu-abrir) * .42) cubic-bezier(.34, 1.56, .64, 1) both;
+  animation: mu-capa-entra calc(var(--mu-abrir) * .34) cubic-bezier(.34, 1.56, .64, 1) both;
 }
 @keyframes mu-capa-entra {
   from { opacity: 0; transform: scale(.3); }
@@ -219,17 +234,39 @@
 }
 
 .mu--revelar .mu__faixa {
-  animation: mu-faixa-entra calc(var(--mu-abrir) * .62) cubic-bezier(.22, 1, .36, 1)
+  animation: mu-faixa-entra calc(var(--mu-abrir) * .38) cubic-bezier(.22, 1, .36, 1)
              calc(var(--mu-abrir) * .34) both;
 }
+/* REVELAR COM CORTE, E NÃO COM LARGURA.
+
+   Animar a largura parecia o caminho óbvio e não funciona: a faixa tem
+   padding dos dois lados e box-sizing de borda, então ela NÃO encolhe abaixo
+   do próprio padding — medido, ela parava em 99px com "width: 0". Resultado:
+   um toco verde ao lado da capa desde o primeiro quadro, antes de a capa
+   sequer terminar de crescer.
+
+   Zerar o padding junto resolveria, mas o padding é diferente quando a capa
+   está à direita e quando não tem capa — o quadro brigaria com as três
+   regras. O corte não briga com nenhuma: a faixa já está do tamanho final o
+   tempo todo, e o que anda é quanto dela aparece.
+
+   Como a esquerda da faixa mora atrás da capa, os primeiros pixels revelados
+   ficam escondidos — e o que se vê é a faixa saindo DE TRÁS da capa. */
 @keyframes mu-faixa-entra {
-  from { width: 0; }
-  to   { width: var(--mu-larg); }
+  from { clip-path: inset(0 100% 0 0 round var(--mu-raio)); }
+  to   { clip-path: inset(0 0 0 0 round var(--mu-raio)); }
+}
+
+/* Capa à direita: a faixa sai pro outro lado, então o corte também. */
+.mu--capa-direita.mu--revelar .mu__faixa { animation-name: mu-faixa-entra-esq; }
+@keyframes mu-faixa-entra-esq {
+  from { clip-path: inset(0 0 0 100% round var(--mu-raio)); }
+  to   { clip-path: inset(0 0 0 0 round var(--mu-raio)); }
 }
 
 .mu--revelar .mu__texto,
 .mu--revelar .mu__prog {
-  animation: mu-texto-entra calc(var(--mu-abrir) * .4) ease calc(var(--mu-abrir) * .68) both;
+  animation: mu-texto-entra calc(var(--mu-abrir) * .28) ease calc(var(--mu-abrir) * .72) both;
 }
 @keyframes mu-texto-entra {
   from { opacity: 0; transform: translateX(-12px); }
@@ -250,8 +287,13 @@
              calc(var(--mu-fechar) * .18) both;
 }
 @keyframes mu-faixa-sai {
-  from { width: var(--mu-larg); }
-  to   { width: 0; }
+  from { clip-path: inset(0 0 0 0 round var(--mu-raio)); }
+  to   { clip-path: inset(0 100% 0 0 round var(--mu-raio)); }
+}
+.mu--capa-direita.mu--fechando .mu__faixa { animation-name: mu-faixa-sai-esq; }
+@keyframes mu-faixa-sai-esq {
+  from { clip-path: inset(0 0 0 0 round var(--mu-raio)); }
+  to   { clip-path: inset(0 0 0 100% round var(--mu-raio)); }
 }
 
 .mu--fechando .mu__capa {
