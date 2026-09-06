@@ -197,8 +197,8 @@ const el = (id) => document.getElementById(id);
 let chave = '';
 try {
   const naUrl = new URLSearchParams(location.search).get('chave');
-  if (naUrl) { sessionStorage.setItem('zc:chave', naUrl.trim()); history.replaceState(null, '', location.pathname); }
-  chave = sessionStorage.getItem('zc:chave') || '';
+  if (naUrl) { try { localStorage.setItem('zc:chave', naUrl.trim()); } catch (e) {} sessionStorage.setItem('zc:chave', naUrl.trim()); history.replaceState(null, '', location.pathname); }
+  chave = (function () { try { return localStorage.getItem('zc:chave') || sessionStorage.getItem('zc:chave') || ''; } catch (e) { return ''; } })();
 } catch (e) { chave = new URLSearchParams(location.search).get('chave') || ''; }
 
 /* Minutos na tela, segundos no servidor. Ninguém pensa "300 segundos por

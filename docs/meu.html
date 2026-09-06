@@ -127,8 +127,8 @@ const el = (id) => document.getElementById(id);
 let chave = '';
 try {
   const doHash = decodeURIComponent(location.hash.replace(/^#/, '')).trim();
-  if (doHash) { sessionStorage.setItem('zc:chave', doHash); history.replaceState(null, '', location.pathname); }
-  chave = sessionStorage.getItem('zc:chave') || '';
+  if (doHash) { try { localStorage.setItem('zc:chave', doHash); } catch (e) {} sessionStorage.setItem('zc:chave', doHash); history.replaceState(null, '', location.pathname); }
+  chave = (function () { try { return localStorage.getItem('zc:chave') || sessionStorage.getItem('zc:chave') || ''; } catch (e) { return ''; } })();
 } catch (e) { chave = decodeURIComponent(location.hash.replace(/^#/, '')).trim(); }
 
 if (!chave) {

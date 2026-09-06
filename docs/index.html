@@ -306,7 +306,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=24"></script>
+<script src="clock.js?v=25"></script>
 <script>
 'use strict';
 
@@ -339,16 +339,39 @@ function limpaEndereco(hash) {
   try { history.replaceState(null, '', caminho + (hash || location.hash || '')); } catch (e) {}
 }
 
+/* A CHAVE PRECISA SOBREVIVER A UMA ABA NOVA.
+
+   Ela morava no sessionStorage, que é POR ABA: abrir o site numa guia nova
+   dava lista vazia e pedia login de novo — e como a chave é guardada com
+   hash, cada login gera outra, quebrando os links do OBS que carregam a
+   antiga. Uma pessoa abrindo uma segunda aba entrava num ciclo de perder os
+   links sem ter feito nada errado.
+
+   O localStorage sobrevive a aba e a reinício. O sessionStorage continua
+   sendo lido, pra não derrubar quem estiver com o site aberto agora. */
+const guardaChave = (v) => {
+  try { localStorage.setItem('zc:chave', v); } catch (e) {}
+  try { sessionStorage.setItem('zc:chave', v); } catch (e) {}
+};
+const leChave = () => {
+  try { return localStorage.getItem('zc:chave') || sessionStorage.getItem('zc:chave') || ''; }
+  catch (e) { return ''; }
+};
+const esqueceChave = () => {
+  try { localStorage.removeItem('zc:chave'); } catch (e) {}
+  try { sessionStorage.removeItem('zc:chave'); } catch (e) {}
+};
+
 let chave = '';
 try {
   const cru = decodeURIComponent((location.hash || '').slice(1));
   const naBusca = new URLSearchParams(location.search).get('chave');
   const achada = (cru && cru[0] !== '/') ? cru : (naBusca || '');
   if (achada) {
-    sessionStorage.setItem('zc:chave', achada.trim());
+    guardaChave(achada.trim());
     limpaEndereco('#/overlays');
   }
-  chave = sessionStorage.getItem('zc:chave') || '';
+  chave = leChave();
   if (!achada) limpaEndereco();     /* tira o index.html mesmo sem chave */
 } catch (e) { chave = new URLSearchParams(location.search).get('chave') || ''; }
 
@@ -359,7 +382,14 @@ async function api(caminho, opcoes) {
   o.headers = Object.assign({ 'X-Chave': chave, 'Content-Type': 'application/json' }, o.headers);
   const r = await fetch(API + caminho, o);
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.erro || ('falhou (' + r.status + ')'));
+  if (!r.ok) {
+    const erro = new Error(d.erro || ('falhou (' + r.status + ')'));
+    /* O status vai junto: sem ele, "sua chave não vale" e "deu ruim no
+       servidor" chegam iguais em quem trata o erro, e a tela acaba dizendo a
+       coisa errada na hora mais importante. */
+    erro.status = r.status;
+    throw erro;
+  }
   return d;
 }
 
@@ -1753,7 +1783,7 @@ function telaControlador() {
     try {
       const d = await api('/chave.php', { method: 'POST', body: JSON.stringify({ acao: 'redefinir' }) });
       chave = d.chave;
-      try { sessionStorage.setItem('zc:chave', chave); } catch (e) {}
+      guardaChave(chave);
       telaControlador();
       recado('Chave trocada. Agora cole o endereço novo na fonte do OBS — o antigo não vale mais.', 'bom');
     } catch (e) { recado(e.message, 'ruim'); }
@@ -1765,13 +1795,20 @@ function telaControlador() {
 
   /* ----- conta da Twitch ----- */
   const btEntrarDeNovo = h('button', { cls: 'bt', type: 'button', txt: 'Entrar de novo na Twitch' });
-  btEntrarDeNovo.onclick = () => { location.href = API + '/entrar.php'; };
+  btEntrarDeNovo.onclick = () => {
+    /* Avisar ANTES, e não depois: a chave é guardada com hash, então entrar
+       de novo obriga a gerar outra — e todo link que carrega a chave (a fonte
+       da ponte e o painel do OBS) para de valer na hora. Os overlays não:
+       eles usam a chave pública de cada um, que não muda. */
+    if (!confirm('Entrar de novo troca a sua chave. Seus overlays NAO sao afetados e continuam funcionando no OBS. O que precisa ser colado de novo la sao a fonte da ponte e o painel, e os dois novos aparecem aqui em Meu Controller depois que voce entrar. Continuar?')) return;
+    location.href = API + '/entrar.php';
+  };
 
   const btSair = h('button', { cls: 'bt fraco', type: 'button', txt: 'Sair deste computador' });
   btSair.onclick = () => {
     /* Só apaga a chave guardada aqui. A conta continua ligada no servidor:
        "sair" não pode desligar overlay que está no ar numa live. */
-    try { sessionStorage.removeItem('zc:chave'); } catch (e) {}
+    esqueceChave();
     location.href = 'index.html';
   };
 
@@ -2862,14 +2899,38 @@ el('irInicio').onclick = () => vaiPara('#/overlays');
 el('abaMeu').onclick = () => { fechaBandejas(null); vaiPara('#/meu'); };
 
 async function carrega() {
-  try { perfis = (await api('/perfil.php')).perfis || []; }
-  catch (e) { recado(e.message, 'ruim'); }
+  try {
+    perfis = (await api('/perfil.php')).perfis || [];
+    return true;
+  } catch (e) {
+    /* CHAVE VELHA NÃO É LISTA VAZIA.
+
+       Entrar de novo na Twitch gera uma chave nova — a antiga é guardada com
+       hash e não dá pra devolver. Quem abrisse o site por um link salvo com a
+       chave antiga levava 401 aqui, e a tela mostrava "nenhum overlay ainda".
+       Ou seja: a pessoa via os overlays dela sumirem sem ter perdido nada.
+
+       Nada foi apagado nesse caso, e a tela precisa dizer isso. */
+    if (e.status === 401 || e.status === 403) {
+      esqueceChave();
+      const cx = el('semChave');
+      const p2 = cx.querySelector('p');
+      if (p2) p2.textContent = 'Esta chave não vale mais — ela troca quando você entra de novo na Twitch. '
+        + 'Nada foi apagado: seus overlays continuam no lugar e os que já estão no OBS continuam funcionando. '
+        + 'Entre de novo pra pegar a chave nova.';
+      cx.classList.remove('escondido');
+      el('tela').innerHTML = '';
+      return false;
+    }
+    recado(e.message, 'ruim');
+    return false;
+  }
 }
 
 (async function () {
   montaBandejas();
   if (!chave) { el('semChave').classList.remove('escondido'); return; }
-  await carrega();
+  if (!await carrega()) return;
   rota();
 })();
 </script>
