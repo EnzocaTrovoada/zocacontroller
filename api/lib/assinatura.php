@@ -35,6 +35,37 @@ function acesso_do_usuario(int $usuario_id): array
 }
 
 /** Recursos por plano num lugar só. Não espalhar "if plano ==" pelo código. */
+/**
+ * O que este usuario pode, com as excecoes dele por cima do plano.
+ *
+ * O plano continua sendo a regra; a sobrescrita fica visivel como excecao, e
+ * NULL quer dizer "vale o do plano". Sem essa separacao, dar um extra pra
+ * alguem viraria uma linha de plano nova pra cada favor feito.
+ */
+function recursos_do_usuario(int $usuario_id, string $plano): array
+{
+    $r = recursos_do_plano($plano);
+
+    $st = db()->prepare('SELECT perfis_max, recursos FROM usuarios WHERE id = ?');
+    $st->execute([$usuario_id]);
+    $u = $st->fetch();
+    if (!$u) return $r;
+
+    if ($u['perfis_max'] !== null) $r['perfis_max'] = (int) $u['perfis_max'];
+
+    if (!empty($u['recursos'])) {
+        $extra = json_decode((string) $u['recursos'], true);
+        /* So chaves que o plano ja conhece: recurso inventado no banco nao
+           pode virar recurso de verdade sem passar pelo codigo. */
+        if (is_array($extra)) {
+            foreach ($extra as $k => $v) {
+                if (array_key_exists($k, $r)) $r[$k] = $v;
+            }
+        }
+    }
+    return $r;
+}
+
 function recursos_do_plano(string $plano): array
 {
     if ($plano === 'pro' || $plano === 'pro_ano') {

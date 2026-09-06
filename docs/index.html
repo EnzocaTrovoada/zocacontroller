@@ -306,7 +306,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=21"></script>
+<script src="clock.js?v=22"></script>
 <script>
 'use strict';
 
@@ -800,6 +800,8 @@ const GRUPOS = [
     { k: 'barra',   l: 'Mostrar barra', c: 'chave' },
     { k: 'bcor',    l: 'Cor cheia', c: 'cor' },
     { k: 'bfundo',  l: 'Cor vazia', c: 'cor' },
+    { k: 'blarg', l: 'Largura da barra', c: 'faixa', min: 0, max: 2000, u: (n) => n ? 'px' : ' (acompanha)',
+      dica: 'em 0 a barra fica do tamanho do número; qualquer outro valor é a largura em pixels' },
     { k: 'baltura', l: 'Altura', c: 'faixa', min: 2, max: 60, u: 'px' },
     { k: 'bcantos', l: 'Cantos', c: 'faixa', min: 0, max: 40, u: 'px' },
     { k: 'bdentro', l: 'Número dentro da barra', c: 'chave',
@@ -1072,6 +1074,18 @@ function montaBandejas() {
     } catch (e) { recado(e.message, 'ruim'); }
   };
   bf.appendChild(kick);
+
+  /* O link só nasce pra quem é admin. Isso é conveniência, não segurança: o
+     admin.php responde 404 pra qualquer outro, então esconder aqui só evita
+     mostrar uma porta que não abriria. */
+  api('/admin.php').then(() => {
+    const adm = h('button', { type: 'button' }, [
+      document.createTextNode('Administração'),
+      h('small', { txt: 'quem entrou e o que cada um pode' }),
+    ]);
+    adm.onclick = () => { fechaBandejas(null); vaiPara('#/admin'); };
+    bf.appendChild(adm);
+  }).catch(() => {});
 
   const tut = h('button', { type: 'button' }, [
     document.createTextNode('Como instalar'),
@@ -1499,6 +1513,18 @@ function telaEditor(perfil, tipoNovo) {
   empurra();                 /* o estado de partida é o fundo da pilha */
   tela.appendChild(h('h1', { txt: (perfil ? 'Editar ' : 'Novo ') + (TIPOS[tipo] || {}).nome }));
   tela.appendChild(h('p', { cls: 'sub', txt: 'Arraste cada parte pra onde quiser, como no Photoshop. Segure Shift pra travar no eixo, dê dois cliques numa peça pra pular pro campo dela, e use Ctrl+Z pra voltar atrás (Ctrl+Shift+Z refaz). O que você vê aqui é o mesmo desenho que vai pro OBS — não é imitação.' }));
+
+  /* A PRÉVIA DA META MOSTRAVA ZERO: o número automático é injetado pelo
+     servidor quando o OVERLAY pergunta, e o editor nunca perguntava — então
+     aqui aparecia "0 / 1000" enquanto no OBS apareceria o número certo. */
+  if (tipo === 'meta' && cfg.fonte !== 'manual') {
+    api('/contagem.php?fonte=' + encodeURIComponent(cfg.fonte)).then((r) => {
+      if (!r || typeof r.valor !== 'number') return;
+      cfg.atual = r.valor;
+      redesenhar.forEach((f) => f());
+      manda();
+    }).catch(() => {});
+  }
 
   /* O OVERLAY DE MÚSICA SEM SPOTIFY FICA VAZIO PRA SEMPRE, E EM SILÊNCIO:
      Na prévia aqui ele mostra a música de mentira e parece tudo certo; no
@@ -2537,6 +2563,85 @@ const PASSOS_CHAT = [
   ['Essa fonte carrega a sua chave', 'Não mostre ela na tela e não mande pra ninguém. Se aparecer em print ou VOD, troque a chave em Meu Controller.'],
 ];
 
+function telaAdmin() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Administração' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Quem entrou no site e o que cada um pode. Deixar um campo vazio devolve o valor do plano — assim o plano continua sendo a regra e a exceção aparece como exceção.' }));
+
+  const lista = h('div');
+  tela.appendChild(lista);
+
+  api('/admin.php').then((d) => {
+    lista.innerHTML = '';
+    const us = d.usuarios || [];
+    if (!us.length) return lista.appendChild(h('p', { cls: 'd', txt: 'Ninguém ainda.' }));
+
+    tela.insertBefore(h('p', { cls: 'd', txt: us.length + (us.length === 1 ? ' conta' : ' contas') }), lista);
+
+    us.forEach((u) => {
+      const quando = (s) => s ? new Date(s.replace(' ', 'T')).toLocaleString('pt-BR') : 'nunca';
+
+      const maxi = h('input', { type: 'number', min: '0', style: 'flex:0 0 90px',
+                                placeholder: String(u.vale.perfis_max) });
+      if (u.perfis_max !== null) maxi.value = u.perfis_max;
+
+      const marcas = {};
+      const linhaMarcas = h('div', { cls: 'campo', style: 'gap:14px;flex-wrap:wrap' });
+      [['multiplataforma', 'Multiplataforma'], ['pokebot', 'Pokébot'], ['marca_dagua', "Marca d'água"]]
+        .forEach(([k, rot]) => {
+          const cx = h('input', { type: 'checkbox' });
+          cx.checked = !!u.vale[k];
+          marcas[k] = cx;
+          linhaMarcas.appendChild(h('label', { style: 'display:flex;align-items:center;gap:6px;font-size:12.5px' },
+            [cx, document.createTextNode(rot)]));
+        });
+
+      const salvar = h('button', { cls: 'bt mini', type: 'button', txt: 'Salvar' });
+      const recado2 = h('span', { cls: 'd', style: 'font-size:11.5px' });
+
+      salvar.onclick = async () => {
+        salvar.disabled = true;
+        recado2.textContent = 'salvando…';
+        try {
+          const recursos = {};
+          Object.keys(marcas).forEach((k) => { recursos[k] = marcas[k].checked; });
+          await api('/admin.php', { method: 'POST', body: JSON.stringify({
+            id: u.id,
+            perfis_max: maxi.value === '' ? null : parseInt(maxi.value, 10),
+            recursos,
+          }) });
+          recado2.textContent = 'salvo';
+          recado2.style.color = 'var(--verde-forte)';
+        } catch (e) {
+          recado2.textContent = e.message;
+          recado2.style.color = 'var(--perigo)';
+        }
+        salvar.disabled = false;
+      };
+
+      const cabeca = h('h3', { txt: u.login + (u.admin ? '  ·  admin' : '') });
+
+      lista.appendChild(h('div', { cls: 'fatia' }, [
+        cabeca,
+        h('p', { cls: 'd', txt: 'entrou em ' + quando(u.criado_em)
+               + '  ·  última vez ' + quando(u.visto_em)
+               + '  ·  plano ' + u.plano
+               + '  ·  ' + u.overlays + ' de ' + u.vale.perfis_max + ' overlays' }),
+        h('div', { cls: 'campo' }, [
+          h('label', { txt: 'Máximo de overlays' }), maxi,
+          h('span', { cls: 'd', style: 'font-size:11.5px',
+                      txt: 'vazio = o do plano (' + (d.padrao[u.plano === 'gratis' ? 'gratis' : 'pro'] || {}).perfis_max + ')' }),
+        ]),
+        linhaMarcas,
+        h('div', { cls: 'campo', style: 'gap:8px' }, [salvar, recado2]),
+      ]));
+    });
+  }).catch((e) => {
+    lista.appendChild(h('p', { cls: 'd', txt: 'Não deu: ' + e.message }));
+  });
+}
+
 function telaTutorial() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -2602,6 +2707,7 @@ function rota() {
   if (p[0] === 'meu') return telaControlador();
   if (p[0] === 'comandos') return telaComandos();
   if (p[0] === 'tutorial') return telaTutorial();
+  if (p[0] === 'admin') return telaAdmin();
   if (p[0] === 'subathon') return telaSubathon();
   if (p[0] === 'mods') return telaMods();
   if (p[0] === 'novo' && TIPOS[p[1]]) return telaEditor(null, p[1]);

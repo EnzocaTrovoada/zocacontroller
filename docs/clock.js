@@ -252,6 +252,9 @@
     bfundo:   { t: 'c', d: '#ffffff' },
     bfopac:   { t: 'n', d: 18,  min: 0,  max: 100 },
     bgap:     { t: 'n', d: 10,  min: 0,  max: 120 },
+    /* 0 = a barra tem a largura do que esta em cima dela. Qualquer outro
+       numero e a largura em pixels. */
+    blarg:    { t: 'n', d: 0,   min: 0,  max: 2000 },
     bacima:   { t: 'b', d: 0 },
     /* contador e placar */
     titulo:   { t: 't', d: '', max: 30 },
@@ -891,6 +894,13 @@
     cx.style.marginTop    = cfg.bacima ? '0' : cfg.bgap + 'px';
     cx.style.marginBottom = cfg.bacima ? cfg.bgap + 'px' : '0';
     cx.style.order        = cfg.bacima ? '-1' : '';
+
+    /* Largura: 0 e "acompanha o que esta em cima". A caixa encolhe ate o
+       conteudo e a barra em 100% passa a valer a largura do numero, em vez
+       da largura da fonte inteira do OBS. */
+    var raiz = cx.closest('.rl') || cx.parentElement;
+    if (raiz) raiz.classList.toggle('rl--barra-segue', !cfg.blarg);
+    cx.style.width = cfg.blarg ? cfg.blarg + 'px' : '';
 
     var dentro = cx.firstElementChild;
     dentro.style.width        = pct + '%';

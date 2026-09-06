@@ -57,13 +57,23 @@ function meta_bateu(int $usuario_id, string $fonte, int $agora): void
     if (!$c || !$c['alvo'] || !$c['seg']) return;
     if ($agora < (int) $c['alvo']) return;
 
+    /* PASSO ZERO QUER DIZER "DISPARA UMA VEZ E ACABOU".
+
+       Antes isto era GREATEST(passo, 1), o que forcava subir de um em um
+       mesmo com o passo zerado: um canal de 1004 seguidores com alvo em 1000
+       via o alvo virar 1001, 1002, 1003... uma consulta por vez, ate alcancar.
+       Quem deixa o passo vazio quer uma meta unica, nao uma escada.
+
+       Zerar o alvo depois de bater e explicito: a propria tela ja diz que
+       alvo 0 e meta desligada, entao a pessoa VE que aquela acabou. */
+    $novo = ((int) $c['passo'] > 0) ? (int) $c['alvo'] + (int) $c['passo'] : 0;
+
     /* O UPDATE condicional E a trava: quem conseguir mudar a linha e quem
        soma. Duas consultas ao mesmo tempo, so uma passa. */
     $sobe = db()->prepare(
-        "UPDATE subathon SET $alvo = $alvo + GREATEST($passo, 1)
-          WHERE usuario_id = ? AND $alvo = ?"
+        "UPDATE subathon SET $alvo = ? WHERE usuario_id = ? AND $alvo = ?"
     );
-    $sobe->execute([$usuario_id, (int) $c['alvo']]);
+    $sobe->execute([$novo, $usuario_id, (int) $c['alvo']]);
     if (!$sobe->rowCount()) return;
 
     subathon_somar($usuario_id, [

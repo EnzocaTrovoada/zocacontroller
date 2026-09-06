@@ -40,7 +40,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $acesso = acesso_do_usuario((int) $quem['usuario_id']);
     json_saida([
         'perfis' => $perfis,
-        'maximo' => recursos_do_plano($acesso['ativo'] ? $acesso['plano'] : 'gratis')['perfis_max'],
+        'maximo' => recursos_do_usuario((int) $quem['usuario_id'], $acesso['ativo'] ? $acesso['plano'] : 'gratis')['perfis_max'],
     ]);
 }
 
@@ -77,7 +77,7 @@ if ($acao === 'criar') {
     }
 
     $acesso = acesso_do_usuario((int) $quem['usuario_id']);
-    $maximo = recursos_do_plano($acesso['ativo'] ? $acesso['plano'] : 'gratis')['perfis_max'];
+    $maximo = recursos_do_usuario((int) $quem['usuario_id'], $acesso['ativo'] ? $acesso['plano'] : 'gratis')['perfis_max'];
 
     $st = db()->prepare('SELECT COUNT(*) FROM perfis WHERE usuario_id = ?');
     $st->execute([$quem['usuario_id']]);

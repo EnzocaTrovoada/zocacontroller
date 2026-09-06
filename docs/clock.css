@@ -173,10 +173,14 @@
 /* ---- barra da meta ---- */
 .rl__barra {
   display: none;
-  width: 100%;
+  width: var(--rl-barra-larg, 100%);
   overflow: hidden;
   position: relative;
 }
+
+/* A barra acompanhando o conteudo: a caixa encolhe ate o que tem dentro, e
+   a barra em 100% passa a valer a largura do numero em vez da tela inteira. */
+.rl--barra-segue .rl__box { width: fit-content; }
 .rl__barra > i {
   display: block;
   height: 100%;

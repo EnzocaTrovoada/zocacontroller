@@ -124,6 +124,17 @@ function exige_painel(): array
     if ($q['tipo'] !== 'painel') {
         json_saida(['erro' => 'Só o streamer pode fazer isso.'], 403);
     }
+
+    /* Marca que esta conta apareceu hoje. Uma vez por hora, e não a cada
+       requisição: o painel faz dezenas por minuto, e gravar em todas seria
+       trocar uma informação de baixa precisão por escrita constante no banco. */
+    try {
+        db()->prepare(
+            'UPDATE usuarios SET visto_em = NOW()
+              WHERE id = ? AND (visto_em IS NULL OR visto_em < DATE_SUB(NOW(), INTERVAL 1 HOUR))'
+        )->execute([(int) $q['usuario_id']]);
+    } catch (Throwable $e) { /* coluna nova: não derruba quem ainda não rodou o SQL */ }
+
     return $q;
 }
 

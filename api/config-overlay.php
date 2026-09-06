@@ -36,7 +36,7 @@ if (!$perfil) {
 
 // Quem decide o que está liberado é o servidor. Sempre.
 $acesso   = acesso_do_usuario((int) $perfil['usuario_id']);
-$recursos = recursos_do_plano($acesso['ativo'] ? $acesso['plano'] : 'gratis');
+$recursos = recursos_do_usuario((int) $perfil['usuario_id'], $acesso['ativo'] ? $acesso['plano'] : 'gratis');
 
 $config = json_decode($perfil['config'], true) ?: [];
 
