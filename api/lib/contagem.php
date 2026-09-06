@@ -103,13 +103,13 @@ function contagem(int $usuario_id, string $fonte, int $maxIdade = 60): ?int
             /* Fora do ar a Helix devolve lista vazia, e isso NAO e falha: e
                zero de verdade. Tratar como falha deixaria o numero de ontem
                congelado na tela com a live desligada. */
-            [$http, $corpo] = tw_helix($usuario_id, 'GET', 'streams', ['user_id' => $bid, 'first' => 1]);
+            [$http, $corpo] = tw_helix($usuario_id, 'GET', '/streams', ['user_id' => $bid, 'first' => 1]);
             $ok = ($http === 200 && isset($corpo['data']));
             if ($ok) $corpo['total'] = (int) ($corpo['data'][0]['viewer_count'] ?? 0);
         } else {
             [$http, $corpo] = $fonte === 'seguidores'
-                ? tw_helix($usuario_id, 'GET', 'channels/followers', ['broadcaster_id' => $bid, 'first' => 1])
-                : tw_helix($usuario_id, 'GET', 'subscriptions',      ['broadcaster_id' => $bid, 'first' => 1]);
+                ? tw_helix($usuario_id, 'GET', '/channels/followers', ['broadcaster_id' => $bid, 'first' => 1])
+                : tw_helix($usuario_id, 'GET', '/subscriptions',      ['broadcaster_id' => $bid, 'first' => 1]);
             $ok = ($http === 200 && isset($corpo['total']));
         }
     } catch (Throwable $e) {

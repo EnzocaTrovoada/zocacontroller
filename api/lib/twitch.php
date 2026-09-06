@@ -196,6 +196,16 @@ function tw_token(int $usuario_id): string
 function tw_helix(int $usuario_id, string $metodo, string $caminho, array $query = [], $corpo = null): array
 {
     $token = tw_token($usuario_id);
+
+    /* A BARRA NÃO PODE DEPENDER DE QUEM CHAMA.
+
+       TW_HELIX não termina em barra, então caminho sem barra virava
+       ".../helixstreams" — um 404 que parece erro da Twitch e é erro nosso.
+       Passou despercebido porque a maioria das chamadas escreve "/streams" e
+       só as três da contagem escreviam "streams": a contagem automática de
+       seguidores, subs e viewers nunca funcionou em conta nenhuma. */
+    if ($caminho === '' || $caminho[0] !== '/') $caminho = '/' . $caminho;
+
     $url = TW_HELIX . $caminho . ($query ? '?' . http_build_query($query) : '');
 
     $cabecalhos = [
