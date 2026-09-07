@@ -126,7 +126,15 @@
     mraio:    { t: 'n', d: 30,  min: 0,  max: 120 },
     mrola:    { t: 'b', d: 1 },
     manim:    { t: 'e', d: 'revelar', v: ['revelar', 'surge', 'nenhum'] },
-    mquando:  { t: 'e', d: 'trocou',  v: ['trocou', 'sempre'] },
+    /* NASCE FICANDO NA TELA.
+
+       Com 'trocou' o overlay aparece por alguns segundos quando a fonte do
+       OBS carrega e some — e só volta quando a MÚSICA troca, o que pode
+       levar quatro minutos. Medido: aos 8 segundos ele já estava invisível e
+       ficou assim em todas as consultas seguintes, porque a faixa era a
+       mesma. Quem cria uma overlay de música e vê a tela vazia conclui que
+       não funciona, e está certo em concluir. */
+    mquando:  { t: 'e', d: 'sempre',  v: ['trocou', 'sempre'] },
     mtempo:   { t: 'n', d: 7, min: 2, max: 120 },
     mabrir:   { t: 'n', d: 900,  min: 200, max: 4000 },
     mfechar:  { t: 'n', d: 1400, min: 200, max: 4000 },

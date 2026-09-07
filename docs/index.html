@@ -306,7 +306,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=27"></script>
+<script src="clock.js?v=28"></script>
 <script>
 'use strict';
 
@@ -435,6 +435,7 @@ function padraoDe(tipo) {
     return Object.assign(base, {
       titulo: '', font: 'Archivo', size: 26, weight: 700, color: '#FFFFFF',
       sw: 0, glow: 0, shx: 0, shy: 2, shb: 8, sho: 75, shc: '#000000',
+      mquando: 'sempre',
       mcapa: 1, mtam: 132, mlado: 'esquerda', mlarg: 520, mgap: 18,
       mbarra: 1, mbalt: 4, mbcor: '#1DB954',
       martcor: '#FFFFFF', martopac: 70, martsize: 70,
@@ -629,7 +630,8 @@ const GRUPOS = [
       dica: 'a de quatro tempos é a do desenho: o quadrado cresce, a barra estica pro lado, o nome aparece',
       ops: [['revelar', 'Quadrado → barra → nome'], ['surge', 'Só desliza pro lado'], ['nenhum', 'Nada, fica parado']] },
     { k: 'mquando', l: 'Quando mostrar', c: 'lista', se: (c) => c.manim !== 'nenhum',
-      ops: [['trocou', 'Ao trocar de música, e some depois'], ['sempre', 'Fica na tela o tempo todo']] },
+      ops: [['sempre', 'Fica na tela o tempo todo'], ['trocou', 'Só quando a música troca']],
+      dica: 'em "só quando troca" ele some depois de alguns segundos e só volta na próxima faixa — com uma música de quatro minutos, isso é quatro minutos de tela vazia' },
     { k: 'mtempo', l: 'Fica na tela', c: 'faixa', min: 2, max: 120, u: 's',
       se: (c) => c.manim !== 'nenhum' && c.mquando === 'trocou',
       dica: 'o !musica traz de volta a qualquer momento' },
