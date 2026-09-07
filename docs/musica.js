@@ -176,8 +176,18 @@
     function pinta() {
       if (!atual) return;
       if (!mediuLargura && (cfg.mquando === 'sempre' || cfg.manim === 'nenhum')) mede();
+      /* SEM DURAÇÃO, SEM BARRA.
+
+         O Last.fm não diz quanto a faixa dura nem onde ela está — só o nome.
+         Uma barra parada em zero a live inteira parece defeito; não ter barra
+         é só não ter barra. Por isso ela some quando a duração é zero, e o
+         controle de mostrar barra continua valendo pra quem usa Spotify. */
+      var semTempo = !(atual.dura > 0);
+      root.classList.toggle('mu--sem-barra', !cfg.mbarra || semTempo);
+      if (semTempo) return;
+
       var em = atual.em + (atual.tocando ? (Date.now() - marcado) : 0);
-      var pct = atual.dura > 0 ? Math.min(100, em * 100 / atual.dura) : 0;
+      var pct = Math.min(100, em * 100 / atual.dura);
       dentro.style.width = pct + '%';
     }
 

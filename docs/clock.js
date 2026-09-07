@@ -135,6 +135,10 @@
        mesma. Quem cria uma overlay de música e vê a tela vazia conclui que
        não funciona, e está certo em concluir. */
     mquando:  { t: 'e', d: 'sempre',  v: ['trocou', 'sempre'] },
+    /* De onde vem a música. O Last.fm é o padrão porque funciona pra qualquer
+       pessoa; o Spotify atende cinco contas por vez enquanto o app do site
+       estiver em modo de desenvolvimento. */
+    mfonte:   { t: 'e', d: 'lastfm', v: ['lastfm', 'spotify'] },
     mtempo:   { t: 'n', d: 7, min: 2, max: 120 },
     mabrir:   { t: 'n', d: 900,  min: 200, max: 4000 },
     mfechar:  { t: 'n', d: 1400, min: 200, max: 4000 },

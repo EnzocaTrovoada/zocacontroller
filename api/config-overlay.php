@@ -93,7 +93,18 @@ if ($perfil['tipo'] === 'meta' && $fonte !== 'manual') {
    a PESSOA escolheu. Junto, cada troca de faixa pareceria uma edicao. */
 $musica = null;
 if ($perfil['tipo'] === 'musica') {
-    try { $musica = sp_tocando((int) $perfil['usuario_id']); } catch (Throwable $e) { $musica = null; }
+    /* De onde vem a música. Last.fm é o padrão porque atende qualquer pessoa;
+       o Spotify atende cinco contas enquanto o app estiver em modo de
+       desenvolvimento — mas só ele faz !pular, !fila e !like. */
+    $fonteMus = (string) ($config['mfonte'] ?? 'lastfm');
+    try {
+        if ($fonteMus === 'spotify') {
+            $musica = sp_tocando((int) $perfil['usuario_id']);
+        } else {
+            require_once __DIR__ . '/lib/lastfm.php';
+            $musica = lf_tocando((int) $perfil['usuario_id']);
+        }
+    } catch (Throwable $e) { $musica = null; }
 }
 
 $eventos = null;

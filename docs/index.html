@@ -306,7 +306,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=30"></script>
+<script src="clock.js?v=31"></script>
 <script>
 'use strict';
 
@@ -435,7 +435,7 @@ function padraoDe(tipo) {
     return Object.assign(base, {
       titulo: '', font: 'Archivo', size: 26, weight: 700, color: '#FFFFFF',
       sw: 0, glow: 0, shx: 0, shy: 2, shb: 8, sho: 75, shc: '#000000',
-      mquando: 'sempre',
+      mfonte: 'lastfm', mquando: 'sempre',
       mcapa: 1, mtam: 132, mlado: 'esquerda', mlarg: 520, mgap: 18,
       mbarra: 1, mbalt: 4, mbcor: '#1DB954',
       martcor: '#FFFFFF', martopac: 70, martsize: 70,
@@ -629,6 +629,11 @@ const GRUPOS = [
     { k: 'manim', l: 'Animação', c: 'lista',
       dica: 'a de quatro tempos é a do desenho: o quadrado cresce, a barra estica pro lado, o nome aparece',
       ops: [['revelar', 'Quadrado → barra → nome'], ['surge', 'Só desliza pro lado'], ['nenhum', 'Nada, fica parado']] },
+    { k: 'mfonte', l: 'De onde vem a música', c: 'lista', se: so('musica'),
+      ops: [['lastfm', 'Last.fm'], ['spotify', 'Spotify']],
+      dica: 'o Last.fm funciona pra qualquer pessoa; o Spotify hoje atende só quem o Enzo cadastrou, mas é o único que responde aos comandos !pular, !fila e !like' },
+    { k: 'mbarra', l: 'Mostrar barra de progresso', c: 'chave', se: (c) => c.mfonte === 'spotify',
+      dica: 'só no Spotify — o Last.fm não diz quanto a faixa dura' },
     { k: 'mquando', l: 'Quando mostrar', c: 'lista', se: (c) => c.manim !== 'nenhum',
       ops: [['sempre', 'Fica na tela o tempo todo'], ['trocou', 'Só quando a música troca']],
       dica: 'em "só quando troca" ele some depois de alguns segundos e só volta na próxima faixa — com uma música de quatro minutos, isso é quatro minutos de tela vazia' },
@@ -1761,6 +1766,64 @@ function telaEditor(perfil, tipoNovo) {
     const spEstado = h('p', { cls: 'd', txt: 'vendo o que o servidor enxerga…' });
     tela.appendChild(spEstado);
 
+    /* O LAST.FM PEDE UMA COISA SÓ: o nome de usuário. Não tem login, não tem
+       lista de permissão — por isso ele funciona pra qualquer um no primeiro
+       dia, que é justamente o que o Spotify não consegue hoje. */
+    const lfNome = h('input', { type: 'text', placeholder: 'seu usuário no Last.fm', style: 'flex:0 0 200px' });
+    const lfBt = h('button', { cls: 'bt mini', type: 'button', txt: 'Ligar' });
+    const lfEstado = h('p', { cls: 'd', style: 'margin:4px 0 0;flex:1 1 100%' });
+    const lfLinha = h('div', { cls: 'campo escondido', style: 'flex-wrap:wrap' },
+      [h('label', { txt: 'Conta do Last.fm' }), lfNome, lfBt, lfEstado]);
+    tela.appendChild(lfLinha);
+
+    const lfDiz = (txt, bom) => {
+      lfEstado.textContent = txt;
+      lfEstado.style.color = bom ? 'var(--verde-forte)' : 'var(--perigo)';
+    };
+
+    const lfVer = () => {
+      lfEstado.style.color = '';
+      lfEstado.textContent = 'vendo…';
+      api('/lastfm.php').then((r) => {
+        if (r.usuario) lfNome.value = r.usuario;
+        if (!r.ligado) return lfDiz('Escreva o seu usuário do Last.fm e clique em Ligar.', false);
+        if (r.erro) return lfDiz(r.erro, false);
+        if (!r.tocando) {
+          /* "Nada tocando" no Last.fm quase sempre quer dizer que o scrobble
+             não está ligado — o Last.fm só sabe da música se o Spotify (ou o
+             player) estiver mandando pra ele. */
+          return lfDiz('Ligado como ' + r.usuario + ', mas o Last.fm não está recebendo nada agora. '
+            + 'Confira em last.fm > Configurações > Aplicativos se o seu Spotify está conectado lá, '
+            + 'e dê play numa música.', false);
+        }
+        lfDiz('Tocando agora: ' + r.tocando.nome + ' — ' + r.tocando.artista + '.', true);
+      }).catch((e) => lfDiz('Não consegui perguntar: ' + e.message, false));
+    };
+
+    lfBt.onclick = async () => {
+      lfBt.disabled = true;
+      lfEstado.style.color = '';
+      lfEstado.textContent = 'conferindo…';
+      try {
+        const r = await api('/lastfm.php', { method: 'POST', body: JSON.stringify({ usuario: lfNome.value }) });
+        lfNome.value = r.usuario;
+        if (r.tocando) lfDiz('Pronto. Tocando agora: ' + r.tocando.nome + ' — ' + r.tocando.artista + '.', true);
+        else lfDiz('Conta ligada, mas nada tocando agora. Dê play numa música e recarregue.', false);
+      } catch (e) { lfDiz(e.message, false); }
+      lfBt.disabled = false;
+    };
+
+    /* Cada fonte mostra o seu diagnóstico e esconde o do outro: dois blocos
+       de erro na tela ao mesmo tempo é o caminho curto pra pessoa consertar
+       o que não está quebrado. */
+    const verFonteMusica = () => {
+      const ehSpotify = cfg.mfonte === 'spotify';
+      lfLinha.classList.toggle('escondido', ehSpotify);
+      spEstado.classList.toggle('escondido', !ehSpotify);
+      spAcoes.classList.toggle('escondido', !ehSpotify);
+      if (ehSpotify) spVer(); else lfVer();
+    };
+
     /* CONECTAR E DESCONECTAR AQUI, E NÃO SÓ NA TELA DE MODERADORES.
 
        O bloco da conta do Spotify morava em Moderadores — lugar nenhum pra
@@ -1857,7 +1920,9 @@ function telaEditor(perfil, tipoNovo) {
         spEstado.style.color = 'var(--perigo)';
       });
     };
-    spVer();
+
+    redesenhar.push(verFonteMusica);
+    verFonteMusica();
     api('/spotify.php').then((d) => {
       if (d && d.ligado) return;
       avisoSpot.textContent = 'A sua conta do Spotify ainda não está conectada. Sem isso este overlay fica vazio no OBS, mesmo aparecendo certo aqui na prévia. ';

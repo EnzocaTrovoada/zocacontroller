@@ -77,6 +77,18 @@ return [
         'api_key' => '',
     ],
 
+    /* Last.fm. So a chave: o que a pessoa esta ouvindo e dado publico e a
+       leitura nao pede autenticacao nenhuma. Crie em
+       last.fm/api/account/create — sai na hora, sem revisao.
+
+       E o que faz a overlay de musica funcionar pra QUALQUER usuario. O
+       Spotify continua existindo por causa do !pular, !fila e !like, mas o
+       app dele em modo de desenvolvimento atende cinco contas e todo o resto
+       recebe 403. */
+    'lastfm' => [
+        'api_key' => '',
+    ],
+
     // Para onde mandar o streamer depois do login.
     'hub' => 'https://mods.zocahop.com/meu.html',
 
