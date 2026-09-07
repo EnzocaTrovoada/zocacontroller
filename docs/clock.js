@@ -626,6 +626,17 @@
     var info = fonteInfo(cfg.font);
     var s = root.style;
 
+    /* PEDIR A FONTE AQUI, E NÃO NO DESENHISTA.
+
+       O carregaFonte só era chamado dentro do relógio. Chat, feed, música e
+       alerta aplicavam o estilo e nunca pediam o arquivo — a família ficava
+       escrita no CSS, o navegador não tinha a fonte, e caía pro último item
+       da pilha de reserva, que é o Arial. Escolher Anton e ver Arial.
+
+       Aqui é o lugar certo porque é esta função que decide a família: quem
+       chama ela quer aquela letra, e quem quer a letra precisa do arquivo. */
+    carregaFonte(root.ownerDocument, cfg.font);
+
     s.setProperty('--rl-font', '"' + cfg.font + '", ' + STACKS[info ? info.f : 'sans']);
     s.setProperty('--rl-size', cfg.size + 'px');
     s.setProperty('--rl-weight', String(cfg.weight));
