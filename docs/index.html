@@ -306,7 +306,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=26"></script>
+<script src="clock.js?v=27"></script>
 <script>
 'use strict';
 
@@ -1664,17 +1664,46 @@ function telaEditor(perfil, tipoNovo) {
 
     const ytHandle = h('input', { type: 'text', placeholder: '@seucanal', style: 'flex:0 0 200px' });
     const ytBt = h('button', { cls: 'bt mini', type: 'button', txt: 'Ligar canal' });
-    const ytLinha = h('div', { cls: 'campo escondido', style: 'margin-top:6px' },
-      [h('label', { txt: 'Canal do YouTube' }), ytHandle, ytBt]);
+    /* O RESULTADO FICA AQUI, E NÃO NO RECADO DO TOPO.
+
+       O recado aparece no alto da página, e quem está mexendo neste campo
+       está lá embaixo — o erro passava despercebido e a impressão era de que
+       o botão não fazia nada. */
+    const ytEstado = h('p', { cls: 'd', style: 'margin:4px 0 0;flex:1 1 100%' });
+    const ytLinha = h('div', { cls: 'campo escondido', style: 'margin-top:6px;flex-wrap:wrap' },
+      [h('label', { txt: 'Canal do YouTube' }), ytHandle, ytBt, ytEstado]);
     tela.appendChild(ytLinha);
+
+    const ytDiz = (txt, bom) => {
+      ytEstado.textContent = txt;
+      ytEstado.style.color = bom ? 'var(--verde-forte)' : 'var(--perigo)';
+    };
+
+    const ytVer = () => {
+      ytEstado.style.color = '';
+      ytEstado.textContent = 'vendo…';
+      api('/youtube.php').then((r) => {
+        if (r.handle) ytHandle.value = '@' + r.handle;
+        if (!r.ligado) return ytDiz('Nenhum canal ligado ainda. Escreva o @ e clique em Ligar canal.', false);
+        if (r.erro) return ytDiz(r.erro, false);
+        if (r.inscritos === null) return ytDiz('Canal ligado, mas o YouTube está com a contagem de inscritos escondida.', false);
+        ytDiz('Canal @' + r.handle + ' ligado: ' + r.inscritos.toLocaleString('pt-BR') + ' inscritos.', true);
+        if (cfg.fonte === 'subs') { cfg.atual = r.inscritos; redesenhar.forEach((f) => f()); manda(); }
+      }).catch((e) => ytDiz('Não consegui perguntar: ' + e.message, false));
+    };
 
     ytBt.onclick = async () => {
       ytBt.disabled = true;
+      ytEstado.style.color = '';
+      ytEstado.textContent = 'procurando o canal…';
       try {
         const r = await api('/youtube.php', { method: 'POST', body: JSON.stringify({ handle: ytHandle.value }) });
-        recado('Canal ligado: ' + (r.inscritos === null ? 'inscritos escondidos no YouTube' : r.inscritos.toLocaleString('pt-BR') + ' inscritos'), 'bom');
-        if (typeof r.inscritos === 'number') { cfg.atual = r.inscritos; redesenhar.forEach((f) => f()); manda(); }
-      } catch (e) { recado(e.message, 'ruim'); }
+        if (r.inscritos === null) ytDiz('Canal ligado, mas os inscritos estão escondidos no YouTube.', false);
+        else {
+          ytDiz('Pronto: ' + r.inscritos.toLocaleString('pt-BR') + ' inscritos.', true);
+          cfg.atual = r.inscritos; redesenhar.forEach((f) => f()); manda();
+        }
+      } catch (e) { ytDiz(e.message, false); }
       ytBt.disabled = false;
     };
 
@@ -1687,7 +1716,7 @@ function telaEditor(perfil, tipoNovo) {
           + 'acima de cem mil, de mil em mil. Isso é regra do YouTube e vale até pro dono do canal — '
           + 'a meta vai andar aos saltos, não de um em um.';
         avisoPlat.classList.remove('escondido');
-        api('/youtube.php').then((r) => { if (r.handle) ytHandle.value = '@' + r.handle; }).catch(() => {});
+        ytVer();
       } else if (p2 === 'kick') {
         avisoPlat.textContent = 'O Kick não expõe contagem de seguidores em lugar nenhum da API — '
           + 'por isso ela não aparece na lista. Assinantes e gente assistindo funcionam normalmente, '
@@ -1720,6 +1749,52 @@ function telaEditor(perfil, tipoNovo) {
   if (tipo === 'musica') {
     const avisoSpot = h('p', { cls: 'aviso escondido' });
     tela.appendChild(avisoSpot);
+
+    /* O QUE O SERVIDOR ESTÁ VENDO AGORA.
+
+       "Conectei e não aparece no OBS" tem três causas bem diferentes: não
+       conectou, conectou e o Spotify diz que não há nada tocando, ou está
+       tudo certo e o problema é a fonte do OBS. Sem separar as três, a
+       pessoa fica adivinhando — e eu também. */
+    const spEstado = h('p', { cls: 'd', txt: 'vendo o que o servidor enxerga…' });
+    tela.appendChild(spEstado);
+
+    const spVer = () => {
+      api('/spotify.php').then((r) => {
+        if (!r.ligado) {
+          spEstado.textContent = 'O Spotify não está conectado. Conecte em Ferramentas.';
+          spEstado.style.color = 'var(--perigo)';
+          return;
+        }
+        if (!r.tocando) {
+          /* Este é o caso que mais confunde: conectado e vazio. O Spotify só
+             responde "tocando" quando há um aparelho ativo — pausado, ou logo
+             depois de abrir o app, ele responde vazio. */
+          spEstado.textContent = 'Conectado, mas o Spotify está respondendo que não há nada tocando. '
+            + 'Dê play numa música e recarregue esta tela. Se estiver tocando e mesmo assim aparecer isto, '
+            + 'o Spotify não está enxergando o aparelho — troque de música uma vez pra ele acordar.';
+          spEstado.style.color = 'var(--perigo)';
+          return;
+        }
+        /* Conectado e tocando, e ainda assim "não aparece": quase sempre é
+           isto. O padrão é aparecer na TROCA de música e sumir depois, então
+           com a mesma faixa tocando o overlay fica invisível a maior parte do
+           tempo — e parece quebrado. */
+        const escondePorPadrao = cfg.mquando === 'trocou' && cfg.manim !== 'nenhum';
+        spEstado.textContent = 'Conectado e tocando agora: ' + r.tocando.nome + ' — ' + r.tocando.artista + '.'
+          + (escondePorPadrao
+            ? ' ATENÇÃO: este overlay está em "ao trocar de música", então ele aparece por '
+              + cfg.mtempo + ' segundos quando a faixa muda e some. No OBS, com a mesma música tocando, '
+              + 'ele fica invisível — é o comportamento certo, não um defeito. Pra ficar sempre na tela, '
+              + 'mude "Quando mostrar" pra "Fica na tela o tempo todo".'
+            : ' Se não aparece no OBS, o problema é a fonte lá, não a conexão.');
+        spEstado.style.color = escondePorPadrao ? 'var(--tinta)' : 'var(--verde-forte)';
+      }).catch((e) => {
+        spEstado.textContent = 'Não consegui perguntar: ' + e.message;
+        spEstado.style.color = 'var(--perigo)';
+      });
+    };
+    spVer();
     api('/spotify.php').then((d) => {
       if (d && d.ligado) return;
       avisoSpot.textContent = 'A sua conta do Spotify ainda não está conectada. Sem isso este overlay fica vazio no OBS, mesmo aparecendo certo aqui na prévia. ';
