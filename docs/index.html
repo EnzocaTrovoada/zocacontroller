@@ -306,7 +306,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=29"></script>
+<script src="clock.js?v=30"></script>
 <script>
 'use strict';
 
@@ -1761,10 +1761,37 @@ function telaEditor(perfil, tipoNovo) {
     const spEstado = h('p', { cls: 'd', txt: 'vendo o que o servidor enxerga…' });
     tela.appendChild(spEstado);
 
+    /* CONECTAR E DESCONECTAR AQUI, E NÃO SÓ NA TELA DE MODERADORES.
+
+       O bloco da conta do Spotify morava em Moderadores — lugar nenhum pra
+       quem está mexendo numa overlay de música e leva uma mensagem dizendo
+       pra reconectar. Botão que a mensagem manda apertar tem que estar do
+       lado da mensagem. */
+    const spAcoes = h('div', { cls: 'campo escondido', style: 'gap:8px' });
+    tela.appendChild(spAcoes);
+
+    const spBotoes = (ligado, entrar) => {
+      spAcoes.innerHTML = '';
+      const b = h('button', { cls: 'bt mini', type: 'button',
+                              txt: ligado ? 'Desconectar o Spotify' : 'Conectar o Spotify' });
+      b.onclick = async () => {
+        if (!ligado) { if (entrar) location.href = entrar; return; }
+        b.disabled = true;
+        try {
+          await api('/spotify.php', { method: 'POST', body: JSON.stringify({ acao: 'desligar' }) });
+          recado('Spotify desconectado.', 'bom');
+          spVer();
+        } catch (e) { recado(e.message, 'ruim'); b.disabled = false; }
+      };
+      spAcoes.appendChild(b);
+      spAcoes.classList.remove('escondido');
+    };
+
     const spVer = () => {
       api('/spotify.php').then((r) => {
+        spBotoes(!!r.ligado, r.entrar);
         if (!r.ligado) {
-          spEstado.textContent = 'O Spotify não está conectado. Conecte em Ferramentas.';
+          spEstado.textContent = 'O Spotify não está conectado.';
           spEstado.style.color = 'var(--perigo)';
           return;
         }
@@ -1779,8 +1806,14 @@ function telaEditor(perfil, tipoNovo) {
             if (g.etapa !== 'ok') return;
 
             if (g.http_tocando === 403 || g.http_player === 403) {
-              spEstado.textContent = 'O Spotify recusou a leitura (403). Isso costuma ser permissão antiga: '
-                + 'desconecte e conecte o Spotify de novo em Ferramentas.';
+              /* 403 aqui quase nunca é a conta de quem usa: é o app do site
+                 estar em modo de desenvolvimento no Spotify, que atende no
+                 máximo 5 contas numa lista escrita à mão. Quem não está na
+                 lista leva 403 em tudo. Reconectar não resolve, e mandar
+                 reconectar só faz a pessoa perder tempo. */
+              spEstado.textContent = 'O Spotify recusou (403), e isso não é a sua conta: o aplicativo do site '
+                + 'ainda está em modo de desenvolvimento no Spotify, que só atende 5 contas cadastradas à mão. '
+                + 'Avise o Enzo pra te adicionar — reconectar aqui não resolve.';
             } else if (g.privado) {
               spEstado.textContent = 'O seu Spotify está em SESSÃO PRIVADA. Nesse modo ele não conta o que está '
                 + 'tocando pra ninguém, nem pra gente. Desligue a sessão privada no app do Spotify.';
