@@ -306,7 +306,7 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=28"></script>
+<script src="clock.js?v=29"></script>
 <script>
 'use strict';
 
@@ -1769,6 +1769,34 @@ function telaEditor(perfil, tipoNovo) {
           return;
         }
         if (!r.tocando) {
+          /* Conectado e vazio é o caso que mais confunde, e as causas são
+             bem diferentes. Pergunta o cru pro Spotify e diz qual é. */
+          api('/spotify.php?diag=1').then((g) => {
+            if (g.etapa === 'token') {
+              spEstado.textContent = 'O acesso ao Spotify venceu: ' + g.erro + ' Conecte de novo em Ferramentas.';
+              return;
+            }
+            if (g.etapa !== 'ok') return;
+
+            if (g.http_tocando === 403 || g.http_player === 403) {
+              spEstado.textContent = 'O Spotify recusou a leitura (403). Isso costuma ser permissão antiga: '
+                + 'desconecte e conecte o Spotify de novo em Ferramentas.';
+            } else if (g.privado) {
+              spEstado.textContent = 'O seu Spotify está em SESSÃO PRIVADA. Nesse modo ele não conta o que está '
+                + 'tocando pra ninguém, nem pra gente. Desligue a sessão privada no app do Spotify.';
+            } else if (!g.aparelho) {
+              spEstado.textContent = 'O Spotify não está reportando nenhum aparelho ativo. Isso acontece quando ele '
+                + 'foi aberto e ficou parado: dê play, pule uma música, e ele volta a reportar.';
+            } else if (g.tocando && !g.tem_item) {
+              spEstado.textContent = 'O Spotify diz que está tocando em "' + g.aparelho + '", mas não devolve a faixa. '
+                + 'Costuma ser podcast ou episódio, que a leitura de música não enxerga.';
+            } else {
+              spEstado.textContent = 'O Spotify respondeu ' + g.http_tocando + ' e não trouxe faixa. Aparelho: '
+                + (g.aparelho || 'nenhum') + '. ' + (g.erro_api || '');
+            }
+            spEstado.style.color = 'var(--perigo)';
+          }).catch(() => {});
+
           /* Este é o caso que mais confunde: conectado e vazio. O Spotify só
              responde "tocando" quando há um aparelho ativo — pausado, ou logo
              depois de abrir o app, ele responde vazio. */

@@ -351,3 +351,48 @@ function sp_playlist_por(int $usuario_id, string $uri): array
     if ($http >= 200 && $http < 300) return ['ok' => true];
     return ['ok' => false, 'erro' => sp_erro($http, 'Pôr na playlist')];
 }
+
+/**
+ * O QUE O SPOTIFY RESPONDE AGORA, SEM FILTRO.
+ *
+ * O sp_tocando engole o código HTTP de propósito: pra ele, falha e "nada
+ * tocando" acabam no mesmo lugar, que é não mexer na tela. Isso está certo
+ * pro overlay e é péssimo pra descobrir por que não funciona — "conectado e
+ * nada tocando" e "o Spotify recusou" viram a mesma frase.
+ *
+ * Esta função existe só pra tela de diagnóstico e devolve o código cru.
+ */
+function sp_diagnostico(int $usuario_id): array
+{
+    $st = db()->prepare('SELECT 1 FROM spotify WHERE usuario_id = ?');
+    $st->execute([$usuario_id]);
+    if (!$st->fetchColumn()) return ['etapa' => 'sem-conta'];
+
+    try {
+        $token = sp_token($usuario_id);
+    } catch (Throwable $e) {
+        return ['etapa' => 'token', 'erro' => $e->getMessage()];
+    }
+    if (!$token) return ['etapa' => 'token', 'erro' => 'Não consegui renovar o acesso.'];
+
+    /* As duas chamadas, porque elas falham por motivos diferentes: a de
+       "tocando agora" é a que o overlay usa, e a de "player" conta se existe
+       algum aparelho ativo — que é o que costuma faltar. */
+    [$h1, $d1] = sp_http('GET', SP_API . '/me/player/currently-playing',
+        ['Authorization: Bearer ' . $token]);
+    [$h2, $d2] = sp_http('GET', SP_API . '/me/player',
+        ['Authorization: Bearer ' . $token]);
+
+    return [
+        'etapa'          => 'ok',
+        'http_tocando'   => $h1,
+        'tem_item'       => !empty($d1['item']),
+        'nome'           => (string) ($d1['item']['name'] ?? ''),
+        'http_player'    => $h2,
+        'tocando'        => !empty($d2['is_playing']),
+        'aparelho'       => (string) ($d2['device']['name'] ?? ''),
+        'tipo_aparelho'  => (string) ($d2['device']['type'] ?? ''),
+        'privado'        => !empty($d2['device']['is_private_session']),
+        'erro_api'       => (string) ($d1['error']['message'] ?? $d2['error']['message'] ?? ''),
+    ];
+}

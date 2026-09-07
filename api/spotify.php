@@ -67,6 +67,11 @@ if (isset($_GET['code']) || isset($_GET['error'])) {
 cors();
 $quem = exige_painel();
 
+/* Antes do GET comum, porque aquele encerra a resposta. */
+if (isset($_GET['diag'])) {
+    json_saida(sp_diagnostico((int) $quem['usuario_id']));
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $st = db()->prepare('SELECT 1 FROM spotify WHERE usuario_id = ?');
     $st->execute([$quem['usuario_id']]);
