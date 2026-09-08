@@ -140,9 +140,35 @@ $etag = '"' . md5($perfil['atualizado_em'] . '|' . json_encode($recursos)
 header('ETag: ' . $etag);
 header('Cache-Control: no-cache, must-revalidate');
 
-if (($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $etag) {
-    http_response_code(304);
-    exit;
+/* O ETAG VOLTA DIFERENTE DO QUE SAIU.
+
+   Medido na producao: o PHP manda ETag: "abc" e a resposta chega ao
+   navegador como ETag: W/"abc". Quem poe o W/ e a camada da hospedagem, que
+   comprime a resposta — comprimida, ela nao e byte a byte a mesma coisa, e
+   o padrao manda enfraquecer o ETag nesse caso.
+
+   O navegador devolve no If-None-Match exatamente o que recebeu, com o W/.
+   A comparacao literal com $etag entao NUNCA batia, e o 304 nunca aconteceu:
+   toda consulta de todo overlay, a cada 15 segundos, vinha com o corpo
+   inteiro. Comparar sem o prefixo conserta isso.
+
+   A lista tambem e aceita porque o cabecalho pode trazer varios valores
+   separados por virgula, e "*" quer dizer "qualquer um serve". */
+$recebido = trim((string) ($_SERVER['HTTP_IF_NONE_MATCH'] ?? ''));
+if ($recebido !== '') {
+    $limpo = static function (string $v): string {
+        $v = trim($v);
+        if (stripos($v, 'W/') === 0) $v = substr($v, 2);
+        return trim($v);
+    };
+    $alvo = $limpo($etag);
+    foreach (explode(',', $recebido) as $um) {
+        $um = $limpo($um);
+        if ($um === '*' || $um === $alvo) {
+            http_response_code(304);
+            exit;
+        }
+    }
 }
 
 json_saida([

@@ -240,27 +240,40 @@
 
   if (!k) return;
 
-  var ultimo = '', buscando = false;
+  var ultimo = '', buscando = false, desenhou = false;
 
-  function buscar() {
+  function buscar(semCache) {
     if (buscando) return;
     buscando = true;
     /* 'no-cache' E NAO 'no-store' — a diferença aqui vale banda de
        verdade. */
-    fetch(API + '/config-overlay.php?k=' + encodeURIComponent(k), { cache: 'no-cache' })
+    fetch(API + '/config-overlay.php?k=' + encodeURIComponent(k),
+          { cache: semCache ? 'reload' : 'no-cache' })
       .then(function (r) {
         /* O cabeçalho Date da própria resposta diz a hora do servidor. É de
            graça, não depende de site de terceiro, e é o que mantém o subathon
            certo mesmo com o relógio da máquina torto. */
         var d = r.headers.get('Date');
         if (d) { var t = Date.parse(d); if (t) Relogio.ajustaRelogioDoServidor(t - Date.now()); }
-        if (r.status === 304) return null;      /* nada mudou */
+        /* 304 ANTES DE TER DESENHADO É TELA PRETA PERMANENTE.
+
+           "Nada mudou" só é uma resposta útil pra quem já tem algo na tela.
+           Numa fonte recém-carregada no OBS não há nada desenhado, e o 304
+           não traz corpo: sem este desvio, o overlay ficaria em branco e
+           continuaria em branco a cada 15 segundos, porque o 304 seguiria
+           chegando enquanto a config não mudasse. Aqui a gente pede de novo
+           ignorando o cache, e aí vem o corpo. */
+        if (r.status === 304) {
+          if (!desenhou) setTimeout(function () { buscar(true); }, 300);
+          return null;
+        }
         return r.ok ? r.json() : null;
       })
       .then(function (j) {
         if (!j || !j.config) return;
         var s = JSON.stringify(j.config);
         if (s !== ultimo) { ultimo = s; desenha(j.config); }
+        desenhou = true;
         /* O feed muda sem a config mudar: sub novo nao e edicao de overlay. */
         /* O mesmo canal serve o feed e o alerta: os dois vivem dos eventos.
            O que muda é o que cada um faz com eles — o feed lista, o alerta
