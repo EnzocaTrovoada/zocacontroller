@@ -38,8 +38,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     }, $st->fetchAll());
 
     $acesso = acesso_do_usuario((int) $quem['usuario_id']);
+
+    /* DE QUEM E ESTA LISTA.
+
+       Uma chave de outra conta devolve uma lista vazia perfeitamente
+       legitima, e do lado de la isso e indistinguivel de "meus overlays
+       sumiram". Mandando o login junto, a tela consegue dizer em qual conta
+       ela esta — e a duvida acaba em um segundo. */
+    $lg = db()->prepare('SELECT login FROM usuarios WHERE id = ?');
+    $lg->execute([(int) $quem['usuario_id']]);
+
     json_saida([
         'perfis' => $perfis,
+        'login'  => (string) ($lg->fetchColumn() ?: ''),
         'maximo' => recursos_do_usuario((int) $quem['usuario_id'], $acesso['ativo'] ? $acesso['plano'] : 'gratis')['perfis_max'],
     ]);
 }

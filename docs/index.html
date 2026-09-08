@@ -62,6 +62,10 @@
     border-top: 5px solid currentColor; opacity: .7;
   }
   .espaco { flex: 1; }
+/* A conta em que a tela esta. Discreta de proposito: e informacao de
+   conferencia, nao de navegacao. */
+.quem { color: var(--fraco); font-size: 13px; letter-spacing: .01em; }
+@media (max-width: 640px) { .quem { display: none; } }
   .lua {
     padding: 0 20px; border: 0; border-left: 1px solid var(--linha);
     background: none; color: var(--tinta); cursor: pointer; font-size: 17px;
@@ -288,6 +292,10 @@
   <button class="aba" id="abaMeu" type="button">Meu Controller</button>
 
   <span class="espaco"></span>
+  <!-- De qual conta e este painel. Quando alguem diz que os overlays
+       sumiram, a primeira coisa a saber e se a tela esta olhando pra conta
+       certa: uma chave de outra conta mostra uma lista vazia legitima. -->
+  <span class="quem" id="quemSou"></span>
   <button class="lua" id="btTema" type="button" title="Trocar tema" aria-label="Trocar tema">🌙</button>
 </nav>
 
@@ -362,6 +370,18 @@ const esqueceChave = () => {
   try { sessionStorage.removeItem('zc:chave'); } catch (e) {}
 };
 
+/* A ÚLTIMA LISTA QUE DEU CERTO, GUARDADA AQUI NO NAVEGADOR.
+
+   Não substitui o servidor e nem tenta: é lista velha, aparece marcada como
+   velha e some assim que a leitura de verdade funciona. Existe por um motivo
+   só — quando a leitura falha, a pergunta da pessoa é "cadê meus overlays?",
+   e a resposta útil é mostrar os links do OBS na hora, não uma tela vazia. */
+const guardaListaLocal = (l) => { try { localStorage.setItem('zc:perfis', JSON.stringify(l)); } catch (e) {} };
+const leListaLocal = () => {
+  try { const v = JSON.parse(localStorage.getItem('zc:perfis') || '[]'); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+};
+
 let chave = '';
 try {
   const cru = decodeURIComponent((location.hash || '').slice(1));
@@ -381,13 +401,41 @@ async function api(caminho, opcoes) {
   const o = Object.assign({ headers: {} }, opcoes || {});
   o.headers = Object.assign({ 'X-Chave': chave, 'Content-Type': 'application/json' }, o.headers);
   const r = await fetch(API + caminho, o);
-  const d = await r.json().catch(() => ({}));
+
+  /* RESPOSTA ILEGÍVEL NÃO PODE VIRAR OBJETO VAZIO.
+
+     O corpo era lido com .json().catch(() => ({})). Qualquer resposta que
+     não fosse JSON — um aviso do PHP impresso antes do conteúdo, uma página
+     de erro da hospedagem, uma resposta cortada no meio — chegava aqui como
+     200 com um objeto vazio. E 200 com objeto vazio, na lista de overlays,
+     desenha exatamente a mesma tela que "você não tem overlay nenhum": sem
+     erro, sem aviso, sem pista. A pessoa via os overlays dela sumirem
+     enquanto no servidor estava tudo no lugar.
+
+     Agora o corpo é lido como texto: se não der pra entender, vira erro de
+     verdade, carregando o começo do que veio — que é o que diz onde
+     procurar. */
+  const cru = await r.text().catch(() => '');
+  let d = {};
+  let ilegivel = false;
+  if (cru.trim() !== '') {
+    try { d = JSON.parse(cru); } catch (e) { ilegivel = true; }
+    if (!d || typeof d !== 'object') { d = {}; ilegivel = true; }
+  }
+
   if (!r.ok) {
     const erro = new Error(d.erro || ('falhou (' + r.status + ')'));
     /* O status vai junto: sem ele, "sua chave não vale" e "deu ruim no
        servidor" chegam iguais em quem trata o erro, e a tela acaba dizendo a
        coisa errada na hora mais importante. */
     erro.status = r.status;
+    throw erro;
+  }
+
+  if (ilegivel) {
+    const erro = new Error('o servidor respondeu algo que não é JSON: ' + cru.trim().slice(0, 200));
+    erro.status = 0;
+    erro.ilegivel = true;
     throw erro;
   }
   return d;
@@ -1567,8 +1615,40 @@ function telaLista(filtro) {
   criar.onclick = () => vaiPara('#/novo/' + (filtro || 'meta'));
   tela.appendChild(criar);
 
+  /* A LISTA VELHA PRECISA SE ANUNCIAR.
+
+     Sem esta caixa, "não consegui falar com o servidor" e "você não tem
+     overlay nenhum" desenham a mesma tela — e a segunda é a que assusta. */
+  if (listaVelha) {
+    const cx = h('div', { cls: 'aviso', style: 'margin:16px 0' });
+    cx.appendChild(h('p', { style: 'margin:0 0 10px', txt:
+      'Não consegui falar com o servidor agora, então esta é a última lista que eu tinha visto. '
+      + 'Nada foi apagado: os overlays que já estão no OBS continuam funcionando, porque eles falam '
+      + 'com o servidor por conta própria e não dependem desta tela.' }));
+
+    const bt = h('button', { cls: 'bt mini', type: 'button', txt: 'Tentar de novo' });
+    bt.onclick = async () => {
+      bt.disabled = true;
+      bt.textContent = 'tentando…';
+      /* So redesenha se deu certo: quando carrega() descobre que a chave
+         morreu, ela mesma limpa a tela e poe a caixa de entrar. Chamar
+         rota() aqui desenharia a lista por cima dessa caixa, e a pessoa
+         veria as duas coisas ao mesmo tempo. */
+      if (await carrega()) rota();
+      else { bt.disabled = false; bt.textContent = 'Tentar de novo'; }
+    };
+    cx.appendChild(bt);
+
+    if (erroCarga) {
+      cx.appendChild(h('p', { cls: 'd', style: 'margin:10px 0 0', txt: 'O que deu errado: ' + erroCarga.message }));
+    }
+    tela.appendChild(cx);
+  }
+
   if (!lista.length) {
-    tela.appendChild(h('div', { cls: 'vazio', txt: 'Nenhum overlay ainda. Crie o primeiro aí em cima.', style: 'margin-top:18px' }));
+    if (!listaVelha) {
+      tela.appendChild(h('div', { cls: 'vazio', txt: 'Nenhum overlay ainda. Crie o primeiro aí em cima.', style: 'margin-top:18px' }));
+    }
     return;
   }
 
@@ -3198,11 +3278,45 @@ window.addEventListener('hashchange', rota);
 el('irInicio').onclick = () => vaiPara('#/overlays');
 el('abaMeu').onclick = () => { fechaBandejas(null); vaiPara('#/meu'); };
 
+/* De qual conta é esta tela, e se a lista nela é a de verdade. */
+let quemSou = '';
+let listaVelha = false;
+let erroCarga = null;
+
+function pintaQuemSou() {
+  const c = el('quemSou');
+  if (!c) return;
+  c.textContent = quemSou ? '@' + quemSou : '';
+  c.title = quemSou ? 'Esta tela está no painel da conta @' + quemSou : '';
+}
+
 async function carrega() {
-  try {
-    perfis = (await api('/perfil.php')).perfis || [];
-    return true;
-  } catch (e) {
+  let ultimoErro = null;
+
+  /* TRÊS TENTATIVAS ANTES DE DESISTIR.
+
+     Quase toda falha aqui é um soluço de rede de um segundo. Desistir na
+     primeira transforma isso numa tela de erro no meio da live, por nada. */
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    try {
+      const d = await api('/perfil.php');
+      perfis = d.perfis || [];
+      quemSou = d.login || '';
+      listaVelha = false;
+      erroCarga = null;
+      guardaListaLocal(perfis);
+      pintaQuemSou();
+      el('semChave').classList.add('escondido');
+      return true;
+    } catch (e) {
+      ultimoErro = e;
+      if (e.status === 401 || e.status === 403) break;
+      if (tentativa < 2) await new Promise((ok) => setTimeout(ok, 700 * (tentativa + 1)));
+    }
+  }
+
+  {
+    const e = ultimoErro;
     /* CHAVE VELHA NÃO É LISTA VAZIA.
 
        Entrar de novo na Twitch gera uma chave nova — a antiga é guardada com
@@ -3225,6 +3339,15 @@ async function carrega() {
     /* Falha que NÃO é de chave não pode apagar a tela: um soluço do servidor
         deixaria a pessoa olhando pra nada, sem nem saber o que houve. Avisa e
         segue com a lista vazia, que é recuperável. */
+    /* FALHA DE LEITURA NÃO É LISTA VAZIA.
+
+       Este era o buraco. Toda falha que não fosse de chave caía aqui, a
+       lista continuava vazia e a tela desenhava "Nenhum overlay ainda" — a
+       mesma frase de quem nunca criou nada. Agora a tela sabe que a lista é
+       velha, diz isso, e mostra os overlays que dá pra mostrar. */
+    erroCarga = e;
+    listaVelha = true;
+    perfis = leListaLocal();
     recado(e.message, 'ruim');
     return true;
   }
