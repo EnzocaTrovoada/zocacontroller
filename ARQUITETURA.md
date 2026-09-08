@@ -380,11 +380,10 @@ um pagamento de verdade. Antes de cobrar de alguém, três coisas, nesta ordem:
 
 ## 7. O teste que nunca foi feito
 
-Nada disso — nem o que já está pronto — foi testado numa live de verdade por
-mim. Overlay funcionando na aba de um navegador é evidência fraca: a fonte do
-OBS congela `setTimeout` e animação de CSS quando não está sendo pintada, e
-foi exatamente esse detalhe que produziu leituras falsas várias vezes durante
-a construção.
+Nada disso — nem o que já está pronto — foi testado numa live de verdade.
+Overlay funcionando na aba de um navegador é evidência fraca: a fonte do OBS
+congela `setTimeout` e animação de CSS quando não está sendo pintada, e esse
+detalhe já produziu leitura falsa várias vezes durante a construção.
 
 Uma live de teste de trinta minutos, com o painel aberto de um lado e o OBS do
 outro, vale mais do que qualquer item desta lista. Sugestão de roteiro:
