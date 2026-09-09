@@ -136,6 +136,12 @@
   /* Os planos nascem escondidos de propósito: primeiro a pessoa entende o
      que ganha, depois vê quanto custa. Preço antes do motivo só serve pra
      virar "caro" sem termo de comparação. */
+  /* O roteiro do teste. Numerado porque é sequência de verdade: pular a
+     janela anônima faz os outros passos falharem. */
+  .pop .passos { margin: 0 0 12px; padding-left: 20px; }
+  .pop .passos li { margin-bottom: 7px; color: var(--fraco); font-size: 13.5px; line-height: 1.5; }
+  .pop .passos li::marker { color: var(--verde); font-weight: 600; }
+
   .pop__planos { display: flex; flex-direction: column; gap: 8px; }
   .pop__plano {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -2015,6 +2021,19 @@ function abrePro(estado) {
       b.disabled = true;
       try {
         const r = await api('/checkout.php?plano=' + encodeURIComponent(pl.slug));
+
+        /* EM MODO DE TESTE, ABA NORMAL NÃO FUNCIONA.
+
+           O Mercado Pago exige que as duas pontas sejam do mesmo mundo: se
+           quem VENDE é de teste, quem PAGA também precisa ser. Numa aba
+           comum o navegador manda junto a sessão da sua conta real, e o
+           checkout recusa com "uma das partes é de teste" — erro que não diz
+           o que fazer e parece defeito nosso.
+
+           Por isso aqui o link não abre sozinho: ele aparece pra ser colado
+           numa janela anônima, que é onde não existe sessão nenhuma. */
+        if (estado.modo === 'teste') return passoAPasso(r.url);
+
         /* Aba nova, e não redirecionamento: quem sai do painel pro Mercado
            Pago e volta numa página deles perde o caminho de volta. */
         window.open(r.url, '_blank', 'noopener');
@@ -2027,6 +2046,45 @@ function abrePro(estado) {
     };
     planos.appendChild(b);
   });
+
+  /* O roteiro do teste, no lugar do botão que não pode simplesmente abrir. */
+  function passoAPasso(url) {
+    planos.classList.add('escondido');
+
+    const passos = h('ol', { cls: 'passos' });
+    [
+      'Abra uma janela ANÔNIMA (Ctrl+Shift+N no Chrome).',
+      'Cole o link aí embaixo nela.',
+      'Entre com o usuário de teste COMPRADOR — não com a sua conta.',
+      'Pague com cartão de teste 5480 8328 0103 3311, CVV 123, validade 11/30, '
+        + 'e no nome do titular escreva APRO pra simular aprovado (ou FUND pra recusado).',
+      'Volte aqui e recarregue a página pra ver o plano mudar.',
+    ].forEach((txt) => passos.appendChild(h('li', { txt })));
+
+    const campo = h('input', { type: 'text', value: url, readonly: 'readonly',
+      style: 'width:100%;font:12px var(--mono)' });
+    campo.onclick = () => campo.select();
+
+    const copiar = h('button', { cls: 'bt mini', type: 'button', txt: 'Copiar link' });
+    copiar.onclick = async () => {
+      try { await navigator.clipboard.writeText(url); copiar.textContent = 'Copiado'; }
+      catch (e) { campo.select(); copiar.textContent = 'Use Ctrl+C'; }
+      setTimeout(() => { copiar.textContent = 'Copiar link'; }, 2000);
+    };
+
+    const volta = h('button', { cls: 'bt fraco mini', type: 'button', txt: 'Escolher outro plano' });
+    volta.onclick = () => { roteiro.remove(); planos.classList.remove('escondido'); };
+
+    const roteiro = h('div', { style: 'margin-top:4px' }, [
+      h('p', { cls: 'aviso', txt:
+        'O Mercado Pago recusa quando um lado é de teste e o outro é real. '
+        + 'Numa aba comum ele usa a sua conta de verdade, e dá "uma das partes é de teste".' }),
+      passos, campo,
+      h('div', { style: 'display:flex;gap:8px;margin-top:8px' }, [copiar, volta]),
+    ]);
+
+    caixa.appendChild(roteiro);
+  }
 
   const seja = h('button', { cls: 'bt principal', type: 'button',
     txt: estado.plano === 'gratis' ? 'Seja Pro' : 'Renovar', style: 'width:100%' });
