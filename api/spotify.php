@@ -53,6 +53,7 @@ if (isset($_GET['code']) || isset($_GET['error'])) {
             throw new RuntimeException('O Spotify recusou a troca do código.');
         }
         sp_guardar($usuario_id, $t);
+        sp_anota_email($usuario_id, (string) $t['access_token']);
     } catch (Throwable $e) {
         $pagina('Não deu certo', '<h1>Não deu certo</h1><p>' . htmlspecialchars($e->getMessage()) . '</p>');
     }

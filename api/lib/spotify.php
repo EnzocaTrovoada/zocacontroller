@@ -19,7 +19,18 @@ const SP_API      = 'https://api.spotify.com/v1';
    PULAR E ENFILEIRAR SÓ FUNCIONAM COM SPOTIFY PREMIUM — os endpoints de
    player devolvem 403 em conta grátis, e isso é regra do Spotify, não nossa.
    Curtir e playlist funcionam em qualquer conta. */
-const SP_ESCOPOS = 'user-read-currently-playing user-read-playback-state '
+/* O E-MAIL ENTRA POR UM MOTIVO CHATO E ESPECIFICO.
+
+   O app esta em modo de desenvolvimento no Spotify, e nesse modo eles
+   atendem CINCO contas, escritas a mao na lista do painel deles. Todo mundo
+   fora da lista recebe 403 em qualquer chamada.
+
+   Sem o e-mail, cadastrar alguem na lista exige perguntar por fora, um a um.
+   Com ele, o painel de administracao mostra a lista pronta pra colar.
+
+   Isto nao aumenta o limite de cinco — so tira o atrito de usar os cinco. O
+   que acaba com o limite e a extensao de cota, que se pede no painel deles. */
+const SP_ESCOPOS = 'user-read-email user-read-currently-playing user-read-playback-state '
                  . 'user-modify-playback-state user-library-modify '
                  . 'playlist-modify-public playlist-modify-private playlist-read-private';
 
@@ -78,6 +89,32 @@ function sp_guardar(int $usuario_id, array $t): void
         (string) ($t['refresh_token'] ?? ''),
         (int) ($t['expires_in'] ?? 3600),
     ]);
+}
+
+/**
+ * Anota o e-mail da conta que acabou de conectar.
+ *
+ * É o que permite cadastrar a pessoa na lista de permissão do app sem ter
+ * que perguntar por fora, um a um. Serve pra ISSO e nada mais: não vai pra
+ * lugar nenhum, não sai do painel de administração, e some junto com a
+ * conexão quando a pessoa desconecta.
+ *
+ * Falhar aqui não pode derrubar a conexão: quem acabou de autorizar o
+ * Spotify quer o Spotify funcionando, e o e-mail é conveniência nossa.
+ */
+function sp_anota_email(int $usuario_id, string $token): void
+{
+    try {
+        [$http, $eu] = sp_http('GET', 'https://api.spotify.com/v1/me',
+            ['Authorization: Bearer ' . $token]);
+        if ($http !== 200 || empty($eu['email'])) return;
+
+        db()->prepare('UPDATE spotify SET email = ? WHERE usuario_id = ?')
+            ->execute([mb_substr((string) $eu['email'], 0, 160), $usuario_id]);
+    } catch (Throwable $e) {
+        /* coluna nova ou escopo ainda não autorizado: não é motivo pra
+           quebrar uma conexão que deu certo */
+    }
 }
 
 /** Token válido, renovando se precisar. Null se a pessoa não conectou. */

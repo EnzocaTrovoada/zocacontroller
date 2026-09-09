@@ -50,7 +50,23 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         ];
     }
 
-    json_saida(['eu' => $uid, 'usuarios' => $lista, 'padrao' => [
+    /* OS E-MAILS DO SPOTIFY, PRA COLAR NA LISTA DE PERMISSÃO DELES.
+
+       O app está em modo de desenvolvimento e atende cinco contas escritas à
+       mão no painel do Spotify. Esta lista é só quem já conectou e ainda não
+       está cadastrado — é o que evita ficar perguntando e-mail no privado. */
+    $spot = [];
+    try {
+        $q = db()->query(
+            'SELECT u.login, s.email
+               FROM spotify s JOIN usuarios u ON u.id = s.usuario_id
+              WHERE s.email IS NOT NULL AND s.email <> \'\'
+              ORDER BY s.usuario_id DESC LIMIT 200'
+        );
+        $spot = $q->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { /* coluna nova: quem não rodou o SQL vê lista vazia */ }
+
+    json_saida(['eu' => $uid, 'usuarios' => $lista, 'spotify' => $spot, 'padrao' => [
         'gratis' => recursos_do_plano('gratis'),
         'pro'    => recursos_do_plano('pro'),
     ]]);
