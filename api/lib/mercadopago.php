@@ -24,8 +24,17 @@ require_once __DIR__ . '/db.php';
 
 const MP_API = 'https://api.mercadopago.com';
 
-/** Quantos dias cada período vale. */
+/** Quantos dias cada período vale. O vitalício não tem dias — tem data. */
 const MP_DIAS = ['mensal' => 30, 'anual' => 365];
+
+/* A DATA DO VITALÍCIO.
+
+   Uma data distante em vez de NULL de propósito: 'valido_ate IS NULL' já quer
+   dizer "nunca teve acesso" em acesso_do_usuario(), e reaproveitar o mesmo
+   NULL pra dizer o contrário ("acesso pra sempre") faria as duas situações
+   opostas passarem pelo mesmo IF. Com data, toda consulta que já existe
+   continua valendo sem precisar aprender um caso novo. */
+const MP_VITALICIO_ATE = '2099-12-31 23:59:59';
 
 /**
  * A configuração, com os padrões seguros.
@@ -182,17 +191,21 @@ function mp_ler_pagamento(string $pagamento_id): ?array
  */
 function mp_liberar(int $usuario_id, array $plano, string $referencia, string $pagamento_id, int $centavos): void
 {
-    $dias = MP_DIAS[$plano['periodo']] ?? 30;
+    if (($plano['periodo'] ?? '') === 'vitalicio') {
+        $ate = MP_VITALICIO_ATE;
+    } else {
+        $dias = MP_DIAS[$plano['periodo']] ?? 30;
 
-    $st = db()->prepare(
-        "SELECT MAX(valido_ate) FROM assinaturas
-          WHERE usuario_id = ? AND status = 'ativa' AND valido_ate IS NOT NULL"
-    );
-    $st->execute([$usuario_id]);
-    $atual = $st->fetchColumn();
+        $st = db()->prepare(
+            "SELECT MAX(valido_ate) FROM assinaturas
+              WHERE usuario_id = ? AND status = 'ativa' AND valido_ate IS NOT NULL"
+        );
+        $st->execute([$usuario_id]);
+        $atual = $st->fetchColumn();
 
-    $base = ($atual && strtotime($atual) > time()) ? strtotime($atual) : time();
-    $ate = date('Y-m-d H:i:s', $base + $dias * 86400);
+        $base = ($atual && strtotime($atual) > time()) ? strtotime($atual) : time();
+        $ate = date('Y-m-d H:i:s', $base + $dias * 86400);
+    }
 
     /* A linha certa é a que o checkout criou, achada pela referência. Se ela
        sumiu (banco limpo, teste antigo), cria uma: pagamento confirmado não

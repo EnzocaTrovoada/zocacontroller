@@ -66,8 +66,29 @@ function recursos_do_usuario(int $usuario_id, string $plano): array
     return $r;
 }
 
+/* "Ilimitado" é um número grande, não um caso especial.
+   Um null ou um -1 aqui obrigaria toda comparação de teto a aprender a
+   exceção, e a que esquecesse trataria ilimitado como zero. */
+const PERFIS_ILIMITADO = 9999;
+
 function recursos_do_plano(string $plano): array
 {
+    if ($plano === 'vitalicio') {
+        return [
+            'marca_dagua'     => false,
+            'pokebot'         => true,
+            'multiplataforma' => true,
+            'temas'           => 'todos',
+            'perfis_max'      => PERFIS_ILIMITADO,
+            /* Os três abaixo não são checados por código nenhum: são promessa
+               de atendimento, e quem cumpre é o Enzo. Ficam aqui pra que a
+               lista do painel e o que o servidor sabe sejam a mesma coisa. */
+            'beta'            => true,
+            'sugestoes'       => true,
+            'suporte'         => 'pessoal',
+        ];
+    }
+
     if ($plano === 'pro' || $plano === 'pro_ano') {
         return [
             'marca_dagua'     => false,
@@ -75,6 +96,9 @@ function recursos_do_plano(string $plano): array
             'multiplataforma' => true,
             'temas'           => 'todos',
             'perfis_max'      => 50,
+            'beta'            => false,
+            'sugestoes'       => false,
+            'suporte'         => 'comum',
         ];
     }
 
@@ -87,5 +111,8 @@ function recursos_do_plano(string $plano): array
            quer experimentar antes de decidir. O teto existe pra impedir abuso,
            não pra impedir uso — e a hospedagem está em 5% com tudo junto. */
         'perfis_max'      => 8,
+        'beta'            => false,
+        'sugestoes'       => false,
+        'suporte'         => 'comum',
     ];
 }

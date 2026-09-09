@@ -19,6 +19,9 @@
     --tinta:#101A14; --fraco:#5C6C62; --apagado:#8A9990;
     --verde:#12A150; --verde-fraco:#E4F5EA; --verde-forte:#0B7A3B;
     --perigo:#C4432B;
+    /* O dourado e so do vitalicio. Fica mais escuro no tema claro pra
+       nao virar amarelo lavado em cima do fundo branco. */
+    --dourado:#B07D14;
     --disp:"Archivo",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
     --sombra:0 1px 2px rgba(16,26,20,.06), 0 8px 24px rgba(16,26,20,.06);
   }
@@ -28,6 +31,7 @@
     --tinta:#E4EDE7; --fraco:#93A69B; --apagado:#71857A;
     --verde:#3DD47F; --verde-fraco:#14301F; --verde-forte:#69E39C;
     --perigo:#E4735A;
+    --dourado:#E0A82E;
     --sombra:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
   }
 
@@ -132,6 +136,16 @@
   .pop__lista b { font-weight: 600; }
   .pop__lista small { display: block; color: var(--apagado); font-size: 12.5px; margin-top: 1px; }
   .pop__ok { color: var(--verde); font-weight: 700; }
+  .pop__estrela { color: var(--dourado); font-weight: 700; }
+  .pop__lista li.so-vital b { color: var(--dourado); }
+  .pop__tag {
+    display: inline-block; margin-left: 8px; font-style: normal;
+    font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+    color: var(--dourado); border: 1px solid currentColor;
+    padding: 1px 5px; vertical-align: 2px;
+  }
+  .pop__plano.vital { border-color: var(--dourado); }
+  .pop__plano.vital span { color: var(--dourado); }
 
   /* Os planos nascem escondidos de propósito: primeiro a pessoa entende o
      que ganha, depois vê quanto custa. Preço antes do motivo só serve pra
@@ -1956,6 +1970,13 @@ const PRO_BENEFICIOS = [
    'no grátis só os básicos'],
   ['Pokébot liberado',
    'o bot de captura funcionando no seu chat'],
+  /* O quarto item de cada linha marca o que só existe no vitalício. Marcar
+     em vez de fazer duas listas: quem está olhando quer comparar, e comparar
+     entre duas listas separadas obriga a pessoa a ir e voltar. */
+  ['Overlays ilimitados', 'sem teto nenhum, nem os 50 do Pro', 1],
+  ['Ferramentas em desenvolvimento', 'você usa antes de todo mundo, enquanto ainda estão sendo feitas', 1],
+  ['Suas sugestões entram na fila', 'pede a ferramenta que falta e ela é considerada de verdade', 1],
+  ['Suporte pessoal 24 horas', 'falando direto com o Enzo, não com formulário', 1],
 ];
 
 function fechaPop() {
@@ -1986,13 +2007,19 @@ function abrePro(estado) {
   const ate = estado.valido_ate ? new Date(estado.valido_ate.replace(' ', 'T')) : null;
   caixa.appendChild(h('p', { cls: 'sub', txt: estado.plano === 'gratis'
     ? 'Você está no plano grátis. Veja o que muda.'
-    : 'Você já é Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '. Pode renovar quando quiser.' }));
+    : estado.plano === 'vitalicio'
+      ? 'Você é Vitalício. Já tem tudo, pra sempre.'
+      : 'Você já é Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '. Pode renovar quando quiser.' }));
 
   const lista = h('ul', { cls: 'pop__lista' });
-  PRO_BENEFICIOS.forEach(([titulo, detalhe]) => {
-    lista.appendChild(h('li', {}, [
-      h('span', { cls: 'pop__ok', txt: '✓' }),
-      h('div', {}, [h('b', { txt: titulo }), h('small', { txt: detalhe })]),
+  PRO_BENEFICIOS.forEach(([titulo, detalhe, soVital]) => {
+    const dentro = h('div', {}, [h('b', { txt: titulo })]);
+    if (soVital) dentro.appendChild(h('em', { cls: 'pop__tag', txt: 'só no Vitalício' }));
+    dentro.appendChild(h('small', { txt: detalhe }));
+
+    lista.appendChild(h('li', { cls: soVital ? 'so-vital' : '' }, [
+      h('span', { cls: soVital ? 'pop__estrela' : 'pop__ok', txt: soVital ? '★' : '✓' }),
+      dentro,
     ]));
   });
   caixa.appendChild(lista);
@@ -2008,11 +2035,13 @@ function abrePro(estado) {
 
   (estado.planos || []).forEach((pl) => {
     const reais = (pl.preco_centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const porMes = pl.periodo === 'anual'
-      ? (pl.preco_centavos / 1200).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + ' por mês'
-      : 'cobrado uma vez, vale 30 dias';
+    const porMes = pl.periodo === 'vitalicio'
+      ? 'paga uma vez e nunca mais'
+      : pl.periodo === 'anual'
+        ? (pl.preco_centavos / 1200).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + ' por mês'
+        : 'cobrado uma vez, vale 30 dias';
 
-    const b = h('button', { cls: 'pop__plano', type: 'button' }, [
+    const b = h('button', { cls: 'pop__plano' + (pl.periodo === 'vitalicio' ? ' vital' : ''), type: 'button' }, [
       h('div', {}, [h('b', { txt: pl.nome }), h('small', { txt: porMes })]),
       h('span', { txt: reais }),
     ]);
@@ -2683,9 +2712,13 @@ function telaControlador() {
   if (proEstado) {
     const ate = proEstado.valido_ate ? new Date(proEstado.valido_ate.replace(' ', 'T')) : null;
     fatiaPlano.appendChild(h('h3', { txt: 'Seu plano' }));
+    /* Vitalício não tem "até": a data existe no banco só pra caber na mesma
+       coluna dos outros, e mostrar "até 31/12/2099" pareceria pegadinha. */
     fatiaPlano.appendChild(h('p', { cls: 'd', txt: proEstado.plano === 'gratis'
       ? 'Grátis. Dá pra ver o que muda no Pro na aba Upgrade, ali em cima.'
-      : 'Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '.' }));
+      : proEstado.plano === 'vitalicio'
+        ? 'Vitalício. Não vence.'
+        : 'Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '.' }));
     fatiaPlano.classList.remove('escondido');
   }
 
