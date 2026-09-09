@@ -87,10 +87,25 @@ function mp_webhook_valido(string $x_signature, string $x_request_id, string $da
     if ($ts === null || $v1 === null) {
         return false;
     }
-    if (abs(time() - (int) $ts) > 300) {
+
+    /* O TS VEM EM MILISSEGUNDOS.
+       A documentação deles mostra ts:1742505638683 — treze dígitos. Comparar
+       isso direto com time(), que devolve segundos, dava uma diferença de mais
+       de um trilhão: a janela de cinco minutos reprovava TODA notificação
+       legítima como se fosse velha, e nenhum pagamento passaria.
+
+       Normalizo só para comparar. No texto assinado o ts entra exatamente
+       como chegou — um dígito a mais ou a menos ali muda o HMAC inteiro. */
+    $ts_seg = (int) $ts;
+    if ($ts_seg > 100000000000) {          // treze dígitos ou mais: milissegundos
+        $ts_seg = intdiv($ts_seg, 1000);
+    }
+    if (abs(time() - $ts_seg) > 300) {
         return false;                      // notificação velha: alguém reenviando
     }
 
+    /* O id em minúsculo é regra deles para id alfanumérico; em id numérico não
+       muda nada, então vale sempre. */
     $modelo = 'id:' . strtolower($data_id) . ';request-id:' . $x_request_id . ';ts:' . $ts . ';';
 
     return hash_equals(hash_hmac('sha256', $modelo, cfg()['mercadopago']['webhook_secret']), $v1);
