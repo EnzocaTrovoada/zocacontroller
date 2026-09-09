@@ -40,11 +40,16 @@ return [
        alguem ser cobrado. Ligar e a ULTIMA coisa a fazer, depois do teste de
        ponta a ponta passar.
 
-       'modo' teste usa o sandbox_init_point e as credenciais de TESTE do
-       painel deles: o checkout abre igual, so aceita cartao de teste e nao
-       move dinheiro nenhum. Trocar pra 'producao' exige tambem trocar o
-       access_token e o webhook_secret pelos de producao — sao pares, e
-       misturar um de cada da erro de assinatura sem explicacao. */
+       'modo' NAO troca de endereco: o Mercado Pago desligou o ambiente de
+       sandbox, e hoje teste e producao usam a mesma API e o mesmo checkout.
+       O que separa os dois e so qual credencial esta carregada aqui.
+
+       O 'modo' serve pra duas coisas nossas: marcar as linhas de assinatura
+       como ensaio, e fazer o painel ensinar o caminho da janela anonima em
+       vez de abrir o checkout numa aba comum.
+
+       access_token e webhook_secret sao PARES: misturar um de teste com um
+       de producao da erro de assinatura sem explicacao nenhuma. */
     'mercadopago' => [
         'ligado'         => false,
         'modo'           => 'teste',   // teste | producao

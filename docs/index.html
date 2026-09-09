@@ -2106,8 +2106,9 @@ function abrePro(estado) {
 
     const roteiro = h('div', { style: 'margin-top:4px' }, [
       h('p', { cls: 'aviso', txt:
-        'O Mercado Pago recusa quando um lado é de teste e o outro é real. '
-        + 'Numa aba comum ele usa a sua conta de verdade, e dá "uma das partes é de teste".' }),
+        'O Mercado Pago recusa quando um lado é de teste e o outro é real. Como teste e '
+        + 'produção hoje usam o MESMO endereço, numa aba comum ele pega a sua conta de '
+        + 'verdade e dá "uma das partes é de teste". Na janela anônima não existe conta nenhuma.' }),
       passos, campo,
       h('div', { style: 'display:flex;gap:8px;margin-top:8px' }, [copiar, volta]),
     ]);

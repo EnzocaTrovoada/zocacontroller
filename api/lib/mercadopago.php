@@ -166,11 +166,16 @@ function mp_criar_cobranca(int $usuario_id, array $plano): array
         (string) $r['id'], $ref, 'pendente', $mp['modo'] === 'teste' ? 1 : 0,
     ]);
 
-    /* Em modo de teste o link é o sandbox_init_point: o mesmo checkout, mas
-       que só aceita os cartões de teste e não move dinheiro nenhum. */
-    $url = ($mp['modo'] === 'teste' && !empty($r['sandbox_init_point']))
-        ? $r['sandbox_init_point']
-        : ($r['init_point'] ?? '');
+    /* SEMPRE O init_point, NUNCA O sandbox_init_point.
+
+       O Mercado Pago DESLIGOU o ambiente de sandbox. O sandbox_init_point
+       ainda vem na resposta, mas o endereço sandbox.mercadopago.com.br
+       entra em laço de redirecionamento e o navegador desiste com
+       ERR_TOO_MANY_REDIRECTS — sem mensagem que ligue o erro à causa.
+
+       Hoje teste e produção usam o MESMO endereço e a mesma API. O que
+       separa os dois é só qual credencial está carregada, e mais nada. */
+    $url = (string) ($r['init_point'] ?? '');
 
     return ['url' => $url, 'referencia' => $ref, 'preferencia' => (string) $r['id']];
 }
