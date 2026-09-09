@@ -15,6 +15,7 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/mercadopago.php';
 
 cors();
@@ -22,6 +23,30 @@ $quem = exige_painel();
 trava('checkout', 10, 300);
 
 $mp = mp_cfg();
+
+/* PERGUNTAR SEM COMPRAR.
+
+   O painel precisa saber se existe cobrança antes de desenhar botão nenhum,
+   e perguntar isso não pode criar uma cobrança. Por isso a consulta é um
+   caminho separado, e ele responde 200 mesmo com a cobrança desligada. */
+if (isset($_GET['estado'])) {
+    $acesso = acesso_do_usuario((int) $quem['usuario_id']);
+
+    $st = db()->query("SELECT slug, nome, preco_centavos, periodo FROM planos
+                        WHERE preco_centavos > 0 ORDER BY preco_centavos");
+
+    $st2 = db()->prepare("SELECT MAX(valido_ate) FROM assinaturas
+                           WHERE usuario_id = ? AND status = 'ativa'");
+    $st2->execute([(int) $quem['usuario_id']]);
+
+    json_saida([
+        'ligado'     => $mp['ligado'],
+        'modo'       => $mp['modo'],
+        'plano'      => $acesso['ativo'] ? $acesso['plano'] : 'gratis',
+        'valido_ate' => $st2->fetchColumn() ?: null,
+        'planos'     => $st->fetchAll(PDO::FETCH_ASSOC),
+    ]);
+}
 
 /* A CHAVE GERAL DA COBRANÇA.
 

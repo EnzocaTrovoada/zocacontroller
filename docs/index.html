@@ -2418,6 +2418,58 @@ function telaControlador() {
 
   const base = location.origin + location.pathname.replace(/[^/]*$/, '');
 
+  /* ----- assinatura -----
+
+     A caixa inteira só existe se o servidor disser que a cobrança está
+     aberta. E enquanto ela estiver em modo de teste, só aparece pra admin:
+     um botão de pagar que ainda não foi testado não pode aparecer pra quem
+     está usando o site de verdade. */
+  const fatiaPlano = h('div', { cls: 'fatia escondido' });
+  tela.appendChild(fatiaPlano);
+
+  api('/checkout.php?estado=1').then((c) => {
+    if (!c.ligado) return;
+    if (c.modo === 'teste' && !souAdmin) return;
+
+    fatiaPlano.appendChild(h('h3', { txt: 'Assinatura' }));
+
+    if (c.modo === 'teste') {
+      fatiaPlano.appendChild(h('p', { cls: 'aviso', txt:
+        'MODO DE TESTE. Este checkout não move dinheiro nenhum e só aceita os '
+        + 'cartões de teste do Mercado Pago. Ninguém além de você está vendo esta caixa.' }));
+    }
+
+    const ate = c.valido_ate ? new Date(c.valido_ate.replace(' ', 'T')) : null;
+    fatiaPlano.appendChild(h('p', { cls: 'd', txt: c.plano === 'gratis'
+      ? 'Você está no plano grátis.'
+      : 'Plano ' + c.plano + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '.' }));
+
+    const linha = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px' });
+    (c.planos || []).forEach((p) => {
+      const reais = (p.preco_centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const b = h('button', { cls: 'bt principal', type: 'button',
+        txt: p.nome + ' — ' + reais + (p.periodo === 'anual' ? '/ano' : '/mês') });
+      b.onclick = async () => {
+        b.disabled = true;
+        const antes = b.textContent;
+        b.textContent = 'abrindo…';
+        try {
+          const r = await api('/checkout.php?plano=' + encodeURIComponent(p.slug));
+          /* Aba nova, e não redirecionamento: quem volta do Mercado Pago cai
+             numa página deles, e perder o painel no meio do caminho é o jeito
+             mais fácil de a pessoa achar que algo quebrou. */
+          window.open(r.url, '_blank', 'noopener');
+          recado('Abri o checkout numa aba nova. Depois de pagar, volte aqui e recarregue.', 'bom');
+        } catch (e) { recado(e.message, 'ruim'); }
+        b.disabled = false;
+        b.textContent = antes;
+      };
+      linha.appendChild(b);
+    });
+    fatiaPlano.appendChild(linha);
+    fatiaPlano.classList.remove('escondido');
+  }).catch(() => { /* cobrança fora do ar não pode derrubar esta tela */ });
+
   /* ----- a chave ----- */
   const fatiaChave = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Chave do painel' }),
@@ -3547,6 +3599,7 @@ el('abaMeu').onclick = () => { fechaBandejas(null); vaiPara('#/meu'); };
 
 /* De qual conta é esta tela, e se a lista nela é a de verdade. */
 let quemSou = '';
+let souAdmin = false;
 let listaVelha = false;
 let erroCarga = null;
 
@@ -3569,6 +3622,7 @@ async function carrega() {
       const d = await api('/perfil.php');
       perfis = d.perfis || [];
       quemSou = d.login || '';
+      souAdmin = !!d.admin;
       listaVelha = false;
       erroCarga = null;
       guardaListaLocal(perfis);

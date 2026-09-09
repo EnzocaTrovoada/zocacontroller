@@ -45,12 +45,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
        legitima, e do lado de la isso e indistinguivel de "meus overlays
        sumiram". Mandando o login junto, a tela consegue dizer em qual conta
        ela esta — e a duvida acaba em um segundo. */
-    $lg = db()->prepare('SELECT login FROM usuarios WHERE id = ?');
+    $lg = db()->prepare('SELECT login, admin FROM usuarios WHERE id = ?');
     $lg->execute([(int) $quem['usuario_id']]);
+    $eu = $lg->fetch() ?: ['login' => '', 'admin' => 0];
 
     json_saida([
         'perfis' => $perfis,
-        'login'  => (string) ($lg->fetchColumn() ?: ''),
+        'login'  => (string) ($eu['login'] ?? ''),
+        /* Só pra decidir o que a TELA mostra. Nenhuma permissão de verdade
+           depende disto: quem manda é o admin.php, que confere no banco a
+           cada chamada. */
+        'admin'  => (int) ($eu['admin'] ?? 0),
         'maximo' => recursos_do_usuario((int) $quem['usuario_id'], $acesso['ativo'] ? $acesso['plano'] : 'gratis')['perfis_max'],
     ]);
 }
