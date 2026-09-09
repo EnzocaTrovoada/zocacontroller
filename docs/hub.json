@@ -1,0 +1,44 @@
+{
+  "_leia": [
+    "A vitrine da página inicial. Este arquivo é para ser editado à mão — é",
+    "por isso que ele é JSON solto e não tabela no banco: mudar o que aparece",
+    "na home não devia exigir painel de administração nem migração.",
+    "",
+    "Depois de editar, faça commit: o GitHub Pages publica sozinho e a página",
+    "lê a versão nova na próxima visita.",
+    "",
+    "novidades: a mais recente PRIMEIRO. A data é o que aparece na tela.",
+    "parceiros: lista vazia esconde a seção inteira. Não invente parceiro —",
+    "  uma home com parceiro falso é pior do que uma home sem a seção."
+  ],
+
+  "novidades": [
+    {
+      "data": "2026-09-10",
+      "titulo": "Cronômetro de speedrun",
+      "texto": "Lista de trechos, diferença contra o seu recorde e trecho recorde em dourado, no formato que o LiveSplit consagrou."
+    },
+    {
+      "data": "2026-09-09",
+      "titulo": "Metas no YouTube e no Kick",
+      "texto": "A plataforma é escolhida na hora de criar a overlay, e cada uma só oferece o que a API dela realmente responde."
+    },
+    {
+      "data": "2026-09-09",
+      "titulo": "Música pelo Last.fm",
+      "texto": "Funciona para qualquer pessoa no primeiro dia, sem lista de espera. O Spotify continua para quem usa os comandos do chat."
+    },
+    {
+      "data": "2026-09-08",
+      "titulo": "A lista de overlays não some mais",
+      "texto": "Falha de leitura passou a ser tratada como falha, e não como lista vazia. Quando o servidor não responde, a última lista aparece marcada como velha — com os links do OBS na mão."
+    },
+    {
+      "data": "2026-09-08",
+      "titulo": "Alertas com som próprio",
+      "texto": "Sub, follow e bits aparecendo na hora, com o som que você mandar."
+    }
+  ],
+
+  "parceiros": []
+}
