@@ -178,101 +178,137 @@
 
   /* ---------- vitrine da inicial ---------- */
 
-  /* Três colunas: o que mudou à esquerda, o destaque no meio, o que está em
-     alta à direita. As laterais têm largura fixa e o meio fica com o que
-     sobra — é o meio que tem vídeo, e vídeo é o que precisa de espaço. */
+  /* A VITRINE PRECISA DA TELA INTEIRA.
+
+     O resto do site cabe em 1080px porque é formulário e lista, que ficam
+     ruins largos demais. A vitrine é o contrário: três painéis lado a lado
+     em 1080px espremem tudo — foi o que deixou a primeira versão feia. */
+  body.na-vitrine .w { max-width: 1600px; }
+
+  /* 30% / 40% / 30%. O minmax(0,...) é o que impede uma coluna de crescer
+     por causa de conteúdo comprido e comer as vizinhas. */
   .hub {
-    display: grid; gap: 20px; padding: 18px 0 40px;
-    grid-template-columns: 300px minmax(0, 1fr) 290px;
+    display: grid; gap: 18px; padding: 14px 0 40px;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 4fr) minmax(0, 3fr);
     align-items: start;
   }
-  @media (max-width: 1100px) { .hub { grid-template-columns: 1fr; } }
+  @media (max-width: 1180px) { .hub { grid-template-columns: 1fr; } }
+
+  /* Cada coisa no seu painel, com borda própria — foi o que faltava antes:
+     três listas soltas no branco não pareciam três seções, pareciam uma
+     bagunça só. */
+  .hub__painel {
+    border: 1px solid var(--linha); background: var(--caixa);
+    padding: 16px 18px; min-width: 0;
+  }
+  .hub__painel + .hub__painel { margin-top: 16px; }
 
   .hub h2 {
-    margin: 0 0 12px; font: 600 11.5px var(--mono);
-    letter-spacing: .16em; text-transform: uppercase; color: var(--fraco);
+    margin: 0 0 14px; font: 600 11px var(--mono);
+    letter-spacing: .18em; text-transform: uppercase; color: var(--fraco);
   }
 
-  .hub__col { min-width: 0; }
-
-  /* ---- coluna da esquerda: o que mudou ---- */
-
-  /* Altura travada com rolagem própria: a lista cresce pra sempre e sem teto
-     ela empurraria a página inteira pra baixo. */
-  .hub__rolo {
-    max-height: 420px; overflow-y: auto;
-    border: 1px solid var(--linha); background: var(--caixa);
-    padding: 2px 14px;
-  }
-  .hub__nov { padding: 12px 0; border-bottom: 1px solid var(--linha); }
-  .hub__nov:last-child { border-bottom: 0; }
+  /* ---- esquerda: atualizações ---- */
+  .hub__rolo { max-height: 460px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+  .hub__nov { padding: 13px 0; border-bottom: 1px solid var(--linha); }
+  .hub__nov:first-child { padding-top: 0; }
+  .hub__nov:last-child { border-bottom: 0; padding-bottom: 0; }
   .hub__nov time { display: block; color: var(--apagado); font: 500 11px var(--mono); margin-bottom: 3px; }
-  .hub__nov b { display: block; font: 600 14px var(--disp); margin-bottom: 2px; }
-  .hub__nov span { color: var(--fraco); font-size: 13px; line-height: 1.45; }
+  .hub__nov b { display: block; font: 600 14.5px var(--disp); margin-bottom: 3px; }
+  .hub__nov span { color: var(--fraco); font-size: 13px; line-height: 1.5; }
 
   /* ---- meio: o carrossel ---- */
-  .hub__carro { display: flex; align-items: center; gap: 10px; }
 
-  .hub__seta {
-    flex: none; width: 34px; height: 34px; border: 1px solid var(--linha);
-    background: var(--caixa); color: var(--tinta); cursor: pointer;
-    font-size: 16px; line-height: 1; display: grid; place-items: center;
+  /* Os vizinhos aparecem cortados nas beiradas, como na home da Twitch: é o
+     que faz o carrossel parecer carrossel sem precisar de legenda dizendo
+     que tem mais coisa. */
+  .hub__trilho { display: flex; align-items: center; gap: 8px; }
+
+  .hub__lado {
+    flex: 0 0 9%; align-self: stretch; min-width: 0;
+    border: 0; padding: 0; background: none; cursor: pointer;
+    opacity: .38; overflow: hidden;
   }
-  .hub__seta:hover { border-color: var(--verde); color: var(--verde-forte); }
+  .hub__lado:hover { opacity: .8; }
+  .hub__lado img { width: 300%; height: 100%; object-fit: cover; display: block; }
+  .hub__lado.dir img { margin-left: -200%; }
+  .hub__lado .vazio { width: 100%; height: 100%; background: var(--caixa2); }
 
-  .hub__palco { flex: 1 1 auto; min-width: 0; border: 1px solid var(--linha); background: var(--caixa); }
+  .hub__palco { flex: 1 1 auto; min-width: 0; }
 
-  /* 16/9 fixo pro quadro não pular de altura ao trocar de canal. */
-  .hub__video { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden; }
+  .hub__video {
+    position: relative; width: 100%; aspect-ratio: 16/9;
+    background: #000; overflow: hidden; border: 1px solid var(--linha);
+  }
   .hub__video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   .hub__video img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
   .hub__off {
-    position: absolute; inset: 0; display: grid; place-items: center; gap: 6px;
-    background: rgba(6,12,8,.55); color: #fff; text-align: center;
-    font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    position: absolute; inset: 0; display: grid; place-items: center;
+    background: rgba(6,12,8,.6); color: #fff;
+    font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase;
   }
 
-  .hub__info { padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
-  .hub__info b { font: 600 16px var(--disp); }
-  .hub__info .tit { color: var(--fraco); font-size: 13.5px;
+  .hub__info { padding: 14px 2px 0; display: flex; flex-direction: column; gap: 4px; }
+  .hub__info b { font: 600 18px var(--disp); }
+  .hub__info .tit { color: var(--fraco); font-size: 14px;
     overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .hub__info .meta { color: var(--apagado); font: 500 11.5px var(--mono); padding-top: 4px; }
+  .hub__info .meta { color: var(--apagado); font: 500 12px var(--mono); padding-top: 2px; }
   .hub__info .ao-vivo { color: var(--perigo); font-weight: 700; }
 
   .hub__selo {
     align-self: flex-start; font: 600 10px var(--mono); letter-spacing: .1em;
-    text-transform: uppercase; padding: 2px 6px; border: 1px solid currentColor;
-    color: var(--fraco); margin-bottom: 2px;
+    text-transform: uppercase; padding: 2px 7px; border: 1px solid currentColor;
+    color: var(--fraco);
   }
   .hub__selo.pro { color: var(--dourado); }
   .hub__selo.usuario { color: var(--verde-forte); }
 
-  /* Bolinhas: dizem quantos são e em qual você está. */
-  .hub__pontos { display: flex; justify-content: center; gap: 6px; padding: 10px 0 0; }
+  .hub__pontos { display: flex; justify-content: center; gap: 7px; padding: 14px 0 0; }
   .hub__ponto {
     width: 7px; height: 7px; border-radius: 50%; border: 0; padding: 0;
     background: var(--linha2); cursor: pointer;
   }
-  .hub__ponto.on { background: var(--verde); }
+  .hub__ponto.on { background: var(--verde); width: 20px; border-radius: 4px; }
 
   /* ---- direita: em alta ---- */
-  .hub__filtros { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-  .hub__filtros select, .hub__filtros input { width: 100%; }
+
+  /* Os controles do site inteiro só ganham estilo dentro de .campo, e aqui
+     não existe .campo — sem isto o navegador desenha o select cinza dele,
+     que destoa de tudo. */
+  .hub__busca { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .hub__busca select, .hub__busca input {
+    width: 100%; font: 13px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha);
+    padding: 9px 10px; border-radius: 4px;
+  }
+  .hub__busca select:focus, .hub__busca input:focus {
+    outline: 0; border-color: var(--verde);
+  }
+  .hub__busca select {
+    appearance: none; -webkit-appearance: none; cursor: pointer;
+    /* A setinha desenhada por nós: a nativa vem com a cor do sistema e fica
+       invisível no tema escuro. */
+    background-image: linear-gradient(45deg, transparent 50%, var(--fraco) 50%),
+                      linear-gradient(135deg, var(--fraco) 50%, transparent 50%);
+    background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 30px;
+  }
 
   .hub__topico {
-    display: flex; align-items: baseline; gap: 8px;
-    padding: 7px 0; border-bottom: 1px solid var(--linha); font-size: 13.5px;
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--linha); font-size: 13.5px;
   }
   .hub__topico:last-child { border-bottom: 0; }
-  .hub__topico .n { color: var(--apagado); font: 500 11px var(--mono); width: 16px; flex: none; }
+  .hub__topico .n { color: var(--apagado); font: 500 11px var(--mono); width: 14px; flex: none; }
   .hub__topico .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hub__topico .v { color: var(--verde-forte); font: 500 11.5px var(--mono); flex: none; }
 
-  .hub__canais { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; }
   .hub__canal {
-    display: flex; align-items: baseline; gap: 8px; padding: 6px 0;
-    text-decoration: none; color: var(--tinta); font-size: 13px;
+    display: flex; align-items: baseline; gap: 10px; padding: 8px 0;
+    text-decoration: none; color: var(--tinta); font-size: 13.5px;
     border-bottom: 1px solid var(--linha);
   }
   .hub__canal:last-child { border-bottom: 0; }
@@ -283,7 +319,7 @@
   .hub__parceiros { display: flex; flex-wrap: wrap; gap: 10px; }
   .hub__parceiro {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px; border: 1px solid var(--linha); background: var(--caixa);
+    padding: 10px 14px; border: 1px solid var(--linha); background: var(--caixa2);
     text-decoration: none; color: var(--tinta); font-size: 14px;
   }
   .hub__parceiro:hover { border-color: var(--verde); }
@@ -2397,116 +2433,150 @@ function telaInicio() {
   const tela = el('tela');
   tela.innerHTML = '';
 
-  /* O atalho de volta pro painel só existe pra quem tem painel, e só nesta
-     tela: nas outras a pessoa já está lá dentro. */
+  /* A vitrine usa a tela toda; o resto do site não. A classe no body é o que
+     solta o limite de largura só aqui. */
+  document.body.classList.add('na-vitrine');
+
   const btVolta = el('abaMeusOverlays');
   if (btVolta) btVolta.style.display = chave ? '' : 'none';
 
   const hub = h('div', { cls: 'hub' });
   tela.appendChild(hub);
 
-  const colEsq = h('div', { cls: 'hub__col' }, [h('h2', { txt: 'Atualizações' })]);
-  const colMei = h('div', { cls: 'hub__col' }, [h('h2', { txt: 'Quem sabe você gosta desse streamer' })]);
-  const colDir = h('div', { cls: 'hub__col' }, [h('h2', { txt: 'Em alta na Twitch' })]);
-  hub.appendChild(colEsq);
-  hub.appendChild(colMei);
-  hub.appendChild(colDir);
+  /* ================= esquerda: atualizações ================= */
+  const rolo = h('div', { cls: 'hub__rolo' });
+  hub.appendChild(h('div', { cls: 'hub__col' }, [
+    h('div', { cls: 'hub__painel' }, [h('h2', { txt: 'Atualizações' }), rolo]),
+  ]));
+  const colEsq = hub.lastChild;
 
-  /* ------------------------------------------------ o carrossel do meio */
+  const secPar = h('div', { cls: 'hub__painel escondido' }, [h('h2', { txt: 'Parceiros' })]);
+  colEsq.appendChild(secPar);
+
+  /* ================= meio: o carrossel ================= */
+  const espiaEsq = h('button', { cls: 'hub__lado', type: 'button', title: 'Anterior' });
+  const espiaDir = h('button', { cls: 'hub__lado dir', type: 'button', title: 'Próximo' });
   const palco = h('div', { cls: 'hub__palco' });
   const pontos = h('div', { cls: 'hub__pontos' });
 
-  const antes = h('button', { cls: 'hub__seta', type: 'button', txt: '‹', title: 'Anterior' });
-  const depois = h('button', { cls: 'hub__seta', type: 'button', txt: '›', title: 'Próximo' });
-  colMei.appendChild(h('div', { cls: 'hub__carro' }, [antes, palco, depois]));
-  colMei.appendChild(pontos);
+  /* O TEXTO FICA FORA DO TRILHO.
 
+     Os vizinhos espiando têm que ter a altura do VÍDEO, não a do bloco
+     inteiro: esticados até embaixo do título e do botão eles viram duas
+     faixas compridas nas laterais, que é o oposto do efeito. */
+  const infoBox = h('div', { cls: 'hub__info' });
+
+  const colMei = h('div', { cls: 'hub__col' }, [
+    h('h2', { txt: 'Quem sabe você gosta desse streamer' }),
+    h('div', { cls: 'hub__trilho' }, [espiaEsq, palco, espiaDir]),
+    infoBox,
+    pontos,
+  ]);
+  hub.appendChild(colMei);
+
+  /* ================= direita: em alta ================= */
+  const selIdioma = h('select');
+  [['pt', 'Português'], ['en', 'Inglês'], ['es', 'Espanhol'], ['ja', 'Japonês']]
+    .forEach(([v, r]) => selIdioma.appendChild(h('option', { value: v, txt: r })));
+
+  const campoCat = h('input', { type: 'text', placeholder: 'Buscar categoria…' });
+  const listaTop = h('div');
+  const listaCanais = h('div');
+
+  hub.appendChild(h('div', { cls: 'hub__col' }, [
+    h('div', { cls: 'hub__painel' }, [
+      h('h2', { txt: 'Em alta na Twitch' }),
+      h('div', { cls: 'hub__busca' }, [selIdioma, campoCat]),
+      listaTop,
+    ]),
+    h('div', { cls: 'hub__painel' }, [
+      h('h2', { txt: 'Canais do filtro' }),
+      listaCanais,
+    ]),
+  ]));
+
+  /* ------------------------------------------------ o carrossel */
   let cartoes = [];
   let atual = 0;
   let girando = null;
 
+  function espia(botao, cartao) {
+    botao.innerHTML = '';
+    if (!cartao) { botao.style.visibility = 'hidden'; return; }
+    botao.style.visibility = '';
+    if (cartao.thumb) botao.appendChild(h('img', { src: cartao.thumb, alt: '', loading: 'lazy' }));
+    else botao.appendChild(h('div', { cls: 'vazio' }));
+    botao.title = cartao.nome || cartao.login;
+  }
+
   /* O player só entra no slide ATIVO, e só pra quem está no ar. Três iframes
-     de vídeo abertos ao mesmo tempo é banda e processador da máquina de quem
-     está visitando, gasto pra mostrar dois vídeos que ninguém está vendo. */
+     de vídeo abertos é banda e processador da máquina de quem visita, gasto
+     pra mostrar dois vídeos que ninguém está vendo. */
   function pintaPalco() {
     palco.innerHTML = '';
+    infoBox.innerHTML = '';
     const c = cartoes[atual];
     if (!c) return;
 
     const quadro = h('div', { cls: 'hub__video' });
 
     if (c.aovivo) {
-      /* O 'parent' precisa bater com o domínio de quem está exibindo, senão a
-         Twitch recusa o embed. Sai daqui mesmo pra funcionar em produção e em
-         teste local sem alguém lembrar de trocar. */
-      const src = 'https://player.twitch.tv/?channel=' + encodeURIComponent(c.login)
-        + '&parent=' + encodeURIComponent(location.hostname)
-        + '&muted=true&autoplay=true';
-      quadro.appendChild(h('iframe', { src, allowfullscreen: 'true',
-        title: 'Live de ' + (c.nome || c.login), loading: 'lazy' }));
+      /* O 'parent' precisa bater com o domínio de quem exibe, senão a Twitch
+         recusa o embed. Sai daqui mesmo pra funcionar em produção e em teste
+         sem ninguém lembrar de trocar. */
+      quadro.appendChild(h('iframe', {
+        src: 'https://player.twitch.tv/?channel=' + encodeURIComponent(c.login)
+           + '&parent=' + encodeURIComponent(location.hostname)
+           + '&muted=true&autoplay=true',
+        allowfullscreen: 'true', title: 'Live de ' + (c.nome || c.login), loading: 'lazy',
+      }));
     } else {
       if (c.thumb) quadro.appendChild(h('img', { src: c.thumb, alt: '', loading: 'lazy' }));
       quadro.appendChild(h('div', { cls: 'hub__off', txt: 'offline agora' }));
     }
 
     const [selCls, selTxt] = HUB_SELOS[c.fatia] || ['', ''];
-    const info = h('div', { cls: 'hub__info' }, [
-      h('span', { cls: 'hub__selo ' + selCls, txt: selTxt }),
-      h('b', { txt: c.nome || c.login }),
-      h('span', { cls: 'tit', txt: c.titulo || '' }),
-    ]);
+    const info = infoBox;
+    info.appendChild(h('span', { cls: 'hub__selo ' + selCls, txt: selTxt }));
+    info.appendChild(h('b', { txt: c.nome || c.login }));
+    info.appendChild(h('span', { cls: 'tit', txt: c.titulo || '' }));
 
     const meta = h('span', { cls: 'meta' });
     if (c.aovivo) {
       meta.appendChild(h('span', { cls: 'ao-vivo', txt: '● AO VIVO' }));
-      meta.appendChild(document.createTextNode('  ' + (c.jogo ? c.jogo + '  ·  ' : '') + c.viewers + ' assistindo'));
+      meta.appendChild(document.createTextNode('  ' + (c.jogo ? c.jogo + '  ·  ' : '')
+        + (c.viewers || 0).toLocaleString('pt-BR') + ' assistindo'));
     } else {
       meta.appendChild(document.createTextNode(c.jogo ? 'Último: ' + c.jogo : 'Canal offline'));
     }
     info.appendChild(meta);
 
-    const ir = h('a', { cls: 'bt mini', href: 'https://twitch.tv/' + c.login,
+    info.appendChild(h('a', { cls: 'bt mini', href: 'https://twitch.tv/' + c.login,
       target: '_blank', rel: 'noopener noreferrer', txt: 'Abrir na Twitch',
-      style: 'align-self:flex-start;margin-top:8px;text-decoration:none' });
-    info.appendChild(ir);
+      style: 'align-self:flex-start;margin-top:10px;text-decoration:none' }));
 
     palco.appendChild(quadro);
-    palco.appendChild(info);
 
+    const n = cartoes.length;
+    espia(espiaEsq, n > 1 ? cartoes[(atual - 1 + n) % n] : null);
+    espia(espiaDir, n > 1 ? cartoes[(atual + 1) % n] : null);
     [...pontos.children].forEach((b, i) => b.classList.toggle('on', i === atual));
   }
 
-  /* NÃO chamar isto de vaiPara: já existe uma vaiPara() global, que é a de
-     navegação, com outra assinatura. Duas funções de mesmo nome e sentidos
-     diferentes no mesmo arquivo é armadilha pra quem mexer depois. */
+  /* NÃO chamar de vaiPara: já existe uma global com esse nome e outro
+     sentido — duas funções homônimas no mesmo arquivo é armadilha. */
   function mostra(i) {
     atual = (i + cartoes.length) % cartoes.length;
     pintaPalco();
-    /* Cada toque adia o giro automático: quem está escolhendo não quer a
-       tela mudando embaixo do dedo. */
+    /* Cada toque adia o giro: quem está escolhendo não quer a tela mudando
+       embaixo do dedo. */
     if (girando) { clearInterval(girando); girando = setInterval(() => mostra(atual + 1), 12000); }
   }
 
-  antes.onclick = () => mostra(atual - 1);
-  depois.onclick = () => mostra(atual + 1);
+  espiaEsq.onclick = () => mostra(atual - 1);
+  espiaDir.onclick = () => mostra(atual + 1);
 
-  /* ------------------------------------------------ a coluna da direita */
-  const selIdioma = h('select');
-  HUB_IDIOMAS.forEach(([v, r]) => selIdioma.appendChild(h('option', { value: v, txt: r })));
-
-  const campoCat = h('input', { type: 'text', placeholder: 'todas as categorias' });
-
-  const avisoPlat = h('p', { cls: 'd', style: 'margin:0 0 10px',
-    txt: 'Os dados são da Twitch. YouTube e Kick não têm como listar quem está no ar agora.' });
-
-  const listaTop = h('div');
-  const listaCanais = h('div', { cls: 'hub__canais' });
-
-  colDir.appendChild(h('div', { cls: 'hub__filtros' }, [selIdioma, campoCat]));
-  colDir.appendChild(avisoPlat);
-  colDir.appendChild(listaTop);
-  colDir.appendChild(listaCanais);
-
+  /* ------------------------------------------------ os dados */
   function carregaVitrine() {
     listaTop.innerHTML = '<p class="d">vendo…</p>';
 
@@ -2514,7 +2584,6 @@ function telaInicio() {
             + '&categoria=' + encodeURIComponent(campoCat.value.trim());
 
     api2('/vitrine.php' + q).then((d) => {
-      /* ----- carrossel ----- */
       const fatias = (d && d.fatias) || {};
       cartoes = ['usuario', 'pro', 'twitch']
         .filter((f) => fatias[f] && fatias[f].login)
@@ -2523,8 +2592,11 @@ function telaInicio() {
       pontos.innerHTML = '';
       if (!cartoes.length) {
         palco.innerHTML = '';
-        palco.appendChild(h('p', { cls: 'd', style: 'padding:22px;text-align:center',
+        infoBox.innerHTML = '';
+        palco.appendChild(h('p', { cls: 'd', style: 'padding:30px;text-align:center',
           txt: 'Ninguém pra mostrar agora.' }));
+        espiaEsq.style.visibility = 'hidden';
+        espiaDir.style.visibility = 'hidden';
       } else {
         cartoes.forEach((_, i) => {
           const b = h('button', { cls: 'hub__ponto', type: 'button', title: 'Canal ' + (i + 1) });
@@ -2537,10 +2609,6 @@ function telaInicio() {
         if (cartoes.length > 1) girando = setInterval(() => mostra(atual + 1), 12000);
       }
 
-      antes.style.visibility = cartoes.length > 1 ? '' : 'hidden';
-      depois.style.visibility = cartoes.length > 1 ? '' : 'hidden';
-
-      /* ----- em alta ----- */
       const a = (d && d.altas) || {};
       listaTop.innerHTML = '';
       (a.topicos || []).forEach((tp, i) => {
@@ -2555,13 +2623,16 @@ function telaInicio() {
       }
 
       listaCanais.innerHTML = '';
-      (a.canais || []).slice(0, 8).forEach((c) => {
+      (a.canais || []).slice(0, 10).forEach((c) => {
         listaCanais.appendChild(h('a', { cls: 'hub__canal', href: 'https://twitch.tv/' + c.login,
           target: '_blank', rel: 'noopener noreferrer' }, [
           h('span', { cls: 'nm', txt: c.nome || c.login }),
           h('span', { cls: 'v', txt: (c.viewers || 0).toLocaleString('pt-BR') }),
         ]));
       });
+      if (!(a.canais || []).length) {
+        listaCanais.appendChild(h('p', { cls: 'd', txt: 'Ninguém no ar nesse filtro.' }));
+      }
     }).catch(() => {
       listaTop.innerHTML = '';
       listaTop.appendChild(h('p', { cls: 'd', txt: 'Não consegui falar com a Twitch agora.' }));
@@ -2570,18 +2641,13 @@ function telaInicio() {
 
   selIdioma.onchange = carregaVitrine;
   let bateu = null;
+  /* Espera meio segundo depois da última tecla: sem isso, cada letra digitada
+     vira um pedido, e "valorant" seriam oito. */
   campoCat.oninput = () => { clearTimeout(bateu); bateu = setTimeout(carregaVitrine, 500); };
 
   carregaVitrine();
 
-  /* ------------------------------------------------ a coluna da esquerda */
-  const rolo = h('div', { cls: 'hub__rolo' });
-  colEsq.appendChild(rolo);
-
-  const secPar = h('section', { cls: 'escondido', style: 'margin-top:20px' },
-    [h('h2', { txt: 'Parceiros' })]);
-  colEsq.appendChild(secPar);
-
+  /* ------------------------------------------------ novidades */
   const pinta = (d) => {
     const novs = (d && d.novidades) || [];
     rolo.innerHTML = '';
@@ -4516,6 +4582,7 @@ function vaiPara(hash) { if (location.hash === hash) rota(); else location.hash 
 
 function rota() {
   recado('');
+  document.body.classList.remove('na-vitrine');
   const btVolta = el('abaMeusOverlays');
   if (btVolta) btVolta.style.display = 'none';
   const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/');
