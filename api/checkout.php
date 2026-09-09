@@ -49,11 +49,26 @@ if (isset($_GET['estado'])) {
                            WHERE usuario_id = ? AND status = 'ativa'");
     $st2->execute([(int) $quem['usuario_id']]);
 
+    $ate = $st2->fetchColumn() ?: null;
+
+    /* QUANTOS DIAS FALTAM, CONTADO NO SERVIDOR.
+
+       O relógio da máquina de quem assiste pode estar torto, e "faltam 3
+       dias" calculado lá viraria aviso na hora errada — cedo demais é
+       barulho, tarde demais é a pessoa perdendo o Pro no meio da live sem
+       nunca ter sido avisada. */
+    $dias = null;
+    if ($ate && $acesso['ativo']) {
+        $dias = (int) floor((strtotime($ate) - time()) / 86400);
+    }
+
     json_saida([
         'ligado'     => $mp['ligado'],
         'modo'       => $mp['modo'],
         'plano'      => $acesso['ativo'] ? $acesso['plano'] : 'gratis',
-        'valido_ate' => $st2->fetchColumn() ?: null,
+        'valido_ate' => $ate,
+        'dias'       => $dias,
+        'cortesia'   => !empty($acesso['cortesia']),
         'planos'     => $st->fetchAll(PDO::FETCH_ASSOC),
     ]);
 }

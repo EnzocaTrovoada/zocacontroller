@@ -34,6 +34,36 @@ function acesso_do_usuario(int $usuario_id): array
     ];
 }
 
+/**
+ * A cobrança já abriu?
+ *
+ * Enquanto não abriu, NINGUÉM pode pagar — e limitar quem não tem como pagar
+ * é só quebrar o site de graça. Por isso esta pergunta vem antes de qualquer
+ * restrição: com a cobrança fechada, todo mundo é tratado como Pro.
+ *
+ * Isso vale pra tudo de uma vez: marca d'água, teto de overlays, comandos.
+ * Um lugar só decide, então virar a chave no config liga tudo junto e nada
+ * fica esquecido restringindo por engano.
+ */
+function cobranca_aberta(): bool
+{
+    return !empty(cfg()['mercadopago']['ligado']);
+}
+
+/**
+ * Este usuário pode usar este recurso agora?
+ *
+ * A porta única. Espalhar "if plano ==" pelo código é como um recurso acaba
+ * bloqueado num lugar e liberado noutro — e o lugar esquecido é sempre o que
+ * alguém encontra.
+ */
+function recurso_liberado(int $usuario_id, string $chave): bool
+{
+    $a = acesso_do_usuario($usuario_id);
+    $r = recursos_do_usuario($usuario_id, $a['ativo'] ? $a['plano'] : 'gratis');
+    return !empty($r[$chave]);
+}
+
 /** Recursos por plano num lugar só. Não espalhar "if plano ==" pelo código. */
 /**
  * O que este usuario pode, com as excecoes dele por cima do plano.
@@ -44,7 +74,8 @@ function acesso_do_usuario(int $usuario_id): array
  */
 function recursos_do_usuario(int $usuario_id, string $plano): array
 {
-    $r = recursos_do_plano($plano);
+    /* Cobrança fechada: todo mundo é Pro. Ver cobranca_aberta() acima. */
+    $r = recursos_do_plano(cobranca_aberta() ? $plano : 'pro');
 
     $st = db()->prepare('SELECT perfis_max, recursos FROM usuarios WHERE id = ?');
     $st->execute([$usuario_id]);

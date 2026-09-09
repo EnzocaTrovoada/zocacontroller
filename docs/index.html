@@ -169,6 +169,17 @@
   .pop .passos li { margin-bottom: 7px; color: var(--fraco); font-size: 13.5px; line-height: 1.5; }
   .pop .passos li::marker { color: var(--verde); font-weight: 600; }
 
+  /* O aviso de vencimento. Âmbar e não vermelho: nada quebrou ainda, e
+     vermelho pra coisa que ainda vai acontecer gasta o vermelho à toa. */
+  #avisoPlano {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin: 16px 0 0; padding: 12px 16px;
+    border-left: 3px solid var(--dourado); background: var(--caixa);
+    font-size: 14px; color: var(--tinta);
+  }
+  #avisoPlano b { font-weight: 600; }
+  #avisoPlano .bt { margin-left: auto; }
+
   .pop__acao {
     flex: 0 0 auto;
     background: var(--caixa); padding: 14px 0 0;
@@ -430,6 +441,10 @@
     <p><a class="bt principal" href="https://api.zocahop.com/entrar.php"
           style="display:inline-block;text-decoration:none">Entrar com a Twitch</a></p>
   </div>
+
+  <!-- Fica acima da tela, e não dentro dela: assim ele sobrevive à troca de
+       telas e a pessoa não precisa estar numa página específica pra ver. -->
+  <div id="avisoPlano" class="escondido"></div>
 
   <div id="tela"></div>
   <p id="recado"></p>
@@ -2191,7 +2206,40 @@ function ligaUpgrade() {
     if (c.modo === 'teste' && !souAdmin) return;
     proEstado = c;
     el('abaUpgrade').classList.remove('escondido');
+    avisaVencimento(c);
   }).catch(() => { /* cobrança fora do ar não pode atrapalhar o resto */ });
+}
+
+/* AVISAR ANTES, NUNCA DEPOIS.
+
+   Perder o Pro no meio de uma live, com a marca d'água voltando na tela sem
+   explicação, é o pior jeito de descobrir que a assinatura venceu. Uma
+   semana de antecedência dá tempo de pagar sem pressa, e a cortesia (os dias
+   de tolerância depois do vencimento) aparece com o texto trocado, porque aí
+   a situação já é outra: ainda funciona, mas por pouco tempo. */
+function avisaVencimento(c) {
+  const cx = el('avisoPlano');
+  cx.innerHTML = '';
+  /* Esconder junto com o esvaziar: sem isto, quem já tinha visto o aviso uma
+     vez ficava com a caixa vazia e com borda ocupando espaço na tela. */
+  cx.classList.add('escondido');
+
+  if (c.plano === 'gratis' || c.plano === 'vitalicio') return;
+  if (!c.cortesia && (c.dias === null || c.dias > 7)) return;
+
+  const bt = h('button', { cls: 'bt mini', type: 'button', txt: 'Renovar' });
+  bt.onclick = () => { if (proEstado) abrePro(proEstado); };
+
+  const texto = c.cortesia
+    ? 'Sua assinatura venceu. Você está nos dias de tolerância — o Pro continua '
+      + 'funcionando por pouco tempo, e depois disso a marca d\'água volta.'
+    : c.dias <= 0
+      ? 'Sua assinatura vence hoje.'
+      : 'Sua assinatura vence em ' + c.dias + (c.dias === 1 ? ' dia.' : ' dias.');
+
+  cx.appendChild(h('span', {}, [h('b', { txt: 'Plano Pro. ' }), document.createTextNode(texto)]));
+  cx.appendChild(bt);
+  cx.classList.remove('escondido');
 }
 
 el('abaUpgrade').onclick = () => {
