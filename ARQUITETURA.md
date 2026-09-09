@@ -373,17 +373,31 @@ O que JÁ está pronto e conferido é a verificação de assinatura
 reprovaria todo pagamento legítimo: o `ts` do Mercado Pago vem em
 MILISSEGUNDOS e a janela de cinco minutos comparava com segundos.
 
-O que falta, nesta ordem:
+**Estado em 2026-09-09: a estrutura está escrita e desligada.**
+`api/lib/mercadopago.php`, `api/checkout.php` e
+`api/webhook-mercadopago.php` estão fechados; `sql/023-cobranca.sql` cria as
+colunas que amarram cobrança e pagamento. A chave `mercadopago.ligado` no
+config nasce **falsa**: o checkout responde 503 e nenhum botão de pagar
+existe no painel. Nada pode ser cobrado por acidente.
 
-1. **Fechar o checkout.** `POST https://api.mercadopago.com/preapproval` com
-   `external_reference = usuario_id`, gravando `assinaturas` como `pendente`
-   ANTES de redirecionar — senão o webhook volta e não acha a linha.
-2. **Fechar o webhook.** `GET /v1/payments/{id}` (ou `/preapproval/{id}`) com
-   o access_token e só então mexer em `assinaturas.status` e `valido_ate`.
-   Nunca liberar pelo corpo da notificação: ele diz QUE algo mudou, não a
-   verdade do que mudou.
-3. **Testar com as credenciais de sandbox** do Mercado Pago, um ciclo
-   completo: aprovado, recusado, e estorno.
+**Pagamento avulso, não assinatura recorrente.** A recorrência do Mercado
+Pago só aceita cartão, e Pix não pode ser recorrente. Para streamer
+brasileiro pequeno, tirar o Pix da mesa é tirar metade do público. Cada
+pagamento empurra a validade 30 ou 365 dias a partir do que for maior entre
+hoje e a validade atual — quem renova adiantado não perde os dias que
+faltavam. O custo honesto: ninguém é cobrado sozinho, então quem esquece cai
+pro grátis.
+
+O que falta, e é tudo do lado de fora do código:
+
+1. **Criar o app no painel do Mercado Pago** e pegar as credenciais de
+   TESTE, mais a "Assinatura secreta" do webhook.
+2. **Rodar o `sql/023-cobranca.sql`.**
+3. **Testar de ponta a ponta em modo teste** — aprovado, recusado, Pix
+   pendente que aprova depois.
+4. **Só então** virar `ligado => true` e trocar as credenciais pelas de
+   produção. Elas são pares: access_token de teste com segredo de produção dá
+   erro de assinatura sem explicação.
 4. **Decidir o que acontece com quem não paga.** Hoje `acesso_do_usuario()`
    dá cortesia de alguns dias e depois cai para o plano grátis, que agora tem
    8 overlays. Quem tiver 20 no plano pago e cair para o grátis fica com 20 e
