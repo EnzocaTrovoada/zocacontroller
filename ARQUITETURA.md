@@ -361,20 +361,59 @@ natureza e vaza com um print da tela.
 
 ## 6. Cobrança
 
-`api/checkout.php` e `api/webhook-mercadopago.php` existem e nunca receberam
-um pagamento de verdade. Antes de cobrar de alguém, três coisas, nesta ordem:
+**Correção do que este arquivo dizia antes:** `api/checkout.php` e
+`api/webhook-mercadopago.php` não são código pronto e sem teste — são
+ESQUELETO. O checkout tem 39 linhas e a chamada à API deles está comentada;
+o webhook tem a moldura certa (assinatura, idempotência, resposta rápida) mas
+a consulta que confirma o pagamento é um TODO. Ou seja: hoje ninguém
+consegue pagar, e se conseguisse ninguém seria liberado.
 
-1. **Testar com as credenciais de sandbox** do Mercado Pago, um ciclo
+O que JÁ está pronto e conferido é a verificação de assinatura
+(`mp_webhook_valido` em `api/lib/seguranca.php`) — inclusive um defeito que
+reprovaria todo pagamento legítimo: o `ts` do Mercado Pago vem em
+MILISSEGUNDOS e a janela de cinco minutos comparava com segundos.
+
+O que falta, nesta ordem:
+
+1. **Fechar o checkout.** `POST https://api.mercadopago.com/preapproval` com
+   `external_reference = usuario_id`, gravando `assinaturas` como `pendente`
+   ANTES de redirecionar — senão o webhook volta e não acha a linha.
+2. **Fechar o webhook.** `GET /v1/payments/{id}` (ou `/preapproval/{id}`) com
+   o access_token e só então mexer em `assinaturas.status` e `valido_ate`.
+   Nunca liberar pelo corpo da notificação: ele diz QUE algo mudou, não a
+   verdade do que mudou.
+3. **Testar com as credenciais de sandbox** do Mercado Pago, um ciclo
    completo: aprovado, recusado, e estorno.
-2. **Conferir a assinatura do webhook.** Mercado Pago assina com
-   `x-signature` (HMAC-SHA256 sobre `id`, `request-id` e `ts`). Sem verificar,
-   qualquer um libera plano pago mandando um POST. Isso é o mesmo cuidado que
-   já foi tomado no webhook do Kick — copie a forma de lá.
-3. **Decidir o que acontece com quem não paga.** Hoje `acesso_do_usuario()`
+4. **Decidir o que acontece com quem não paga.** Hoje `acesso_do_usuario()`
    dá cortesia de alguns dias e depois cai para o plano grátis, que agora tem
    8 overlays. Quem tiver 20 no plano pago e cair para o grátis fica com 20 e
    não pode criar mais — não perde nada. Confirme que é isso mesmo que você
    quer, porque é o comportamento que está no código.
+
+---
+
+## 6.5. Cronômetro de speedrun — FEITO
+
+Existe desde 2026-09-09: tipo de overlay `speedrun`, em `docs/spd.js` e
+`docs/spd.css`. Lista de trechos, diferença contra o recorde, trecho recorde
+em dourado e soma dos melhores, no formato que o LiveSplit consagrou.
+
+O que ficou de fora, e por quê: **tecla global não existe numa página.** O
+LiveSplit é programa de desktop e escuta a tecla com o jogo em primeiro
+plano; uma aba de navegador só recebe tecla quando ela mesma está em foco.
+Por isso os atalhos valem com o painel na frente, e quem joga em tela cheia
+depende do chat.
+
+Duas continuações possíveis, em ordem de utilidade:
+
+1. **`!split` pelo chat.** O comando já tem toda a estrutura pronta em
+   `api/comando.php` — falta a ação que mexe no `spcor` do overlay. É a que
+   resolve o caso real de quem joga em tela cheia.
+2. **Tecla global de verdade, pela ponte.** A `ponte.html` já fala
+   obs-websocket. O OBS tem tecla global para ligar e desligar fonte; a ponte
+   pode ouvir `SceneItemEnableStateChanged` de uma fonte-isca e traduzir isso
+   em split. Dá tecla global de verdade sem instalar nada, ao custo de uma
+   configuração a mais.
 
 ---
 
