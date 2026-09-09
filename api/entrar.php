@@ -10,6 +10,24 @@ require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/twitch.php';
 require_once __DIR__ . '/lib/seguranca.php';
 
+/* O COOKIE DA SESSÃO COM AS TRÊS TRANCAS.
+
+   Esta sessão guarda o 'state' do OAuth, que é o que impede alguém de te
+   fazer entrar numa conta que não é sua. Com os padrões do PHP ele sai sem
+   marca nenhuma: viajaria em http se alguém forçasse, o JavaScript da página
+   conseguiria ler, e ele seria mandado junto em requisição vinda de outro
+   site.
+
+   'Lax' e não 'Strict' de propósito: a volta da Twitch é uma navegação vinda
+   de fora, e com Strict o cookie não viria junto — o state não bateria e o
+   login falharia sempre. */
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'secure'   => true,
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
 session_start();
 
 function pagina(string $titulo, string $miolo): void

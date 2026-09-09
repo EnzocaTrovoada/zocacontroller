@@ -2,6 +2,13 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
+<!-- A CHAVE VIAJA NA URL DESTA PÁGINA.
+     Sem esta linha, todo pedido a servidor de fora (a fonte do Google, por
+     exemplo) leva junto um cabeçalho Referer. Navegador atual só manda a
+     origem e corta o resto, mas o CEF embutido no OBS costuma ficar
+     versões atrás, e ali o endereço inteiro — com a chave — sairia de casa.
+     no-referrer não manda nada, e não custa nada. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Painel — ZocaController</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">

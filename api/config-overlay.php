@@ -19,6 +19,23 @@ header('Access-Control-Allow-Origin: *');   // o overlay roda dentro do OBS
    máquina de quem transmite — justamente o que ele tentava não fazer. */
 header('Access-Control-Expose-Headers: ETag, Date');
 
+/* POR QUE NÃO TEM LIMITE DE TENTATIVAS AQUI.
+
+   Este é o único endereço que qualquer um alcança sem chave de painel, então
+   a pergunta é natural. Duas respostas:
+
+   Adivinhar a chave não é o risco: são 72 bits sorteados, e não existe
+   máquina que percorra isso.
+
+   Contra enxurrada de pedidos, um limite aqui atrapalharia mais do que
+   ajuda. O limite_ok() custa DUAS idas ao banco, e este é o endereço mais
+   quente do sistema — cada overlay aberto pergunta a cada 15 segundos. Eu
+   dobraria o trabalho de banco do caminho mais usado pra me defender de algo
+   que, quando acontece, já chegou no PHP e no banco de qualquer jeito.
+
+   Enxurrada se barra ANTES do PHP: Cloudflare na frente do api.zocahop.com,
+   que é de graça e resolve de verdade. */
+
 $chave = $_GET['k'] ?? '';
 if (!preg_match('/^[A-Za-z0-9_-]{10,64}$/', $chave)) {
     json_saida(['erro' => 'Link inválido. Gere um novo no painel.'], 400);

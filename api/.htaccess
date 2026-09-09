@@ -2,3 +2,19 @@
 <FilesMatch "^config\.php$">
     Require all denied
 </FilesMatch>
+
+# Cabecalhos que valem pra toda resposta desta pasta.
+#
+# nosniff: sem ele o navegador pode "adivinhar" que uma resposta e HTML e
+#   executar como pagina o que era pra ser dado. Junto com o Content-Type
+#   fixo do som.php, e a segunda tranca da mesma porta.
+#
+# no-referrer: nenhuma resposta daqui deve ajudar a montar de onde veio.
+#
+# HSTS: o site ja e todo https; isto impede que a PRIMEIRA visita seja em
+#   texto puro. Um ano e o minimo que os navegadores aceitam pra valer.
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "no-referrer"
+    Header always set Strict-Transport-Security "max-age=31536000"
+</IfModule>
