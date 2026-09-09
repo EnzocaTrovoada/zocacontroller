@@ -177,61 +177,108 @@
   .pop .passos li::marker { color: var(--verde); font-weight: 600; }
 
   /* ---------- vitrine da inicial ---------- */
-  .hub { display: flex; flex-direction: column; gap: 34px; padding: 12px 0 40px; }
 
-  .hub__capa h1 { margin: 0 0 6px; font: 700 clamp(30px,5vw,44px)/1.05 var(--disp); letter-spacing: -.03em; }
-  .hub__capa p { margin: 0 0 18px; max-width: 56ch; color: var(--fraco); font-size: 15.5px; }
+  /* Três colunas: o que mudou à esquerda, o destaque no meio, o que está em
+     alta à direita. As laterais têm largura fixa e o meio fica com o que
+     sobra — é o meio que tem vídeo, e vídeo é o que precisa de espaço. */
+  .hub {
+    display: grid; gap: 20px; padding: 18px 0 40px;
+    grid-template-columns: 300px minmax(0, 1fr) 290px;
+    align-items: start;
+  }
+  @media (max-width: 1100px) { .hub { grid-template-columns: 1fr; } }
 
   .hub h2 {
-    margin: 0 0 14px; font: 600 12px var(--mono);
+    margin: 0 0 12px; font: 600 11.5px var(--mono);
     letter-spacing: .16em; text-transform: uppercase; color: var(--fraco);
   }
 
-  /* A live do dia. Miniatura à esquerda, texto à direita, e o bloco inteiro é
-     o link — alvo grande é o que faz alguém clicar sem querer acertar. */
-  /* Três painéis lado a lado, que viram um por linha quando não cabem. O
-     auto-fit com minmax faz isso sem media query e sem contar quantos são —
-     importante porque duas das três fatias podem simplesmente não ter
-     ninguém no ar. */
-  .hub__vitrine {
-    display: grid; gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  }
+  .hub__col { min-width: 0; }
 
-  .hub__live {
-    display: flex; flex-direction: column;
+  /* ---- coluna da esquerda: o que mudou ---- */
+
+  /* Altura travada com rolagem própria: a lista cresce pra sempre e sem teto
+     ela empurraria a página inteira pra baixo. */
+  .hub__rolo {
+    max-height: 420px; overflow-y: auto;
     border: 1px solid var(--linha); background: var(--caixa);
-    text-decoration: none; color: var(--tinta); overflow: hidden;
+    padding: 2px 14px;
   }
-  .hub__live:hover { border-color: var(--verde); }
-  .hub__live img { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: var(--caixa2); display: block; }
-  .hub__live .corpo { padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-  .hub__live b { font: 600 15px var(--disp); }
-  .hub__live .tit { color: var(--fraco); font-size: 13.5px;
-    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .hub__live .meta { margin-top: auto; padding-top: 6px; color: var(--apagado); font: 500 11.5px var(--mono); }
-  .hub__live .ao-vivo { color: var(--perigo); font-weight: 700; }
+  .hub__nov { padding: 12px 0; border-bottom: 1px solid var(--linha); }
+  .hub__nov:last-child { border-bottom: 0; }
+  .hub__nov time { display: block; color: var(--apagado); font: 500 11px var(--mono); margin-bottom: 3px; }
+  .hub__nov b { display: block; font: 600 14px var(--disp); margin-bottom: 2px; }
+  .hub__nov span { color: var(--fraco); font-size: 13px; line-height: 1.45; }
 
-  /* O selo diz de qual fatia veio. Sem ele os três cartões são iguais, e o
-     "assinante Pro" perde exatamente o que o torna um motivo pra assinar. */
+  /* ---- meio: o carrossel ---- */
+  .hub__carro { display: flex; align-items: center; gap: 10px; }
+
+  .hub__seta {
+    flex: none; width: 34px; height: 34px; border: 1px solid var(--linha);
+    background: var(--caixa); color: var(--tinta); cursor: pointer;
+    font-size: 16px; line-height: 1; display: grid; place-items: center;
+  }
+  .hub__seta:hover { border-color: var(--verde); color: var(--verde-forte); }
+
+  .hub__palco { flex: 1 1 auto; min-width: 0; border: 1px solid var(--linha); background: var(--caixa); }
+
+  /* 16/9 fixo pro quadro não pular de altura ao trocar de canal. */
+  .hub__video { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden; }
+  .hub__video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .hub__video img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .hub__off {
+    position: absolute; inset: 0; display: grid; place-items: center; gap: 6px;
+    background: rgba(6,12,8,.55); color: #fff; text-align: center;
+    font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  }
+
+  .hub__info { padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
+  .hub__info b { font: 600 16px var(--disp); }
+  .hub__info .tit { color: var(--fraco); font-size: 13.5px;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .hub__info .meta { color: var(--apagado); font: 500 11.5px var(--mono); padding-top: 4px; }
+  .hub__info .ao-vivo { color: var(--perigo); font-weight: 700; }
+
   .hub__selo {
-    align-self: flex-start; margin-bottom: 2px;
-    font: 600 10px var(--mono); letter-spacing: .1em; text-transform: uppercase;
-    padding: 2px 6px; border: 1px solid currentColor; color: var(--fraco);
+    align-self: flex-start; font: 600 10px var(--mono); letter-spacing: .1em;
+    text-transform: uppercase; padding: 2px 6px; border: 1px solid currentColor;
+    color: var(--fraco); margin-bottom: 2px;
   }
   .hub__selo.pro { color: var(--dourado); }
   .hub__selo.usuario { color: var(--verde-forte); }
 
-  .hub__novidades { display: flex; flex-direction: column; }
-  .hub__nov {
-    display: grid; grid-template-columns: 96px 1fr; gap: 16px;
-    padding: 14px 0; border-top: 1px solid var(--linha);
+  /* Bolinhas: dizem quantos são e em qual você está. */
+  .hub__pontos { display: flex; justify-content: center; gap: 6px; padding: 10px 0 0; }
+  .hub__ponto {
+    width: 7px; height: 7px; border-radius: 50%; border: 0; padding: 0;
+    background: var(--linha2); cursor: pointer;
   }
-  .hub__nov:last-child { border-bottom: 1px solid var(--linha); }
-  .hub__nov time { color: var(--apagado); font: 500 12px var(--mono); padding-top: 2px; }
-  .hub__nov b { display: block; font: 600 15px var(--disp); margin-bottom: 2px; }
-  .hub__nov span { color: var(--fraco); font-size: 14px; }
-  @media (max-width: 560px) { .hub__nov { grid-template-columns: 1fr; gap: 2px; } }
+  .hub__ponto.on { background: var(--verde); }
+
+  /* ---- direita: em alta ---- */
+  .hub__filtros { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .hub__filtros select, .hub__filtros input { width: 100%; }
+
+  .hub__topico {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 7px 0; border-bottom: 1px solid var(--linha); font-size: 13.5px;
+  }
+  .hub__topico:last-child { border-bottom: 0; }
+  .hub__topico .n { color: var(--apagado); font: 500 11px var(--mono); width: 16px; flex: none; }
+  .hub__topico .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hub__topico .v { color: var(--verde-forte); font: 500 11.5px var(--mono); flex: none; }
+
+  .hub__canais { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; }
+  .hub__canal {
+    display: flex; align-items: baseline; gap: 8px; padding: 6px 0;
+    text-decoration: none; color: var(--tinta); font-size: 13px;
+    border-bottom: 1px solid var(--linha);
+  }
+  .hub__canal:last-child { border-bottom: 0; }
+  .hub__canal:hover .nm { color: var(--verde-forte); }
+  .hub__canal .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hub__canal .v { color: var(--apagado); font: 500 11px var(--mono); flex: none; }
 
   .hub__parceiros { display: flex; flex-wrap: wrap; gap: 10px; }
   .hub__parceiro {
@@ -501,6 +548,9 @@
        sumiram, a primeira coisa a saber e se a tela esta olhando pra conta
        certa: uma chave de outra conta mostra uma lista vazia legitima. -->
   <span class="quem" id="quemSou"></span>
+  <!-- A porta de volta pro painel. No canto direito porque é onde o olho vai
+       procurar a ação, e não no meio do conteúdo da vitrine. -->
+  <button class="aba" id="abaMeusOverlays" type="button" style="display:none">Meus overlays</button>
   <button class="lua" id="btTema" type="button" title="Trocar tema" aria-label="Trocar tema">🌙</button>
 </nav>
 
@@ -2335,100 +2385,219 @@ el('abaUpgrade').onclick = () => {
    exceção: essa vem do servidor porque depende da API da Twitch. */
 let hubDados = null;
 
+const HUB_SELOS = {
+  usuario: ['usuario', 'Usa o ZocaController'],
+  pro:     ['pro',     'Assinante'],
+  twitch:  ['',        'Descoberta'],
+};
+
+const HUB_IDIOMAS = [['pt', 'Português'], ['en', 'Inglês'], ['es', 'Espanhol'], ['ja', 'Japonês']];
+
 function telaInicio() {
   const tela = el('tela');
   tela.innerHTML = '';
 
+  /* O atalho de volta pro painel só existe pra quem tem painel, e só nesta
+     tela: nas outras a pessoa já está lá dentro. */
+  const btVolta = el('abaMeusOverlays');
+  if (btVolta) btVolta.style.display = chave ? '' : 'none';
+
   const hub = h('div', { cls: 'hub' });
   tela.appendChild(hub);
 
-  /* ----- capa ----- */
-  const capa = h('div', { cls: 'hub__capa' }, [
-    h('h1', { txt: 'Overlays que se cuidam sozinhos' }),
-    h('p', { txt: 'Meta, subathon, chat, música, alertas e cronômetro de speedrun. '
-      + 'Você cola o link no OBS uma vez; o que editar aqui aparece na live em até 15 segundos.' }),
-  ]);
-  if (!chave) {
-    capa.appendChild(h('a', { cls: 'bt principal', href: API + '/entrar.php',
-      style: 'display:inline-block;text-decoration:none', txt: 'Entrar com a Twitch' }));
-  } else {
-    const ir = h('button', { cls: 'bt principal', type: 'button', txt: 'Meus overlays' });
-    ir.onclick = () => vaiPara('#/overlays');
-    capa.appendChild(ir);
+  const colEsq = h('div', { cls: 'hub__col' }, [h('h2', { txt: 'Atualizações' })]);
+  const colMei = h('div', { cls: 'hub__col' }, [h('h2', { txt: 'Quem sabe você gosta desse streamer' })]);
+  const colDir = h('div', { cls: 'hub__col' }, [h('h2', { txt: 'Em alta na Twitch' })]);
+  hub.appendChild(colEsq);
+  hub.appendChild(colMei);
+  hub.appendChild(colDir);
+
+  /* ------------------------------------------------ o carrossel do meio */
+  const palco = h('div', { cls: 'hub__palco' });
+  const pontos = h('div', { cls: 'hub__pontos' });
+
+  const antes = h('button', { cls: 'hub__seta', type: 'button', txt: '‹', title: 'Anterior' });
+  const depois = h('button', { cls: 'hub__seta', type: 'button', txt: '›', title: 'Próximo' });
+  colMei.appendChild(h('div', { cls: 'hub__carro' }, [antes, palco, depois]));
+  colMei.appendChild(pontos);
+
+  let cartoes = [];
+  let atual = 0;
+  let girando = null;
+
+  /* O player só entra no slide ATIVO, e só pra quem está no ar. Três iframes
+     de vídeo abertos ao mesmo tempo é banda e processador da máquina de quem
+     está visitando, gasto pra mostrar dois vídeos que ninguém está vendo. */
+  function pintaPalco() {
+    palco.innerHTML = '';
+    const c = cartoes[atual];
+    if (!c) return;
+
+    const quadro = h('div', { cls: 'hub__video' });
+
+    if (c.aovivo) {
+      /* O 'parent' precisa bater com o domínio de quem está exibindo, senão a
+         Twitch recusa o embed. Sai daqui mesmo pra funcionar em produção e em
+         teste local sem alguém lembrar de trocar. */
+      const src = 'https://player.twitch.tv/?channel=' + encodeURIComponent(c.login)
+        + '&parent=' + encodeURIComponent(location.hostname)
+        + '&muted=true&autoplay=true';
+      quadro.appendChild(h('iframe', { src, allowfullscreen: 'true',
+        title: 'Live de ' + (c.nome || c.login), loading: 'lazy' }));
+    } else {
+      if (c.thumb) quadro.appendChild(h('img', { src: c.thumb, alt: '', loading: 'lazy' }));
+      quadro.appendChild(h('div', { cls: 'hub__off', txt: 'offline agora' }));
+    }
+
+    const [selCls, selTxt] = HUB_SELOS[c.fatia] || ['', ''];
+    const info = h('div', { cls: 'hub__info' }, [
+      h('span', { cls: 'hub__selo ' + selCls, txt: selTxt }),
+      h('b', { txt: c.nome || c.login }),
+      h('span', { cls: 'tit', txt: c.titulo || '' }),
+    ]);
+
+    const meta = h('span', { cls: 'meta' });
+    if (c.aovivo) {
+      meta.appendChild(h('span', { cls: 'ao-vivo', txt: '● AO VIVO' }));
+      meta.appendChild(document.createTextNode('  ' + (c.jogo ? c.jogo + '  ·  ' : '') + c.viewers + ' assistindo'));
+    } else {
+      meta.appendChild(document.createTextNode(c.jogo ? 'Último: ' + c.jogo : 'Canal offline'));
+    }
+    info.appendChild(meta);
+
+    const ir = h('a', { cls: 'bt mini', href: 'https://twitch.tv/' + c.login,
+      target: '_blank', rel: 'noopener noreferrer', txt: 'Abrir na Twitch',
+      style: 'align-self:flex-start;margin-top:8px;text-decoration:none' });
+    info.appendChild(ir);
+
+    palco.appendChild(quadro);
+    palco.appendChild(info);
+
+    [...pontos.children].forEach((b, i) => b.classList.toggle('on', i === atual));
   }
-  hub.appendChild(capa);
 
-  /* ----- quem está no ar hoje ----- */
-  const secLive = h('section', { cls: 'escondido' }, [h('h2', { txt: 'No ar agora' })]);
-  hub.appendChild(secLive);
+  /* NÃO chamar isto de vaiPara: já existe uma vaiPara() global, que é a de
+     navegação, com outra assinatura. Duas funções de mesmo nome e sentidos
+     diferentes no mesmo arquivo é armadilha pra quem mexer depois. */
+  function mostra(i) {
+    atual = (i + cartoes.length) % cartoes.length;
+    pintaPalco();
+    /* Cada toque adia o giro automático: quem está escolhendo não quer a
+       tela mudando embaixo do dedo. */
+    if (girando) { clearInterval(girando); girando = setInterval(() => mostra(atual + 1), 12000); }
+  }
 
-  const SELOS = {
-    usuario: ['usuario', 'Usa o ZocaController'],
-    pro:     ['pro',     'Assinante'],
-    twitch:  ['',        'Descoberta'],
-  };
+  antes.onclick = () => mostra(atual - 1);
+  depois.onclick = () => mostra(atual + 1);
 
-  api2('/vitrine.php').then((d) => {
-    const fatias = (d && d.fatias) || {};
-    const grade = h('div', { cls: 'hub__vitrine' });
-    let quantos = 0;
+  /* ------------------------------------------------ a coluna da direita */
+  const selIdioma = h('select');
+  HUB_IDIOMAS.forEach(([v, r]) => selIdioma.appendChild(h('option', { value: v, txt: r })));
 
-    ['usuario', 'pro', 'twitch'].forEach((f) => {
-      const l = fatias[f];
-      if (!l || !l.login) return;
-      quantos++;
+  const campoCat = h('input', { type: 'text', placeholder: 'todas as categorias' });
 
-      const cartao = h('a', { cls: 'hub__live', href: 'https://twitch.tv/' + l.login,
-        target: '_blank', rel: 'noopener noreferrer' });
+  const avisoPlat = h('p', { cls: 'd', style: 'margin:0 0 10px',
+    txt: 'Os dados são da Twitch. YouTube e Kick não têm como listar quem está no ar agora.' });
 
-      if (l.thumb) cartao.appendChild(h('img', { src: l.thumb, alt: '', loading: 'lazy' }));
+  const listaTop = h('div');
+  const listaCanais = h('div', { cls: 'hub__canais' });
 
-      const [selCls, selTxt] = SELOS[f];
-      cartao.appendChild(h('div', { cls: 'corpo' }, [
-        h('span', { cls: 'hub__selo ' + selCls, txt: selTxt }),
-        h('b', { txt: l.nome || l.login }),
-        h('span', { cls: 'tit', txt: l.titulo || '' }),
-        h('span', { cls: 'meta' }, [
-          h('span', { cls: 'ao-vivo', txt: '● AO VIVO' }),
-          document.createTextNode('  ' + (l.jogo ? l.jogo + '  ·  ' : '')
-            + l.viewers + (l.viewers === 1 ? ' assistindo' : ' assistindo')),
-        ]),
-      ]));
+  colDir.appendChild(h('div', { cls: 'hub__filtros' }, [selIdioma, campoCat]));
+  colDir.appendChild(avisoPlat);
+  colDir.appendChild(listaTop);
+  colDir.appendChild(listaCanais);
 
-      grade.appendChild(cartao);
+  function carregaVitrine() {
+    listaTop.innerHTML = '<p class="d">vendo…</p>';
+
+    const q = '?idioma=' + encodeURIComponent(selIdioma.value)
+            + '&categoria=' + encodeURIComponent(campoCat.value.trim());
+
+    api2('/vitrine.php' + q).then((d) => {
+      /* ----- carrossel ----- */
+      const fatias = (d && d.fatias) || {};
+      cartoes = ['usuario', 'pro', 'twitch']
+        .filter((f) => fatias[f] && fatias[f].login)
+        .map((f) => Object.assign({ fatia: f }, fatias[f]));
+
+      pontos.innerHTML = '';
+      if (!cartoes.length) {
+        palco.innerHTML = '';
+        palco.appendChild(h('p', { cls: 'd', style: 'padding:22px;text-align:center',
+          txt: 'Ninguém pra mostrar agora.' }));
+      } else {
+        cartoes.forEach((_, i) => {
+          const b = h('button', { cls: 'hub__ponto', type: 'button', title: 'Canal ' + (i + 1) });
+          b.onclick = () => mostra(i);
+          pontos.appendChild(b);
+        });
+        atual = Math.min(atual, cartoes.length - 1);
+        pintaPalco();
+        if (girando) clearInterval(girando);
+        if (cartoes.length > 1) girando = setInterval(() => mostra(atual + 1), 12000);
+      }
+
+      antes.style.visibility = cartoes.length > 1 ? '' : 'hidden';
+      depois.style.visibility = cartoes.length > 1 ? '' : 'hidden';
+
+      /* ----- em alta ----- */
+      const a = (d && d.altas) || {};
+      listaTop.innerHTML = '';
+      (a.topicos || []).forEach((tp, i) => {
+        listaTop.appendChild(h('div', { cls: 'hub__topico' }, [
+          h('span', { cls: 'n', txt: String(i + 1) }),
+          h('span', { cls: 'nm', txt: tp.nome }),
+          h('span', { cls: 'v', txt: (tp.espectadores || 0).toLocaleString('pt-BR') }),
+        ]));
+      });
+      if (!(a.topicos || []).length) {
+        listaTop.appendChild(h('p', { cls: 'd', txt: 'Nada encontrado nesse filtro.' }));
+      }
+
+      listaCanais.innerHTML = '';
+      (a.canais || []).slice(0, 8).forEach((c) => {
+        listaCanais.appendChild(h('a', { cls: 'hub__canal', href: 'https://twitch.tv/' + c.login,
+          target: '_blank', rel: 'noopener noreferrer' }, [
+          h('span', { cls: 'nm', txt: c.nome || c.login }),
+          h('span', { cls: 'v', txt: (c.viewers || 0).toLocaleString('pt-BR') }),
+        ]));
+      });
+    }).catch(() => {
+      listaTop.innerHTML = '';
+      listaTop.appendChild(h('p', { cls: 'd', txt: 'Não consegui falar com a Twitch agora.' }));
     });
+  }
 
-    if (!quantos) return;
-    secLive.appendChild(grade);
-    secLive.appendChild(h('p', { cls: 'd', style: 'margin:10px 0 0',
-      txt: 'Canais diferentes por dia. A descoberta é sorteada entre as lives pequenas '
-         + 'em português — não é anúncio e ninguém paga pra aparecer aqui.' }));
-    secLive.classList.remove('escondido');
-  }).catch(() => { /* ninguém no ar: a seção some, e isso basta */ });
+  selIdioma.onchange = carregaVitrine;
+  let bateu = null;
+  campoCat.oninput = () => { clearTimeout(bateu); bateu = setTimeout(carregaVitrine, 500); };
 
-  /* ----- novidades e parceiros ----- */
-  const secNov = h('section', { cls: 'escondido' }, [h('h2', { txt: 'O que mudou' })]);
-  const secPar = h('section', { cls: 'escondido' }, [h('h2', { txt: 'Parceiros' })]);
-  hub.appendChild(secNov);
-  hub.appendChild(secPar);
+  carregaVitrine();
+
+  /* ------------------------------------------------ a coluna da esquerda */
+  const rolo = h('div', { cls: 'hub__rolo' });
+  colEsq.appendChild(rolo);
+
+  const secPar = h('section', { cls: 'escondido', style: 'margin-top:20px' },
+    [h('h2', { txt: 'Parceiros' })]);
+  colEsq.appendChild(secPar);
 
   const pinta = (d) => {
     const novs = (d && d.novidades) || [];
-    if (novs.length) {
-      const lista = h('div', { cls: 'hub__novidades' });
-      novs.slice(0, 6).forEach((n) => {
-        /* Data montada peça por peça: new Date('2026-09-10') é lido como UTC
-           e vira 09/09 pra quem está no Brasil. */
-        const p2 = String(n.data || '').split('-');
-        const quando = p2.length === 3 ? p2[2] + '/' + p2[1] + '/' + p2[0] : (n.data || '');
-        lista.appendChild(h('div', { cls: 'hub__nov' }, [
-          h('time', { txt: quando }),
-          h('div', {}, [h('b', { txt: n.titulo || '' }), h('span', { txt: n.texto || '' })]),
-        ]));
-      });
-      secNov.appendChild(lista);
-      secNov.classList.remove('escondido');
-    }
+    rolo.innerHTML = '';
+    if (!novs.length) { rolo.appendChild(h('p', { cls: 'd', txt: 'Nada por aqui ainda.' })); return; }
+
+    novs.forEach((n) => {
+      /* Data montada peça por peça: new Date('2026-09-10') é lido como UTC e
+         vira 09/09 pra quem está no Brasil. */
+      const p2 = String(n.data || '').split('-');
+      const quando = p2.length === 3 ? p2[2] + '/' + p2[1] + '/' + p2[0] : (n.data || '');
+      rolo.appendChild(h('div', { cls: 'hub__nov' }, [
+        h('time', { txt: quando }),
+        h('b', { txt: n.titulo || '' }),
+        h('span', { txt: n.texto || '' }),
+      ]));
+    });
 
     const pars = (d && d.parceiros) || [];
     if (pars.length) {
@@ -4347,6 +4516,8 @@ function vaiPara(hash) { if (location.hash === hash) rota(); else location.hash 
 
 function rota() {
   recado('');
+  const btVolta = el('abaMeusOverlays');
+  if (btVolta) btVolta.style.display = 'none';
   const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/');
   if (p[0] === 'inicio') return telaInicio();
   if (p[0] === 'meu') return telaControlador();
@@ -4368,6 +4539,7 @@ window.addEventListener('hashchange', rota);
    a porta de entrada — a lista já tem aba própria. */
 el('irInicio').onclick = () => vaiPara('#/inicio');
 el('abaMeu').onclick = () => { fechaBandejas(null); vaiPara('#/meu'); };
+el('abaMeusOverlays').onclick = () => { fechaBandejas(null); vaiPara('#/overlays'); };
 
 /* De qual conta é esta tela, e se a lista nela é a de verdade. */
 let quemSou = '';

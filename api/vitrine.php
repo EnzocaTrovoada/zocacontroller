@@ -1,20 +1,30 @@
 <?php
 /**
- * A vitrine da página inicial: até três canais em destaque.
+ * A vitrine da página inicial.
  *
- * Três fontes independentes, e cada uma responde uma pergunta diferente:
+ * Três fontes pro carrossel, e cada uma responde uma pergunta diferente:
  *
- *   usuario  — alguém que usa o ZocaController e está no ar agora
- *   pro      — o mesmo, mas entre quem paga (é o que faz assinar valer algo
- *              além dos recursos)
- *   twitch   — qualquer canal pequeno em português, usuário do site ou não
+ *   usuario  — alguém que usa o ZocaController
+ *   pro      — o mesmo, mas entre quem paga
+ *   twitch   — um canal pequeno em português, usuário do site ou não
  *
- * Cada fatia é escolhida UMA VEZ POR DIA e fica guardada. As duas primeiras
- * custam um pedido; a terceira custa dezenas, e é por isso que ela não pode
- * ser sorteada a cada visita — ver o comentário em vitrine_twitch().
+ * Mais os TÓPICOS EM ALTA, que saem de uma leitura só e dizem o que está
+ * rendendo audiência em português agora.
  *
- * A leitura é pública: é vitrine, é pra ser vista por quem ainda não entrou.
- * Só o que MEXE nela exige ser admin.
+ * ---------------------------------------------------------------------
+ * DUAS COISAS SEPARADAS, COM PREÇOS MUITO DIFERENTES:
+ *
+ *   ESCOLHER quem aparece é caro. A Twitch devolve as lives ordenadas por
+ *   audiência da maior pra menor, e não existe "me dê uma pequena" — tem que
+ *   caminhar dezenas de páginas. Isso acontece UMA VEZ POR DIA e guarda uma
+ *   LISTA de candidatos, não um só.
+ *
+ *   CONFERIR se essa pessoa ainda está no ar é barato: um pedido resolve cem
+ *   canais. Isso acontece a cada poucos minutos.
+ *
+ * Misturar os dois foi o erro da primeira versão: com escolha diária, um
+ * canal sorteado de manhã continuava anunciado como "ao vivo" à noite, muito
+ * depois de ter desligado. Cartaz mentindo é pior do que cartaz vazio.
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
@@ -25,9 +35,11 @@ cors();
 
 const VITRINE_FATIAS = ['usuario', 'pro', 'twitch'];
 
-/* Quantas páginas descer na lista da Twitch antes de olhar. Sorteado pra que
-   a vitrine não caia sempre na mesma faixa de audiência, e com teto porque
-   cada página é um pedido. */
+/* De quanto em quanto tempo se reconfere quem está no ar. Cinco minutos é
+   curto o bastante pra não mentir e longo o bastante pra ninguém sentir. */
+const VITRINE_FRESCOR = 300;
+
+/* Quantas páginas descer na lista da Twitch atrás dos canais pequenos. */
 const VITRINE_MIN_PAGINAS = 12;
 const VITRINE_MAX_PAGINAS = 34;
 
@@ -42,11 +54,21 @@ const VITRINE_MAX_VIEWERS = 30;
 
 function vitrine_le(string $chave): ?array
 {
-    $st = db()->prepare('SELECT valor, atualizado_em FROM vitrine WHERE chave = ?');
+    $st = db()->prepare('SELECT valor, TIMESTAMPDIFF(SECOND, atualizado_em, NOW()) AS idade,
+                                DATE(atualizado_em) AS dia
+                           FROM vitrine WHERE chave = ?');
     $st->execute([$chave]);
     $l = $st->fetch();
     if (!$l) return null;
-    return ['valor' => json_decode((string) $l['valor'], true), 'em' => (string) $l['atualizado_em']];
+
+    /* A idade vem do BANCO, não do PHP. Se um estiver num fuso e o outro
+       noutro, comparar data de lá com data daqui erraria o dia inteiro — e o
+       erro só apareceria na virada, que é quando ninguém está olhando. */
+    return [
+        'valor' => json_decode((string) $l['valor'], true),
+        'idade' => (int) $l['idade'],
+        'dia'   => (string) $l['dia'],
+    ];
 }
 
 function vitrine_grava(string $chave, $valor): void
@@ -57,13 +79,6 @@ function vitrine_grava(string $chave, $valor): void
     )->execute([$chave, json_encode($valor, JSON_UNESCAPED_UNICODE)]);
 }
 
-/**
- * A configuração da vitrine, com os padrões.
- *
- * 'fixo' é o canal que o Enzo escolheu à mão. Quando existe, ele manda em
- * cima do sorteio — é a saída de emergência pra quando o sorteado não pode
- * ficar ali, e também o jeito de destacar alguém de propósito.
- */
 function vitrine_config(): array
 {
     $c = vitrine_le('config');
@@ -72,11 +87,12 @@ function vitrine_config(): array
     $saida = [];
     foreach (VITRINE_FATIAS as $f) {
         $saida[$f] = [
-            'ligado'   => array_key_exists('ligado', $c[$f] ?? []) ? (bool) $c[$f]['ligado'] : true,
-            'fixo'     => (string) ($c[$f]['fixo'] ?? ''),
-            'categoria'=> (string) ($c[$f]['categoria'] ?? ''),
+            'ligado'    => array_key_exists('ligado', $c[$f] ?? []) ? (bool) $c[$f]['ligado'] : true,
+            'fixo'      => (string) ($c[$f]['fixo'] ?? ''),
+            'categoria' => (string) ($c[$f]['categoria'] ?? ''),
         ];
     }
+    $saida['idioma'] = (string) ($c['idioma'] ?? 'pt');
     return $saida;
 }
 
@@ -97,7 +113,7 @@ function vitrine_bloqueados(): array
 function vitrine_cartao(array $s): array
 {
     /* A miniatura vem com {width} e {height} pra gente escolher o tamanho. */
-    $thumb = str_replace(['{width}', '{height}'], ['440', '248'],
+    $thumb = str_replace(['{width}', '{height}'], ['640', '360'],
         (string) ($s['thumbnail_url'] ?? ''));
 
     return [
@@ -107,6 +123,7 @@ function vitrine_cartao(array $s): array
         'jogo'    => (string) ($s['game_name'] ?? ''),
         'viewers' => (int) ($s['viewer_count'] ?? 0),
         'thumb'   => $thumb,
+        'aovivo'  => true,
     ];
 }
 
@@ -120,15 +137,13 @@ function vitrine_serve(array $s, array $bloqueados): bool
 }
 
 /** Quais destes logins estão no ar agora. Cem por pedido é o teto deles. */
-function vitrine_quem_esta_ao_vivo(array $logins, array $bloqueados): array
+function vitrine_ao_vivo(array $logins, array $bloqueados): array
 {
     $vivos = [];
-    foreach (array_chunk(array_values($logins), 100) as $lote) {
+    foreach (array_chunk(array_values(array_unique($logins)), 100) as $lote) {
+        if (!$lote) continue;
         $q = 'user_login=' . implode('&user_login=', array_map('rawurlencode', $lote));
-        [$http, $r] = tw_http('GET', TW_HELIX . '/streams?' . $q, [
-            'Authorization: Bearer ' . tw_token_do_app(),
-            'Client-Id: ' . cfg()['twitch']['client_id'],
-        ]);
+        [$http, $r] = tw_helix_app('GET', '/streams?' . $q);
         if ($http !== 200 || empty($r['data'])) continue;
         foreach ($r['data'] as $s) {
             if (vitrine_serve($s, $bloqueados)) $vivos[] = $s;
@@ -137,22 +152,60 @@ function vitrine_quem_esta_ao_vivo(array $logins, array $bloqueados): array
     return $vivos;
 }
 
+/**
+ * O cartão de quem está com a live FECHADA.
+ *
+ * Existe porque painel que some quando ninguém está no ar deixa a página
+ * inicial cheia de buraco — e, de fora, buraco e defeito são a mesma imagem.
+ * Melhor mostrar o canal desligado, dizendo que está desligado, do que não
+ * mostrar nada.
+ */
+function vitrine_cartao_offline(string $login, array $bloqueados): ?array
+{
+    if (in_array(strtolower($login), $bloqueados, true)) return null;
+
+    [$h1, $u] = tw_helix_app('GET', '/users', ['login' => $login]);
+    if ($h1 !== 200 || empty($u['data'][0])) return null;
+    $uu = $u['data'][0];
+
+    /* O que ele estava transmitindo da última vez. Serve de contexto: "canal
+       de Hollow Knight" diz muito mais do que só um nome. */
+    $titulo = '';
+    $jogo = '';
+    [$h2, $c] = tw_helix_app('GET', '/channels', ['broadcaster_id' => (string) $uu['id']]);
+    if ($h2 === 200 && !empty($c['data'][0])) {
+        $titulo = mb_substr((string) ($c['data'][0]['title'] ?? ''), 0, 120);
+        $jogo   = (string) ($c['data'][0]['game_name'] ?? '');
+    }
+
+    return [
+        'login'   => (string) $uu['login'],
+        'nome'    => (string) ($uu['display_name'] ?? $uu['login']),
+        'titulo'  => $titulo,
+        'jogo'    => $jogo,
+        'viewers' => 0,
+        /* Sem live não existe miniatura: o que existe é a arte do canal. */
+        'thumb'   => (string) ($uu['offline_image_url'] ?? ''),
+        'foto'    => (string) ($uu['profile_image_url'] ?? ''),
+        'aovivo'  => false,
+    ];
+}
+
 /* ------------------------------------------------------------------ *
  *  As três fontes
  * ------------------------------------------------------------------ */
 
-/** Logins do site: todos, ou só quem tem plano pago. */
 function vitrine_logins_do_site(bool $soPagantes): array
 {
-    $us = db()->query('SELECT id, login FROM usuarios WHERE login IS NOT NULL AND login <> \'\'')
+    $us = db()->query("SELECT id, login FROM usuarios WHERE login IS NOT NULL AND login <> ''")
               ->fetchAll(PDO::FETCH_ASSOC);
     if (!$soPagantes) return array_column($us, 'login');
 
     $pagantes = [];
     foreach ($us as $u) {
         $a = acesso_do_usuario((int) $u['id']);
-        /* Beta não entra aqui de propósito: esta fatia existe pra mostrar que
-           assinar tem retorno, e testador não assinou. */
+        /* Beta não entra: esta fatia existe pra mostrar que assinar tem
+           retorno, e testador não assinou. */
         if ($a['ativo'] && $a['plano'] !== 'gratis') $pagantes[] = $u['login'];
     }
     return $pagantes;
@@ -161,39 +214,35 @@ function vitrine_logins_do_site(bool $soPagantes): array
 function vitrine_do_site(bool $soPagantes, array $bloqueados): ?array
 {
     $logins = vitrine_logins_do_site($soPagantes);
+    $logins = array_values(array_filter($logins, fn($l) => !in_array(strtolower($l), $bloqueados, true)));
     if (!$logins) return null;
 
-    $vivos = vitrine_quem_esta_ao_vivo($logins, $bloqueados);
-    if (!$vivos) return null;
+    $vivos = vitrine_ao_vivo($logins, $bloqueados);
+    if ($vivos) return vitrine_cartao($vivos[random_int(0, count($vivos) - 1)]);
 
-    return vitrine_cartao($vivos[random_int(0, count($vivos) - 1)]);
+    /* Ninguém no ar: mostra alguém desligado mesmo. */
+    return vitrine_cartao_offline($logins[random_int(0, count($logins) - 1)], $bloqueados);
 }
 
 /**
- * Um canal pequeno qualquer, em português.
+ * A lista de candidatos pequenos da Twitch. Esta é a parte cara.
  *
- * O PORÉM: a Twitch devolve as lives ORDENADAS POR AUDIÊNCIA, da maior pra
- * menor — exatamente ao contrário do que a gente quer. Não existe "me dê uma
- * live pequena": tem que caminhar páginas pra baixo até chegar em quem tem
- * poucos espectadores. Por isso esta é a fatia cara, e por isso ela é
- * escolhida uma vez por dia e não a cada visita.
+ * Guarda VÁRIOS, não um. Assim a conferência de quem está no ar — que é
+ * barata — tem de onde escolher durante o dia inteiro sem repetir a
+ * caminhada.
  */
-function vitrine_twitch(string $categoria, array $bloqueados): ?array
+function vitrine_pool_twitch(string $categoria, string $idioma): array
 {
-    $base = ['language' => 'pt', 'first' => '100', 'type' => 'live'];
+    $base = ['language' => ($idioma ?: 'pt'), 'first' => '100', 'type' => 'live'];
 
-    /* Categoria escolhida à mão: a Twitch filtra por id, não por nome. */
     if ($categoria !== '') {
         [$h, $g] = tw_helix_app('GET', '/games', ['name' => $categoria]);
-        if ($h === 200 && !empty($g['data'][0]['id'])) {
-            $base['game_id'] = (string) $g['data'][0]['id'];
-        }
+        if ($h === 200 && !empty($g['data'][0]['id'])) $base['game_id'] = (string) $g['data'][0]['id'];
     }
 
     $paginas = random_int(VITRINE_MIN_PAGINAS, VITRINE_MAX_PAGINAS);
     $cursor = '';
-    $achadas = [];
-    $ultimaPagina = [];
+    $ultima = [];
 
     for ($i = 0; $i < $paginas; $i++) {
         $q = $base;
@@ -202,39 +251,101 @@ function vitrine_twitch(string $categoria, array $bloqueados): ?array
         [$http, $r] = tw_helix_app('GET', '/streams', $q);
         if ($http !== 200 || empty($r['data'])) break;
 
-        $ultimaPagina = $r['data'];
+        $ultima = $r['data'];
         $cursor = (string) ($r['pagination']['cursor'] ?? '');
-
         /* Acabou a lista antes das páginas sorteadas: esta é a última que
-           existe, e é justamente onde estão os menores. Olha ela. */
+           existe, e é justamente onde estão os menores. */
         if ($cursor === '') break;
     }
 
-    foreach ($ultimaPagina as $s) {
+    $logins = [];
+    foreach ($ultima as $s) {
         $v = (int) ($s['viewer_count'] ?? 0);
         if ($v < VITRINE_MIN_VIEWERS || $v > VITRINE_MAX_VIEWERS) continue;
-        if (!vitrine_serve($s, $bloqueados)) continue;
-        $achadas[] = $s;
+        if (empty($s['user_login'])) continue;
+        $logins[] = (string) $s['user_login'];
+    }
+    return $logins;
+}
+
+function vitrine_twitch(array $cfg, string $idioma, array $bloqueados): ?array
+{
+    $pool = vitrine_le('pool_twitch');
+    $doDia = $pool && $pool['dia'] === date('Y-m-d', time()) && !empty($pool['valor']);
+
+    if (!$doDia) {
+        $logins = vitrine_pool_twitch((string) $cfg['categoria'], $idioma);
+        if ($logins) vitrine_grava('pool_twitch', $logins);
+    } else {
+        $logins = $pool['valor'];
     }
 
-    if (!$achadas) return null;
-    return vitrine_cartao($achadas[random_int(0, count($achadas) - 1)]);
+    if (!$logins) return null;
+
+    /* Um pedido só resolve os cem. Quem já desligou some da resposta, e é
+       isso que impede o cartaz de mentir. */
+    $vivos = vitrine_ao_vivo($logins, $bloqueados);
+    if ($vivos) return vitrine_cartao($vivos[random_int(0, count($vivos) - 1)]);
+
+    /* Todos do dia já desligaram: mostra um desligado mesmo, e amanhã a
+       caminhada refaz a lista. */
+    return vitrine_cartao_offline($logins[random_int(0, count($logins) - 1)], $bloqueados);
 }
 
-/** Um canal específico, escolhido à mão. Só aparece se estiver no ar. */
-function vitrine_fixo(string $login, array $bloqueados): ?array
+function vitrine_sortear(string $fatia, array $cfg, string $idioma, array $bloqueados): ?array
 {
-    $vivos = vitrine_quem_esta_ao_vivo([$login], $bloqueados);
-    return $vivos ? vitrine_cartao($vivos[0]) : null;
-}
-
-function vitrine_sortear(string $fatia, array $cfg, array $bloqueados): ?array
-{
-    if (($cfg['fixo'] ?? '') !== '') return vitrine_fixo($cfg['fixo'], $bloqueados);
+    if (($cfg['fixo'] ?? '') !== '') {
+        $vivos = vitrine_ao_vivo([$cfg['fixo']], $bloqueados);
+        return $vivos ? vitrine_cartao($vivos[0]) : vitrine_cartao_offline($cfg['fixo'], $bloqueados);
+    }
 
     if ($fatia === 'usuario') return vitrine_do_site(false, $bloqueados);
     if ($fatia === 'pro')     return vitrine_do_site(true, $bloqueados);
-    return vitrine_twitch((string) ($cfg['categoria'] ?? ''), $bloqueados);
+    return vitrine_twitch($cfg, $idioma, $bloqueados);
+}
+
+/* ------------------------------------------------------------------ *
+ *  Tópicos em alta
+ * ------------------------------------------------------------------ */
+
+/**
+ * O que está rendendo audiência agora, num idioma.
+ *
+ * Sai da PRIMEIRA página de /streams — as cem maiores lives daquele idioma —
+ * somando espectadores por categoria. Um pedido só, e é medida de verdade do
+ * momento, não a lista global da Twitch (que é dominada por inglês e não diz
+ * nada sobre o público brasileiro).
+ */
+function vitrine_altas(string $idioma, string $categoria, array $bloqueados): array
+{
+    $q = ['language' => ($idioma ?: 'pt'), 'first' => '100', 'type' => 'live'];
+
+    if ($categoria !== '') {
+        [$h, $g] = tw_helix_app('GET', '/games', ['name' => $categoria]);
+        if ($h === 200 && !empty($g['data'][0]['id'])) $q['game_id'] = (string) $g['data'][0]['id'];
+    }
+
+    [$http, $r] = tw_helix_app('GET', '/streams', $q);
+    if ($http !== 200 || empty($r['data'])) return ['topicos' => [], 'canais' => []];
+
+    $porJogo = [];
+    $canais = [];
+
+    foreach ($r['data'] as $s) {
+        $jogo = (string) ($s['game_name'] ?? '');
+        if ($jogo !== '') {
+            if (!isset($porJogo[$jogo])) $porJogo[$jogo] = ['nome' => $jogo, 'canais' => 0, 'espectadores' => 0];
+            $porJogo[$jogo]['canais']++;
+            $porJogo[$jogo]['espectadores'] += (int) ($s['viewer_count'] ?? 0);
+        }
+        if (count($canais) < 12 && vitrine_serve($s, $bloqueados)) {
+            $canais[] = vitrine_cartao($s);
+        }
+    }
+
+    usort($porJogo, fn($a, $b) => $b['espectadores'] <=> $a['espectadores']);
+
+    return ['topicos' => array_slice(array_values($porJogo), 0, 8), 'canais' => $canais];
 }
 
 /* ------------------------------------------------------------------ *
@@ -251,20 +362,26 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $d = corpo_json();
     $acao = (string) ($d['acao'] ?? '');
 
+    $limpaLogin = fn($v) => strtolower(preg_replace('/[^A-Za-z0-9_]/', '', (string) $v));
+
     if ($acao === 'config') {
         $cfg = vitrine_config();
         foreach (VITRINE_FATIAS as $f) {
             if (!isset($d[$f]) || !is_array($d[$f])) continue;
             $cfg[$f]['ligado']    = !empty($d[$f]['ligado']);
-            $cfg[$f]['fixo']      = strtolower(preg_replace('/[^A-Za-z0-9_]/', '', (string) ($d[$f]['fixo'] ?? '')));
+            $cfg[$f]['fixo']      = $limpaLogin($d[$f]['fixo'] ?? '');
             $cfg[$f]['categoria'] = mb_substr(trim((string) ($d[$f]['categoria'] ?? '')), 0, 80);
         }
+        if (isset($d['idioma'])) {
+            $cfg['idioma'] = preg_replace('/[^a-z-]/', '', strtolower((string) $d['idioma'])) ?: 'pt';
+        }
         vitrine_grava('config', $cfg);
-        /* Mudou a regra, o sorteio de hoje não vale mais: apagar as escolhas
-           faz a próxima visita sortear de novo já com a regra nova. */
+
+        /* Mudou a regra, o que estava guardado não vale mais. */
         foreach (VITRINE_FATIAS as $f) {
             db()->prepare('DELETE FROM vitrine WHERE chave = ?')->execute(['fatia_' . $f]);
         }
+        db()->prepare('DELETE FROM vitrine WHERE chave IN (?, ?)')->execute(['pool_twitch', 'altas']);
         json_saida(['ok' => true, 'config' => $cfg]);
     }
 
@@ -272,11 +389,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $f = (string) ($d['fatia'] ?? '');
         if (!in_array($f, VITRINE_FATIAS, true)) json_saida(['erro' => 'Fatia desconhecida.'], 400);
         db()->prepare('DELETE FROM vitrine WHERE chave = ?')->execute(['fatia_' . $f]);
+        /* Sortear de novo o da Twitch tem que refazer a caminhada também,
+           senão ele só troca de nome dentro da mesma lista de hoje. */
+        if ($f === 'twitch') db()->prepare('DELETE FROM vitrine WHERE chave = ?')->execute(['pool_twitch']);
         json_saida(['ok' => true]);
     }
 
     if ($acao === 'banir') {
-        $login = strtolower(preg_replace('/[^A-Za-z0-9_]/', '', (string) ($d['login'] ?? '')));
+        $login = $limpaLogin($d['login'] ?? '');
         if ($login === '') json_saida(['erro' => 'Falta o canal.'], 400);
 
         db()->prepare(
@@ -284,8 +404,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
              ON DUPLICATE KEY UPDATE motivo = VALUES(motivo)'
         )->execute([$login, mb_substr(trim((string) ($d['motivo'] ?? '')), 0, 160) ?: null]);
 
-        /* Some da vitrine AGORA, não amanhã: quem é banido é banido porque
-           não pode estar ali neste momento. */
+        /* Some AGORA, não amanhã. */
         foreach (VITRINE_FATIAS as $f) {
             $g = vitrine_le('fatia_' . $f);
             if (strtolower((string) ($g['valor']['login'] ?? '')) === $login) {
@@ -296,8 +415,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 
     if ($acao === 'desbanir') {
-        $login = strtolower(preg_replace('/[^A-Za-z0-9_]/', '', (string) ($d['login'] ?? '')));
-        db()->prepare('DELETE FROM vitrine_bloqueio WHERE login = ?')->execute([$login]);
+        db()->prepare('DELETE FROM vitrine_bloqueio WHERE login = ?')->execute([$limpaLogin($d['login'] ?? '')]);
         json_saida(['ok' => true]);
     }
 
@@ -318,32 +436,38 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
 $cfg = vitrine_config();
 $bloqueados = vitrine_bloqueados();
-$hoje = date('Y-m-d');
-$fatias = [];
+$idioma = (string) $cfg['idioma'];
 
+/* O visitante pode filtrar os tópicos sem mexer na configuração de ninguém. */
+$idiomaPedido = preg_replace('/[^a-z-]/', '', strtolower((string) ($_GET['idioma'] ?? ''))) ?: $idioma;
+$catPedida    = mb_substr(trim((string) ($_GET['categoria'] ?? '')), 0, 80);
+
+$fatias = [];
 foreach (VITRINE_FATIAS as $f) {
     if (!$cfg[$f]['ligado']) continue;
 
     $g = vitrine_le('fatia_' . $f);
-    $valeAinda = $g && substr($g['em'], 0, 10) === $hoje;
+    $fresco = $g && $g['idade'] < VITRINE_FRESCOR;
 
-    if ($valeAinda) {
+    if ($fresco) {
         $cartao = $g['valor'];
     } else {
-        /* Quem chegou primeiro depois da virada paga a conta de sortear. Se
-           der errado, vale a escolha de ontem: canal de ontem na vitrine é
-           bem menos ruim do que um buraco na página inicial. */
         try {
-            $cartao = vitrine_sortear($f, $cfg[$f], $bloqueados);
+            $cartao = vitrine_sortear($f, $cfg[$f], $idioma, $bloqueados);
         } catch (Throwable $e) {
             $cartao = null;
         }
 
-        if ($cartao) vitrine_grava('fatia_' . $f, $cartao);
-        elseif ($g) $cartao = $g['valor'];
+        /* GUARDA ATÉ O "NÃO ACHEI".
+
+           Sem isto, uma fatia vazia refaz a busca a CADA visita da página
+           inicial — e a fatia 'pro' consulta o acesso de cada conta do site
+           pra montar a lista. Com quatro contas ninguém sente; com
+           quatrocentas, a home cai sozinha. */
+        vitrine_grava('fatia_' . $f, $cartao);
     }
 
-    /* Banido depois de sorteado não pode continuar aparecendo até amanhã. */
+    /* Banido depois de guardado não pode continuar aparecendo. */
     if ($cartao && in_array(strtolower((string) ($cartao['login'] ?? '')), $bloqueados, true)) {
         $cartao = null;
     }
@@ -351,8 +475,35 @@ foreach (VITRINE_FATIAS as $f) {
     if ($cartao) $fatias[$f] = $cartao;
 }
 
-/* Cinco minutos de cache na borda: a vitrine muda uma vez por dia, e cada
-   visita da página inicial não precisa acordar o banco. */
-header('Cache-Control: public, max-age=300');
+/* ----- tópicos em alta ----- */
+/* A CHAVE PRECISA CABER EM VARCHAR(32).
 
-json_saida(['fatias' => $fatias]);
+   Nome de categoria é livre e comprido — "League of Legends: Wild Rift"
+   sozinho estoura o campo. Fora do modo estrito o MySQL CORTA em silêncio, e
+   aí duas categorias diferentes passariam a dividir a mesma linha de cache,
+   uma servindo o resultado da outra. Resumir em md5 dá tamanho fixo. */
+$chaveAltas = 'altas_' . substr(md5($idiomaPedido . '|' . mb_strtolower($catPedida)), 0, 20);
+$ga = vitrine_le($chaveAltas);
+
+if ($ga && $ga['idade'] < VITRINE_FRESCOR) {
+    $altas = $ga['valor'];
+} else {
+    try {
+        $altas = vitrine_altas($idiomaPedido, $catPedida, $bloqueados);
+    } catch (Throwable $e) {
+        $altas = $ga['valor'] ?? ['topicos' => [], 'canais' => []];
+    }
+    vitrine_grava($chaveAltas, $altas);
+}
+
+header('Cache-Control: public, max-age=120');
+
+json_saida([
+    'fatias' => $fatias,
+    'altas'  => [
+        'idioma'    => $idiomaPedido,
+        'categoria' => $catPedida,
+        'topicos'   => $altas['topicos'] ?? [],
+        'canais'    => $altas['canais'] ?? [],
+    ],
+]);
