@@ -72,10 +72,39 @@ function recurso_liberado(int $usuario_id, string $chave): bool
  * NULL quer dizer "vale o do plano". Sem essa separacao, dar um extra pra
  * alguem viraria uma linha de plano nova pra cada favor feito.
  */
+/**
+ * Este usuário entrou antes da cobrança existir?
+ *
+ * Quem testou o site enquanto ele era grátis não pode acordar um dia com
+ * marca d'água na live e metade dos overlays travados porque a gente resolveu
+ * cobrar. Eles ficam com tudo, e a marca é ligada à mão no painel de
+ * administração se um dia fizer sentido.
+ *
+ * Coluna nova em vez de assinatura de cortesia de propósito: assim o
+ * relatório de cobrança nunca mistura cortesia com dinheiro de verdade.
+ */
+function usuario_beta(int $usuario_id): bool
+{
+    try {
+        $st = db()->prepare('SELECT beta FROM usuarios WHERE id = ?');
+        $st->execute([$usuario_id]);
+        return (bool) $st->fetchColumn();
+    } catch (Throwable $e) {
+        /* Coluna nova: quem ainda não rodou o SQL não pode ver o site quebrar.
+           Falhar pro lado de NÃO-beta seria o contrário do que este código
+           existe pra fazer, mas falhar pro lado de beta liberaria tudo pra
+           todo mundo — então o silêncio aqui só vale enquanto a cobrança
+           estiver fechada, e nesse caso já está tudo liberado mesmo. */
+        return false;
+    }
+}
+
 function recursos_do_usuario(int $usuario_id, string $plano): array
 {
-    /* Cobrança fechada: todo mundo é Pro. Ver cobranca_aberta() acima. */
-    $r = recursos_do_plano(cobranca_aberta() ? $plano : 'pro');
+    /* Duas portas pro mesmo lugar: a cobrança ainda não abriu, ou esta pessoa
+       estava aqui antes dela abrir. Nos dois casos, Pro. */
+    $comoPro = !cobranca_aberta() || usuario_beta($usuario_id);
+    $r = recursos_do_plano($comoPro ? 'pro' : $plano);
 
     $st = db()->prepare('SELECT perfis_max, recursos FROM usuarios WHERE id = ?');
     $st->execute([$usuario_id]);

@@ -176,6 +176,59 @@
   .pop .passos li { margin-bottom: 7px; color: var(--fraco); font-size: 13.5px; line-height: 1.5; }
   .pop .passos li::marker { color: var(--verde); font-weight: 600; }
 
+  /* ---------- vitrine da inicial ---------- */
+  .hub { display: flex; flex-direction: column; gap: 34px; padding: 12px 0 40px; }
+
+  .hub__capa h1 { margin: 0 0 6px; font: 700 clamp(30px,5vw,44px)/1.05 var(--disp); letter-spacing: -.03em; }
+  .hub__capa p { margin: 0 0 18px; max-width: 56ch; color: var(--fraco); font-size: 15.5px; }
+
+  .hub h2 {
+    margin: 0 0 14px; font: 600 12px var(--mono);
+    letter-spacing: .16em; text-transform: uppercase; color: var(--fraco);
+  }
+
+  /* A live do dia. Miniatura à esquerda, texto à direita, e o bloco inteiro é
+     o link — alvo grande é o que faz alguém clicar sem querer acertar. */
+  .hub__live {
+    display: flex; gap: 16px; align-items: stretch;
+    border: 1px solid var(--linha); background: var(--caixa);
+    text-decoration: none; color: var(--tinta); overflow: hidden;
+  }
+  .hub__live:hover { border-color: var(--verde); }
+  .hub__live img { width: 220px; flex: none; object-fit: cover; background: var(--caixa2); display: block; }
+  .hub__live div { padding: 14px 16px 14px 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .hub__live b { font: 600 16px var(--disp); }
+  .hub__live .tit { color: var(--fraco); font-size: 14px;
+    overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .hub__live .meta { margin-top: auto; color: var(--apagado); font: 500 12px var(--mono); }
+  .hub__live .ao-vivo { color: var(--perigo); font-weight: 700; }
+  @media (max-width: 560px) {
+    .hub__live { flex-direction: column; }
+    .hub__live img { width: 100%; height: 160px; }
+    .hub__live div { padding: 0 16px 14px; }
+  }
+
+  .hub__novidades { display: flex; flex-direction: column; }
+  .hub__nov {
+    display: grid; grid-template-columns: 96px 1fr; gap: 16px;
+    padding: 14px 0; border-top: 1px solid var(--linha);
+  }
+  .hub__nov:last-child { border-bottom: 1px solid var(--linha); }
+  .hub__nov time { color: var(--apagado); font: 500 12px var(--mono); padding-top: 2px; }
+  .hub__nov b { display: block; font: 600 15px var(--disp); margin-bottom: 2px; }
+  .hub__nov span { color: var(--fraco); font-size: 14px; }
+  @media (max-width: 560px) { .hub__nov { grid-template-columns: 1fr; gap: 2px; } }
+
+  .hub__parceiros { display: flex; flex-wrap: wrap; gap: 10px; }
+  .hub__parceiro {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border: 1px solid var(--linha); background: var(--caixa);
+    text-decoration: none; color: var(--tinta); font-size: 14px;
+  }
+  .hub__parceiro:hover { border-color: var(--verde); }
+  .hub__parceiro img { height: 22px; width: auto; display: block; }
+
   /* O aviso de vencimento. Âmbar e não vermelho: nada quebrou ainda, e
      vermelho pra coisa que ainda vai acontecer gasta o vermelho à toa. */
   #avisoPlano {
@@ -2062,8 +2115,10 @@ function abrePro(estado) {
   topo.appendChild(h('h2', { txt: 'ZocaController Pro' }));
 
   const ate = estado.valido_ate ? new Date(estado.valido_ate.replace(' ', 'T')) : null;
-  topo.appendChild(h('p', { cls: 'sub', txt: estado.plano === 'gratis'
-    ? 'Você está no plano grátis. Veja o que muda.'
+  topo.appendChild(h('p', { cls: 'sub', txt: estado.beta
+    ? 'Você é testador e já tem tudo isto liberado, de graça. Pode assinar se quiser apoiar — não muda nada no que você usa.'
+    : estado.plano === 'gratis'
+      ? 'Você está no plano grátis. Veja o que muda.'
     : estado.plano === 'vitalicio'
       ? 'Você é Vitalício. Já tem tudo, pra sempre.'
       : 'Você já é Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '. Pode renovar quando quiser.' }));
@@ -2231,6 +2286,8 @@ function avisaVencimento(c) {
      vez ficava com a caixa vazia e com borda ocupando espaço na tela. */
   cx.classList.add('escondido');
 
+  /* Testador não recebe cobrança nem lembrete: ele não tem o que renovar. */
+  if (c.beta) return;
   if (c.plano === 'gratis' || c.plano === 'vitalicio') return;
   if (!c.cortesia && (c.dias === null || c.dias > 7)) return;
 
@@ -2253,6 +2310,126 @@ el('abaUpgrade').onclick = () => {
   fechaBandejas(null);
   if (proEstado) abrePro(proEstado);
 };
+
+/* ---------------- a vitrine da inicial ---------------- */
+
+/* POR QUE OS DADOS VÊM DE UM ARQUIVO E NÃO DO BANCO.
+
+   Novidades e parceiros mudam quando o Enzo quer, não quando um usuário faz
+   algo. Guardar isso no banco pediria tela de administração, migração e uma
+   rota nova — pra editar um texto que muda uma vez por semana. Um JSON no
+   repositório se edita, se comita, e o Pages publica. A live do dia é a
+   exceção: essa vem do servidor porque depende da API da Twitch. */
+let hubDados = null;
+
+function telaInicio() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+
+  const hub = h('div', { cls: 'hub' });
+  tela.appendChild(hub);
+
+  /* ----- capa ----- */
+  const capa = h('div', { cls: 'hub__capa' }, [
+    h('h1', { txt: 'Overlays que se cuidam sozinhos' }),
+    h('p', { txt: 'Meta, subathon, chat, música, alertas e cronômetro de speedrun. '
+      + 'Você cola o link no OBS uma vez; o que editar aqui aparece na live em até 15 segundos.' }),
+  ]);
+  if (!chave) {
+    capa.appendChild(h('a', { cls: 'bt principal', href: API + '/entrar.php',
+      style: 'display:inline-block;text-decoration:none', txt: 'Entrar com a Twitch' }));
+  } else {
+    const ir = h('button', { cls: 'bt principal', type: 'button', txt: 'Meus overlays' });
+    ir.onclick = () => vaiPara('#/overlays');
+    capa.appendChild(ir);
+  }
+  hub.appendChild(capa);
+
+  /* ----- a live do dia ----- */
+  const secLive = h('section', { cls: 'escondido' }, [h('h2', { txt: 'A live de hoje' })]);
+  hub.appendChild(secLive);
+
+  api2('/vitrine.php').then((d) => {
+    if (!d || !d.live || !d.live.login) return;
+    const l = d.live;
+
+    const cartao = h('a', { cls: 'hub__live', href: 'https://twitch.tv/' + l.login,
+      target: '_blank', rel: 'noopener noreferrer' });
+
+    if (l.thumb) cartao.appendChild(h('img', { src: l.thumb, alt: '', loading: 'lazy' }));
+
+    cartao.appendChild(h('div', {}, [
+      h('b', { txt: l.nome || l.login }),
+      h('span', { cls: 'tit', txt: l.titulo || '' }),
+      h('span', { cls: 'meta' }, [
+        h('span', { cls: 'ao-vivo', txt: '● AO VIVO' }),
+        document.createTextNode('  ' + (l.jogo ? l.jogo + '  ·  ' : '')
+          + l.viewers + (l.viewers === 1 ? ' pessoa assistindo' : ' pessoas assistindo')),
+      ]),
+    ]));
+
+    secLive.appendChild(cartao);
+    secLive.appendChild(h('p', { cls: 'd', style: 'margin:10px 0 0',
+      txt: 'Um canal pequeno diferente por dia, sorteado entre as lives em português. '
+         + 'Não é anúncio e ninguém paga pra aparecer aqui.' }));
+    secLive.classList.remove('escondido');
+  }).catch(() => { /* sem live hoje: a seção some, e isso basta */ });
+
+  /* ----- novidades e parceiros ----- */
+  const secNov = h('section', { cls: 'escondido' }, [h('h2', { txt: 'O que mudou' })]);
+  const secPar = h('section', { cls: 'escondido' }, [h('h2', { txt: 'Parceiros' })]);
+  hub.appendChild(secNov);
+  hub.appendChild(secPar);
+
+  const pinta = (d) => {
+    const novs = (d && d.novidades) || [];
+    if (novs.length) {
+      const lista = h('div', { cls: 'hub__novidades' });
+      novs.slice(0, 6).forEach((n) => {
+        /* Data montada peça por peça: new Date('2026-09-10') é lido como UTC
+           e vira 09/09 pra quem está no Brasil. */
+        const p2 = String(n.data || '').split('-');
+        const quando = p2.length === 3 ? p2[2] + '/' + p2[1] + '/' + p2[0] : (n.data || '');
+        lista.appendChild(h('div', { cls: 'hub__nov' }, [
+          h('time', { txt: quando }),
+          h('div', {}, [h('b', { txt: n.titulo || '' }), h('span', { txt: n.texto || '' })]),
+        ]));
+      });
+      secNov.appendChild(lista);
+      secNov.classList.remove('escondido');
+    }
+
+    const pars = (d && d.parceiros) || [];
+    if (pars.length) {
+      const cx = h('div', { cls: 'hub__parceiros' });
+      pars.forEach((p3) => {
+        const a = h('a', { cls: 'hub__parceiro', href: p3.link || '#',
+          target: '_blank', rel: 'noopener noreferrer' });
+        if (p3.logo) a.appendChild(h('img', { src: p3.logo, alt: '' }));
+        a.appendChild(h('span', { txt: p3.nome || '' }));
+        cx.appendChild(a);
+      });
+      secPar.appendChild(cx);
+      secPar.classList.remove('escondido');
+    }
+  };
+
+  if (hubDados) pinta(hubDados);
+  else {
+    fetch('hub.json', { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { hubDados = d; pinta(d); })
+      .catch(() => { /* vitrine é enfeite: sem ela o site funciona igual */ });
+  }
+}
+
+/* A vitrine não manda chave nenhuma: ela é pública, e mandar a chave num
+   pedido que não precisa dela é espalhar segredo à toa. */
+async function api2(caminho) {
+  const r = await fetch(API + caminho, { cache: 'no-cache' });
+  if (!r.ok) throw new Error('falhou (' + r.status + ')');
+  return r.json();
+}
 
 /* ---------------- telas ---------------- */
 function telaLista(filtro) {
@@ -2819,11 +2996,13 @@ function telaControlador() {
     fatiaPlano.appendChild(h('h3', { txt: 'Seu plano' }));
     /* Vitalício não tem "até": a data existe no banco só pra caber na mesma
        coluna dos outros, e mostrar "até 31/12/2099" pareceria pegadinha. */
-    fatiaPlano.appendChild(h('p', { cls: 'd', txt: proEstado.plano === 'gratis'
-      ? 'Grátis. Dá pra ver o que muda no Pro na aba Upgrade, ali em cima.'
-      : proEstado.plano === 'vitalicio'
-        ? 'Vitalício. Não vence.'
-        : 'Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '.' }));
+    fatiaPlano.appendChild(h('p', { cls: 'd', txt: proEstado.beta
+      ? 'Testador. Você usou o site antes da cobrança existir, então continua com tudo liberado, sem pagar nada.'
+      : proEstado.plano === 'gratis'
+        ? 'Grátis. Dá pra ver o que muda no Pro na aba Upgrade, ali em cima.'
+        : proEstado.plano === 'vitalicio'
+          ? 'Vitalício. Não vence.'
+          : 'Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '.' }));
     fatiaPlano.classList.remove('escondido');
   }
 
@@ -4001,6 +4180,7 @@ function vaiPara(hash) { if (location.hash === hash) rota(); else location.hash 
 function rota() {
   recado('');
   const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/');
+  if (p[0] === 'inicio') return telaInicio();
   if (p[0] === 'meu') return telaControlador();
   if (p[0] === 'comandos') return telaComandos();
   if (p[0] === 'tutorial') return telaTutorial();
@@ -4016,7 +4196,9 @@ function rota() {
   telaLista(TIPOS[p[1]] ? p[1] : null);
 }
 window.addEventListener('hashchange', rota);
-el('irInicio').onclick = () => vaiPara('#/overlays');
+/* A marca leva pra vitrine, não pra lista. Quem clica no nome do site espera
+   a porta de entrada — a lista já tem aba própria. */
+el('irInicio').onclick = () => vaiPara('#/inicio');
 el('abaMeu').onclick = () => { fechaBandejas(null); vaiPara('#/meu'); };
 
 /* De qual conta é esta tela, e se a lista nela é a de verdade. */
@@ -4098,7 +4280,26 @@ async function carrega() {
 
 (async function () {
   montaBandejas();
-  if (!chave) { el('semChave').classList.remove('escondido'); return; }
+
+  /* SEM CHAVE NÃO É ERRO: É VISITANTE.
+
+     Antes, quem chegava pela primeira vez via só "Falta a chave" — uma tela
+     que dá a entender que algo quebrou, pra quem nem sabe o que é chave. Um
+     visitante merece ver o que o site faz antes de entrar. A caixa de chave
+     continua existindo pro outro caso, que é a chave TER existido e não valer
+     mais. */
+  if (!chave) {
+    /* As abas do painel não servem pra quem não entrou: clicar em qualquer
+       uma delas só levaria a uma tela que falha. Some com elas e o que resta
+       é a vitrine e o botão de entrar. */
+    ['abaOverlays', 'abaFerramentas', 'abaMeu'].forEach((id) => {
+      const a = el(id);
+      if (a) a.classList.add('escondido');
+    });
+    telaInicio();
+    return;
+  }
+
   if (!await carrega()) return;
   ligaUpgrade();
   rota();

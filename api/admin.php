@@ -24,7 +24,7 @@ if (!(int) $st->fetchColumn()) {
 /* ---------- a lista ---------- */
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $st = db()->query(
-        'SELECT u.id, u.login, u.criado_em, u.visto_em, u.admin,
+        'SELECT u.id, u.login, u.criado_em, u.visto_em, u.admin, u.beta,
                 u.perfis_max, u.recursos,
                 (SELECT COUNT(*) FROM perfis p WHERE p.usuario_id = u.id) AS overlays
            FROM usuarios u
@@ -42,6 +42,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
             'criado_em'  => (string) $u['criado_em'],
             'visto_em'   => $u['visto_em'],
             'admin'      => (int) $u['admin'],
+            'beta'       => (int) ($u['beta'] ?? 0),
             'plano'      => $plano,
             'overlays'   => (int) $u['overlays'],
             'perfis_max' => $u['perfis_max'] === null ? null : (int) $u['perfis_max'],
@@ -91,6 +92,14 @@ if (array_key_exists('perfis_max', $d)) {
     $v = $d['perfis_max'];
     $campos[] = 'perfis_max = ?';
     $vals[]   = ($v === null || $v === '') ? null : max(0, min(500, (int) $v));
+}
+
+/* Ligar e desligar o selo de testador. Existe pra dois casos: alguém que
+   ajudou muito e merece continuar com tudo, e alguém que foi marcado por
+   engano quando a cobrança abriu. */
+if (array_key_exists('beta', $d)) {
+    $campos[] = 'beta = ?';
+    $vals[]   = !empty($d['beta']) ? 1 : 0;
 }
 
 if (array_key_exists('recursos', $d)) {

@@ -62,9 +62,14 @@ if (isset($_GET['estado'])) {
         $dias = (int) floor((strtotime($ate) - time()) / 86400);
     }
 
+    /* O painel precisa saber, senão ele mostraria "você está no grátis" pra
+       quem tem tudo liberado — e a pessoa iria pagar por engano. */
+    $beta = usuario_beta((int) $quem['usuario_id']);
+
     json_saida([
         'ligado'     => $mp['ligado'],
         'modo'       => $mp['modo'],
+        'beta'       => $beta,
         'plano'      => $acesso['ativo'] ? $acesso['plano'] : 'gratis',
         'valido_ate' => $ate,
         'dias'       => $dias,
