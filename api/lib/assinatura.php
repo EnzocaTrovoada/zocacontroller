@@ -73,32 +73,27 @@ const PERFIS_ILIMITADO = 9999;
 
 function recursos_do_plano(string $plano): array
 {
-    if ($plano === 'vitalicio') {
+    /* VITALÍCIO É O MESMO PRO, PAGO UMA VEZ SÓ.
+
+       Nenhum recurso é exclusivo dele. Isso é escolha de produto e simplifica
+       o código todo: existem dois níveis de acesso, não três, e nenhuma tela
+       precisa explicar por que uma coisa aparece num plano pago e não no
+       outro. O que o vitalício compra é não pagar de novo. */
+    if ($plano === 'pro' || $plano === 'pro_ano' || $plano === 'vitalicio') {
         return [
             'marca_dagua'     => false,
             'pokebot'         => true,
             'multiplataforma' => true,
             'temas'           => 'todos',
             'perfis_max'      => PERFIS_ILIMITADO,
+            'musica_chat'     => true,
+            'oque_streamar'   => true,
             /* Os três abaixo não são checados por código nenhum: são promessa
                de atendimento, e quem cumpre é o Enzo. Ficam aqui pra que a
                lista do painel e o que o servidor sabe sejam a mesma coisa. */
             'beta'            => true,
             'sugestoes'       => true,
             'suporte'         => 'pessoal',
-        ];
-    }
-
-    if ($plano === 'pro' || $plano === 'pro_ano') {
-        return [
-            'marca_dagua'     => false,
-            'pokebot'         => true,
-            'multiplataforma' => true,
-            'temas'           => 'todos',
-            'perfis_max'      => 50,
-            'beta'            => false,
-            'sugestoes'       => false,
-            'suporte'         => 'comum',
         ];
     }
 
@@ -111,6 +106,8 @@ function recursos_do_plano(string $plano): array
            quer experimentar antes de decidir. O teto existe pra impedir abuso,
            não pra impedir uso — e a hospedagem está em 5% com tudo junto. */
         'perfis_max'      => 8,
+        'musica_chat'     => false,
+        'oque_streamar'   => false,
         'beta'            => false,
         'sugestoes'       => false,
         'suporte'         => 'comum',

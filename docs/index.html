@@ -111,11 +111,24 @@
     display: flex; align-items: center; justify-content: center;
     padding: 20px; background: rgba(6, 12, 8, .68);
   }
+  /* TRÊS FAIXAS, E SÓ A DO MEIO ROLA.
+
+     Antes a caixa inteira rolava e o botão de pagar ia parar abaixo da
+     dobra — de fora, um botão que existe mas não dá pra clicar. Tentei
+     position:sticky primeiro e não resolveu: sticky depende do elemento já
+     estar dentro do trecho visível, e com dez benefícios ele nunca estava.
+
+     Com flex, o cabeçalho e a barra de baixo têm altura própria e o miolo
+     fica com o que sobra. O botão passa a ser inalcançável só se a janela
+     for menor que ele. */
   .pop__caixa {
+    display: flex; flex-direction: column;
     background: var(--caixa); border: 1px solid var(--linha);
-    width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto;
+    width: 100%; max-width: 520px; max-height: 88vh; overflow: hidden;
     padding: 26px 28px 22px; box-shadow: var(--sombra);
   }
+  .pop__topo { flex: 0 0 auto; }
+  .pop__corpo { flex: 1 1 auto; overflow-y: auto; min-height: 0; margin: 0 -4px; padding: 0 4px; }
   .pop__x {
     float: right; border: 0; background: none; cursor: pointer;
     color: var(--apagado); font-size: 22px; line-height: 1; padding: 0 2px;
@@ -155,6 +168,12 @@
   .pop .passos { margin: 0 0 12px; padding-left: 20px; }
   .pop .passos li { margin-bottom: 7px; color: var(--fraco); font-size: 13.5px; line-height: 1.5; }
   .pop .passos li::marker { color: var(--verde); font-weight: 600; }
+
+  .pop__acao {
+    flex: 0 0 auto;
+    background: var(--caixa); padding: 14px 0 0;
+    border-top: 1px solid var(--linha);
+  }
 
   .pop__planos { display: flex; flex-direction: column; gap: 8px; }
   .pop__plano {
@@ -1959,24 +1978,35 @@ const FABRICA = {
    Isto não é lista de marketing: cada linha corresponde a uma chave de
    recursos_do_plano() no servidor. Se as duas divergirem, a promessa aqui
    vira mentira lá — então mexeu numa, mexe na outra. */
+/* UMA LISTA SÓ, TUDO DO PRO.
+
+   O vitalício não tem exclusividade nenhuma: ele é o mesmo Pro, pago uma vez.
+   Duas listas aqui obrigariam quem está decidindo a comparar indo e voltando,
+   e obrigariam o servidor a ter três níveis de acesso em vez de dois.
+
+   Cada linha corresponde a uma chave de recursos_do_plano(). Se divergirem, a
+   promessa daqui vira mentira lá — mexeu numa, mexe na outra. */
 const PRO_BENEFICIOS = [
-  ['50 overlays em vez de 8',
-   'dá pra montar cena de jogo, cena de conversa e cena de encerramento sem apagar nada'],
+  ['Overlays ilimitados',
+   'sem teto nenhum; no grátis são 8'],
   ['Sem a marca do ZocaController na tela',
    'a live fica com a sua cara, não com a nossa'],
   ['Twitch, YouTube e Kick ao mesmo tempo',
    'a mesma meta contando de todas, sem montar overlay separado pra cada uma'],
+  ['Comandos de música no chat',
+   'o chat usa !pular, !fila e !like direto no seu Spotify'],
+  ['Qual jogo transmitir hoje',
+   'cruza a sua biblioteca da Steam com o que está rendendo audiência e sugere'],
   ['Todos os temas',
    'no grátis só os básicos'],
   ['Pokébot liberado',
    'o bot de captura funcionando no seu chat'],
-  /* O quarto item de cada linha marca o que só existe no vitalício. Marcar
-     em vez de fazer duas listas: quem está olhando quer comparar, e comparar
-     entre duas listas separadas obriga a pessoa a ir e voltar. */
-  ['Overlays ilimitados', 'sem teto nenhum, nem os 50 do Pro', 1],
-  ['Ferramentas em desenvolvimento', 'você usa antes de todo mundo, enquanto ainda estão sendo feitas', 1],
-  ['Suas sugestões entram na fila', 'pede a ferramenta que falta e ela é considerada de verdade', 1],
-  ['Suporte pessoal 24 horas', 'falando direto com o Enzo, não com formulário', 1],
+  ['Ferramentas em desenvolvimento',
+   'você usa antes de todo mundo, enquanto ainda estão sendo feitas'],
+  ['Suas sugestões entram na fila',
+   'pede a ferramenta que falta e ela é considerada de verdade'],
+  ['Suporte pessoal 24 horas',
+   'falando direto com o Enzo, não com formulário'],
 ];
 
 function fechaPop() {
@@ -1998,34 +2028,35 @@ function abrePro(estado) {
   fundo.onclick = (e) => { if (e.target === fundo) fechaPop(); };
   document.addEventListener('keydown', popTecla);
 
+  const topo = h('div', { cls: 'pop__topo' });
+  const corpo = h('div', { cls: 'pop__corpo' });
+  caixa.appendChild(topo);
+  caixa.appendChild(corpo);
+
   const x = h('button', { cls: 'pop__x', type: 'button', txt: '×', title: 'Fechar' });
   x.onclick = fechaPop;
-  caixa.appendChild(x);
+  topo.appendChild(x);
 
-  caixa.appendChild(h('h2', { txt: 'ZocaController Pro' }));
+  topo.appendChild(h('h2', { txt: 'ZocaController Pro' }));
 
   const ate = estado.valido_ate ? new Date(estado.valido_ate.replace(' ', 'T')) : null;
-  caixa.appendChild(h('p', { cls: 'sub', txt: estado.plano === 'gratis'
+  topo.appendChild(h('p', { cls: 'sub', txt: estado.plano === 'gratis'
     ? 'Você está no plano grátis. Veja o que muda.'
     : estado.plano === 'vitalicio'
       ? 'Você é Vitalício. Já tem tudo, pra sempre.'
       : 'Você já é Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '. Pode renovar quando quiser.' }));
 
   const lista = h('ul', { cls: 'pop__lista' });
-  PRO_BENEFICIOS.forEach(([titulo, detalhe, soVital]) => {
-    const dentro = h('div', {}, [h('b', { txt: titulo })]);
-    if (soVital) dentro.appendChild(h('em', { cls: 'pop__tag', txt: 'só no Vitalício' }));
-    dentro.appendChild(h('small', { txt: detalhe }));
-
-    lista.appendChild(h('li', { cls: soVital ? 'so-vital' : '' }, [
-      h('span', { cls: soVital ? 'pop__estrela' : 'pop__ok', txt: soVital ? '★' : '✓' }),
-      dentro,
+  PRO_BENEFICIOS.forEach(([titulo, detalhe]) => {
+    lista.appendChild(h('li', {}, [
+      h('span', { cls: 'pop__ok', txt: '✓' }),
+      h('div', {}, [h('b', { txt: titulo }), h('small', { txt: detalhe })]),
     ]));
   });
-  caixa.appendChild(lista);
+  corpo.appendChild(lista);
 
   if (estado.modo === 'teste') {
-    caixa.appendChild(h('p', { cls: 'aviso', txt:
+    corpo.appendChild(h('p', { cls: 'aviso', txt:
       'MODO DE TESTE. Este checkout não move dinheiro e só aceita os cartões de teste '
       + 'do Mercado Pago. Ninguém além de você está vendo isto.' }));
   }
@@ -2061,7 +2092,15 @@ function abrePro(estado) {
 
            Por isso aqui o link não abre sozinho: ele aparece pra ser colado
            numa janela anônima, que é onde não existe sessão nenhuma. */
-        if (estado.modo === 'teste') return passoAPasso(r.url);
+        if (estado.modo === 'teste') {
+          /* Reabilitar ANTES de sair: o return pulava o b.disabled = false
+             lá embaixo, então quem voltasse pra lista com "Escolher outro
+             plano" encontrava o botão que já tinha clicado morto — e nada
+             na tela explicava por quê. */
+          b.disabled = false;
+          passoAPasso(r.url);
+          return;
+        }
 
         /* Aba nova, e não redirecionamento: quem sai do painel pro Mercado
            Pago e volta numa página deles perde o caminho de volta. */
@@ -2113,7 +2152,8 @@ function abrePro(estado) {
       h('div', { style: 'display:flex;gap:8px;margin-top:8px' }, [copiar, volta]),
     ]);
 
-    caixa.appendChild(roteiro);
+    corpo.appendChild(roteiro);
+    corpo.scrollTop = corpo.scrollHeight;
   }
 
   const seja = h('button', { cls: 'bt principal', type: 'button',
@@ -2123,11 +2163,20 @@ function abrePro(estado) {
     planos.classList.remove('escondido');
   };
 
-  caixa.appendChild(seja);
-  caixa.appendChild(planos);
-  caixa.appendChild(h('p', { cls: 'd', style: 'margin:14px 0 0;text-align:center',
-    txt: 'Pix, cartão ou saldo do Mercado Pago. O pagamento acontece no site deles — '
-       + 'os dados do seu cartão não passam por aqui.' }));
+  /* O QUE SE CLICA NÃO PODE FICAR ABAIXO DA DOBRA.
+
+     A lista de benefícios cresceu e passou a empurrar o botão pra fora da
+     área visível da caixa. Como a caixa rola por dentro, de fora isso parece
+     um botão que não dá pra clicar — a pessoa não tem como saber que ele
+     existe mais embaixo. Grudado no rodapé, ele está sempre lá, e a lista
+     rola atrás. */
+  const acao = h('div', { cls: 'pop__acao' }, [
+    seja, planos,
+    h('p', { cls: 'd', style: 'margin:12px 0 0;text-align:center',
+      txt: 'Pix, cartão ou saldo do Mercado Pago. O pagamento acontece no site deles — '
+         + 'os dados do seu cartão não passam por aqui.' }),
+  ]);
+  caixa.appendChild(acao);
 
   document.body.appendChild(fundo);
 }
