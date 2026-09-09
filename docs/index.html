@@ -151,6 +151,21 @@
   }
 
   .palco iframe { display: block; width: 100%; height: 300px; border: 0; }
+
+  /* ---------- trechos da speedrun ---------- */
+  .trechos { display: flex; flex-direction: column; gap: 6px; flex: 1 1 100%; }
+  .trecho { display: flex; align-items: center; gap: 6px; }
+  .trecho input { flex: 1 1 auto; min-width: 80px; }
+  .trecho-n {
+    width: 22px; text-align: right; color: var(--apagado);
+    font: 500 12px var(--mono); font-variant-numeric: tabular-nums;
+  }
+  /* O tempo de referência de cada trecho: só leitura, e discreto de
+     propósito — ele é medido correndo, não digitado. */
+  .trecho-t {
+    min-width: 60px; text-align: right; color: var(--fraco);
+    font: 500 12px var(--mono); font-variant-numeric: tabular-nums;
+  }
   .prontos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
   .prontos button { text-align: left; line-height: 1.15; }
   .prontos small { display: block; font: 400 10.5px var(--mono); color: var(--apagado); margin-top: 2px; }
@@ -316,7 +331,11 @@
   <p id="recado"></p>
 </div>
 
-<script src="clock.js?v=32"></script>
+<script src="clock.js?v=33"></script>
+<!-- A prévia roda dentro do iframe da overlay.html, mas o EDITOR também
+     precisa do spd.js: é dele que sai o formato de tempo dos botões da
+     corrida e da lista de trechos. -->
+<script src="spd.js?v=33"></script>
 <script>
 'use strict';
 
@@ -454,6 +473,7 @@ const TIPOS = {
   feed:     { nome: 'Feed',     txt: 'Último sub, último follow, quem doou' },
   musica:   { nome: 'Música',   txt: 'O que está tocando no seu Spotify' },
   alerta:   { nome: 'Alerta',   txt: 'Sub, follow e bits aparecendo na hora' },
+  speedrun: { nome: 'Speedrun', txt: 'Cronômetro com trechos, contra o seu recorde' },
 };
 
 /* Padrões que já nascem bonitos. Um leigo não quer escolher opacidade de
@@ -510,6 +530,18 @@ function padraoDe(tipo) {
       atbits:   '{quem} mandou {quanto} bits!',
       atreal:   '{quem} doou R$ {quanto}!',
       atempo: 6, aentre: 'descer', anome: '#7CE07C', asom: 'sino', asomid: 0, avol: 60,
+    });
+  }
+  if (tipo === 'speedrun') {
+    return Object.assign(base, {
+      titulo: '', font: 'Archivo', size: 52, weight: 700, color: '#FFFFFF',
+      sw: 0, glow: 0, shx: 0, shy: 2, shb: 8, sho: 75, shc: '#000000',
+      bg: 'solid', bgc: '#07100B', bga: 72, bgr: 12, bgp: 14,
+      sptit: '', spcat: 'Any%',
+      sptre: [], spcor: { e: 'parado', i: 0, pa: 0, s: [] },
+      spver: 8, sptam: 20, splarg: 340,
+      spdel: 1, sppb: 1, spsob: 1,
+      spgan: '#4ADE80', spper: '#F87171', spour: '#FBBF24',
     });
   }
   if (tipo === 'feed') {
@@ -636,6 +668,24 @@ const GRUPOS = [
     /* O alerta abre por aqui porque "o que faz ele aparecer" é a primeira
        pergunta que a pessoa tem na cabeça. Letra, cor e som só fazem sentido
        depois de existir alerta pra enfeitar. */
+    { k: 'spcor',   l: 'A corrida', c: 'corrida', se: so('speedrun') },
+    { k: 'sptit',   l: 'Jogo', c: 'texto', se: so('speedrun'),
+      dica: 'aparece em cima da lista' },
+    { k: 'spcat',   l: 'Categoria', c: 'texto', se: so('speedrun'),
+      dica: 'Any%, 100%, Glitchless — o que estiver correndo' },
+    { k: 'sptre',   l: 'Trechos', c: 'trechos', se: so('speedrun') },
+    { k: 'spver',   l: 'Trechos visíveis', c: 'faixa', min: 2, max: 30, se: so('speedrun'),
+      dica: 'a lista acompanha onde você está; o resto fica fora da tela' },
+    { k: 'sptam',   l: 'Tamanho da lista', c: 'faixa', min: 8, max: 60, u: () => 'px', se: so('speedrun') },
+    { k: 'splarg',  l: 'Largura', c: 'faixa', min: 160, max: 900, u: () => 'px', se: so('speedrun') },
+    { k: 'spdel',   l: 'Mostrar a diferença', c: 'chave', se: so('speedrun'),
+      dica: 'quanto você está na frente ou atrás do seu recorde' },
+    { k: 'sppb',    l: 'Mostrar o tempo de referência', c: 'chave', se: so('speedrun') },
+    { k: 'spsob',   l: 'Mostrar a soma dos melhores', c: 'chave', se: so('speedrun'),
+      dica: 'o tempo que sairia juntando o seu melhor de cada trecho' },
+    { k: 'spgan',   l: 'Cor de estar na frente', c: 'cor', se: so('speedrun') },
+    { k: 'spper',   l: 'Cor de estar atrás', c: 'cor', se: so('speedrun') },
+    { k: 'spour',   l: 'Cor de trecho recorde', c: 'cor', se: so('speedrun') },
     { k: 'asub',    l: 'Aparecer quando alguém assinar', c: 'chave', se: so('alerta') },
     { k: 'afollow', l: 'Aparecer quando alguém seguir', c: 'chave', se: so('alerta'),
       dica: 'o follow só chega se você tiver ligado os avisos da Twitch em Meu Controller' },
@@ -1549,6 +1599,221 @@ const FABRICA = {
        num Kick que não conta seguidores. */
     redesenhar.push(pinta);
     return s;
+  },
+
+  /* ------------------------------------------------------------------ *
+   *  Os trechos da run
+   * ------------------------------------------------------------------ */
+
+  /* Um trecho é { n: nome, p: tempo do recorde, b: melhor parcial }. Aqui só
+     se edita o NOME e a ordem: p e b são medidos correndo, não digitados.
+     Deixar a pessoa digitar o próprio recorde seria abrir a porta pra uma
+     comparação que não corresponde a corrida nenhuma. */
+  trechos(it) {
+    const caixa = h('div', { cls: 'trechos' });
+
+    const grava = (lista) => mudou(it.k, lista);
+
+    const pinta = () => {
+      const lista = Array.isArray(cfg[it.k]) ? cfg[it.k] : [];
+      caixa.innerHTML = '';
+
+      lista.forEach((tr, i) => {
+        const nome = h('input', { type: 'text', value: tr.n || '', placeholder: 'Nome do trecho' });
+        nome.oninput = () => {
+          const l = cfg[it.k].slice();
+          l[i] = Object.assign({}, l[i], { n: nome.value.slice(0, 40) });
+          /* Escrevo direto e mando salvar: passar por mudou() aqui
+             redesenharia o campo embaixo do dedo e perderia o cursor. */
+          cfg[it.k] = l;
+          manda();
+        };
+
+        const sobe = h('button', { cls: 'bt mini', type: 'button', txt: '↑', title: 'Subir' });
+        sobe.disabled = i === 0;
+        sobe.onclick = () => {
+          const l = cfg[it.k].slice();
+          const x = l[i - 1]; l[i - 1] = l[i]; l[i] = x;
+          grava(l);
+        };
+
+        const desce = h('button', { cls: 'bt mini', type: 'button', txt: '↓', title: 'Descer' });
+        desce.disabled = i === lista.length - 1;
+        desce.onclick = () => {
+          const l = cfg[it.k].slice();
+          const x = l[i + 1]; l[i + 1] = l[i]; l[i] = x;
+          grava(l);
+        };
+
+        const fora = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×', title: 'Tirar' });
+        fora.onclick = () => {
+          if (!confirm('Tirar "' + (tr.n || 'este trecho') + '"? O recorde dele vai junto.')) return;
+          const l = cfg[it.k].slice();
+          l.splice(i, 1);
+          grava(l);
+        };
+
+        const marca = h('span', { cls: 'trecho-t', txt:
+          tr.p != null ? Speedrun.tempo(tr.p, false) : '—' });
+
+        caixa.appendChild(h('div', { cls: 'trecho' }, [
+          h('span', { cls: 'trecho-n', txt: String(i + 1) }),
+          nome, marca, sobe, desce, fora,
+        ]));
+      });
+
+      const mais = h('button', { cls: 'bt mini', type: 'button', txt: '+ Adicionar trecho' });
+      mais.onclick = () => {
+        const l = (Array.isArray(cfg[it.k]) ? cfg[it.k] : []).slice();
+        if (l.length >= 40) return recado('Quarenta trechos já é bastante.', 'ruim');
+        l.push({ n: '', p: null, b: null });
+        grava(l);
+      };
+      caixa.appendChild(mais);
+    };
+
+    redesenhar.push(pinta);
+    pinta();
+    return caixa;
+  },
+
+  /* ------------------------------------------------------------------ *
+   *  Os botões da corrida
+   * ------------------------------------------------------------------ */
+
+  /* NÃO EXISTE TECLA GLOBAL AQUI, E ISSO PRECISA FICAR CLARO.
+
+     O LiveSplit é um programa do Windows e consegue ouvir a tecla com o jogo
+     em primeiro plano. Uma página não consegue: só recebe tecla quando ELA
+     está em foco. Por isso os atalhos abaixo valem com esta aba na frente, e
+     quem joga em tela cheia usa o !split pelo chat. */
+  corrida(it) {
+    const visor = h('b', { cls: 'valor', style: 'width:auto;font:600 18px var(--mono);color:var(--tinta)' });
+    const passo = h('p', { cls: 'd', style: 'margin:2px 0 8px;flex:1 1 100%' });
+    const linha = h('div', { cls: 'tempoBotoes' });
+
+    const agora = () => Math.round(Relogio.agoraServidor());
+    const cor = () => cfg[it.k] || { e: 'parado', i: 0, pa: 0, s: [] };
+    const trechos = () => (Array.isArray(cfg.sptre) ? cfg.sptre : []);
+
+    const grava = (novo) => mudou(it.k, novo);
+
+    /* Fecha a corrida: guarda os melhores parciais sempre, e o recorde só se
+       o tempo final tiver sido melhor. São duas coisas diferentes — um trecho
+       recorde dentro de uma run ruim continua sendo um trecho recorde. */
+    const fecha = (c) => {
+      const tre = trechos().slice();
+      let melhorou = false;
+
+      for (let i = 0; i < tre.length && i < c.s.length; i++) {
+        const seg = c.s[i] - (i > 0 ? c.s[i - 1] : 0);
+        if (tre[i].b == null || seg < tre[i].b) {
+          tre[i] = Object.assign({}, tre[i], { b: seg });
+        }
+      }
+
+      const finalAgora = c.s[c.s.length - 1];
+      const finalAntes = tre.length ? tre[tre.length - 1].p : null;
+      if (c.s.length === tre.length && (finalAntes == null || finalAgora < finalAntes)) {
+        for (let i = 0; i < tre.length; i++) tre[i] = Object.assign({}, tre[i], { p: c.s[i] });
+        melhorou = true;
+      }
+
+      cfg.sptre = tre;
+      return melhorou;
+    };
+
+    const acoes = {
+      iniciar: () => grava({ e: 'correndo', i: agora(), pa: 0, s: [] }),
+
+      split: () => {
+        const c = cor();
+        if (c.e !== 'correndo') return;
+        const s = (c.s || []).slice();
+        s.push(agora() - c.i);
+
+        if (s.length >= trechos().length && trechos().length > 0) {
+          const fim = { e: 'fim', i: 0, pa: s[s.length - 1], s: s };
+          const melhorou = fecha(fim);
+          grava(fim);
+          recado(melhorou ? 'Recorde novo! ' + Speedrun.tempo(fim.pa, true) : 'Run fechada em ' + Speedrun.tempo(fim.pa, true), melhorou ? 'bom' : '');
+          return;
+        }
+        grava({ e: 'correndo', i: c.i, pa: 0, s: s });
+      },
+
+      desfazer: () => {
+        const c = cor();
+        if (!c.s || !c.s.length) return;
+        const s = c.s.slice();
+        s.pop();
+        /* Desfazer depois do fim volta a correr: o relógio precisa continuar
+           de onde estava, e não do zero. */
+        if (c.e === 'fim') grava({ e: 'correndo', i: agora() - c.pa, pa: 0, s: s });
+        else grava({ e: c.e, i: c.i, pa: c.pa, s: s });
+      },
+
+      pausar: () => {
+        const c = cor();
+        if (c.e === 'correndo') grava({ e: 'pausado', i: 0, pa: agora() - c.i, s: c.s || [] });
+        else if (c.e === 'pausado') grava({ e: 'correndo', i: agora() - (c.pa || 0), pa: 0, s: c.s || [] });
+      },
+
+      zerar: () => {
+        if (!confirm('Zerar a corrida? Os recordes ficam; só o tempo de agora volta a zero.')) return;
+        grava({ e: 'parado', i: 0, pa: 0, s: [] });
+      },
+    };
+
+    [['Iniciar', 'iniciar'], ['Split', 'split'], ['Desfazer', 'desfazer'],
+     ['Pausar', 'pausar'], ['Zerar', 'zerar']].forEach(([txt, acao]) => {
+      const b = h('button', { cls: 'bt mini', type: 'button', txt });
+      b.dataset.acao = acao;
+      b.onclick = () => acoes[acao]();
+      linha.appendChild(b);
+    });
+
+    const pinta = () => {
+      const c = cor();
+      const ms = c.e === 'correndo' ? agora() - c.i : (c.pa || 0);
+      visor.textContent = Speedrun.tempo(ms, true);
+
+      const n = trechos().length;
+      const feitos = (c.s || []).length;
+      const nomes = { parado: 'parada', correndo: 'correndo', pausado: 'pausada', fim: 'terminada' };
+      passo.textContent = n === 0
+        ? 'Adicione os trechos aí embaixo antes de começar.'
+        : 'Corrida ' + (nomes[c.e] || c.e) + ' — trecho ' + Math.min(feitos + 1, n) + ' de ' + n + '.';
+
+      linha.querySelector('[data-acao="pausar"]').textContent = c.e === 'pausado' ? 'Continuar' : 'Pausar';
+      linha.querySelector('[data-acao="iniciar"]').disabled = c.e === 'correndo' || c.e === 'pausado' || n === 0;
+      linha.querySelector('[data-acao="split"]').disabled = c.e !== 'correndo';
+      linha.querySelector('[data-acao="desfazer"]').disabled = !(c.s || []).length;
+      linha.querySelector('[data-acao="pausar"]').disabled = c.e === 'parado' || c.e === 'fim';
+    };
+
+    /* O visor anda sozinho enquanto a corrida corre. Meio segundo é o
+       bastante aqui: este número é conferência, o que a live vê é a overlay. */
+    const tique = setInterval(() => { if (cor().e === 'correndo') pinta(); }, 500);
+    window.addEventListener('hashchange', () => clearInterval(tique), { once: true });
+
+    /* Atalhos, só com esta aba em foco e fora de campo de texto. */
+    const tecla = (e) => {
+      if (!document.body.contains(linha)) return;
+      const alvo = e.target && e.target.tagName;
+      if (alvo === 'INPUT' || alvo === 'TEXTAREA' || alvo === 'SELECT') return;
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); cor().e === 'correndo' ? acoes.split() : acoes.iniciar(); }
+      else if (e.key === 'Backspace') { e.preventDefault(); acoes.desfazer(); }
+      else if (e.key.toLowerCase() === 'p') acoes.pausar();
+    };
+    document.addEventListener('keydown', tecla);
+
+    redesenhar.push(pinta);
+    pinta();
+    return h('div', {}, [visor, passo, linha,
+      h('p', { cls: 'd', style: 'margin:6px 0 0;flex:1 1 100%', txt:
+        'Com esta aba na frente: espaço ou Enter inicia e dá split, Backspace desfaz, P pausa. '
+        + 'Jogando em tela cheia a página não recebe tecla nenhuma — aí é !split pelo chat.' })]);
   },
 
   pausa(it) {

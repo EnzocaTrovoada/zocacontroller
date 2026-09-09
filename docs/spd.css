@@ -1,0 +1,151 @@
+/* Cronômetro de speedrun.
+ *
+ * A caixa cresce com o conteúdo e encosta à esquerda: overlay de speedrun
+ * mora na lateral da tela, ao lado do jogo, e largura fixa deixaria trecho
+ * de nome curto com um vão enorme.
+ */
+
+.sp {
+  display: inline-block;
+  font-family: var(--rl-font);
+  color: var(--rl-color);
+  -webkit-font-smoothing: antialiased;
+}
+
+.sp__caixa {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: var(--sp-larg);
+  padding: var(--rl-bgp);
+  background: var(--rl-bg);
+  border-radius: var(--rl-bgr);
+}
+
+/* ---------------- topo ---------------- */
+.sp__topo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: center;
+  padding-bottom: 4px;
+}
+
+.sp__jogo {
+  font-weight: var(--rl-weight);
+  font-size: calc(var(--sp-linha) * 1.25);
+  letter-spacing: var(--rl-track);
+  text-transform: var(--rl-caps);
+  line-height: 1.15;
+  filter: var(--rl-filter);
+}
+
+.sp__cat {
+  font-size: calc(var(--sp-linha) * .85);
+  opacity: .72;
+  line-height: 1.2;
+}
+
+/* ---------------- a lista ---------------- */
+.sp__trechos {
+  display: flex;
+  flex-direction: column;
+}
+
+.sp__vazio {
+  font-size: calc(var(--sp-linha) * .9);
+  opacity: .5;
+  padding: 6px 0;
+  text-align: center;
+}
+
+/* Três colunas: nome que estica, diferença e tempo com largura própria.
+   Largura própria porque número pulando de coluna a cada split é a coisa que
+   mais cansa a vista num overlay que fica horas na tela. */
+.sp__l {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 4px;
+  font-size: var(--sp-linha);
+  line-height: 1.35;
+  border-radius: 3px;
+}
+
+.sp--sem-delta .sp__l { grid-template-columns: 1fr auto; }
+.sp--sem-delta .sp__d { display: none; }
+.sp--sem-pb .sp__l { grid-template-columns: 1fr auto; }
+.sp--sem-pb .sp__pb { display: none; }
+.sp--sem-pb.sp--sem-delta .sp__l { grid-template-columns: 1fr; }
+
+.sp__nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp__d, .sp__pb {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.sp__d { min-width: 3.4em; text-align: right; }
+.sp__pb { min-width: 4.4em; text-align: right; opacity: .85; }
+
+.sp__l--feito .sp__nome { opacity: .72; }
+
+/* O trecho em que a pessoa está. Fundo em vez de cor de texto: a cor do
+   texto aqui já é usada pra dizer ganho e perda, e duas informações na mesma
+   propriedade viram nenhuma. */
+.sp__l--atual {
+  background: rgba(255, 255, 255, .12);
+}
+
+.sp__ganho { color: var(--sp-ganho); }
+.sp__perda { color: var(--sp-perda); }
+.sp__ouro  { color: var(--sp-ouro); }
+
+/* ---------------- o relógio ---------------- */
+.sp__relogio {
+  text-align: right;
+  padding-top: 2px;
+}
+
+.sp__t {
+  display: inline-block;
+  font-size: var(--rl-size);
+  font-weight: var(--rl-weight);
+  font-style: var(--rl-style);
+  letter-spacing: var(--rl-track);
+  font-variant-numeric: var(--rl-numeric);
+  font-feature-settings: "tnum";
+  line-height: 1;
+  filter: var(--rl-filter);
+  -webkit-text-stroke: var(--rl-sw) var(--rl-sc);
+  paint-order: stroke fill;
+  transform: translate(var(--rl-nx), var(--rl-ny));
+}
+
+.sp--frente .sp__t { color: var(--sp-ganho); }
+.sp--atras  .sp__t { color: var(--sp-perda); }
+
+/* Pausado precisa se anunciar. Sem isto, cronômetro parado e cronômetro
+   quebrado são a mesma imagem — e a segunda leitura é a que dá aflição. */
+.sp--pausado .sp__t { opacity: .55; }
+
+/* ---------------- rodapé ---------------- */
+.sp__rodape {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: calc(var(--sp-linha) * .85);
+  opacity: .7;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, .14);
+}
+
+.sp__soma {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}

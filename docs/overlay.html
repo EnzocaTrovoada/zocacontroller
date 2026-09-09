@@ -6,10 +6,11 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="clock.css?v=32">
-<link rel="stylesheet" href="chat.css?v=32">
-<link rel="stylesheet" href="musica.css?v=32">
-<link rel="stylesheet" href="alerta.css?v=32">
+<link rel="stylesheet" href="clock.css?v=33">
+<link rel="stylesheet" href="chat.css?v=33">
+<link rel="stylesheet" href="musica.css?v=33">
+<link rel="stylesheet" href="alerta.css?v=33">
+<link rel="stylesheet" href="spd.css?v=33">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
@@ -24,10 +25,11 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=32"></script>
-<script src="chat.js?v=32"></script>
-<script src="musica.js?v=32"></script>
-<script src="alerta.js?v=32"></script>
+<script src="clock.js?v=33"></script>
+<script src="chat.js?v=33"></script>
+<script src="musica.js?v=33"></script>
+<script src="alerta.js?v=33"></script>
+<script src="spd.js?v=33"></script>
 <script>
 (function () {
   'use strict';
@@ -51,14 +53,16 @@
     /* Tres desenhistas: o de texto, o de lista e o da musica. */
     var quer = (tipo === 'chat' || tipo === 'feed') ? 'chat'
              : tipo === 'musica' ? 'musica'
-             : tipo === 'alerta' ? 'alerta' : 'relogio';
+             : tipo === 'alerta' ? 'alerta'
+             : tipo === 'speedrun' ? 'speedrun' : 'relogio';
     if (atual === quer) return false;
     if (relogio) relogio.destroy();
     raiz.className = '';
     raiz.innerHTML = '';
-    relogio = quer === 'chat'   ? Chat.mount(raiz, config)
-            : quer === 'musica' ? Musica.mount(raiz, config)
-            : quer === 'alerta' ? Alerta.mount(raiz, config)
+    relogio = quer === 'chat'     ? Chat.mount(raiz, config)
+            : quer === 'musica'   ? Musica.mount(raiz, config)
+            : quer === 'alerta'   ? Alerta.mount(raiz, config)
+            : quer === 'speedrun' ? Speedrun.mount(raiz, config)
             : Relogio.mount(raiz, config);
     atual = quer;
     raiz.classList.toggle('is-editando', editando);
@@ -241,6 +245,7 @@
   if (!k) return;
 
   var ultimo = '', buscando = false, desenhou = false;
+  var ultimaConfig = null;      /* quem decide o ritmo da busca precisa dela */
 
   function buscar(semCache) {
     if (buscando) return;
@@ -272,6 +277,7 @@
       .then(function (j) {
         if (!j || !j.config) return;
         var s = JSON.stringify(j.config);
+        ultimaConfig = j.config;
         if (s !== ultimo) { ultimo = s; desenha(j.config); }
         desenhou = true;
         /* O feed muda sem a config mudar: sub novo nao e edicao de overlay. */
@@ -290,8 +296,26 @@
 
   /* Quem chama a busca é a BATIDA do relógio (Web Worker). */
   var ultimaBusca = 0;
+
+  /* QUINZE SEGUNDOS É UMA ETERNIDADE NO MEIO DE UMA SPEEDRUN.
+
+     O relógio em si não depende da busca — ele conta sozinho a partir de
+     quando a corrida começou. O que depende é o SPLIT: enquanto a lista não
+     chega, a tela mostra o trecho anterior. Quinze segundos de atraso ali
+     seria a diferença aparecendo depois da pessoa já ter passado do próximo
+     trecho.
+
+     Então, e só enquanto uma corrida está de fato correndo, o pedido vai a
+     cada dois segundos. Com o 304 funcionando isso custa poucos bytes por
+     pedido, e para assim que a corrida para. */
+  function intervaloDaBusca() {
+    if (!ultimaConfig || ultimaConfig.tipo !== 'speedrun') return 15000;
+    var corr = ultimaConfig.spcor;
+    return (corr && corr.e === 'correndo') ? 2000 : 15000;
+  }
+
   function talvezBuscar() {
-    if (Date.now() - ultimaBusca < 15000) return;
+    if (Date.now() - ultimaBusca < intervaloDaBusca()) return;
     ultimaBusca = Date.now();
     buscar();
   }

@@ -81,7 +81,36 @@
       'Europe/Moscow', 'Africa/Luanda', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Shanghai',
       'Asia/Dubai', 'Australia/Sydney', 'Pacific/Auckland', 'UTC'
     ] },
-    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat', 'feed', 'musica', 'alerta'] },
+    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat', 'feed', 'musica', 'alerta', 'speedrun'] },
+
+    /* ---------------- speedrun ----------------
+
+       Duas chaves aqui guardam ESTRUTURA, não um valor solto, e são as
+       primeiras do esquema a fazer isso:
+
+         sptre  os trechos      [{ n: nome, p: tempo do recorde, b: melhor
+                                   parcial }, ...]   — tempos em milissegundos
+         spcor  a corrida agora  { e: estado, i: quando começou, pa: quanto
+                                   já correu quando parado, s: [acumulado de
+                                   cada trecho já fechado] }
+
+       'i' vale enquanto corre e 'pa' vale enquanto está parado — nunca os
+       dois. É a mesma escolha do subathon, pelo mesmo motivo: guardar quando
+       acaba em vez de quanto falta é o que faz o número continuar certo
+       depois do OBS passar horas fechado. */
+    sptit:    { t: 't', d: '', max: 40 },
+    spcat:    { t: 't', d: '', max: 40 },
+    sptre:    { t: 'j', d: [], max: 4000 },
+    spcor:    { t: 'j', d: { e: 'parado', i: 0, pa: 0, s: [] }, max: 2000 },
+    spver:    { t: 'n', d: 8,   min: 2,   max: 30 },
+    sptam:    { t: 'n', d: 20,  min: 8,   max: 60 },
+    splarg:   { t: 'n', d: 340, min: 160, max: 900 },
+    spdel:    { t: 'b', d: 1 },
+    sppb:     { t: 'b', d: 1 },
+    spsob:    { t: 'b', d: 1 },
+    spgan:    { t: 'c', d: '#4ade80' },
+    spper:    { t: 'c', d: '#f87171' },
+    spour:    { t: 'c', d: '#fbbf24' },
     /* ---- o que esta tocando ---- */
     mcapa:    { t: 'b', d: 1 },
     mtam:     { t: 'n', d: 132, min: 24, max: 400 },
@@ -436,6 +465,37 @@
     return /^[0-9a-fA-F]{6}$/.test(s) ? '#' + s.toLowerCase() : fb;
   }
 
+  /* CÓPIA DE VERDADE, NÃO A MESMA CAIXA.
+
+     O padrão de uma chave de lista é um objeto, e objeto em JavaScript viaja
+     por referência: sem copiar, dois overlays diferentes ficariam apontando
+     pro MESMO array de trechos, e editar um mexeria no outro. */
+  function clona(v) {
+    try { return JSON.parse(JSON.stringify(v)); } catch (e) { return null; }
+  }
+
+  /* Lista ou objeto vindo de fora. Passa por JSON de ida e volta de
+     propósito: além de copiar, isso derruba função, undefined e ciclo — que
+     é tudo que não pode chegar até o desenhista. */
+  function limpaJson(v, spec) {
+    var o = v;
+    var teto = spec.max || 4000;
+
+    if (typeof o === 'string') {
+      if (o.length > teto) return clona(spec.d);
+      try { o = JSON.parse(o); } catch (e) { return clona(spec.d); }
+    }
+    if (o === null || typeof o !== 'object') return clona(spec.d);
+
+    var copia = clona(o);
+    if (copia === null) return clona(spec.d);
+
+    var txt;
+    try { txt = JSON.stringify(copia); } catch (e) { return clona(spec.d); }
+    if (txt.length > teto) return clona(spec.d);
+    return copia;
+  }
+
   function limpaNum(v, spec) {
     var n = parseFloat(v);
     if (!isFinite(n)) return spec.d;
@@ -448,13 +508,17 @@
     var out = {};
     for (var i = 0; i < KEYS.length; i++) {
       var k = KEYS[i], s = SCHEMA[k], v = src[k];
-      if (v === undefined || v === null || v === '') { out[k] = s.d; continue; }
+      if (v === undefined || v === null || v === '') {
+        out[k] = (s.t === 'j') ? clona(s.d) : s.d;
+        continue;
+      }
       if (s.t === 'b') out[k] = (v === 1 || v === '1' || v === true || v === 'true') ? 1 : 0;
       else if (s.t === 'n') out[k] = limpaNum(v, s);
       else if (s.t === 'c') out[k] = limpaCor(v, s.d);
       else if (s.t === 'e') out[k] = s.v.indexOf(String(v)) >= 0 ? String(v) : s.d;
       else if (s.t === 'f') out[k] = limpaFonte(v);
       else if (s.t === 't') out[k] = limpaTexto(v, s);
+      else if (s.t === 'j') out[k] = limpaJson(v, s);
       else out[k] = s.d;
     }
     return out;
@@ -485,8 +549,17 @@
     var parts = [];
     for (var i = 0; i < KEYS.length; i++) {
       var k = KEYS[i];
-      if (c[k] === DEFAULTS[k]) continue;
-      var v = SCHEMA[k].t === 'c' ? String(c[k]).replace('#', '') : c[k];
+      /* Objeto nunca é igual a objeto por ===, então uma chave de lista
+         entraria na URL SEMPRE, mesmo intocada, engordando o endereço de
+         todo overlay. A comparação delas é pelo texto. */
+      if (SCHEMA[k].t === 'j') {
+        if (JSON.stringify(c[k]) === JSON.stringify(DEFAULTS[k])) continue;
+      } else if (c[k] === DEFAULTS[k]) {
+        continue;
+      }
+      var v = SCHEMA[k].t === 'c' ? String(c[k]).replace('#', '')
+            : SCHEMA[k].t === 'j' ? JSON.stringify(c[k])
+            : c[k];
       parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
     }
     return parts.join('&');
