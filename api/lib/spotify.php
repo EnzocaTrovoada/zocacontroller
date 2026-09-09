@@ -252,12 +252,24 @@ function sp_curtir(int $usuario_id): array
     $m = sp_tocando($usuario_id, 0);
     if (!$m || empty($m['id'])) return ['ok' => false, 'erro' => 'Não tem nada tocando agora.'];
 
-    /* O corpo documentado, e não um array vazio com o id na query. O Spotify
-       aceita as duas formas de mandar o id, mas mandar um corpo `[]` junto de
-       um id na query é pedir pra alguma das duas ser ignorada. Não deu pra
-       conferir contra uma conta real daqui — o que dá pra garantir é que esta
-       é a forma que a documentação descreve. */
-    [$http] = sp_chamar($usuario_id, 'PUT', '/me/tracks', ['ids' => [$m['id']]]);
+    /* O ENDEREÇO MUDOU EM MARÇO DE 2026, E O ANTIGO NÃO AVISA QUE MORREU.
+
+       O Spotify juntou salvar faixa, álbum, podcast e seguir artista num
+       endereço só: PUT /me/library, com as URIs na QUERY (não no corpo, ao
+       contrário de quase todo o resto da API deles). O antigo PUT /me/tracks
+       passou a devolver 403 mesmo com token e escopo certos — 403 que a
+       gente traduzia como "o app está em modo de desenvolvimento", mandando
+       a pessoa conferir uma coisa que não tinha nada a ver.
+
+       O caminho velho fica de reserva: se um dia o novo responder 404 num
+       app antigo, o !like continua funcionando em vez de sumir. */
+    $uri = 'spotify:track:' . $m['id'];
+    [$http] = sp_chamar($usuario_id, 'PUT', '/me/library?uris=' . rawurlencode($uri), []);
+
+    if ($http === 404 || $http === 405) {
+        [$http] = sp_chamar($usuario_id, 'PUT', '/me/tracks', ['ids' => [$m['id']]]);
+    }
+
     if ($http >= 200 && $http < 300) return ['ok' => true, 'faixa' => $m['nome']];
     return ['ok' => false, 'erro' => sp_erro($http, 'Curtir')];
 }
