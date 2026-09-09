@@ -96,6 +96,58 @@
   .bandeja button:hover small, .bandeja a:hover small { color: var(--verde); }
   .bandeja hr { border: 0; border-top: 1px solid var(--linha); margin: 6px 4px; }
 
+  /* ---------- Upgrade ---------- */
+  .aba.pro { color: var(--verde-forte); }
+  .aba.pro:hover { background: var(--verde-fraco); }
+
+  /* O popup. Fundo próprio e position fixed: ele precisa cobrir a página
+     inteira, e herdar rolagem de quem está embaixo faria a caixa fugir. */
+  .pop {
+    position: fixed; inset: 0; z-index: 60;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; background: rgba(6, 12, 8, .68);
+  }
+  .pop__caixa {
+    background: var(--caixa); border: 1px solid var(--linha);
+    width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto;
+    padding: 26px 28px 22px; box-shadow: var(--sombra);
+  }
+  .pop__x {
+    float: right; border: 0; background: none; cursor: pointer;
+    color: var(--apagado); font-size: 22px; line-height: 1; padding: 0 2px;
+  }
+  .pop__x:hover { color: var(--tinta); }
+  .pop h2 {
+    margin: 0 0 4px; font: 700 26px var(--disp);
+    letter-spacing: -.02em; color: var(--tinta);
+  }
+  .pop .sub { margin: 0 0 18px; }
+
+  .pop__lista { list-style: none; margin: 0 0 22px; padding: 0; }
+  .pop__lista li {
+    display: grid; grid-template-columns: 20px 1fr; gap: 10px;
+    align-items: start; padding: 8px 0; border-bottom: 1px solid var(--linha);
+  }
+  .pop__lista li:last-child { border-bottom: 0; }
+  .pop__lista b { font-weight: 600; }
+  .pop__lista small { display: block; color: var(--apagado); font-size: 12.5px; margin-top: 1px; }
+  .pop__ok { color: var(--verde); font-weight: 700; }
+
+  /* Os planos nascem escondidos de propósito: primeiro a pessoa entende o
+     que ganha, depois vê quanto custa. Preço antes do motivo só serve pra
+     virar "caro" sem termo de comparação. */
+  .pop__planos { display: flex; flex-direction: column; gap: 8px; }
+  .pop__plano {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    width: 100%; text-align: left; padding: 12px 14px;
+    border: 1px solid var(--linha); background: var(--caixa2);
+    color: var(--tinta); cursor: pointer; font: inherit;
+  }
+  .pop__plano:hover { border-color: var(--verde); background: var(--verde-fraco); }
+  .pop__plano b { font: 600 15px var(--disp); }
+  .pop__plano span { font: 600 15px var(--mono); color: var(--verde-forte); white-space: nowrap; }
+  .pop__plano small { display: block; color: var(--apagado); font-size: 12px; font-weight: 400; }
+
   /* ---------- conteúdo ---------- */
   .w { max-width: 1080px; margin: 0 auto; padding: 30px 20px 90px; }
   h1 { font: 700 clamp(24px,4vw,34px)/1.05 var(--disp); letter-spacing: -.02em; margin: 0 0 8px; }
@@ -307,6 +359,10 @@
   </button>
 
   <button class="aba" id="abaMeu" type="button">Meu Controller</button>
+
+  <!-- Só aparece quando o servidor diz que a cobrança está aberta. Em modo
+       de teste, só pra admin. -->
+  <button class="aba pro escondido" id="abaUpgrade" type="button">Upgrade</button>
 
   <span class="espaco"></span>
   <!-- De qual conta e este painel. Quando alguem diz que os overlays
@@ -1867,6 +1923,136 @@ const FABRICA = {
   },
 };
 
+/* ---------------- Upgrade ---------------- */
+
+/* O QUE O PRO DÁ, NA ORDEM EM QUE IMPORTA.
+
+   Isto não é lista de marketing: cada linha corresponde a uma chave de
+   recursos_do_plano() no servidor. Se as duas divergirem, a promessa aqui
+   vira mentira lá — então mexeu numa, mexe na outra. */
+const PRO_BENEFICIOS = [
+  ['50 overlays em vez de 8',
+   'dá pra montar cena de jogo, cena de conversa e cena de encerramento sem apagar nada'],
+  ['Sem a marca do ZocaController na tela',
+   'a live fica com a sua cara, não com a nossa'],
+  ['Twitch, YouTube e Kick ao mesmo tempo',
+   'a mesma meta contando de todas, sem montar overlay separado pra cada uma'],
+  ['Todos os temas',
+   'no grátis só os básicos'],
+  ['Pokébot liberado',
+   'o bot de captura funcionando no seu chat'],
+];
+
+function fechaPop() {
+  const p = el('pop');
+  if (p) p.remove();
+  document.removeEventListener('keydown', popTecla);
+}
+
+function popTecla(e) { if (e.key === 'Escape') fechaPop(); }
+
+function abrePro(estado) {
+  fechaPop();
+
+  const caixa = h('div', { cls: 'pop__caixa' });
+  const fundo = h('div', { cls: 'pop', id: 'pop' }, [caixa]);
+
+  /* Clicar fora fecha; clicar dentro não. Sem o segundo, arrastar pra
+     selecionar um texto da caixa fecharia o popup no meio. */
+  fundo.onclick = (e) => { if (e.target === fundo) fechaPop(); };
+  document.addEventListener('keydown', popTecla);
+
+  const x = h('button', { cls: 'pop__x', type: 'button', txt: '×', title: 'Fechar' });
+  x.onclick = fechaPop;
+  caixa.appendChild(x);
+
+  caixa.appendChild(h('h2', { txt: 'ZocaController Pro' }));
+
+  const ate = estado.valido_ate ? new Date(estado.valido_ate.replace(' ', 'T')) : null;
+  caixa.appendChild(h('p', { cls: 'sub', txt: estado.plano === 'gratis'
+    ? 'Você está no plano grátis. Veja o que muda.'
+    : 'Você já é Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '. Pode renovar quando quiser.' }));
+
+  const lista = h('ul', { cls: 'pop__lista' });
+  PRO_BENEFICIOS.forEach(([titulo, detalhe]) => {
+    lista.appendChild(h('li', {}, [
+      h('span', { cls: 'pop__ok', txt: '✓' }),
+      h('div', {}, [h('b', { txt: titulo }), h('small', { txt: detalhe })]),
+    ]));
+  });
+  caixa.appendChild(lista);
+
+  if (estado.modo === 'teste') {
+    caixa.appendChild(h('p', { cls: 'aviso', txt:
+      'MODO DE TESTE. Este checkout não move dinheiro e só aceita os cartões de teste '
+      + 'do Mercado Pago. Ninguém além de você está vendo isto.' }));
+  }
+
+  /* ----- os planos, só depois do "Seja Pro" ----- */
+  const planos = h('div', { cls: 'pop__planos escondido' });
+
+  (estado.planos || []).forEach((pl) => {
+    const reais = (pl.preco_centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const porMes = pl.periodo === 'anual'
+      ? (pl.preco_centavos / 1200).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + ' por mês'
+      : 'cobrado uma vez, vale 30 dias';
+
+    const b = h('button', { cls: 'pop__plano', type: 'button' }, [
+      h('div', {}, [h('b', { txt: pl.nome }), h('small', { txt: porMes })]),
+      h('span', { txt: reais }),
+    ]);
+
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        const r = await api('/checkout.php?plano=' + encodeURIComponent(pl.slug));
+        /* Aba nova, e não redirecionamento: quem sai do painel pro Mercado
+           Pago e volta numa página deles perde o caminho de volta. */
+        window.open(r.url, '_blank', 'noopener');
+        fechaPop();
+        recado('Abri o pagamento numa aba nova. Depois de pagar, volte aqui e recarregue a página.', 'bom');
+      } catch (e) {
+        recado(e.message, 'ruim');
+      }
+      b.disabled = false;
+    };
+    planos.appendChild(b);
+  });
+
+  const seja = h('button', { cls: 'bt principal', type: 'button',
+    txt: estado.plano === 'gratis' ? 'Seja Pro' : 'Renovar', style: 'width:100%' });
+  seja.onclick = () => {
+    seja.classList.add('escondido');
+    planos.classList.remove('escondido');
+  };
+
+  caixa.appendChild(seja);
+  caixa.appendChild(planos);
+  caixa.appendChild(h('p', { cls: 'd', style: 'margin:14px 0 0;text-align:center',
+    txt: 'Pix, cartão ou saldo do Mercado Pago. O pagamento acontece no site deles — '
+       + 'os dados do seu cartão não passam por aqui.' }));
+
+  document.body.appendChild(fundo);
+}
+
+/* A aba só existe se houver o que vender. Perguntar uma vez, na abertura do
+   painel, e guardar: isto não muda no meio da sessão. */
+let proEstado = null;
+
+function ligaUpgrade() {
+  api('/checkout.php?estado=1').then((c) => {
+    if (!c.ligado) return;
+    if (c.modo === 'teste' && !souAdmin) return;
+    proEstado = c;
+    el('abaUpgrade').classList.remove('escondido');
+  }).catch(() => { /* cobrança fora do ar não pode atrapalhar o resto */ });
+}
+
+el('abaUpgrade').onclick = () => {
+  fechaBandejas(null);
+  if (proEstado) abrePro(proEstado);
+};
+
 /* ---------------- telas ---------------- */
 function telaLista(filtro) {
   const tela = el('tela');
@@ -2418,57 +2604,23 @@ function telaControlador() {
 
   const base = location.origin + location.pathname.replace(/[^/]*$/, '');
 
-  /* ----- assinatura -----
+  /* ----- o plano -----
 
-     A caixa inteira só existe se o servidor disser que a cobrança está
-     aberta. E enquanto ela estiver em modo de teste, só aparece pra admin:
-     um botão de pagar que ainda não foi testado não pode aparecer pra quem
-     está usando o site de verdade. */
+     SEM PREÇO AQUI. Esta tela é a das coisas da pessoa — chave, links,
+     conta. Preço no meio disso é vitrine em cima de ferramenta. O que cabe
+     é a informação: em que plano você está. Quem quiser mudar tem a aba
+     Upgrade lá em cima. */
   const fatiaPlano = h('div', { cls: 'fatia escondido' });
   tela.appendChild(fatiaPlano);
 
-  api('/checkout.php?estado=1').then((c) => {
-    if (!c.ligado) return;
-    if (c.modo === 'teste' && !souAdmin) return;
-
-    fatiaPlano.appendChild(h('h3', { txt: 'Assinatura' }));
-
-    if (c.modo === 'teste') {
-      fatiaPlano.appendChild(h('p', { cls: 'aviso', txt:
-        'MODO DE TESTE. Este checkout não move dinheiro nenhum e só aceita os '
-        + 'cartões de teste do Mercado Pago. Ninguém além de você está vendo esta caixa.' }));
-    }
-
-    const ate = c.valido_ate ? new Date(c.valido_ate.replace(' ', 'T')) : null;
-    fatiaPlano.appendChild(h('p', { cls: 'd', txt: c.plano === 'gratis'
-      ? 'Você está no plano grátis.'
-      : 'Plano ' + c.plano + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '.' }));
-
-    const linha = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px' });
-    (c.planos || []).forEach((p) => {
-      const reais = (p.preco_centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      const b = h('button', { cls: 'bt principal', type: 'button',
-        txt: p.nome + ' — ' + reais + (p.periodo === 'anual' ? '/ano' : '/mês') });
-      b.onclick = async () => {
-        b.disabled = true;
-        const antes = b.textContent;
-        b.textContent = 'abrindo…';
-        try {
-          const r = await api('/checkout.php?plano=' + encodeURIComponent(p.slug));
-          /* Aba nova, e não redirecionamento: quem volta do Mercado Pago cai
-             numa página deles, e perder o painel no meio do caminho é o jeito
-             mais fácil de a pessoa achar que algo quebrou. */
-          window.open(r.url, '_blank', 'noopener');
-          recado('Abri o checkout numa aba nova. Depois de pagar, volte aqui e recarregue.', 'bom');
-        } catch (e) { recado(e.message, 'ruim'); }
-        b.disabled = false;
-        b.textContent = antes;
-      };
-      linha.appendChild(b);
-    });
-    fatiaPlano.appendChild(linha);
+  if (proEstado) {
+    const ate = proEstado.valido_ate ? new Date(proEstado.valido_ate.replace(' ', 'T')) : null;
+    fatiaPlano.appendChild(h('h3', { txt: 'Seu plano' }));
+    fatiaPlano.appendChild(h('p', { cls: 'd', txt: proEstado.plano === 'gratis'
+      ? 'Grátis. Dá pra ver o que muda no Pro na aba Upgrade, ali em cima.'
+      : 'Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '.' }));
     fatiaPlano.classList.remove('escondido');
-  }).catch(() => { /* cobrança fora do ar não pode derrubar esta tela */ });
+  }
 
   /* ----- a chave ----- */
   const fatiaChave = h('div', { cls: 'fatia' }, [
@@ -3678,6 +3830,7 @@ async function carrega() {
   montaBandejas();
   if (!chave) { el('semChave').classList.remove('escondido'); return; }
   if (!await carrega()) return;
+  ligaUpgrade();
   rota();
 })();
 </script>

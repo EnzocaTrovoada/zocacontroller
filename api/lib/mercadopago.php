@@ -214,6 +214,88 @@ function mp_liberar(int $usuario_id, array $plano, string $referencia, string $p
     }
 }
 
+/**
+ * O que é, de verdade, a credencial que está no config.
+ *
+ * O 403 "At least one policy returned UNAUTHORIZED" não diz nada sobre a
+ * causa, e as causas são todas parecidas de fora: chave pública no lugar do
+ * access token, credencial de um app e segredo de outro, credencial de
+ * usuário de teste onde deveria ir a da aplicação. Perguntar quem é o dono
+ * do token separa as três em um pedido só.
+ *
+ * NUNCA devolve o token. Só o formato dele e o que o Mercado Pago responde.
+ */
+function mp_diagnostico(): array
+{
+    $mp = mp_cfg();
+    $tk = $mp['access_token'];
+
+    /* A chave pública e o access token dos dois começam com TEST- ou
+       APP_USR-, e é por isso que trocar um pelo outro é tão fácil. O que
+       separa: o access token tem partes separadas por hífen e é bem mais
+       longo. */
+    $forma = 'desconhecido';
+    if ($tk === '') {
+        $forma = 'vazio';
+    } elseif (preg_match('/^(TEST|APP_USR)-\d{10,}-\d{6}-[0-9a-f]{32}-\d+$/', $tk)) {
+        $forma = 'access token';
+    } elseif (preg_match('/^(TEST|APP_USR)-[0-9a-f-]{30,40}$/', $tk)) {
+        $forma = 'CHAVE PÚBLICA (public key) — não serve aqui';
+    }
+
+    $r = [
+        'modo'            => $mp['modo'],
+        'ligado'          => $mp['ligado'],
+        'token_prefixo'   => $tk === '' ? '' : explode('-', $tk)[0],
+        'token_tamanho'   => strlen($tk),
+        'token_forma'     => $forma,
+        'tem_segredo'     => $mp['webhook_secret'] !== '',
+        'notification_url'=> rtrim(cfg()['api_base'] ?? '', '/') . '/webhook-mercadopago.php',
+    ];
+
+    /* De quem é o token. Este endereço aceita qualquer access token válido,
+       então é o teste mais barato de "a credencial presta". */
+    try {
+        [$http, $eu] = mp_http('GET', '/users/me');
+        $r['users_me_http'] = $http;
+        if ($http === 200 && is_array($eu)) {
+            $r['conta'] = [
+                'id'       => $eu['id'] ?? null,
+                'apelido'  => $eu['nickname'] ?? null,
+                'site'     => $eu['site_id'] ?? null,
+                'tipo'     => $eu['user_type'] ?? null,
+            ];
+        } else {
+            $r['users_me_erro'] = is_array($eu) ? ($eu['message'] ?? json_encode($eu)) : 'sem corpo';
+        }
+    } catch (Throwable $e) {
+        $r['users_me_erro'] = $e->getMessage();
+    }
+
+    /* E a prova final: tenta criar uma cobrança de um centavo e joga fora.
+       É o mesmo caminho do checkout de verdade, então o erro que aparecer
+       aqui é exatamente o erro que a pessoa levaria. */
+    try {
+        [$http, $p] = mp_http('POST', '/checkout/preferences', [
+            'items' => [[
+                'title' => 'teste de credencial', 'quantity' => 1,
+                'currency_id' => 'BRL', 'unit_price' => 1.0,
+            ]],
+        ]);
+        $r['preferencia_http'] = $http;
+        if ($http === 201 || $http === 200) {
+            $r['preferencia'] = 'criou — a credencial serve pra cobrar';
+        } else {
+            $r['preferencia_erro'] = is_array($p) ? ($p['message'] ?? json_encode($p)) : 'sem corpo';
+            $r['preferencia_causa'] = is_array($p) ? ($p['cause'] ?? null) : null;
+        }
+    } catch (Throwable $e) {
+        $r['preferencia_erro'] = $e->getMessage();
+    }
+
+    return $r;
+}
+
 function mp_plano_por_slug(string $slug): ?array
 {
     $st = db()->prepare('SELECT * FROM planos WHERE slug = ? LIMIT 1');

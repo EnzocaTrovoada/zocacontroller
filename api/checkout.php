@@ -24,6 +24,16 @@ trava('checkout', 10, 300);
 
 $mp = mp_cfg();
 
+/* O DIAGNÓSTICO DA CREDENCIAL. Só admin, porque conta de qual conta do
+   Mercado Pago o site está falando. */
+if (isset($_GET['diagnostico'])) {
+    $ad = db()->prepare('SELECT admin FROM usuarios WHERE id = ?');
+    $ad->execute([(int) $quem['usuario_id']]);
+    if (!$ad->fetchColumn()) json_saida(['erro' => 'Não encontrado.'], 404);
+
+    json_saida(mp_diagnostico());
+}
+
 /* PERGUNTAR SEM COMPRAR.
 
    O painel precisa saber se existe cobrança antes de desenhar botão nenhum,
