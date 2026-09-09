@@ -214,6 +214,15 @@
   }
   /* O tempo de referência de cada trecho: só leitura, e discreto de
      propósito — ele é medido correndo, não digitado. */
+  /* A saída do diagnóstico. Monoespaçada e com quebra preservada: são
+     linhas alinhadas, e reflow embaralharia o que está sendo comparado. */
+  .diag {
+    margin: 10px 0 0; padding: 12px 14px; background: var(--caixa2);
+    border: 1px solid var(--linha); border-left: 3px solid var(--verde);
+    font: 12.5px/1.6 var(--mono); color: var(--tinta);
+    white-space: pre-wrap; overflow-x: auto;
+  }
+
   .trecho-t {
     min-width: 60px; text-align: right; color: var(--fraco);
     font: 500 12px var(--mono); font-variant-numeric: tabular-nums;
@@ -2620,6 +2629,71 @@ function telaControlador() {
       ? 'Grátis. Dá pra ver o que muda no Pro na aba Upgrade, ali em cima.'
       : 'Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '.' }));
     fatiaPlano.classList.remove('escondido');
+  }
+
+  /* ----- conferir a credencial do Mercado Pago -----
+
+     O 403 deles é sempre o mesmo texto pra três causas diferentes, e
+     descobrir qual delas é exige comparar credencial com conta. Botão porque
+     a alternativa era mandar montar cabeçalho na mão no navegador — e quem
+     está tentando abrir a cobrança já está com problema demais pra isso. */
+  if (souAdmin && proEstado && proEstado.modo === 'teste') {
+    const saida = h('pre', { cls: 'diag escondido' });
+    const bt = h('button', { cls: 'bt', type: 'button', txt: 'Conferir a credencial do Mercado Pago' });
+
+    bt.onclick = async () => {
+      bt.disabled = true;
+      saida.classList.remove('escondido');
+      saida.textContent = 'perguntando ao Mercado Pago…';
+      try {
+        const d = await api('/checkout.php?diagnostico=1');
+        const linhas = [];
+
+        linhas.push('A credencial no config é: ' + (d.token_forma || '?'));
+        linhas.push('  começa com "' + (d.token_prefixo || '—') + '", ' + d.token_tamanho + ' caracteres');
+        linhas.push('Assinatura secreta preenchida: ' + (d.tem_segredo ? 'sim' : 'NÃO'));
+        linhas.push('Modo: ' + d.modo + '   ·   Cobrança ligada: ' + (d.ligado ? 'sim' : 'não'));
+        linhas.push('');
+
+        if (d.conta) {
+          linhas.push('O token é da conta: ' + (d.conta.apelido || '?')
+            + '  (id ' + (d.conta.id || '?') + ', país ' + (d.conta.site || '?') + ')');
+        } else {
+          linhas.push('Não consegui saber de quem é o token: ' + (d.users_me_erro || d.users_me_http));
+        }
+        linhas.push('');
+
+        if (d.preferencia) {
+          linhas.push('Criar cobrança: FUNCIONOU. A credencial serve.');
+        } else {
+          linhas.push('Criar cobrança: falhou (' + d.preferencia_http + ')');
+          linhas.push('  ' + (d.preferencia_erro || '—'));
+          linhas.push('');
+          /* O veredito, não só os dados: a lista crua acima já existia no
+             JSON e não estava ajudando ninguém a decidir o que fazer. */
+          if (/public/i.test(d.token_forma || '')) {
+            linhas.push('O QUE FAZER: você copiou a Public Key. Volte em');
+            linhas.push('Suas integrações > sua aplicação > Credenciais de teste');
+            linhas.push('e copie o ACCESS TOKEN, que é o campo de baixo e bem mais longo.');
+          } else if (d.preferencia_http === 403) {
+            linhas.push('O QUE FAZER: o token é válido mas não pode cobrar por esta conta.');
+            linhas.push('Quase sempre é token de USUÁRIO DE TESTE no lugar do token da');
+            linhas.push('sua aplicação. Use Credenciais de teste da APLICAÇÃO.');
+          } else if (d.preferencia_http === 401) {
+            linhas.push('O QUE FAZER: o token não vale mais. Gere outro no painel deles.');
+          }
+        }
+        saida.textContent = linhas.join('\n');
+      } catch (e) {
+        saida.textContent = 'Não consegui conferir: ' + e.message;
+      }
+      bt.disabled = false;
+    };
+
+    fatiaPlano.appendChild(h('p', { cls: 'd', style: 'margin-top:14px',
+      txt: 'Só você vê isto. Nada aqui mostra o token — só o formato dele e o que o Mercado Pago responde.' }));
+    fatiaPlano.appendChild(bt);
+    fatiaPlano.appendChild(saida);
   }
 
   /* ----- a chave ----- */
