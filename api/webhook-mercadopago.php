@@ -8,6 +8,7 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/seguranca.php';
+require_once __DIR__ . '/lib/mercadopago.php';
 
 $corpo = file_get_contents('php://input');
 $dados = json_decode($corpo, true) ?: [];
@@ -46,8 +47,64 @@ echo 'ok';
 responder_e_continuar();
 
 // 4. Daqui pra baixo o cliente já foi embora.
-//
-// TODO consultar GET /preapproval/{id} (ou /v1/payments/{id}) com o access_token
-//      e só então atualizar assinaturas.status e assinaturas.valido_ate.
-// TODO marcar eventos_pagamento.processado_em, ou gravar a falha em .erro
-//      para uma rotina de reprocessamento pegar depois.
+
+/* O aviso trouxe um id. Agora perguntamos ao Mercado Pago o que esse id é de
+   verdade — e é ESTA resposta que decide, não o corpo que chegou. Um webhook
+   diz que algo mudou; ele não diz a verdade do que mudou. */
+$falha = null;
+
+try {
+    $tipo = (string) ($dados['type'] ?? ($_GET['type'] ?? ''));
+
+    /* Só pagamento interessa. Os outros avisos (merchant_order e afins)
+       chegam pelo mesmo canal, e tratar todos daria trabalho para nada. */
+    if ($tipo !== '' && $tipo !== 'payment') {
+        throw new RuntimeException('ignorado: tipo ' . $tipo);
+    }
+
+    $pag = mp_ler_pagamento($data_id);
+    if ($pag === null) {
+        throw new RuntimeException('o Mercado Pago não respondeu sobre o pagamento ' . $data_id);
+    }
+
+    $situacao = (string) ($pag['status'] ?? '');
+    $ref      = (string) ($pag['external_reference'] ?? '');
+
+    if ($situacao !== 'approved') {
+        /* Pendente e recusado não são erro: o Pix aprovado chega depois no
+           mesmo canal. Guardar como tratado evita reprocessar pra sempre. */
+        throw new RuntimeException('ignorado: pagamento ' . ($situacao ?: 'sem status'));
+    }
+
+    $usuario_id = mp_referencia_usuario($ref);
+    if (!$usuario_id) {
+        throw new RuntimeException('referência sem dono: ' . $ref);
+    }
+
+    /* De qual plano era. A referência carrega o slug, mas quem manda é a
+       linha que o checkout gravou — ela é nossa e ninguém de fora escreve
+       nela. A referência só serve de reserva. */
+    $st = db()->prepare('SELECT plano_id FROM assinaturas WHERE referencia = ? LIMIT 1');
+    $st->execute([$ref]);
+    $plano_id = (int) $st->fetchColumn();
+
+    $plano = $plano_id ? mp_plano_por_id($plano_id) : null;
+    if (!$plano && preg_match('/^zc-\d+-([a-z0-9_]+)-/', $ref, $m)) {
+        $plano = mp_plano_por_slug($m[1]);
+    }
+    if (!$plano) {
+        throw new RuntimeException('não achei o plano da referência ' . $ref);
+    }
+
+    $centavos = (int) round(((float) ($pag['transaction_amount'] ?? 0)) * 100);
+    mp_liberar($usuario_id, $plano, $ref, (string) ($pag['id'] ?? $data_id), $centavos);
+
+} catch (Throwable $e) {
+    $falha = $e->getMessage();
+}
+
+/* O diário fecha sempre, com o motivo quando não deu. Sem isto, um pagamento
+   que não liberou vira um mistério sem rastro — e é justamente o caso em que
+   alguém pagou e está sem o que comprou. */
+db()->prepare('UPDATE eventos_pagamento SET processado_em = NOW(), erro = ? WHERE id = ?')
+    ->execute([$falha, $evento_pk]);

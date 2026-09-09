@@ -1,39 +1,60 @@
 <?php
 /**
- * Manda o usuário para o checkout HOSPEDADO do Mercado Pago.
+ * Abre a cobrança e devolve o link do checkout HOSPEDADO do Mercado Pago.
  *
  * O cartão é digitado no domínio DELES, nunca no nosso. Nosso servidor não vê,
  * não trafega e não guarda número de cartão — e é isso que mantém a gente fora
  * do escopo pesado do PCI DSS. Nunca embutir campo de cartão em página nossa,
  * nem em iframe: isso já muda o questionário de SAQ A para SAQ A-EP.
+ *
+ * Só responde a quem já entrou com a Twitch: sem dono, um pagamento voltaria
+ * e não haveria a quem liberar.
+ *
+ * Devolve JSON com a URL em vez de redirecionar. Redirecionar daqui tiraria
+ * do painel a chance de mostrar o erro quando o Mercado Pago recusa.
  */
 require_once __DIR__ . '/lib/db.php';
-require_once __DIR__ . '/lib/seguranca.php';
+require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/mercadopago.php';
 
-// TODO exigir usuário logado (OAuth da Twitch) e ler $usuario_id da sessão.
-$usuario_id = 0;
-$plano_slug = $_GET['plano'] ?? 'pro';
+cors();
+$quem = exige_painel();
+trava('checkout', 10, 300);
 
-$st = db()->prepare('SELECT * FROM planos WHERE slug = ? LIMIT 1');
-$st->execute([$plano_slug]);
-$plano = $st->fetch();
+$mp = mp_cfg();
 
-if (!$plano) {
-    json_saida(['erro' => 'Plano não encontrado.'], 404);
+/* A CHAVE GERAL DA COBRANÇA.
+
+   Enquanto estiver desligada, a estrutura inteira pode estar no ar sendo
+   testada sem que exista jeito de alguém ser cobrado por acidente. Ligar é
+   uma linha no config.php, e é a ÚLTIMA coisa a fazer — depois do teste de
+   ponta a ponta passar. */
+if (!$mp['ligado']) {
+    json_saida([
+        'erro'   => 'A cobrança ainda não abriu. Por enquanto está tudo liberado.',
+        'ligado' => false,
+    ], 503);
 }
 
-// TODO POST https://api.mercadopago.com/preapproval
-//      Header: Authorization: Bearer <access_token>
-//      Corpo:  reason, external_reference = usuario_id, back_url = url_retorno,
-//              auto_recurring { frequency: 1, frequency_type: "months",
-//                               transaction_amount: preco_centavos / 100,
-//                               currency_id: "BRL" }
-//
-// A resposta traz init_point (a URL do checkout deles) e o id do preapproval.
-//
-// Gravar em assinaturas com status 'pendente' ANTES de redirecionar — assim o
-// webhook encontra a linha quando o pagamento voltar. E nunca liberar acesso na
-// volta do navegador: essa URL qualquer um digita.
+$slug  = (string) ($_GET['plano'] ?? 'pro');
+$plano = mp_plano_por_slug($slug);
 
-// header('Location: ' . $init_point);
-// exit;
+if (!$plano || (int) $plano['preco_centavos'] <= 0) {
+    json_saida(['erro' => 'Esse plano não existe ou não é pago.'], 404);
+}
+
+try {
+    $r = mp_criar_cobranca((int) $quem['usuario_id'], $plano);
+} catch (Throwable $e) {
+    json_saida(['erro' => $e->getMessage()], 502);
+}
+
+if (($r['url'] ?? '') === '') {
+    json_saida(['erro' => 'O Mercado Pago não devolveu o link do checkout.'], 502);
+}
+
+json_saida([
+    'url'   => $r['url'],
+    'modo'  => $mp['modo'],
+    'plano' => ['nome' => $plano['nome'], 'centavos' => (int) $plano['preco_centavos']],
+]);

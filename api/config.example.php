@@ -34,9 +34,22 @@ return [
         'https://zocahop.com',
     ],
 
+    /* Cobranca.
+
+       'ligado' FALSO deixa a estrutura inteira no ar sem existir jeito de
+       alguem ser cobrado. Ligar e a ULTIMA coisa a fazer, depois do teste de
+       ponta a ponta passar.
+
+       'modo' teste usa o sandbox_init_point e as credenciais de TESTE do
+       painel deles: o checkout abre igual, so aceita cartao de teste e nao
+       move dinheiro nenhum. Trocar pra 'producao' exige tambem trocar o
+       access_token e o webhook_secret pelos de producao — sao pares, e
+       misturar um de cada da erro de assinatura sem explicacao. */
     'mercadopago' => [
-        'access_token'   => '',   // credencial de producao
-        'webhook_secret' => '',   // "Assinatura secreta" no painel de webhooks
+        'ligado'         => false,
+        'modo'           => 'teste',   // teste | producao
+        'access_token'   => '',        // TEST-... no modo teste, APP_USR-... em producao
+        'webhook_secret' => '',        // "Assinatura secreta" no painel de webhooks
         'url_retorno'    => 'https://zocahop.com/zocacontroller/obrigado.php',
     ],
 
