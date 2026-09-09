@@ -189,25 +189,38 @@
 
   /* A live do dia. Miniatura à esquerda, texto à direita, e o bloco inteiro é
      o link — alvo grande é o que faz alguém clicar sem querer acertar. */
+  /* Três painéis lado a lado, que viram um por linha quando não cabem. O
+     auto-fit com minmax faz isso sem media query e sem contar quantos são —
+     importante porque duas das três fatias podem simplesmente não ter
+     ninguém no ar. */
+  .hub__vitrine {
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+
   .hub__live {
-    display: flex; gap: 16px; align-items: stretch;
+    display: flex; flex-direction: column;
     border: 1px solid var(--linha); background: var(--caixa);
     text-decoration: none; color: var(--tinta); overflow: hidden;
   }
   .hub__live:hover { border-color: var(--verde); }
-  .hub__live img { width: 220px; flex: none; object-fit: cover; background: var(--caixa2); display: block; }
-  .hub__live div { padding: 14px 16px 14px 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-  .hub__live b { font: 600 16px var(--disp); }
-  .hub__live .tit { color: var(--fraco); font-size: 14px;
-    overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
-    -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .hub__live .meta { margin-top: auto; color: var(--apagado); font: 500 12px var(--mono); }
+  .hub__live img { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: var(--caixa2); display: block; }
+  .hub__live .corpo { padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+  .hub__live b { font: 600 15px var(--disp); }
+  .hub__live .tit { color: var(--fraco); font-size: 13.5px;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .hub__live .meta { margin-top: auto; padding-top: 6px; color: var(--apagado); font: 500 11.5px var(--mono); }
   .hub__live .ao-vivo { color: var(--perigo); font-weight: 700; }
-  @media (max-width: 560px) {
-    .hub__live { flex-direction: column; }
-    .hub__live img { width: 100%; height: 160px; }
-    .hub__live div { padding: 0 16px 14px; }
+
+  /* O selo diz de qual fatia veio. Sem ele os três cartões são iguais, e o
+     "assinante Pro" perde exatamente o que o torna um motivo pra assinar. */
+  .hub__selo {
+    align-self: flex-start; margin-bottom: 2px;
+    font: 600 10px var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    padding: 2px 6px; border: 1px solid currentColor; color: var(--fraco);
   }
+  .hub__selo.pro { color: var(--dourado); }
+  .hub__selo.usuario { color: var(--verde-forte); }
 
   .hub__novidades { display: flex; flex-direction: column; }
   .hub__nov {
@@ -2345,35 +2358,53 @@ function telaInicio() {
   }
   hub.appendChild(capa);
 
-  /* ----- a live do dia ----- */
-  const secLive = h('section', { cls: 'escondido' }, [h('h2', { txt: 'A live de hoje' })]);
+  /* ----- quem está no ar hoje ----- */
+  const secLive = h('section', { cls: 'escondido' }, [h('h2', { txt: 'No ar agora' })]);
   hub.appendChild(secLive);
 
+  const SELOS = {
+    usuario: ['usuario', 'Usa o ZocaController'],
+    pro:     ['pro',     'Assinante'],
+    twitch:  ['',        'Descoberta'],
+  };
+
   api2('/vitrine.php').then((d) => {
-    if (!d || !d.live || !d.live.login) return;
-    const l = d.live;
+    const fatias = (d && d.fatias) || {};
+    const grade = h('div', { cls: 'hub__vitrine' });
+    let quantos = 0;
 
-    const cartao = h('a', { cls: 'hub__live', href: 'https://twitch.tv/' + l.login,
-      target: '_blank', rel: 'noopener noreferrer' });
+    ['usuario', 'pro', 'twitch'].forEach((f) => {
+      const l = fatias[f];
+      if (!l || !l.login) return;
+      quantos++;
 
-    if (l.thumb) cartao.appendChild(h('img', { src: l.thumb, alt: '', loading: 'lazy' }));
+      const cartao = h('a', { cls: 'hub__live', href: 'https://twitch.tv/' + l.login,
+        target: '_blank', rel: 'noopener noreferrer' });
 
-    cartao.appendChild(h('div', {}, [
-      h('b', { txt: l.nome || l.login }),
-      h('span', { cls: 'tit', txt: l.titulo || '' }),
-      h('span', { cls: 'meta' }, [
-        h('span', { cls: 'ao-vivo', txt: '● AO VIVO' }),
-        document.createTextNode('  ' + (l.jogo ? l.jogo + '  ·  ' : '')
-          + l.viewers + (l.viewers === 1 ? ' pessoa assistindo' : ' pessoas assistindo')),
-      ]),
-    ]));
+      if (l.thumb) cartao.appendChild(h('img', { src: l.thumb, alt: '', loading: 'lazy' }));
 
-    secLive.appendChild(cartao);
+      const [selCls, selTxt] = SELOS[f];
+      cartao.appendChild(h('div', { cls: 'corpo' }, [
+        h('span', { cls: 'hub__selo ' + selCls, txt: selTxt }),
+        h('b', { txt: l.nome || l.login }),
+        h('span', { cls: 'tit', txt: l.titulo || '' }),
+        h('span', { cls: 'meta' }, [
+          h('span', { cls: 'ao-vivo', txt: '● AO VIVO' }),
+          document.createTextNode('  ' + (l.jogo ? l.jogo + '  ·  ' : '')
+            + l.viewers + (l.viewers === 1 ? ' assistindo' : ' assistindo')),
+        ]),
+      ]));
+
+      grade.appendChild(cartao);
+    });
+
+    if (!quantos) return;
+    secLive.appendChild(grade);
     secLive.appendChild(h('p', { cls: 'd', style: 'margin:10px 0 0',
-      txt: 'Um canal pequeno diferente por dia, sorteado entre as lives em português. '
-         + 'Não é anúncio e ninguém paga pra aparecer aqui.' }));
+      txt: 'Canais diferentes por dia. A descoberta é sorteada entre as lives pequenas '
+         + 'em português — não é anúncio e ninguém paga pra aparecer aqui.' }));
     secLive.classList.remove('escondido');
-  }).catch(() => { /* sem live hoje: a seção some, e isso basta */ });
+  }).catch(() => { /* ninguém no ar: a seção some, e isso basta */ });
 
   /* ----- novidades e parceiros ----- */
   const secNov = h('section', { cls: 'escondido' }, [h('h2', { txt: 'O que mudou' })]);
@@ -4039,13 +4070,150 @@ const PASSOS_CHAT = [
   ['Essa fonte carrega a sua chave', 'Não mostre ela na tela e não mande pra ninguém. Se aparecer em print ou VOD, troque a chave em Meu Controller.'],
 ];
 
+/* ---------------- a vitrine, no admin ---------------- */
+
+const VITRINE_FATIAS = [
+  ['usuario', 'Quem usa o site', 'sorteado entre as contas do ZocaController que estiverem no ar'],
+  ['pro',     'Assinante',       'só entre quem paga — é o que faz assinar valer algo além dos recursos'],
+  ['twitch',  'Descoberta',      'qualquer canal pequeno em português, usuário do site ou não'],
+];
+
+function blocoVitrine() {
+  const cx = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Vitrine da página inicial' }),
+    h('p', { cls: 'd', txt: 'Três painéis, cada um com uma fonte. Painel sem ninguém no ar simplesmente não aparece — '
+      + 'a página não mostra buraco.' }),
+  ]);
+
+  const corpo = h('div');
+  cx.appendChild(corpo);
+
+  const carrega = () => {
+    corpo.innerHTML = '';
+    api('/vitrine.php', { method: 'POST', body: JSON.stringify({ acao: 'estado' }) }).then((d) => {
+      const cfg = d.config || {};
+      const campos = {};
+
+      VITRINE_FATIAS.forEach(([k, nome, dica]) => {
+        const c = cfg[k] || {};
+
+        const liga = h('input', { type: 'checkbox' });
+        liga.checked = c.ligado !== false;
+
+        const fixo = h('input', { type: 'text', placeholder: 'sortear', style: 'flex:0 0 150px' });
+        fixo.value = c.fixo || '';
+
+        const cat = h('input', { type: 'text', placeholder: 'qualquer categoria', style: 'flex:0 0 170px' });
+        cat.value = c.categoria || '';
+
+        const dinovo = h('button', { cls: 'bt mini', type: 'button', txt: 'Sortear de novo' });
+        dinovo.onclick = async () => {
+          dinovo.disabled = true;
+          try {
+            await api('/vitrine.php', { method: 'POST', body: JSON.stringify({ acao: 'sortear', fatia: k }) });
+            recado('Pronto. O próximo a abrir a página inicial já vê outro canal.', 'bom');
+          } catch (e) { recado(e.message, 'ruim'); }
+          dinovo.disabled = false;
+        };
+
+        campos[k] = { liga, fixo, cat };
+
+        const linha = h('div', { cls: 'campo', style: 'flex-wrap:wrap;gap:10px' }, [
+          h('label', { style: 'flex:0 0 130px' }, [liga, document.createTextNode(' ' + nome)]),
+          h('span', { cls: 'd', style: 'flex:0 0 90px', txt: 'canal fixo' }), fixo,
+        ]);
+        /* Categoria só faz sentido onde existe sorteio na Twitch: nas outras
+           duas o conjunto já é "quem usa o site", e filtrar por jogo ali só
+           encolheria um grupo que já é pequeno. */
+        if (k === 'twitch') {
+          linha.appendChild(h('span', { cls: 'd', style: 'flex:0 0 70px', txt: 'categoria' }));
+          linha.appendChild(cat);
+        }
+        linha.appendChild(dinovo);
+
+        corpo.appendChild(linha);
+        corpo.appendChild(h('p', { cls: 'd', style: 'margin:0 0 12px', txt: dica
+          + '. Escrevendo um canal em "canal fixo", ele manda em cima do sorteio.' }));
+      });
+
+      const salvar = h('button', { cls: 'bt principal', type: 'button', txt: 'Salvar a vitrine' });
+      salvar.onclick = async () => {
+        salvar.disabled = true;
+        const corpoReq = { acao: 'config' };
+        VITRINE_FATIAS.forEach(([k]) => {
+          corpoReq[k] = {
+            ligado: campos[k].liga.checked,
+            fixo: campos[k].fixo.value.trim(),
+            categoria: campos[k].cat.value.trim(),
+          };
+        });
+        try {
+          await api('/vitrine.php', { method: 'POST', body: JSON.stringify(corpoReq) });
+          recado('Vitrine salva. Mudar a regra apaga o sorteio de hoje, então já vale agora.', 'bom');
+        } catch (e) { recado(e.message, 'ruim'); }
+        salvar.disabled = false;
+      };
+      corpo.appendChild(salvar);
+
+      /* ----- a lista de banidos ----- */
+      corpo.appendChild(h('h3', { style: 'margin-top:22px', txt: 'Quem não pode aparecer' }));
+      corpo.appendChild(h('p', { cls: 'd', txt: 'Vale pros três painéis. Banir alguém que está na vitrine agora '
+        + 'tira ele na hora, sem esperar o dia virar.' }));
+
+      const nome = h('input', { type: 'text', placeholder: 'canal na Twitch', style: 'flex:0 0 170px' });
+      const motivo = h('input', { type: 'text', placeholder: 'motivo (só você vê)', style: 'flex:1 1 200px' });
+      const banir = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'Banir' });
+      banir.onclick = async () => {
+        if (!nome.value.trim()) return recado('Escreva o canal.', 'ruim');
+        banir.disabled = true;
+        try {
+          await api('/vitrine.php', { method: 'POST', body: JSON.stringify({
+            acao: 'banir', login: nome.value.trim(), motivo: motivo.value.trim() }) });
+          nome.value = ''; motivo.value = '';
+          carrega();
+        } catch (e) { recado(e.message, 'ruim'); }
+        banir.disabled = false;
+      };
+      corpo.appendChild(h('div', { cls: 'campo', style: 'flex-wrap:wrap;gap:8px' }, [nome, motivo, banir]));
+
+      const bans = d.bloqueados || [];
+      if (!bans.length) {
+        corpo.appendChild(h('p', { cls: 'd', txt: 'Ninguém banido.' }));
+      } else {
+        bans.forEach((b) => {
+          const tirar = h('button', { cls: 'bt mini', type: 'button', txt: 'Tirar' });
+          tirar.onclick = async () => {
+            try {
+              await api('/vitrine.php', { method: 'POST', body: JSON.stringify({ acao: 'desbanir', login: b.login }) });
+              carrega();
+            } catch (e) { recado(e.message, 'ruim'); }
+          };
+          corpo.appendChild(h('div', { cls: 'campo', style: 'gap:10px' }, [
+            h('b', { style: 'flex:0 0 170px', txt: b.login }),
+            h('span', { cls: 'd', style: 'flex:1', txt: b.motivo || '—' }),
+            tirar,
+          ]));
+        });
+      }
+    }).catch((e) => {
+      corpo.appendChild(h('p', { cls: 'd', txt: 'Não consegui ler a vitrine: ' + e.message }));
+    });
+  };
+
+  carrega();
+  return cx;
+}
+
 function telaAdmin() {
   const tela = el('tela');
   tela.innerHTML = '';
   tela.appendChild(h('h1', { txt: 'Administração' }));
   tela.appendChild(h('p', { cls: 'sub', txt: 'Quem entrou no site e o que cada um pode. Deixar um campo vazio devolve o valor do plano — assim o plano continua sendo a regra e a exceção aparece como exceção.' }));
 
+  tela.appendChild(blocoVitrine());
+
   const lista = h('div');
+  tela.appendChild(h('h3', { style: 'margin-top:26px', txt: 'Contas' }));
   tela.appendChild(lista);
 
   api('/admin.php').then((d) => {
