@@ -216,6 +216,27 @@ function mp_ler_pagamento(string $pagamento_id): ?array
  */
 function mp_liberar(int $usuario_id, array $plano, string $referencia, string $pagamento_id, int $centavos): void
 {
+    /* UM PAGAMENTO LIBERA UMA VEZ SÓ.
+     *
+     * A trava que existia era na tabela de avisos, com UNIQUE no
+     * x-request-id. Só que o Mercado Pago manda VÁRIOS avisos sobre o mesmo
+     * pagamento — um quando entra pendente, outro quando aprova, e reenvios
+     * quando acha que a gente não respondeu — e cada um vem com request-id
+     * diferente. Todo aviso com status 'approved' passava pela trava e caía
+     * aqui, e como esta função soma dias a partir da validade atual, o
+     * segundo aviso dava mais trinta dias de graça.
+     *
+     * A trava certa é pelo id do PAGAMENTO, que é único de verdade. Quando
+     * este pagamento já liberou, a linha dele está 'ativa' com o id dele em
+     * provedor_id — e aí não há nada a fazer.
+     */
+    $ja = db()->prepare(
+        "SELECT 1 FROM assinaturas
+          WHERE provedor = 'mercadopago' AND provedor_id = ? AND status = 'ativa' LIMIT 1"
+    );
+    $ja->execute([$pagamento_id]);
+    if ($ja->fetchColumn()) return;
+
     if (($plano['periodo'] ?? '') === 'vitalicio') {
         $ate = MP_VITALICIO_ATE;
     } else {

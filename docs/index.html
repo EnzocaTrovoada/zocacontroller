@@ -176,6 +176,42 @@
   .pop .passos li { margin-bottom: 7px; color: var(--fraco); font-size: 13.5px; line-height: 1.5; }
   .pop .passos li::marker { color: var(--verde); font-weight: 600; }
 
+  /* ---------- só o administrador vê ----------
+
+     Vermelho e com um marcador na frente. O problema que isto resolve é
+     bobo e real: em telas que TODO MUNDO abre, tinha texto que só o admin
+     enxergava, e de dentro não dava pra saber qual era qual — dá pra
+     escrever a explicação errada pro público sem perceber. */
+  .so-adm {
+    border-left: 3px solid var(--perigo); background: var(--perigo-fraco);
+    padding: 10px 14px; margin: 10px 0; color: var(--perigo);
+  }
+  .so-adm::before {
+    content: 'SÓ VOCÊ VÊ'; display: block; margin-bottom: 4px;
+    font: 600 9.5px var(--mono); letter-spacing: .14em;
+  }
+  .so-adm p, .so-adm li, .so-adm .d { color: var(--perigo); }
+  .so-adm .bt { border-color: currentColor; }
+
+  /* Quando é um trecho curto no meio de outra coisa. */
+  .adm-tag { color: var(--perigo); font-weight: 600; }
+
+  /* ---------- calculadora de comissão ---------- */
+  .calc { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 4px 0 12px; }
+  .calc label { display: flex; flex-direction: column; gap: 3px; font: 500 11px var(--mono); color: var(--fraco); }
+  .calc input, .calc select {
+    width: 110px; font: 13px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); padding: 7px 8px; border-radius: 4px;
+  }
+  .calc-saida {
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 16px;
+    max-width: 380px; font: 13px var(--mono);
+  }
+  .calc-saida .v { text-align: right; font-variant-numeric: tabular-nums; }
+  .calc-saida .forte { font-weight: 700; border-top: 1px solid var(--linha); padding-top: 5px; margin-top: 3px; }
+  .calc-saida .bom { color: var(--verde-forte); }
+  .calc-saida .ruim { color: var(--perigo); }
+
   /* ---------- modo edição ---------- */
   body.editando [data-edit] {
     outline: 1px dashed var(--verde); outline-offset: 2px;
@@ -414,6 +450,16 @@
   button.bt.principal:hover:not(:disabled) { background: var(--verde-forte); border-color: var(--verde-forte); color: #fff; }
   button.bt.mini { padding: 7px 11px; font-size: 12px; }
   button.bt.perigo:hover:not(:disabled) { border-color: var(--perigo); color: var(--perigo); }
+
+  /* Overlay que parou de aparecer por falta de plano. Vermelho porque é
+     perda: alguma coisa que funcionava parou. */
+  .cartao.travado { border-color: var(--perigo); }
+  .cartao.travado .previa { opacity: .35; filter: grayscale(1); }
+  .travado-selo {
+    display: inline-block; margin-bottom: 6px;
+    font: 600 10px var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--perigo); border: 1px solid currentColor; padding: 2px 6px;
+  }
 
   .cartoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
   .cartao {
@@ -2474,8 +2520,8 @@ function abrePro(estado) {
   corpo.appendChild(lista);
 
   if (estado.modo === 'teste') {
-    corpo.appendChild(h('p', { cls: 'aviso', txt:
-      'Modo de teste: não move dinheiro. Só você vê isto.' }));
+    corpo.appendChild(h('div', { cls: 'so-adm' },
+      [h('p', { style: 'margin:0', txt: 'Modo de teste: não move dinheiro.' })]));
   }
 
   /* ----- os planos, só depois do "Seja Pro" ----- */
@@ -2590,7 +2636,7 @@ function abrePro(estado) {
     const abrir = h('a', { cls: 'bt principal mini', href: url, target: '_blank',
       rel: 'noopener noreferrer', txt: 'Abrir pagamento', style: 'text-decoration:none' });
 
-    const roteiro = h('div', { style: 'margin-top:4px' }, [
+    const roteiro = h('div', { cls: 'so-adm', style: 'margin-top:4px' }, [
       h('p', { cls: 'd', style: 'margin:0 0 8px',
         txt: 'Abra em janela anônima e entre com o usuário de teste.' }),
       campo,
@@ -3094,8 +3140,17 @@ function telaLista(filtro) {
     previa.dataset.cfg = JSON.stringify(Object.assign(padraoDe(p.tipo), c));
     if (observador) observador.observe(previa);
 
-    grade.appendChild(h('div', { cls: 'cartao' }, [
+    /* PAROU DE APARECER, MAS NÃO SUMIU.
+
+       Overlay além do teto do plano continua guardado e volta sozinho
+       quando a assinatura voltar. Quem precisa saber disso é o dono, aqui —
+       na transmissão ele simplesmente não desenha, porque cartaz de cobrança
+       em cima da live é o pior lugar possível pra cobrar. */
+    const cartao = h('div', { cls: 'cartao' + (p.bloqueado ? ' travado' : '') }, [
       previa,
+      p.bloqueado
+        ? h('span', { cls: 'travado-selo', txt: 'não está aparecendo' })
+        : document.createTextNode(''),
       h('div', { cls: 'topo' }, [
         h('b', { txt: p.nome || 'Sem nome' }),
         h('span', { cls: 'selo', txt: (TIPOS[p.tipo] || {}).nome || p.tipo }),
@@ -3103,7 +3158,9 @@ function telaLista(filtro) {
       h('span', { style: 'font-size:12.5px;color:var(--apagado)', txt: extra }),
       h('code', { txt: link }),
       h('div', { cls: 'acoes' }, [editar, copiar, apagar]),
-    ]));
+    ]);
+    grade.appendChild(cartao);
+
   });
   tela.appendChild(grade);
 }
@@ -3677,10 +3734,11 @@ function telaControlador() {
       bt.disabled = false;
     };
 
-    fatiaPlano.appendChild(h('p', { cls: 'd', style: 'margin-top:14px',
-      txt: 'Só você vê. Não mostra o token.' }));
-    fatiaPlano.appendChild(bt);
-    fatiaPlano.appendChild(saida);
+    const cxAdm = h('div', { cls: 'so-adm' }, [
+      h('p', { style: 'margin:0 0 8px', txt: 'Diagnóstico da credencial. Não mostra o token.' }),
+      bt, saida,
+    ]);
+    fatiaPlano.appendChild(cxAdm);
   }
 
   /* ----- a chave ----- */
@@ -4787,11 +4845,82 @@ function blocoVitrine() {
 
 const reaisDe = (c) => ((c || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+/* A CONTA DA COMISSÃO, ANTES DE PROMETER QUALQUER COISA.
+
+   Cupom e comissão são números independentes que saem de bolsos diferentes:
+   o cupom sai do preço, a comissão sai do que sobrou pra você. Somar os dois
+   de cabeça erra, e errar aqui é fechar parceria no prejuízo.
+
+   As taxas do Mercado Pago são de 2026, recebendo na hora. */
+const CALC_TAXAS = { pix: 0.99, credito: 4.98, debito: 1.99 };
+
+function calculadoraComissao() {
+  const campo = (rot, el2) => h('label', {}, [document.createTextNode(rot), el2]);
+
+  const preco = h('input', { type: 'text', value: '13,99' });
+  const desc = h('input', { type: 'number', value: '20', min: '0', max: '100' });
+  const com = h('input', { type: 'number', value: '20', min: '0', max: '100' });
+  const meio = h('select');
+  [['pix', 'Pix'], ['credito', 'Crédito'], ['debito', 'Débito']]
+    .forEach(([v, r]) => meio.appendChild(h('option', { value: v, txt: r })));
+
+  const saida = h('div', { cls: 'calc-saida' });
+
+  const conta = () => {
+    const tab = Math.round((parseFloat(String(preco.value).replace(',', '.')) || 0) * 100);
+    const d = Math.max(0, Math.min(100, parseFloat(desc.value) || 0));
+    const c = Math.max(0, Math.min(100, parseFloat(com.value) || 0));
+    const tx = CALC_TAXAS[meio.value];
+
+    const paga = Math.round(tab * (100 - d) / 100);
+    const comis = Math.round(paga * c / 100);
+    const taxa = Math.round(paga * tx / 100);
+    const sobra = paga - comis - taxa;
+    const pct = tab > 0 ? Math.round(sobra / tab * 100) : 0;
+
+    const reais = (v) => (v / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    saida.innerHTML = '';
+    const linha = (rot, val, cls) => {
+      saida.appendChild(h('span', { cls: cls || '', txt: rot }));
+      saida.appendChild(h('span', { cls: 'v ' + (cls || ''), txt: val }));
+    };
+
+    linha('Tabela', reais(tab));
+    linha('Cliente paga (−' + d + '%)', reais(paga));
+    linha('Parceiro leva (' + c + '%)', '− ' + reais(comis));
+    /* Vírgula, não ponto: é número em português no meio de reais. */
+    linha('Taxa ' + meio.options[meio.selectedIndex].text
+          + ' (' + String(tx).replace('.', ',') + '%)', '− ' + reais(taxa));
+    linha('Sobra pra você', reais(sobra) + '  (' + pct + '%)', 'forte ' + (pct >= 50 ? 'bom' : 'ruim'));
+
+    if (pct < 50) {
+      saida.appendChild(h('span', { cls: 'ruim', style: 'grid-column:1/-1;margin-top:6px;font-size:12px',
+        txt: pct <= 0 ? 'Esta combinação dá PREJUÍZO.' : 'Sobra menos da metade da tabela.' }));
+    }
+  };
+
+  [preco, desc, com].forEach((e) => { e.oninput = conta; });
+  meio.onchange = conta;
+  conta();
+
+  return h('div', { cls: 'so-adm' }, [
+    h('p', { style: 'margin:0 0 8px', txt: 'Calculadora: o desconto sai do preço, a comissão sai do que sobra.' }),
+    h('div', { cls: 'calc' }, [
+      campo('preço', preco), campo('cupom %', desc),
+      campo('comissão %', com), campo('pago com', meio),
+    ]),
+    saida,
+  ]);
+}
+
 function blocoParceiros() {
   const cx = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Cupons e parceiros' }),
     h('p', { cls: 'd', txt: 'Cupom sem parceiro é promoção. Com parceiro, gera comissão sobre o valor pago.' }),
   ]);
+
+  cx.appendChild(calculadoraComissao());
 
   const corpo = h('div');
   cx.appendChild(corpo);

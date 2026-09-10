@@ -42,7 +42,7 @@ if (!preg_match('/^[A-Za-z0-9_-]{10,64}$/', $chave)) {
 }
 
 $st = db()->prepare(
-    'SELECT tipo, config, atualizado_em, usuario_id FROM perfis WHERE chave_publica = ? LIMIT 1'
+    'SELECT id, tipo, config, atualizado_em, usuario_id FROM perfis WHERE chave_publica = ? LIMIT 1'
 );
 $st->execute([$chave]);
 $perfil = $st->fetch();
@@ -54,6 +54,37 @@ if (!$perfil) {
 // Quem decide o que está liberado é o servidor. Sempre.
 $acesso   = acesso_do_usuario((int) $perfil['usuario_id']);
 $recursos = recursos_do_usuario((int) $perfil['usuario_id'], $acesso['ativo'] ? $acesso['plano'] : 'gratis');
+
+/* ALÉM DO TETO DO PLANO, O OVERLAY PARA DE DESENHAR.
+ *
+ * Quem tinha trinta overlays no Pro e deixou de pagar volta a ter direito a
+ * oito. Os outros vinte e dois não são apagados — eles ficam guardados,
+ * param de aparecer, e voltam sozinhos quando a assinatura voltar.
+ *
+ * QUAIS oito continuam: os mais antigos. Precisa ser uma regra que não
+ * depende de escolha, senão o site teria que perguntar isso justamente na
+ * hora em que a pessoa está sem acesso — e ordem de criação é a única que
+ * dá o mesmo resultado toda vez.
+ *
+ * O overlay bloqueado devolve tela VAZIA, e não um aviso pedindo pagamento:
+ * isso aqui está dentro de uma transmissão ao vivo, e ninguém merece um
+ * cartaz de cobrança na frente da audiência. Quem precisa saber é o dono, e
+ * o painel diz pra ele em vermelho. */
+$teto = (int) ($recursos['perfis_max'] ?? 0);
+
+$pos = db()->prepare('SELECT COUNT(*) FROM perfis WHERE usuario_id = ? AND id < ?');
+$pos->execute([(int) $perfil['usuario_id'], (int) $perfil['id']]);
+$bloqueado = $teto > 0 && ((int) $pos->fetchColumn()) >= $teto;
+
+if ($bloqueado) {
+    header('Cache-Control: no-cache, must-revalidate');
+    json_saida([
+        'tipo'       => $perfil['tipo'],
+        'config'     => null,
+        'bloqueado'  => true,
+        'recursos'   => $recursos,
+    ]);
+}
 
 $config = json_decode($perfil['config'], true) ?: [];
 

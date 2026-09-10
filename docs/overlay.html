@@ -301,6 +301,16 @@
         return r.ok ? r.json() : null;
       })
       .then(function (j) {
+        /* Bloqueado por falta de plano: some da tela e fica quieto. O aviso
+           é no painel, não em cima da transmissão. */
+        if (j && j.bloqueado) {
+          raiz.innerHTML = '';
+          marca.hidden = true;
+          desenhou = true;
+          ultimo = 'bloqueado';
+          relogio = null;
+          return;
+        }
         if (!j || !j.config) return;
         var s = JSON.stringify(j.config);
         ultimaConfig = j.config;

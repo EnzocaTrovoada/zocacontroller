@@ -32,8 +32,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     );
     $st->execute([$quem['usuario_id']]);
 
-    $perfis = array_map(function (array $p): array {
+    $acessoP = acesso_do_usuario((int) $quem['usuario_id']);
+    $teto = (int) recursos_do_usuario((int) $quem['usuario_id'],
+        $acessoP['ativo'] ? $acessoP['plano'] : 'gratis')['perfis_max'];
+
+    /* QUAL OVERLAY PAROU DE APARECER.
+
+       Mesma regra do config-overlay.php: passando do teto do plano, os mais
+       novos param de desenhar. Aqui a lista vem ORDER BY id, então a posição
+       na lista já é a ordem de criação — o índice diz tudo. */
+    $i = 0;
+    $perfis = array_map(function (array $p) use (&$i, $teto): array {
         $p['config'] = json_decode($p['config'], true) ?: [];
+        $p['bloqueado'] = ($teto > 0 && $i >= $teto) ? 1 : 0;
+        $i++;
         return $p;
     }, $st->fetchAll());
 
