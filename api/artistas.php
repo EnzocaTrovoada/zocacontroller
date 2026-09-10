@@ -197,6 +197,15 @@ if (empty($_FILES['obras'])) {
                     verificado_em = CASE WHEN ? = 1 THEN NOW() ELSE NULL END
               WHERE id = ?"
         )->execute([$selo, $selo, $id]);
+
+        /* Aprovado com selo e com conta: o selo aparece também no feed, sem
+           precisar ligar de novo na outra tela. */
+        if ($selo) {
+            db()->prepare(
+                'UPDATE usuarios SET selo_artista = 1
+                  WHERE id = (SELECT usuario_id FROM artistas WHERE id = ?)'
+            )->execute([$id]);
+        }
         json_saida(['ok' => true]);
     }
 
@@ -236,6 +245,16 @@ $link = $link ?: null;
 $bio     = mb_substr(trim((string) ($_POST['bio'] ?? '')), 0, 240) ?: null;
 $contato = mb_substr(trim((string) ($_POST['contato'] ?? '')), 0, 160) ?: null;
 $semIa   = empty($_POST['sem_ia']) ? 0 : 1;
+
+/* Quem já tem conta manda a chave junto: é o que permite acender o selo de
+   artista no feed quando a inscrição for aprovada. */
+$doDono = null;
+if (($_SERVER['HTTP_X_CHAVE'] ?? '') !== '') {
+    try {
+        $q = quem_chama();
+        if ($q['tipo'] === 'painel') $doDono = (int) $q['usuario_id'];
+    } catch (Throwable $e) { /* chave velha: a inscrição continua valendo */ }
+}
 
 $pend = (int) db()->query("SELECT COUNT(*) FROM artistas WHERE estado = 'pendente'")->fetchColumn();
 if ($pend >= ARTE_PENDENTES) {
@@ -309,8 +328,9 @@ $pdo->beginTransaction();
 $gravados = [];
 try {
     $pdo->prepare(
-        'INSERT INTO artistas (nome, arroba, link, bio, contato, sem_ia) VALUES (?, ?, ?, ?, ?, ?)'
-    )->execute([$nome, $arroba, $link, $bio, $contato, $semIa]);
+        'INSERT INTO artistas (nome, arroba, link, bio, contato, sem_ia, usuario_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?)'
+    )->execute([$nome, $arroba, $link, $bio, $contato, $semIa, $doDono]);
     $artistaId = (int) $pdo->lastInsertId();
 
     $poe = function (array $f, int $ordem, ?string $titulo, int $processo) use ($pdo, $artistaId, &$gravados) {

@@ -81,16 +81,36 @@ try {
 
     $chave = chave_nova(24);
 
-    db()->prepare(
-        'INSERT INTO usuarios (twitch_user_id, login, email, chave_painel)
-              VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE login = VALUES(login), chave_painel = VALUES(chave_painel)'
-    )->execute([
-        $perfil['id'],
-        $perfil['login'],
-        $perfil['email'] ?? null,
-        hash('sha256', $chave),
-    ]);
+    /* Nome e foto vêm de graça nesta resposta e ficam guardados: desenhar
+       um feed pedindo o perfil de cada autor à Twitch a cada visita bate no
+       limite deles num site que funcione. */
+    try {
+        db()->prepare(
+            'INSERT INTO usuarios (twitch_user_id, login, email, chave_painel, nome_exibicao, foto)
+                  VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE login = VALUES(login), chave_painel = VALUES(chave_painel),
+                  nome_exibicao = VALUES(nome_exibicao), foto = VALUES(foto)'
+        )->execute([
+            $perfil['id'],
+            $perfil['login'],
+            $perfil['email'] ?? null,
+            hash('sha256', $chave),
+            $perfil['display_name'] ?? null,
+            $perfil['profile_image_url'] ?? null,
+        ]);
+    } catch (Throwable $e) {
+        /* Colunas novas: entrar não pode quebrar em quem ainda não rodou o SQL. */
+        db()->prepare(
+            'INSERT INTO usuarios (twitch_user_id, login, email, chave_painel)
+                  VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE login = VALUES(login), chave_painel = VALUES(chave_painel)'
+        )->execute([
+            $perfil['id'],
+            $perfil['login'],
+            $perfil['email'] ?? null,
+            hash('sha256', $chave),
+        ]);
+    }
 
     $st = db()->prepare('SELECT id FROM usuarios WHERE twitch_user_id = ?');
     $st->execute([$perfil['id']]);

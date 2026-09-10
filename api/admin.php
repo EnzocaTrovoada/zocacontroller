@@ -25,7 +25,7 @@ if (!(int) $st->fetchColumn()) {
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $st = db()->query(
         'SELECT u.id, u.login, u.criado_em, u.visto_em, u.admin, u.beta, u.cortesia_ate,
-                u.perfis_max, u.recursos,
+                u.perfis_max, u.recursos, u.selo_artista, u.selo_streamer,
                 (SELECT COUNT(*) FROM perfis p WHERE p.usuario_id = u.id) AS overlays
            FROM usuarios u
           ORDER BY u.visto_em IS NULL, u.visto_em DESC, u.id DESC
@@ -43,6 +43,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
             'visto_em'   => $u['visto_em'],
             'admin'      => (int) $u['admin'],
             'beta'       => (int) ($u['beta'] ?? 0),
+            'selo_artista'  => (int) ($u['selo_artista'] ?? 0),
+            'selo_streamer' => (int) ($u['selo_streamer'] ?? 0),
             'cortesia_ate' => $u['cortesia_ate'] ?? null,
             'plano'      => $plano,
             'overlays'   => (int) $u['overlays'],
@@ -227,6 +229,15 @@ if (array_key_exists('beta', $d)) {
    Recebe uma data (ou vazio pra tirar). Com prazo, e não um interruptor,
    porque cortesia sem data é cortesia esquecida: seis meses depois ninguém
    lembra por que aquela conta tem Pro. */
+/* Os dois selos do feed. Ligados à mão, um a um: é isso que os faz valer
+   alguma coisa — verificação automática de "é artista mesmo?" não existe. */
+foreach (['selo_artista', 'selo_streamer'] as $selo) {
+    if (array_key_exists($selo, $d)) {
+        $campos[] = $selo . ' = ?';
+        $vals[]   = empty($d[$selo]) ? 0 : 1;
+    }
+}
+
 if (array_key_exists('cortesia_ate', $d)) {
     $v = trim((string) $d['cortesia_ate']);
     $campos[] = 'cortesia_ate = ?';

@@ -181,47 +181,6 @@
     color: var(--dourado); border: 1px solid currentColor;
     padding: 1px 5px; vertical-align: 2px;
   }
-  .pop__plano.vital { border-color: var(--dourado); }
-  .pop__plano.vital span { color: var(--dourado); }
-
-  /* O escolhido. Precisa ser óbvio, porque um deles já vem marcado e a
-     pessoa tem que perceber isso sem procurar. */
-  .pop__plano.on { border-color: var(--verde); background: var(--verde-fraco); box-shadow: inset 3px 0 0 var(--verde); }
-  .pop__plano.on.vital { border-color: var(--dourado); box-shadow: inset 3px 0 0 var(--dourado); }
-  .pop__plano .comp { display: block; font-size: 11.5px; color: var(--verde-forte); margin-top: 2px; font-weight: 600; }
-  .pop__plano.vital .comp { color: var(--dourado); }
-  /* ETIQUETA EM LINHA, E NÃO FLUTUANDO.
-
-     Ela era position:absolute pendurada no canto do cartão, e vazava pra
-     fora dele: o texto estourava a borda e a de cima cobria a de baixo.
-     Dentro do fluxo, ao lado do nome, ela não tem como escapar de lugar
-     nenhum — e continua sendo a primeira coisa que o olho pega. */
-  /* CONTORNO, E NÃO FUNDO CHEIO.
-
-     Com fundo verde e texto escuro em cima, o contraste dependia do tema —
-     no claro virava verde escuro sobre verde, ilegível. E a regra
-     ".pop__plano span" (que pinta o preço) ganhava desta por especificidade,
-     então nem a cor que eu escolhi estava valendo. Contorno funciona nos
-     dois temas com uma cor só, e o seletor abaixo é específico o bastante
-     pra ganhar. */
-  .pop__plano .pop__etiqueta {
-    display: inline-block; margin-left: 8px; vertical-align: 1px;
-    font: 600 9px var(--mono); letter-spacing: .09em; text-transform: uppercase;
-    background: none; color: var(--verde-forte);
-    border: 1px solid currentColor; padding: 1px 5px; white-space: nowrap;
-  }
-  .pop__plano.vital .pop__etiqueta { color: var(--dourado); }
-
-  /* Sobe um fio ao passar o mouse. Pouco de propósito: é confirmação de que
-     dá pra clicar, não um pulo. */
-  .pop__plano { transition: transform .12s ease-out, border-color .12s, background .12s; }
-  .pop__plano:hover { transform: translateY(-2px); }
-  .pop__plano:active { transform: translateY(0); }
-  @media (prefers-reduced-motion: reduce) { .pop__plano { transition: none; } }
-
-  /* Os planos nascem escondidos de propósito: primeiro a pessoa entende o
-     que ganha, depois vê quanto custa. Preço antes do motivo só serve pra
-     virar "caro" sem termo de comparação. */
   /* O roteiro do teste. Numerado porque é sequência de verdade: pular a
      janela anônima faz os outros passos falharem. */
   .pop .passos { margin: 0 0 12px; padding-left: 20px; }
@@ -509,6 +468,51 @@
   .hub__ponto:hover { background: var(--fraco); }
   .hub__ponto.on { background: var(--verde); width: 20px; border-radius: 4px; }
 
+  /* ---- meio: o feed ---- */
+  .feed { margin-top: 18px; }
+  .feed__novo { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+  .feed__novo textarea {
+    width: 100%; min-height: 62px; resize: vertical; font: 14px inherit; color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); border-radius: 4px; padding: 10px 11px;
+  }
+  .feed__novo textarea:focus { outline: 0; border-color: var(--verde); }
+  .feed__linha { display: flex; align-items: center; gap: 8px; }
+  .feed__linha .conta { margin-left: auto; font: 500 11px var(--mono); color: var(--apagado); }
+  .feed__linha .conta.perto { color: var(--perigo); }
+
+  .feed__post { display: flex; gap: 11px; padding: 14px 0; border-bottom: 1px solid var(--linha); }
+  .feed__post:last-child { border-bottom: 0; }
+  .feed__foto {
+    flex: none; width: 38px; height: 38px; border-radius: 50%; overflow: hidden;
+    background: var(--verde-fraco); display: grid; place-items: center;
+    font: 600 15px var(--disp); color: var(--verde-forte);
+  }
+  .feed__foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .feed__corpo { flex: 1; min-width: 0; }
+  .feed__quem { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 3px; }
+  .feed__quem b { font: 600 14px var(--disp); }
+  .feed__quem .arroba, .feed__quem .quando { color: var(--apagado); font: 500 11.5px var(--mono); }
+  .feed__texto { font-size: 14px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .feed__img {
+    display: block; margin-top: 9px; max-width: 100%; max-height: 420px;
+    border: 1px solid var(--linha); border-radius: 4px; cursor: zoom-in;
+  }
+  .feed__acao {
+    border: 0; background: none; padding: 0; cursor: pointer;
+    color: var(--apagado); font: 500 11.5px var(--mono);
+  }
+  .feed__acao:hover { color: var(--perigo); }
+
+  /* Um selo, um significado. Verde é quem transmite com a gente; roxo é
+     quem desenha à mão. Os dois são conferidos por uma pessoa. */
+  .feed__selo {
+    font: 600 9.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 3px; white-space: nowrap;
+  }
+  .feed__selo.streamer { color: var(--verde-forte); background: var(--verde-fraco); }
+  .feed__selo.artista  { color: #6B3FA0; background: rgba(107,63,160,.13); }
+  [data-tema="escuro"] .feed__selo.artista { color: #C6A6F0; background: rgba(198,166,240,.16); }
+
   /* ---- direita: em alta ---- */
 
   /* Os controles do site inteiro só ganham estilo dentro de .campo, e aqui
@@ -576,6 +580,57 @@
 
   /* O cupom. Discreto: quem não tem código não pode sentir que está
      perdendo desconto por não ter. */
+  /* ---------- os planos, em cartão ----------
+
+     Eram três linhas empilhadas ocupando a largura toda. Linha empilhada é
+     desenho de lista de ajustes, não de preço: nada ali dizia "escolha um",
+     e o número do anual, sozinho numa linha, parecia caro do lado do
+     mensal. Lado a lado a comparação se faz sozinha. */
+  .pop__caixa.largo { max-width: 880px; }
+
+  .planos3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; margin: 4px 0 20px; }
+  @media (max-width: 760px) { .planos3 { grid-template-columns: 1fr; } }
+
+  .pcard {
+    position: relative; display: flex; flex-direction: column; text-align: left;
+    border: 1px solid var(--linha); border-radius: 7px; background: var(--caixa);
+    padding: 17px 16px 16px; cursor: pointer;
+    transition: transform .14s ease-out, border-color .14s, background .14s, box-shadow .14s;
+  }
+  .pcard:hover { transform: translateY(-3px); border-color: var(--verde); }
+  .pcard.on { border-color: var(--verde); background: var(--verde-fraco); box-shadow: inset 0 0 0 1px var(--verde); }
+  .pcard.vital:hover, .pcard.vital.on { border-color: var(--dourado); }
+  .pcard.vital.on { background: rgba(138,98,16,.07); box-shadow: inset 0 0 0 1px var(--dourado); }
+  @media (prefers-reduced-motion: reduce) { .pcard { transition: none; } }
+
+  .pcard__tag {
+    position: absolute; top: -9px; left: 14px; padding: 3px 9px; border-radius: 10px;
+    font: 600 9.5px var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    background: var(--verde); color: #fff;
+  }
+  .pcard.vital .pcard__tag { background: var(--dourado); }
+
+  .pcard__nome {
+    font: 600 11px var(--mono); letter-spacing: .14em; text-transform: uppercase;
+    color: var(--fraco); margin-bottom: 7px;
+  }
+  .pcard__preco { font: 700 27px var(--disp); line-height: 1.1; color: var(--tinta); }
+  .pcard.vital .pcard__preco { color: var(--dourado); }
+  .pcard__preco .antes {
+    font: 400 15px var(--disp); text-decoration: line-through; opacity: .45; margin-right: 7px;
+  }
+  .pcard__periodo { font-size: 12px; color: var(--apagado); margin-top: 2px; }
+  .pcard__comp {
+    margin-top: 9px; font-size: 12.5px; line-height: 1.45; font-weight: 600; color: var(--verde-forte);
+  }
+  .pcard.vital .pcard__comp { color: var(--dourado); }
+
+  /* Numa caixa larga a lista de benefícios em coluna única vira uma tira
+     comprida que empurra o preço pra fora da tela. */
+  .pop__caixa.largo .pop__lista { columns: 2; column-gap: 28px; margin-bottom: 6px; }
+  .pop__caixa.largo .pop__lista li { break-inside: avoid; }
+  @media (max-width: 760px) { .pop__caixa.largo .pop__lista { columns: 1; } }
+
   .pop__cupom { display: flex; gap: 8px; margin: 0 0 10px; }
   .pop__cupom input {
     flex: 1 1 auto; min-width: 0; font: 13px var(--mono); color: var(--tinta);
@@ -603,25 +658,12 @@
   .pop__cupomitem b { font: 600 12.5px var(--mono); letter-spacing: .06em; }
   .pop__cupomitem small { display: block; color: var(--fraco); font-size: 11.5px; font-weight: 400; }
   .pop__cupomitem .quanto { color: var(--verde-forte); font: 600 12.5px var(--mono); white-space: nowrap; }
-  .pop__plano .antes { text-decoration: line-through; opacity: .5; margin-right: 6px; font-weight: 400; }
 
   .pop__acao {
     flex: 0 0 auto;
     background: var(--caixa); padding: 14px 0 0;
     border-top: 1px solid var(--linha);
   }
-
-  .pop__planos { display: flex; flex-direction: column; gap: 8px; }
-  .pop__plano {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    width: 100%; text-align: left; padding: 12px 14px;
-    border: 1px solid var(--linha); background: var(--caixa2);
-    color: var(--tinta); cursor: pointer; font: inherit;
-  }
-  .pop__plano:hover { border-color: var(--verde); background: var(--verde-fraco); }
-  .pop__plano b { font: 600 15px var(--disp); }
-  .pop__plano span { font: 600 15px var(--mono); color: var(--verde-forte); white-space: nowrap; }
-  .pop__plano small { display: block; color: var(--apagado); font-size: 12px; font-weight: 400; }
 
   /* ---------- conteúdo ---------- */
   .w { max-width: 1080px; margin: 0 auto; padding: 30px 20px 90px; }
@@ -885,7 +927,7 @@
 
   <!-- Só aparece quando o servidor diz que a cobrança está aberta. Em modo
        de teste, só pra admin. -->
-  <button class="aba pro escondido" id="abaUpgrade" type="button">Upgrade</button>
+  <button class="aba pro escondido" id="abaUpgrade" type="button">Ver planos</button>
   <!-- Só admin vê. Liga o modo em que clicar num texto abre a caixa de
        reescrever. -->
   <button class="aba escondido" id="abaTextos" type="button">Editar textos</button>
@@ -2884,7 +2926,7 @@ function popTecla(e) { if (e.key === 'Escape') fechaPop(); }
 function abrePro(estado) {
   fechaPop();
 
-  const caixa = h('div', { cls: 'pop__caixa' });
+  const caixa = h('div', { cls: 'pop__caixa largo' });
   const fundo = h('div', { cls: 'pop', id: 'pop' }, [caixa]);
 
   /* Clicar fora fecha; clicar dentro não. Sem o segundo, arrastar pra
@@ -2940,10 +2982,10 @@ function abrePro(estado) {
   const campoCupom = h('input', { type: 'text', placeholder: 'Cupom de desconto', maxlength: '24' });
   const btCupom = h('button', { cls: 'bt mini', type: 'button', txt: 'Aplicar' });
   const cupomDiz = h('p', { cls: 'pop__cupomdiz escondido' });
-  const linhaCupom = h('div', { cls: 'pop__cupom escondido' }, [campoCupom, btCupom]);
+  const linhaCupom = h('div', { cls: 'pop__cupom' }, [campoCupom, btCupom]);
 
   const listaCupons = h('div', { cls: 'pop__cupons escondido' });
-  const temCupom = h('button', { cls: 'pop__temcupom escondido', type: 'button',
+  const temCupom = h('button', { cls: 'pop__temcupom', type: 'button',
     txt: 'Ver cupons disponíveis' });
 
   let cuponsVistos = false;
@@ -3029,7 +3071,7 @@ function abrePro(estado) {
   };
 
   /* ----- os planos ----- */
-  const planos = h('div', { cls: 'pop__planos escondido' });
+  const planos = h('div', { cls: 'planos3' });
   const precos = [];
   let escolhido = null;
 
@@ -3067,30 +3109,35 @@ function abrePro(estado) {
 
   const mensal = (estado.planos || []).find((x) => x.periodo === 'mensal');
 
+  const PERIODO = { mensal: 'por mês', anual: 'por ano', vitalicio: 'uma vez só' };
+  const ETIQUETA = { anual: 'mais escolhido', vitalicio: 'melhor a longo prazo' };
+
   (estado.planos || []).forEach((pl, i) => {
     const reais = reaisDe(pl.preco_centavos);
 
-    const preco = h('span', {});
+    const preco = h('span', { cls: 'pcard__preco' });
     preco.appendChild(document.createTextNode(reais));
 
-    const b = h('button', { cls: 'pop__plano' + (pl.periodo === 'vitalicio' ? ' vital' : ''), type: 'button' }, [
-      h('div', {}, [
-        h('b', { txt: pl.nome }),
-        h('small', { cls: 'comp', txt: comparacao(pl, mensal) }),
-      ]),
-      preco,
-    ]);
+    const b = h('button', { cls: 'pcard' + (pl.periodo === 'vitalicio' ? ' vital' : ''), type: 'button' });
+    if (ETIQUETA[pl.periodo]) b.appendChild(h('span', { cls: 'pcard__tag', txt: ETIQUETA[pl.periodo] }));
+    b.appendChild(h('span', { cls: 'pcard__nome', txt: pl.nome }));
+    b.appendChild(preco);
+    b.appendChild(h('span', { cls: 'pcard__periodo', txt: PERIODO[pl.periodo] || '' }));
 
-    /* Ao lado do nome, dentro do bloco da esquerda. */
-    const nome = b.querySelector('b');
-    if (pl.periodo === 'anual') nome.appendChild(h('span', { cls: 'pop__etiqueta', txt: 'mais escolhido' }));
-    if (pl.periodo === 'vitalicio') nome.appendChild(h('span', { cls: 'pop__etiqueta', txt: 'melhor a longo prazo' }));
+    const comp = comparacao(pl, mensal);
+    if (comp) b.appendChild(h('span', { cls: 'pcard__comp', txt: comp }));
 
     precos.push({ el: preco, cheio: reais, plano: pl, botao: b });
 
     b.onclick = () => marca(i);
     planos.appendChild(b);
   });
+
+  /* Os preços vêm ANTES da lista de benefícios: quem abriu a tela quer
+     saber quanto custa, e a lista é a mesma nos três planos. */
+  corpo.insertBefore(planos, corpo.firstChild);
+  planos.insertAdjacentElement('afterend',
+    h('p', { cls: 'd', style: 'margin:0 0 12px', txt: 'Os três dão exatamente o mesmo:' }));
 
   function marca(i) {
     escolhido = precos[i] ? precos[i].plano : null;
@@ -3116,7 +3163,7 @@ function abrePro(estado) {
   }
 
   /* ----- o botão que paga ----- */
-  const pagar = h('button', { cls: 'bt principal escondido', type: 'button',
+  const pagar = h('button', { cls: 'bt principal', type: 'button',
     txt: 'Seja Pro', style: 'width:100%' });
 
   pagar.onclick = async () => {
@@ -3140,33 +3187,24 @@ function abrePro(estado) {
     pagar.textContent = antes;
   };
 
-  /* ----- ver planos ----- */
-  const verPlanos = h('button', { cls: 'bt principal', type: 'button',
-    txt: estado.plano === 'gratis' ? 'Ver planos' : 'Renovar', style: 'width:100%' });
+  /* OS PREÇOS APARECEM DE CARA.
 
-  verPlanos.onclick = () => {
-    verPlanos.classList.add('escondido');
-    planos.classList.remove('escondido');
-    linhaCupom.classList.remove('escondido');
-    temCupom.classList.remove('escondido');
-    pagar.classList.remove('escondido');
+     Antes havia um "Ver planos" DENTRO do popup, depois de já ter clicado
+     em "Ver planos" pra abrir o popup: dois cliques pra mesma pergunta, e a
+     caixa saltando de tamanho no meio. O botão de fora continua sendo o
+     "Ver planos"; aqui já são os planos.
 
-    /* O ANUAL JÁ VEM MARCADO.
-
-       Ninguém abre a tela sem opção nenhuma escolhida: isso obriga a pessoa
-       a decidir do zero. Vindo marcado no anual, a decisão vira "confirmo ou
-       mudo", que é bem mais fácil — e é o plano que faz mais sentido pra
-       maioria. */
-    const i = precos.findIndex((x) => x.plano.periodo === 'anual');
-    marca(i >= 0 ? i : 0);
-  };
-
+     E o anual já vem marcado: sem nada escolhido, a pessoa decide do zero;
+     com o anual marcado, a decisão vira "confirmo ou mudo". */
   const acao = h('div', { cls: 'pop__acao' }, [
-    verPlanos, temCupom, listaCupons, linhaCupom, cupomDiz, planos, pagar,
+    temCupom, listaCupons, linhaCupom, cupomDiz, pagar,
     h('p', { cls: 'd', style: 'margin:12px 0 0;text-align:center',
       txt: 'Pix, cartão ou saldo. O pagamento acontece no site do Mercado Pago.' }),
   ]);
   caixa.appendChild(acao);
+
+  const iAnual = precos.findIndex((x) => x.plano.periodo === 'anual');
+  marca(iAnual >= 0 ? iAnual : 0);
 
   document.body.appendChild(fundo);
 }
@@ -3246,6 +3284,137 @@ const HUB_SELOS = {
 };
 
 const HUB_IDIOMAS = [['pt', 'Português'], ['en', 'Inglês'], ['es', 'Espanhol'], ['ja', 'Japonês']];
+
+/* ---------------- feed ---------------- */
+
+/* Quanto tempo faz. Montado peça por peça porque 'YYYY-MM-DD HH:MM:SS' sem
+   fuso é lido como UTC por alguns navegadores e como local por outros — a
+   diferença de três horas apareceria como "em 3 horas" num post de agora. */
+function faz(quando) {
+  const p = String(quando || '').split(/[- :]/);
+  if (p.length < 6) return '';
+  const q = new Date(p[0], p[1] - 1, p[2], p[3], p[4], p[5]);
+  const s = Math.max(0, (Date.now() - q.getTime()) / 1000);
+  if (s < 60) return 'agora';
+  if (s < 3600) return Math.floor(s / 60) + ' min';
+  if (s < 86400) return Math.floor(s / 3600) + ' h';
+  if (s < 604800) return Math.floor(s / 86400) + ' d';
+  return q.toLocaleDateString('pt-BR');
+}
+
+function blocoFeed() {
+  const cx = h('div', { cls: 'hub__painel feed' }, [h('h2', { txt: 'Feed' })]);
+  const lista = h('div');
+
+  const desenha = (posts) => {
+    lista.innerHTML = '';
+    if (!posts.length) {
+      lista.appendChild(h('p', { cls: 'd', txt: 'Ninguém postou ainda. Comece você.' }));
+      return;
+    }
+
+    posts.forEach((p) => {
+      const a = p.autor || {};
+
+      const foto = h('div', { cls: 'feed__foto' });
+      if (a.foto) foto.appendChild(h('img', { src: a.foto, alt: '', loading: 'lazy' }));
+      else foto.textContent = (a.nome || a.login || '?').slice(0, 1).toUpperCase();
+
+      const quem = h('div', { cls: 'feed__quem' }, [h('b', { txt: a.nome || a.login })]);
+      if (a.streamer) quem.appendChild(h('span', { cls: 'feed__selo streamer', txt: 'Streamer' }));
+      if (a.artista) quem.appendChild(h('span', { cls: 'feed__selo artista', txt: 'Artista' }));
+      quem.appendChild(h('span', { cls: 'arroba', txt: '@' + a.login }));
+      quem.appendChild(h('span', { cls: 'quando', txt: '· ' + faz(p.criado_em) }));
+
+      const corpo = h('div', { cls: 'feed__corpo' }, [
+        quem,
+        h('div', { cls: 'feed__texto', txt: p.texto || '' }),
+      ]);
+
+      if (p.imagem) {
+        const img = h('img', { cls: 'feed__img', loading: 'lazy', alt: '',
+          src: API + '/feed.php?a=img&id=' + p.imagem });
+        img.onclick = () => window.open(img.src, '_blank', 'noopener');
+        corpo.appendChild(img);
+      }
+
+      /* O botão de apagar só nasce pra quem pode: o servidor confere de
+         novo, então esconder aqui é só não oferecer o que não abriria. */
+      if (chave && (souAdmin || (quemSou && a.login === quemSou))) {
+        const del = h('button', { cls: 'feed__acao', type: 'button', txt: 'apagar' });
+        del.style.marginTop = '7px';
+        del.onclick = async () => {
+          if (!confirm('Apagar esse post?')) return;
+          try {
+            await api('/feed.php', { method: 'POST', body: JSON.stringify({ acao: 'apagar', id: p.id }) });
+            carregaFeed();
+          } catch (e) { recado(e.message, 'ruim'); }
+        };
+        corpo.appendChild(del);
+      }
+
+      lista.appendChild(h('div', { cls: 'feed__post' }, [foto, corpo]));
+    });
+  };
+
+  const carregaFeed = () => {
+    fetch(API + '/feed.php').then((r) => r.json())
+      .then((d) => desenha(d.posts || []))
+      .catch(() => { lista.innerHTML = ''; lista.appendChild(h('p', { cls: 'd', txt: 'Não consegui carregar o feed.' })); });
+  };
+
+  if (chave) {
+    const campo = h('textarea', { maxlength: '500', placeholder: 'O que você está fazendo na live?' });
+    const foto  = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif',
+      style: 'display:none' });
+    const anexo = h('button', { cls: 'bt mini', type: 'button', txt: 'Imagem' });
+    const publicar = h('button', { cls: 'bt principal', type: 'button', txt: 'Publicar' });
+    const conta = h('span', { cls: 'conta', txt: '500' });
+
+    anexo.onclick = () => foto.click();
+    foto.onchange = () => {
+      const f = foto.files && foto.files[0];
+      anexo.textContent = f ? f.name.slice(0, 18) : 'Imagem';
+    };
+    campo.oninput = () => {
+      const resta = 500 - campo.value.length;
+      conta.textContent = String(resta);
+      conta.classList.toggle('perto', resta < 60);
+    };
+
+    publicar.onclick = async () => {
+      const f = foto.files && foto.files[0];
+      if (!campo.value.trim()) return recado('Escreva alguma coisa.', 'ruim');
+      if (f && f.size > 4194304) return recado('A imagem pode ter no máximo 4 MB.', 'ruim');
+
+      const fd = new FormData();
+      fd.append('texto', campo.value);
+      if (f) fd.append('imagem', f);
+
+      publicar.disabled = true;
+      try {
+        /* Sem Content-Type na mão: o boundary do multipart é o navegador
+           que escreve. */
+        const r = await fetch(API + '/feed.php', { method: 'POST', headers: { 'X-Chave': chave }, body: fd });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.erro || 'não deu');
+        campo.value = ''; foto.value = ''; anexo.textContent = 'Imagem'; conta.textContent = '500';
+        carregaFeed();
+      } catch (e) { recado(e.message, 'ruim'); }
+      publicar.disabled = false;
+    };
+
+    cx.appendChild(h('div', { cls: 'feed__novo' }, [
+      campo,
+      h('div', { cls: 'feed__linha' }, [anexo, publicar, foto, conta]),
+    ]));
+  }
+
+  cx.appendChild(lista);
+  lista.appendChild(h('p', { cls: 'd', txt: 'vendo…' }));
+  carregaFeed();
+  return cx;
+}
 
 let hubTeclado = null;
 
@@ -3336,6 +3505,7 @@ function telaInicio() {
     trilho,
     infoBox,
     pontos,
+    blocoFeed(),
   ]);
   hub.appendChild(colMei);
 
@@ -5718,6 +5888,19 @@ function telaAdmin() {
       const betaCx = h('input', { type: 'checkbox' });
       betaCx.checked = !!u.beta;
 
+      /* Os dois selos do feed, ligados um a um. É a conferência que dá
+         valor ao selo: automático, ele não diria nada. */
+      const selos = {};
+      const linhaSelos = h('div', { cls: 'campo', style: 'gap:14px;flex-wrap:wrap' });
+      [['selo_streamer', 'Streamer verificado'], ['selo_artista', 'Artista verificado']]
+        .forEach(([k, rot]) => {
+          const cxs = h('input', { type: 'checkbox' });
+          cxs.checked = !!u[k];
+          selos[k] = cxs;
+          linhaSelos.appendChild(h('label', { style: 'display:flex;align-items:center;gap:6px;font-size:12.5px' },
+            [cxs, document.createTextNode(rot)]));
+        });
+
       const salvar = h('button', { cls: 'bt mini', type: 'button', txt: 'Salvar' });
       const recado2 = h('span', { cls: 'd', style: 'font-size:11.5px' });
 
@@ -5732,6 +5915,8 @@ function telaAdmin() {
             perfis_max: maxi.value === '' ? null : parseInt(maxi.value, 10),
             cortesia_ate: cortesia.value,
             beta: betaCx.checked,
+            selo_streamer: selos.selo_streamer.checked,
+            selo_artista: selos.selo_artista.checked,
             recursos,
           }) });
           recado2.textContent = 'salvo';
@@ -5765,6 +5950,7 @@ function telaAdmin() {
           h('span', { cls: 'd', style: 'font-size:11.5px',
                       txt: 'vazio = o do plano (' + (d.padrao[u.plano === 'gratis' ? 'gratis' : 'pro'] || {}).perfis_max + ')' }),
         ]),
+        linhaSelos,
         linhaMarcas,
         h('div', { cls: 'campo', style: 'gap:8px' }, [salvar, recado2]),
       ]));
@@ -5873,7 +6059,10 @@ function formArtista() {
     try {
       /* Sem Content-Type na mão: o boundary do multipart é o navegador que
          escreve. */
-      const r = await fetch(API + '/artistas.php', { method: 'POST', body: fd });
+      /* Com conta, a chave vai junto: é o que amarra a inscrição ao
+         perfil e faz o selo aparecer no feed depois de aprovada. */
+      const r = await fetch(API + '/artistas.php', { method: 'POST', body: fd,
+        headers: chave ? { 'X-Chave': chave } : {} });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.erro || 'não deu');
       diz.textContent = 'Inscrição recebida. A resposta vai pelo contato que você deixou.';
