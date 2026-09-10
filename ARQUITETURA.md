@@ -75,6 +75,14 @@ anual R$ 150, vitalício R$ 330. Sem marca d'água em plano nenhum.
 busca, caminho de navegação, modo de edição de textos, CSS extra, admin com
 usuários, cupons, parceiros e comissões.
 
+**Artistas:** `#/artistas` é a única tela que abre sem chave — um artista que
+chega por link de divulgação não tem conta e não precisa ter. Inscrição
+pública com até 5 imagens mais um arquivo de processo, tudo pendente até
+alguém aprovar. O selo "sem IA" é conferência humana, não detector: quem
+aprova abre o processo e olha. As imagens ficam em `arte/`, fora da pasta
+servida, e saem por `artistas.php?a=obra&id=`; as pendentes só com link
+assinado de 15 minutos, porque `<img>` não manda cabeçalho.
+
 ---
 
 ## 4. Limites reais das plataformas
@@ -99,49 +107,7 @@ Verificados na documentação. Não re-descubra.
 
 ## 5. O que falta
 
-### 5.1 Artistas
-
-Seção do site pra divulgar arte humana, sem IA.
-
-Como o Instagram não deixa puxar por @, o conteúdo é cadastrado — o que dá
-curadoria de graça: você escolhe qual arte aparece, com autorização explícita.
-
-```sql
-CREATE TABLE artistas (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  nome VARCHAR(80) NOT NULL,
-  arroba VARCHAR(64) NULL,
-  link VARCHAR(200) NULL,
-  bio VARCHAR(240) NULL,
-  estado ENUM('pendente','aprovado','recusado') NOT NULL DEFAULT 'pendente',
-  sem_ia TINYINT(1) NOT NULL DEFAULT 0,
-  verificado_em DATETIME NULL,
-  criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE artista_obras (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  artista_id INT UNSIGNED NOT NULL,
-  arquivo VARCHAR(64) NOT NULL,
-  titulo VARCHAR(120) NULL,
-  ordem INT NOT NULL DEFAULT 0
-);
-```
-
-Arquivos: `api/artistas.php` (inscrição pública, listagem, moderação) e uma
-tela nova. Upload reaproveita as regras do `api/som.php`: nome sorteado por
-nós, tipo decidido pelo conteúdo e não pela extensão, teto de tamanho,
-servido por PHP com Content-Type fixo.
-
-**Inscrição:** formulário público com nome, @, link e 1 a 5 imagens. Entra
-como `pendente`; ninguém aparece sem aprovação.
-
-**Verificação "sem IA":** não existe detector confiável — não prometa detecção
-automática. O que dá é declaração mais evidência: o artista marca "feito à
-mão" e envia **um arquivo de processo** (PSD, rascunho, timelapse) que só o
-admin vê. Aprovado, ganha o selo. O selo é a palavra do Enzo, não a de um
-algoritmo, e o texto do site precisa dizer isso.
-
-### 5.2 Estatísticas da transmissão
+### 5.1 Estatísticas da transmissão
 
 Já existe `contagens` (seguidores, subs, viewers por usuário). Falta o
 histórico: uma linha por dia.
@@ -167,7 +133,7 @@ atual**, sem porcentagem e sem elogio inventado, com uma linha de incentivo
 verdade só quando existe fato: recorde de espectadores, sequência de dias,
 primeiro sub.
 
-### 5.3 Painéis de mod pelo site
+### 5.2 Painéis de mod pelo site
 
 O que começou o projeto. Hoje o moderador recebe um link solto
 (`docs/mods.html`). Falta: quem é mod de vários canais entrar no site e ver
@@ -185,7 +151,7 @@ Tela: lista dos canais onde ele é mod → escolhe um → player da Twitch embut
 ao lado dos controles que a permissão dele permite. Reaproveita o embed do
 carrossel da vitrine e o `docs/painel.html`, que já tem os controles.
 
-### 5.4 Verificação de streamer na Descoberta
+### 5.3 Verificação de streamer na Descoberta
 
 Hoje a vitrine sorteia qualquer canal pequeno em português, com filtro de
 conteúdo adulto e lista de banidos. Falta um selo de "conferido".
@@ -194,7 +160,7 @@ Mais simples do que parece: uma tabela `vitrine_aprovados(login, aprovado_em)`
 e um botão no admin. Canal aprovado ganha selo e entra num sorteio separado; o
 resto continua aparecendo sem selo. Não precisa de automação.
 
-### 5.5 Menores
+### 5.4 Menores
 
 - `!split` pelo chat (o comando já tem estrutura; falta a ação que mexe no
   `spcor`)
@@ -237,14 +203,14 @@ mexer em `.js`/`.css` exige subir o `?v=`.
 
 **O que não precisa dizer:** os limites das plataformas — estão na seção 4.
 
-**Ordem sugerida**, do mais isolado pro mais entrelaçado: artistas →
-estatísticas → verificação → painéis de mod → guardião da live.
+**Ordem sugerida**, do mais isolado pro mais entrelaçado: estatísticas →
+verificação → painéis de mod → guardião da live.
 
 ---
 
 ## 7. Antes de cobrar de alguém
 
-1. Rodar as migrações pendentes (023 a 031)
+1. Rodar as migrações pendentes (023 a 032)
 2. Subir todo o `api/`
 3. `'ligado' => true`, `'modo' => 'producao'`, credenciais de produção
 4. Testar aprovado, recusado e Pix pendente

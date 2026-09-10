@@ -292,16 +292,34 @@ function vitrine_twitch(array $cfg, string $idioma, array $bloqueados): ?array
     return vitrine_cartao_offline($logins[random_int(0, count($logins) - 1)], $bloqueados);
 }
 
-function vitrine_sortear(string $fatia, array $cfg, string $idioma, array $bloqueados): ?array
+function vitrine_sortear(string $fatia, array $cfg, string $idioma, array $bloqueados, array $evitar = []): ?array
 {
     if (($cfg['fixo'] ?? '') !== '') {
         $vivos = vitrine_ao_vivo([$cfg['fixo']], $bloqueados);
         return $vivos ? vitrine_cartao($vivos[0]) : vitrine_cartao_offline($cfg['fixo'], $bloqueados);
     }
 
-    if ($fatia === 'usuario') return vitrine_do_site(false, $bloqueados);
-    if ($fatia === 'pro')     return vitrine_do_site(true, $bloqueados);
-    return vitrine_twitch($cfg, $idioma, $bloqueados);
+    /* Quem já foi sorteado nesta rodada entra na mesma lista dos banidos:
+       todo sorteio aqui já filtra por ela, então não repetir sai de graça. */
+    $fora = array_values(array_unique(array_merge($bloqueados, $evitar)));
+
+    if ($fatia === 'usuario')   $c = vitrine_do_site(false, $fora);
+    elseif ($fatia === 'pro')   $c = vitrine_do_site(true, $fora);
+    else                        $c = vitrine_twitch($cfg, $idioma, $fora);
+
+    /* TRÊS PAINÉIS, SEMPRE TRÊS.
+
+       A fatia 'pro' fica vazia enquanto ninguém assinou, e a 'usuario'
+       enquanto o site é pequeno. Painel faltando na página inicial não lê
+       como "ainda não temos": lê como defeito. Quando a fonte não tem
+       ninguém, entra um canal pequeno da Twitch — e o cartão guarda de onde
+       veio, pra etiqueta não chamar de assinante quem não é. */
+    if (!$c && $fatia !== 'twitch') {
+        $c = vitrine_twitch($cfg, $idioma, $fora);
+        if ($c) $c['origem'] = 'twitch';
+    }
+
+    return $c;
 }
 
 /* ------------------------------------------------------------------ *
@@ -480,13 +498,16 @@ function vitrine_atualiza(array $cfg, array $bloqueados, string $idioma): array
 {
     $feito = [];
 
+    $escolhidos = [];
+
     foreach (VITRINE_FATIAS as $f) {
         if (!$cfg[$f]['ligado']) continue;
         try {
-            $cartao = vitrine_sortear($f, $cfg[$f], $idioma, $bloqueados);
+            $cartao = vitrine_sortear($f, $cfg[$f], $idioma, $bloqueados, $escolhidos);
         } catch (Throwable $e) {
             $cartao = null;
         }
+        if ($cartao && !empty($cartao['login'])) $escolhidos[] = strtolower((string) $cartao['login']);
         /* GUARDA ATÉ O "NÃO ACHEI": sem isso, uma fatia vazia refaz a busca a
            cada visita, e a fatia 'pro' consulta o acesso de cada conta do
            site pra montar a lista. */

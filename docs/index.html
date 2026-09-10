@@ -343,11 +343,15 @@
      em 1080px espremem tudo — foi o que deixou a primeira versão feia. */
   body.na-vitrine .w { max-width: 1600px; }
 
-  /* 30% / 40% / 30%. O minmax(0,...) é o que impede uma coluna de crescer
-     por causa de conteúdo comprido e comer as vizinhas. */
+  /* O meio leva 5 de 11 porque agora paga por três coisas, e não uma: os
+     dois vizinhos ficaram grandes o bastante pra se entender que são lives,
+     e o vídeo do meio não podia encolher pra pagar essa conta.
+
+     O minmax(0,...) é o que impede uma coluna de crescer por causa de
+     conteúdo comprido e comer as vizinhas. */
   .hub {
     display: grid; gap: 18px; padding: 14px 0 40px;
-    grid-template-columns: minmax(0, 3fr) minmax(0, 4fr) minmax(0, 3fr);
+    grid-template-columns: minmax(0, 3fr) minmax(0, 5fr) minmax(0, 3fr);
     align-items: start;
   }
   @media (max-width: 1180px) { .hub { grid-template-columns: 1fr; } }
@@ -392,22 +396,66 @@
 
   /* ---- meio: o carrossel ---- */
 
-  /* Os vizinhos aparecem cortados nas beiradas, como na home da Twitch: é o
-     que faz o carrossel parecer carrossel sem precisar de legenda dizendo
-     que tem mais coisa. */
-  .hub__trilho { display: flex; align-items: center; gap: 8px; }
+  /* OS VIZINHOS APARECEM INTEIROS, SÓ QUE MENORES.
+
+     Antes eles vinham cortados nas beiradas, imitando a home da Twitch. Sem
+     seta e sem nome, aquilo não lia como "a live de outra pessoa": lia como
+     um retângulo colorido no canto. Miniatura inteira, nome embaixo, selo de
+     ao vivo e uma seta por cima — cada um desses diz uma coisa que faltava. */
+  .hub__trilho { display: flex; align-items: center; gap: 12px; }
 
   .hub__lado {
-    flex: 0 0 9%; align-self: stretch; min-width: 0;
-    border: 0; padding: 0; background: none; cursor: pointer;
-    opacity: .38; overflow: hidden;
+    flex: 0 0 16%; align-self: center; min-width: 0;
+    border: 0; padding: 0; background: none; cursor: pointer; text-align: left;
+    opacity: .78; transition: opacity .18s ease, transform .18s ease;
   }
-  .hub__lado:hover { opacity: .8; }
-  .hub__lado img { width: 300%; height: 100%; object-fit: cover; display: block; }
-  .hub__lado.dir img { margin-left: -200%; }
-  .hub__lado .vazio { width: 100%; height: 100%; background: var(--caixa2); }
+  .hub__lado:hover, .hub__lado:focus-visible { opacity: 1; transform: translateY(-2px); outline: 0; }
+
+  .hub__lado .mini {
+    position: relative; display: block; width: 100%; aspect-ratio: 16/9;
+    overflow: hidden; background: var(--caixa2); border: 1px solid var(--linha);
+    transition: border-color .18s ease;
+  }
+  .hub__lado:hover .mini, .hub__lado:focus-visible .mini { border-color: var(--verde); }
+  .hub__lado img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .hub__lado .nome {
+    display: block; margin-top: 7px; font: 500 12px var(--mono); color: var(--fraco);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* Do lado CONTRÁRIO ao da seta: a miniatura é pequena, e os dois no mesmo
+     canto viram uma mancha só. */
+  .hub__lado .vivo {
+    position: absolute; top: 6px; padding: 2px 5px; border-radius: 2px;
+    font: 700 9px var(--mono); letter-spacing: .1em; color: #fff; background: var(--perigo);
+  }
+  .hub__lado.esq .vivo { right: 6px; }
+  .hub__lado.dir .vivo { left: 6px; }
+
+  /* A SETA É O QUE DIZ QUE DÁ PRA CLICAR. Fica por cima da miniatura, do
+     lado de fora, e não some no hover. */
+  .hub__lado .seta {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+    background: rgba(8,12,9,.66); color: #fff; font: 600 15px var(--disp); line-height: 1;
+    transition: background .18s ease;
+  }
+  .hub__lado.esq .seta { left: 7px; }
+  .hub__lado.dir .seta { right: 7px; }
+  .hub__lado:hover .seta { background: var(--verde); }
 
   .hub__palco { flex: 1 1 auto; min-width: 0; }
+
+  /* O DESLIZE. Curto e pequeno de propósito: o que ele precisa dizer é
+     "trocou, e veio daquele lado". Passar disso vira enfeite que atrasa. */
+  @keyframes hub-entra-esq { from { opacity: 0; transform: translateX(4%); } to { opacity: 1; transform: none; } }
+  @keyframes hub-entra-dir { from { opacity: 0; transform: translateX(-4%); } to { opacity: 1; transform: none; } }
+  .vai-esq .hub__palco, .vai-esq .hub__lado, .hub__info.vai-esq { animation: hub-entra-esq .26s ease-out both; }
+  .vai-dir .hub__palco, .vai-dir .hub__lado, .hub__info.vai-dir { animation: hub-entra-dir .26s ease-out both; }
+  @media (prefers-reduced-motion: reduce) {
+    .vai-esq .hub__palco, .vai-esq .hub__lado, .hub__info.vai-esq,
+    .vai-dir .hub__palco, .vai-dir .hub__lado, .hub__info.vai-dir { animation: none; }
+  }
 
   .hub__video {
     position: relative; width: 100%; aspect-ratio: 16/9;
@@ -422,7 +470,12 @@
     font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase;
   }
 
-  .hub__info { padding: 14px 2px 0; display: flex; flex-direction: column; gap: 4px; }
+  /* Alinhado com o VÍDEO, não com o trilho: o mesmo recuo dos vizinhos
+     mais o vão. Começando na beirada do trilho, o nome do canal ficava
+     embaixo da miniatura do vizinho, e o bloco inteiro parecia torto. */
+  .hub__info {
+    padding: 14px calc(16% + 12px) 0; display: flex; flex-direction: column; gap: 4px;
+  }
   .hub__info b { font: 600 18px var(--disp); }
   .hub__info .tit { color: var(--fraco); font-size: 14px;
     overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -437,11 +490,23 @@
   .hub__selo.pro { color: var(--dourado); }
   .hub__selo.usuario { color: var(--verde-forte); }
 
+  /* No celular o vizinho vira só a seta: 16% de uma tela de 380px é uma
+     miniatura de 60px, que não mostra nada e ainda rouba o vídeo. */
+  @media (max-width: 640px) {
+    .hub__lado { flex: 0 0 34px; opacity: 1; }
+    .hub__lado .mini { aspect-ratio: auto; height: 34px; background: none; border: 0; }
+    .hub__lado img, .hub__lado .nome, .hub__lado .vivo { display: none; }
+    .hub__lado .seta { position: static; transform: none; }
+    .hub__info { padding-left: 2px; padding-right: 2px; }
+  }
+
   .hub__pontos { display: flex; justify-content: center; gap: 7px; padding: 14px 0 0; }
   .hub__ponto {
     width: 7px; height: 7px; border-radius: 50%; border: 0; padding: 0;
     background: var(--linha2); cursor: pointer;
+    transition: background .18s ease, width .22s ease, border-radius .22s ease;
   }
+  .hub__ponto:hover { background: var(--fraco); }
   .hub__ponto.on { background: var(--verde); width: 20px; border-radius: 4px; }
 
   /* ---- direita: em alta ---- */
@@ -607,6 +672,32 @@
     border: 1px dashed var(--linha); border-radius: 6px; padding: 34px 20px;
     text-align: center; color: var(--apagado); font-size: 14px;
   }
+
+  /* ---------- artistas ---------- */
+  .arte-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+  .arte-cartao {
+    border: 1px solid var(--linha); border-radius: 6px; background: var(--caixa);
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .arte-capa {
+    display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+    background: var(--fundo); cursor: zoom-in;
+  }
+  .arte-tiras { display: flex; gap: 4px; padding: 6px 8px 0; flex-wrap: wrap; }
+  .arte-tiras button {
+    width: 42px; height: 34px; padding: 0; overflow: hidden; cursor: pointer;
+    border: 1px solid var(--linha); border-radius: 3px; background: none;
+  }
+  .arte-tiras button[aria-current="true"] { border-color: var(--verde); }
+  .arte-tiras img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .arte-corpo { padding: 12px 14px 15px; display: flex; flex-direction: column; gap: 5px; }
+  .arte-corpo .topo { display: flex; align-items: center; gap: 8px; }
+  .arte-corpo .nm { font: 600 16px var(--disp); flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .arte-corpo .bio { font-size: 13px; color: var(--fraco); }
+  .arte-corpo a { font-size: 12.5px; color: var(--verde-forte); text-decoration: none; }
+  .arte-corpo a:hover { text-decoration: underline; }
+
 
   /* ---------- editor ---------- */
   .editor { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; }
@@ -788,6 +879,9 @@
   </button>
 
   <button class="aba" id="abaMeu" type="button">Meu Controller</button>
+  <!-- Fica visível pra quem não entrou: um artista que chega por um link de
+       divulgação não tem conta e não precisa ter. -->
+  <button class="aba" id="abaArtistas" type="button">Artistas</button>
 
   <!-- Só aparece quando o servidor diz que a cobrança está aberta. Em modo
        de teste, só pra admin. -->
@@ -2387,6 +2481,7 @@ const TELAS = [
   ['#/subathon',  'Subathon',      'cronômetro e o que soma tempo'],
   ['#/mods',      'Moderadores',   'links de quem te ajuda'],
   ['#/tutorial',  'Tutorial',      'como colar no OBS'],
+  ['#/artistas',  'Artistas',      'arte humana, feita à mão'],
 ];
 
 function nomeDaTela(hash) {
@@ -3152,6 +3247,8 @@ const HUB_SELOS = {
 
 const HUB_IDIOMAS = [['pt', 'Português'], ['en', 'Inglês'], ['es', 'Espanhol'], ['ja', 'Japonês']];
 
+let hubTeclado = null;
+
 function telaInicio() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -3220,7 +3317,7 @@ function telaInicio() {
   colEsq.appendChild(secPar);
 
   /* ================= meio: o carrossel ================= */
-  const espiaEsq = h('button', { cls: 'hub__lado', type: 'button', title: 'Anterior' });
+  const espiaEsq = h('button', { cls: 'hub__lado esq', type: 'button', title: 'Anterior' });
   const espiaDir = h('button', { cls: 'hub__lado dir', type: 'button', title: 'Próximo' });
   const palco = h('div', { cls: 'hub__palco' });
   const pontos = h('div', { cls: 'hub__pontos' });
@@ -3232,9 +3329,11 @@ function telaInicio() {
      faixas compridas nas laterais, que é o oposto do efeito. */
   const infoBox = h('div', { cls: 'hub__info' });
 
+  const trilho = h('div', { cls: 'hub__trilho' }, [espiaEsq, palco, espiaDir]);
+
   const colMei = h('div', { cls: 'hub__col' }, [
     h('h2', { txt: 'Quem sabe você gosta desse streamer' }),
-    h('div', { cls: 'hub__trilho' }, [espiaEsq, palco, espiaDir]),
+    trilho,
     infoBox,
     pontos,
   ]);
@@ -3266,13 +3365,23 @@ function telaInicio() {
   let atual = 0;
   let girando = null;
 
-  function espia(botao, cartao) {
+  function espia(botao, cartao, lado) {
     botao.innerHTML = '';
     if (!cartao) { botao.style.visibility = 'hidden'; return; }
     botao.style.visibility = '';
-    if (cartao.thumb) botao.appendChild(h('img', { src: cartao.thumb, alt: '', loading: 'lazy' }));
-    else botao.appendChild(h('div', { cls: 'vazio' }));
-    botao.title = cartao.nome || cartao.login;
+
+    const mini = h('span', { cls: 'mini' });
+    /* Canal desligado não tem miniatura de live; tem a arte do canal, e na
+       falta dela a foto. Caixa cinza vazia parece imagem quebrada. */
+    const arte = cartao.thumb || cartao.foto || '';
+    if (arte) mini.appendChild(h('img', { src: arte, alt: '', loading: 'lazy' }));
+    if (cartao.aovivo) mini.appendChild(h('span', { cls: 'vivo', txt: 'AO VIVO' }));
+    mini.appendChild(h('span', { cls: 'seta', txt: lado === 'esq' ? '\u2039' : '\u203A' }));
+
+    botao.appendChild(mini);
+    botao.appendChild(h('span', { cls: 'nome', txt: cartao.nome || cartao.login }));
+    botao.title = (lado === 'esq' ? 'Anterior: ' : 'Próximo: ') + (cartao.nome || cartao.login);
+    botao.setAttribute('aria-label', botao.title);
   }
 
   /* O player só entra no slide ATIVO, e só pra quem está no ar. Três iframes
@@ -3301,7 +3410,10 @@ function telaInicio() {
       quadro.appendChild(h('div', { cls: 'hub__off', txt: 'offline agora' }));
     }
 
-    const [selCls, selTxt] = HUB_SELOS[c.fatia] || ['', ''];
+    /* De onde o cartão VEIO, e não em que gaveta ele coube: quando a fatia
+       'pro' não tem ninguém, quem entra no lugar é uma descoberta da Twitch,
+       e chamar aquilo de assinante seria mentira na etiqueta. */
+    const [selCls, selTxt] = HUB_SELOS[c.origem || c.fatia] || ['', ''];
     const info = infoBox;
     info.appendChild(h('span', { cls: 'hub__selo ' + selCls, txt: selTxt }));
     info.appendChild(h('b', { txt: c.nome || c.login }));
@@ -3324,23 +3436,56 @@ function telaInicio() {
     palco.appendChild(quadro);
 
     const n = cartoes.length;
-    espia(espiaEsq, n > 1 ? cartoes[(atual - 1 + n) % n] : null);
-    espia(espiaDir, n > 1 ? cartoes[(atual + 1) % n] : null);
+    /* Com dois cartões, "anterior" e "próximo" são o MESMO canal: mostrar o
+       mesmo rosto dos dois lados faz o carrossel parecer quebrado. */
+    espia(espiaEsq, n > 2 ? cartoes[(atual - 1 + n) % n] : null, 'esq');
+    espia(espiaDir, n > 1 ? cartoes[(atual + 1) % n] : null, 'dir');
     [...pontos.children].forEach((b, i) => b.classList.toggle('on', i === atual));
+  }
+
+  function anima(dir) {
+    const cls = dir < 0 ? 'vai-dir' : 'vai-esq';
+    [trilho, infoBox].forEach((no) => {
+      no.classList.remove('vai-esq', 'vai-dir');
+      /* Ler o offsetWidth força o navegador a recalcular agora, e é isso que
+         reinicia a animação quando a classe é a mesma da vez passada. */
+      void no.offsetWidth;
+      no.classList.add(cls);
+    });
   }
 
   /* NÃO chamar de vaiPara: já existe uma global com esse nome e outro
      sentido — duas funções homônimas no mesmo arquivo é armadilha. */
-  function mostra(i) {
-    atual = (i + cartoes.length) % cartoes.length;
+  function mostra(i, dir) {
+    const n = cartoes.length;
+    if (!n) return;
+    const novo = (i + n) % n;
+    if (dir === undefined) dir = (novo === (atual + 1) % n) ? 1 : -1;
+    atual = novo;
+    anima(dir);
     pintaPalco();
     /* Cada toque adia o giro: quem está escolhendo não quer a tela mudando
        embaixo do dedo. */
-    if (girando) { clearInterval(girando); girando = setInterval(() => mostra(atual + 1), 12000); }
+    if (girando) { clearInterval(girando); girando = setInterval(() => mostra(atual + 1, 1), 12000); }
   }
 
-  espiaEsq.onclick = () => mostra(atual - 1);
-  espiaDir.onclick = () => mostra(atual + 1);
+  espiaEsq.onclick = () => mostra(atual - 1, -1);
+  espiaDir.onclick = () => mostra(atual + 1, 1);
+
+  /* Seta do teclado anda no carrossel. Sai quando a pessoa muda de tela, e
+     sai TAMBÉM na entrada — voltar pra inicial estando nela não dispara
+     hashchange, e sem isto cada volta empilharia mais um ouvinte. */
+  if (hubTeclado) document.removeEventListener('keydown', hubTeclado);
+  hubTeclado = (e) => {
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if (e.key === 'ArrowLeft') mostra(atual - 1, -1);
+    else if (e.key === 'ArrowRight') mostra(atual + 1, 1);
+  };
+  document.addEventListener('keydown', hubTeclado);
+  window.addEventListener('hashchange', () => {
+    if (hubTeclado) document.removeEventListener('keydown', hubTeclado);
+    hubTeclado = null;
+  }, { once: true });
 
   /* ------------------------------------------------ os dados */
   function carregaVitrine() {
@@ -3366,13 +3511,13 @@ function telaInicio() {
       } else {
         cartoes.forEach((_, i) => {
           const b = h('button', { cls: 'hub__ponto', type: 'button', title: 'Canal ' + (i + 1) });
-          b.onclick = () => mostra(i);
+          b.onclick = () => mostra(i, i > atual ? 1 : -1);
           pontos.appendChild(b);
         });
         atual = Math.min(atual, cartoes.length - 1);
         pintaPalco();
         if (girando) clearInterval(girando);
-        if (cartoes.length > 1) girando = setInterval(() => mostra(atual + 1), 12000);
+        if (cartoes.length > 1) girando = setInterval(() => mostra(atual + 1, 1), 12000);
       }
 
       const a = (d && d.altas) || {};
@@ -5530,6 +5675,7 @@ function telaAdmin() {
 
   tela.appendChild(blocoVitrine());
   tela.appendChild(blocoParceiros());
+  tela.appendChild(blocoArtistas());
   tela.appendChild(blocoEstilo());
 
   const lista = h('div');
@@ -5628,6 +5774,266 @@ function telaAdmin() {
   });
 }
 
+/* ---------------- artistas ----------------
+
+   A verificação é humana e o site diz isso: detector de imagem gerada erra
+   dos dois lados, e errar contra um artista humano é pior do que deixar
+   passar. */
+
+const ARTE_SELO = 'Quer dizer que a inscrição foi conferida na mão, uma por uma, '
+  + 'olhando o arquivo de processo que a pessoa mandou: rascunho, PSD ou gravação de tela. '
+  + 'Não é detector automático — eles erram, e errar contra quem desenhou de verdade é pior '
+  + 'do que deixar passar.';
+
+const urlObra = (o) => API + '/artistas.php?a=obra&id=' + o.id + (o.t ? '&t=' + encodeURIComponent(o.t) : '');
+const linkSeguro = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u : '';
+
+function cartaoArtista(a) {
+  const obras = (a.obras || []).filter((o) => !o.processo);
+  const cx = h('div', { cls: 'arte-cartao' });
+
+  if (obras.length) {
+    const capa = h('img', { cls: 'arte-capa', loading: 'lazy', alt: a.nome, src: urlObra(obras[0]) });
+    let atual = obras[0];
+    capa.onclick = () => window.open(urlObra(atual), '_blank', 'noopener');
+    cx.appendChild(capa);
+
+    if (obras.length > 1) {
+      const tiras = h('div', { cls: 'arte-tiras' });
+      obras.forEach((o, i) => {
+        const b = h('button', { type: 'button', title: o.titulo || ('imagem ' + (i + 1)) },
+          [h('img', { src: urlObra(o), loading: 'lazy', alt: '' })]);
+        b.setAttribute('aria-current', i === 0 ? 'true' : 'false');
+        b.onclick = () => {
+          atual = o;
+          capa.src = urlObra(o);
+          tiras.querySelectorAll('button').forEach((x) => x.setAttribute('aria-current', x === b ? 'true' : 'false'));
+        };
+        tiras.appendChild(b);
+      });
+      cx.appendChild(tiras);
+    }
+  }
+
+  const topo = h('div', { cls: 'topo' }, [h('span', { cls: 'nm', txt: a.nome })]);
+  if (a.sem_ia) topo.appendChild(h('span', { cls: 'selo', txt: 'Sem IA' }));
+
+  const corpo = h('div', { cls: 'arte-corpo' }, [topo]);
+  if (a.bio) corpo.appendChild(h('span', { cls: 'bio', txt: a.bio }));
+
+  const url = linkSeguro(a.link);
+  if (url) {
+    corpo.appendChild(h('a', { href: url, target: '_blank', rel: 'noopener noreferrer nofollow',
+      txt: a.arroba ? '@' + a.arroba : 'Ver o trabalho' }));
+  } else if (a.arroba) {
+    corpo.appendChild(h('span', { cls: 'd', txt: '@' + a.arroba }));
+  }
+
+  cx.appendChild(corpo);
+  return cx;
+}
+
+function formArtista() {
+  const nome    = h('input', { type: 'text', maxlength: '80',  placeholder: 'Seu nome de artista', style: 'flex:1 1 200px' });
+  const arroba  = h('input', { type: 'text', maxlength: '64',  placeholder: '@ (opcional)', style: 'flex:0 0 150px' });
+  const link    = h('input', { type: 'url',  maxlength: '190', placeholder: 'https://… onde ver o seu trabalho', style: 'flex:1 1 240px' });
+  const bio     = h('input', { type: 'text', maxlength: '240', placeholder: 'Uma linha sobre o que você faz', style: 'flex:1 1 100%' });
+  const contato = h('input', { type: 'text', maxlength: '160', placeholder: 'Contato pra te responder (e-mail, @, Discord)', style: 'flex:1 1 240px' });
+
+  const semIa = h('input', { type: 'checkbox' });
+  const fotos = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif', multiple: '' });
+  const proc  = h('input', { type: 'file' });
+
+  const diz     = h('p', { cls: 'd', style: 'margin:8px 0 0' });
+  const mandar  = h('button', { cls: 'bt principal', type: 'button', txt: 'Mandar inscrição' });
+
+  mandar.onclick = async () => {
+    const fs = fotos.files ? Array.prototype.slice.call(fotos.files) : [];
+    if (!nome.value.trim()) { diz.textContent = 'Falta o seu nome.'; return; }
+    if (!fs.length) { diz.textContent = 'Escolha pelo menos uma imagem.'; return; }
+    if (fs.length > 5) { diz.textContent = 'No máximo 5 imagens.'; return; }
+    if (fs.some((f) => f.size > 4194304)) { diz.textContent = 'Cada imagem pode ter no máximo 4 MB.'; return; }
+
+    const pf = proc.files && proc.files[0];
+    if (semIa.checked && !pf) { diz.textContent = 'Pro selo, mande também o arquivo de processo.'; return; }
+    if (pf && pf.size > 16777216) { diz.textContent = 'O arquivo de processo pode ter no máximo 16 MB.'; return; }
+
+    const fd = new FormData();
+    fd.append('nome', nome.value);
+    fd.append('arroba', arroba.value);
+    fd.append('link', link.value);
+    fd.append('bio', bio.value);
+    fd.append('contato', contato.value);
+    if (semIa.checked) fd.append('sem_ia', '1');
+    fs.forEach((f) => fd.append('obras[]', f));
+    if (pf) fd.append('processo', pf);
+
+    mandar.disabled = true;
+    diz.textContent = 'Mandando…';
+    try {
+      /* Sem Content-Type na mão: o boundary do multipart é o navegador que
+         escreve. */
+      const r = await fetch(API + '/artistas.php', { method: 'POST', body: fd });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.erro || 'não deu');
+      diz.textContent = 'Inscrição recebida. A resposta vai pelo contato que você deixou.';
+      diz.style.color = 'var(--verde-forte)';
+      [nome, arroba, link, bio, contato].forEach((i) => { i.value = ''; });
+      fotos.value = ''; proc.value = ''; semIa.checked = false;
+    } catch (e) {
+      diz.textContent = e.message;
+      diz.style.color = 'var(--perigo)';
+    }
+    mandar.disabled = false;
+  };
+
+  return h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Quero aparecer aqui' }),
+    h('p', { cls: 'd', txt: 'Até 5 imagens. Nada entra no site antes de alguém olhar.' }),
+    h('div', { cls: 'campo' }, [nome, arroba]),
+    h('div', { cls: 'campo' }, [link, contato]),
+    h('div', { cls: 'campo' }, [bio]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Imagens' }), fotos]),
+    h('label', { style: 'display:flex;align-items:flex-start;gap:8px;font-size:13px;margin:10px 0 4px' },
+      [semIa, document.createTextNode('Isto é arte minha, feita à mão, sem imagem gerada por IA.')]),
+    h('div', { cls: 'campo' }, [
+      h('label', { txt: 'Processo' }), proc,
+      h('span', { cls: 'd', style: 'font-size:11.5px', txt: 'rascunho, PSD ou gravação de tela — só quem modera vê' }),
+    ]),
+    h('div', { cls: 'campo' }, [mandar]),
+    diz,
+  ]);
+}
+
+function telaArtistas() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Artistas' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Arte feita por gente. Clique no nome pra chegar em quem fez.' }));
+
+  tela.appendChild(h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'O que o selo "Sem IA" quer dizer' }),
+    h('p', { cls: 'd', txt: ARTE_SELO }),
+  ]));
+
+  const grade = h('div', { cls: 'arte-grade' });
+  tela.appendChild(grade);
+  tela.appendChild(formArtista());
+
+  fetch(API + '/artistas.php').then((r) => r.json()).then((d) => {
+    const as = d.artistas || [];
+    if (!as.length) {
+      grade.appendChild(h('div', { cls: 'vazio', txt: 'Ainda não tem ninguém aqui. Pode ser você.' }));
+      return;
+    }
+    as.forEach((a) => grade.appendChild(cartaoArtista(a)));
+  }).catch(() => {
+    grade.appendChild(h('div', { cls: 'vazio', txt: 'Não consegui carregar a galeria agora.' }));
+  });
+
+  if (souAdmin) {
+    const ir = h('button', { cls: 'bt mini', type: 'button', txt: 'Moderar inscrições' });
+    ir.onclick = () => vaiPara('#/admin');
+    tela.appendChild(h('div', { cls: 'so-adm' }, [
+      h('p', { txt: 'A fila de inscrições e o arquivo de processo de cada uma ficam na Administração.' }),
+      ir,
+    ]));
+  }
+}
+
+/* ---------------- moderação dos artistas ---------------- */
+
+function blocoArtistas() {
+  const cx = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Artistas' }),
+    h('p', { cls: 'd', txt: 'O selo é a sua palavra: abra o processo, olhe, e só então aprove com selo.' }),
+  ]);
+
+  const corpo = h('div');
+  cx.appendChild(corpo);
+
+  const carregaAr = () => {
+    corpo.innerHTML = '<p class="d">vendo…</p>';
+
+    api('/artistas.php', { method: 'POST', body: JSON.stringify({ acao: 'lista' }) }).then((d) => {
+      corpo.innerHTML = '';
+      const as = d.artistas || [];
+      if (!as.length) return corpo.appendChild(h('p', { cls: 'd', txt: 'Nenhuma inscrição ainda.' }));
+
+      as.forEach((a) => {
+        const manda = async (acao, extra) => {
+          try {
+            await api('/artistas.php', { method: 'POST',
+              body: JSON.stringify(Object.assign({ acao, id: a.id }, extra || {})) });
+            carregaAr();
+          } catch (e) { recado(e.message, 'ruim'); }
+        };
+
+        const obras = (a.obras || []).filter((o) => !o.processo);
+        const tiras = h('div', { cls: 'arte-tiras', style: 'padding:0 0 8px' });
+        obras.forEach((o) => {
+          const b = h('button', { type: 'button', style: 'width:64px;height:52px',
+            title: o.titulo || 'abrir' }, [h('img', { src: urlObra(o), loading: 'lazy', alt: '' })]);
+          b.onclick = () => window.open(urlObra(o), '_blank', 'noopener');
+          tiras.appendChild(b);
+        });
+
+        const acoes = h('div', { cls: 'campo', style: 'gap:6px;flex-wrap:wrap' });
+
+        const processo = (a.obras || []).filter((o) => o.processo)[0];
+        if (processo) {
+          const vp = h('button', { cls: 'bt mini', type: 'button', txt: 'Abrir o processo' });
+          vp.onclick = () => window.open(urlObra(processo), '_blank', 'noopener');
+          acoes.appendChild(vp);
+        } else {
+          acoes.appendChild(h('span', { cls: 'd', style: 'font-size:11.5px', txt: 'sem processo' }));
+        }
+
+        if (a.estado !== 'aprovado' || !a.sem_ia) {
+          const ok1 = h('button', { cls: 'bt mini', type: 'button', txt: 'Aprovar com selo' });
+          ok1.onclick = () => manda('aprovar', { sem_ia: 1 });
+          acoes.appendChild(ok1);
+        }
+        if (a.estado !== 'aprovado' || a.sem_ia) {
+          const ok2 = h('button', { cls: 'bt mini', type: 'button', txt: 'Aprovar sem selo' });
+          ok2.onclick = () => manda('aprovar', { sem_ia: 0 });
+          acoes.appendChild(ok2);
+        }
+        if (a.estado !== 'recusado') {
+          const nao = h('button', { cls: 'bt mini', type: 'button', txt: 'Recusar' });
+          nao.onclick = () => {
+            if (confirm('Recusar ' + a.nome + '? As imagens vão pro lixo, o cadastro fica.')) manda('recusar');
+          };
+          acoes.appendChild(nao);
+        }
+        const del = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×' });
+        del.onclick = () => { if (confirm('Apagar ' + a.nome + ' de vez?')) manda('apagar'); };
+        acoes.appendChild(del);
+
+        const url = linkSeguro(a.link);
+        const ficha = h('p', { cls: 'd', txt: a.estado
+          + (a.sem_ia ? '  ·  com selo' : '')
+          + (a.arroba ? '  ·  @' + a.arroba : '')
+          + (a.contato ? '  ·  ' + a.contato : '') });
+
+        const dentro = [h('b', { txt: a.nome }), ficha];
+        if (a.bio) dentro.push(h('p', { cls: 'd', txt: a.bio }));
+        if (url) dentro.push(h('p', {}, [h('a', { href: url, target: '_blank',
+          rel: 'noopener noreferrer nofollow', txt: url })]));
+        dentro.push(tiras, acoes);
+
+        corpo.appendChild(h('div', { style: 'border-top:1px solid var(--linha);padding-top:12px;margin-top:12px' }, dentro));
+      });
+    }).catch((e) => {
+      corpo.innerHTML = '';
+      corpo.appendChild(h('p', { cls: 'd', txt: 'Não deu: ' + e.message }));
+    });
+  };
+
+  carregaAr();
+  return cx;
+}
+
 function telaTutorial() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -5705,6 +6111,7 @@ function rota() {
   if (p[0] === 'comandos') return telaComandos();
   if (p[0] === 'tutorial') return telaTutorial();
   if (p[0] === 'admin') return telaAdmin();
+  if (p[0] === 'artistas') return telaArtistas();
   if (p[0] === 'subathon') return telaSubathon();
   if (p[0] === 'mods') return telaMods();
   if (p[0] === 'novo' && TIPOS[p[1]]) return telaEditor(null, p[1]);
@@ -5720,6 +6127,7 @@ window.addEventListener('hashchange', rota);
    a porta de entrada — a lista já tem aba própria. */
 el('irInicio').onclick = () => vaiPara('#/inicio');
 el('abaMeu').onclick = () => { fechaBandejas(null); vaiPara('#/meu'); };
+el('abaArtistas').onclick = () => { fechaBandejas(null); vaiPara('#/artistas'); };
 el('abaMeusOverlays').onclick = () => { fechaBandejas(null); vaiPara('#/overlays'); };
 
 /* De qual conta é esta tela, e se a lista nela é a de verdade. */
@@ -5820,7 +6228,9 @@ async function carrega() {
       const a = el(id);
       if (a) a.classList.add('escondido');
     });
-    telaInicio();
+    /* A galeria não pede conta: quem chega por um link de artista tem que
+       cair nela, e não na vitrine. */
+    if (location.hash === '#/artistas') rota(); else telaInicio();
     return;
   }
 
