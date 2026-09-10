@@ -188,13 +188,25 @@
   .pop__plano.on.vital { border-color: var(--dourado); box-shadow: inset 3px 0 0 var(--dourado); }
   .pop__plano .comp { display: block; font-size: 11.5px; color: var(--verde-forte); margin-top: 2px; font-weight: 600; }
   .pop__plano.vital .comp { color: var(--dourado); }
+  /* ETIQUETA EM LINHA, E NÃO FLUTUANDO.
+
+     Ela era position:absolute pendurada no canto do cartão, e vazava pra
+     fora dele: o texto estourava a borda e a de cima cobria a de baixo.
+     Dentro do fluxo, ao lado do nome, ela não tem como escapar de lugar
+     nenhum — e continua sendo a primeira coisa que o olho pega. */
   .pop__etiqueta {
-    position: absolute; top: -8px; right: 10px;
-    font: 600 9.5px var(--mono); letter-spacing: .1em; text-transform: uppercase;
-    background: var(--verde); color: #fff; padding: 2px 7px;
+    display: inline-block; margin-left: 8px; vertical-align: 2px;
+    font: 600 9px var(--mono); letter-spacing: .09em; text-transform: uppercase;
+    background: var(--verde); color: #06210F; padding: 2px 6px; white-space: nowrap;
   }
-  .pop__plano { position: relative; }
-  .pop__plano.vital .pop__etiqueta { background: var(--dourado); }
+  .pop__plano.vital .pop__etiqueta { background: var(--dourado); color: #2A1E04; }
+
+  /* Sobe um fio ao passar o mouse. Pouco de propósito: é confirmação de que
+     dá pra clicar, não um pulo. */
+  .pop__plano { transition: transform .12s ease-out, border-color .12s, background .12s; }
+  .pop__plano:hover { transform: translateY(-2px); }
+  .pop__plano:active { transform: translateY(0); }
+  @media (prefers-reduced-motion: reduce) { .pop__plano { transition: none; } }
 
   /* Os planos nascem escondidos de propósito: primeiro a pessoa entende o
      que ganha, depois vê quanto custa. Preço antes do motivo só serve pra
@@ -204,6 +216,43 @@
   .pop .passos { margin: 0 0 12px; padding-left: 20px; }
   .pop .passos li { margin-bottom: 7px; color: var(--fraco); font-size: 13.5px; line-height: 1.5; }
   .pop .passos li::marker { color: var(--verde); font-weight: 600; }
+
+  /* ---------- caminho e busca ---------- */
+  .caminho {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    margin: 14px 0 -6px; font: 500 12px var(--mono); color: var(--apagado);
+  }
+  .caminho button {
+    border: 0; background: none; padding: 0; cursor: pointer;
+    font: inherit; color: var(--fraco);
+  }
+  .caminho button:hover { color: var(--verde-forte); text-decoration: underline; }
+  .caminho b { color: var(--tinta); font-weight: 600; }
+  .caminho span { color: var(--linha2); }
+
+  .busca { position: relative; margin-left: 6px; }
+  .busca input {
+    width: 190px; font: 12.5px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha);
+    padding: 7px 10px; border-radius: 4px;
+  }
+  .busca input:focus { outline: 0; border-color: var(--verde); width: 240px; }
+  .busca input { transition: width .15s ease-out; }
+  @media (max-width: 820px) { .busca { display: none; } }
+
+  .busca__lista {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
+    background: var(--caixa); border: 1px solid var(--linha);
+    max-height: 320px; overflow-y: auto; box-shadow: var(--sombra);
+  }
+  .busca__item {
+    display: block; width: 100%; text-align: left; border: 0; background: none;
+    padding: 9px 12px; cursor: pointer; color: var(--tinta); font: 13px var(--texto, inherit);
+    border-bottom: 1px solid var(--linha);
+  }
+  .busca__item:last-child { border-bottom: 0; }
+  .busca__item:hover, .busca__item.on { background: var(--verde-fraco); }
+  .busca__item small { display: block; color: var(--apagado); font: 11px var(--mono); margin-top: 1px; }
 
   /* ---------- só o administrador vê ----------
 
@@ -303,6 +352,21 @@
     margin: 0 0 14px; font: 600 11px var(--mono);
     letter-spacing: .18em; text-transform: uppercase; color: var(--fraco);
   }
+
+  /* ---- esquerda: onde você parou ---- */
+  .hub__voltar { display: flex; flex-direction: column; }
+  .hub__volta {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    width: 100%; text-align: left; border: 0; background: none; cursor: pointer;
+    padding: 9px 0; border-bottom: 1px solid var(--linha);
+    color: var(--tinta); font: 13.5px inherit;
+  }
+  .hub__volta:last-child { border-bottom: 0; }
+  .hub__volta:hover .nm { color: var(--verde-forte); }
+  .hub__volta .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hub__volta .seta { color: var(--apagado); flex: none; }
+
+  .hub__pro { border-color: var(--verde); }
 
   /* ---- esquerda: atualizações ---- */
   .hub__rolo { max-height: 460px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
@@ -700,6 +764,12 @@
        reescrever. -->
   <button class="aba escondido" id="abaTextos" type="button">Editar textos</button>
 
+  <!-- Buscar leva direto ao lugar: com dez tipos de overlay e sete telas,
+       procurar no olho já custa mais do que digitar. -->
+  <span class="busca" id="busca">
+    <input type="text" id="buscaCampo" placeholder="Buscar…" autocomplete="off">
+  </span>
+
   <span class="espaco"></span>
   <!-- De qual conta e este painel. Quando alguem diz que os overlays
        sumiram, a primeira coisa a saber e se a tela esta olhando pra conta
@@ -725,6 +795,9 @@
   <!-- Fica acima da tela, e não dentro dela: assim ele sobrevive à troca de
        telas e a pessoa não precisa estar numa página específica pra ver. -->
   <div id="avisoPlano" class="escondido"></div>
+
+  <!-- Onde a pessoa está. Some na vitrine, que é a raiz. -->
+  <nav class="caminho escondido" id="caminho" aria-label="Você está em"></nav>
 
   <div id="tela"></div>
   <p id="recado"></p>
@@ -2266,6 +2339,161 @@ const FABRICA = {
   },
 };
 
+/* ---------------- onde você está, e como chegar ---------------- */
+
+/* O NOME DE CADA TELA, num lugar só.
+
+   O caminho e a busca precisam da mesma lista, e duas listas separadas iam
+   divergir na primeira tela nova. */
+const TELAS = [
+  ['#/overlays',  'Meus overlays', 'a lista dos que você já tem'],
+  ['#/meu',       'Meu Controller', 'chave, conta e plano'],
+  ['#/comandos',  'Comandos',      'o que o chat pode fazer'],
+  ['#/subathon',  'Subathon',      'cronômetro e o que soma tempo'],
+  ['#/mods',      'Moderadores',   'links de quem te ajuda'],
+  ['#/tutorial',  'Tutorial',      'como colar no OBS'],
+];
+
+function nomeDaTela(hash) {
+  const p2 = (hash || '#/overlays').replace(/^#\//, '').split('/');
+
+  if (p2[0] === 'inicio') return null;                       /* a raiz */
+  if (p2[0] === 'novo' && TIPOS[p2[1]]) return ['#/overlays', 'Meus overlays', 'Criar ' + TIPOS[p2[1]].nome.toLowerCase()];
+  if (p2[0] === 'editar') {
+    const perfil = perfis.find((x) => String(x.id) === String(p2[1]));
+    return ['#/overlays', 'Meus overlays', 'Editando ' + (perfil ? (perfil.nome || 'overlay') : 'overlay')];
+  }
+  if (p2[0] === 'admin') return [null, 'Administração', null];
+  if (p2[1] && TIPOS[p2[1]]) return ['#/overlays', 'Meus overlays', TIPOS[p2[1]].nome];
+
+  const achou = TELAS.find((x) => x[0] === '#/' + p2[0]);
+  return achou ? [null, achou[1], null] : [null, 'Meus overlays', null];
+}
+
+function pintaCaminho() {
+  const cx = el('caminho');
+  if (!cx) return;
+  cx.innerHTML = '';
+
+  const info = nomeDaTela(location.hash);
+  if (!info || !chave) { cx.classList.add('escondido'); return; }
+
+  const [voltaHash, meio, folha] = info;
+
+  const inicio = h('button', { type: 'button', txt: 'Início' });
+  inicio.onclick = () => vaiPara('#/inicio');
+  cx.appendChild(inicio);
+  cx.appendChild(h('span', { txt: '›' }));
+
+  if (folha && voltaHash) {
+    const b = h('button', { type: 'button', txt: meio });
+    b.onclick = () => vaiPara(voltaHash);
+    cx.appendChild(b);
+    cx.appendChild(h('span', { txt: '›' }));
+    cx.appendChild(h('b', { txt: folha }));
+  } else {
+    cx.appendChild(h('b', { txt: meio }));
+  }
+
+  cx.classList.remove('escondido');
+}
+
+/* ---------------- por onde você andou ---------------- */
+
+/* Guardado no navegador, e não no servidor: é conveniência de quem está
+   nesta máquina, não dado da conta. */
+const guardaVisita = (hash, nome) => {
+  try {
+    const v = JSON.parse(localStorage.getItem('zc:visitas') || '[]')
+      .filter((x) => x.hash !== hash);
+    v.unshift({ hash, nome });
+    localStorage.setItem('zc:visitas', JSON.stringify(v.slice(0, 6)));
+  } catch (e) { /* modo anônimo: sem histórico, e tudo bem */ }
+};
+
+const leVisitas = () => {
+  try {
+    const v = JSON.parse(localStorage.getItem('zc:visitas') || '[]');
+    return Array.isArray(v) ? v : [];
+  } catch (e) { return []; }
+};
+
+/* ---------------- busca ---------------- */
+
+function itensDaBusca() {
+  const itens = [];
+
+  TELAS.forEach(([hash, nome, dica]) => itens.push({ nome, dica, hash }));
+
+  Object.keys(TIPOS).forEach((k) => itens.push({
+    nome: 'Criar ' + TIPOS[k].nome.toLowerCase(),
+    dica: TIPOS[k].txt,
+    hash: '#/novo/' + k,
+  }));
+
+  /* Os overlays da pessoa entram pelo nome: com vinte deles, achar "meta da
+     madrugada" na lista custa mais do que digitar três letras. */
+  perfis.forEach((p2) => itens.push({
+    nome: p2.nome || 'Sem nome',
+    dica: 'seu overlay · ' + ((TIPOS[p2.tipo] || {}).nome || p2.tipo),
+    hash: '#/editar/' + p2.id,
+  }));
+
+  return itens;
+}
+
+/* Sem acento e sem caixa: quem digita "musica" tem que achar "Música". */
+const semAcento = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+function ligaBusca() {
+  const campo = el('buscaCampo');
+  if (!campo) return;
+
+  const lista = h('div', { cls: 'busca__lista escondido' });
+  el('busca').appendChild(lista);
+
+  let achados = [];
+  let marcado = -1;
+
+  const fecha = () => { lista.classList.add('escondido'); marcado = -1; };
+
+  const pinta = () => {
+    lista.innerHTML = '';
+    achados.forEach((it, i) => {
+      const b = h('button', { cls: 'busca__item' + (i === marcado ? ' on' : ''), type: 'button' },
+        [document.createTextNode(it.nome), h('small', { txt: it.dica })]);
+      b.onclick = () => { campo.value = ''; fecha(); vaiPara(it.hash); };
+      lista.appendChild(b);
+    });
+    lista.classList.toggle('escondido', !achados.length);
+  };
+
+  campo.oninput = () => {
+    const q = semAcento(campo.value.trim());
+    if (!q) { achados = []; return fecha(); }
+    achados = itensDaBusca()
+      .filter((it) => semAcento(it.nome).includes(q) || semAcento(it.dica).includes(q))
+      .slice(0, 8);
+    marcado = achados.length ? 0 : -1;
+    pinta();
+  };
+
+  campo.onkeydown = (e) => {
+    if (e.key === 'Escape') { campo.value = ''; return fecha(); }
+    if (!achados.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); marcado = (marcado + 1) % achados.length; pinta(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); marcado = (marcado - 1 + achados.length) % achados.length; pinta(); }
+    else if (e.key === 'Enter' && achados[marcado]) {
+      e.preventDefault();
+      const it = achados[marcado];
+      campo.value = ''; fecha(); vaiPara(it.hash);
+    }
+  };
+
+  campo.onblur = () => setTimeout(fecha, 150);
+  campo.onfocus = () => { if (achados.length) lista.classList.remove('escondido'); };
+}
+
 /* ---------------- textos editáveis ---------------- */
 
 /* O QUE ISTO FAZ, EM UMA FRASE: troca qualquer frase da tela por outra que o
@@ -2660,8 +2888,10 @@ function abrePro(estado) {
       preco,
     ]);
 
-    if (pl.periodo === 'anual') b.appendChild(h('span', { cls: 'pop__etiqueta', txt: 'mais escolhido' }));
-    if (pl.periodo === 'vitalicio') b.appendChild(h('span', { cls: 'pop__etiqueta', txt: 'melhor no longo prazo' }));
+    /* Ao lado do nome, dentro do bloco da esquerda. */
+    const nome = b.querySelector('b');
+    if (pl.periodo === 'anual') nome.appendChild(h('span', { cls: 'pop__etiqueta', txt: 'mais escolhido' }));
+    if (pl.periodo === 'vitalicio') nome.appendChild(h('span', { cls: 'pop__etiqueta', txt: 'melhor a longo prazo' }));
 
     precos.push({ el: preco, cheio: reais, plano: pl, botao: b });
 
@@ -2830,6 +3060,7 @@ function telaInicio() {
   /* A vitrine usa a tela toda; o resto do site não. A classe no body é o que
      solta o limite de largura só aqui. */
   document.body.classList.add('na-vitrine');
+  el('caminho').classList.add('escondido');
 
   const btVolta = el('abaMeusOverlays');
   if (btVolta) btVolta.style.display = chave ? '' : 'none';
@@ -2837,12 +3068,54 @@ function telaInicio() {
   const hub = h('div', { cls: 'hub' });
   tela.appendChild(hub);
 
-  /* ================= esquerda: atualizações ================= */
+  /* ================= esquerda ================= */
+  const colEsq = h('div', { cls: 'hub__col' });
+  hub.appendChild(colEsq);
+
+  /* ----- onde você parou -----
+
+     Fica ACIMA das novidades porque é o que a pessoa veio fazer. Notícia do
+     site é interessante; voltar pro overlay que ela estava mexendo é o
+     motivo de ela ter aberto a página. */
+  const visitas = leVisitas();
+  if (chave && visitas.length) {
+    const cxV = h('div', { cls: 'hub__painel' }, [h('h2', { txt: 'Onde você parou' })]);
+    const listaV = h('div', { cls: 'hub__voltar' });
+
+    visitas.slice(0, 5).forEach((v) => {
+      const b = h('button', { cls: 'hub__volta', type: 'button' }, [
+        h('span', { cls: 'nm', txt: v.nome }),
+        h('span', { cls: 'seta', txt: '›' }),
+      ]);
+      b.onclick = () => vaiPara(v.hash);
+      listaV.appendChild(b);
+    });
+
+    cxV.appendChild(listaV);
+    colEsq.appendChild(cxV);
+  }
+
+  /* ----- seja pro -----
+
+     Na coluna, e não como faixa no topo: quem já é Pro não precisa ver
+     propaganda toda vez que abre o site. */
+  if (proEstado && proEstado.ligado && !proEstado.beta
+      && proEstado.plano === 'gratis'
+      && (proEstado.modo === 'producao' || souAdmin)) {
+    const btPro = h('button', { cls: 'bt principal', type: 'button', txt: 'Ver planos', style: 'width:100%' });
+    btPro.onclick = () => abrePro(proEstado);
+
+    colEsq.appendChild(h('div', { cls: 'hub__painel hub__pro' }, [
+      h('h2', { txt: 'Seja Pro' }),
+      h('p', { cls: 'd', style: 'margin:0 0 12px',
+        txt: 'Overlays ilimitados, Twitch + YouTube + Kick juntos e suporte direto.' }),
+      btPro,
+    ]));
+  }
+
+  /* ----- atualizações ----- */
   const rolo = h('div', { cls: 'hub__rolo' });
-  hub.appendChild(h('div', { cls: 'hub__col' }, [
-    h('div', { cls: 'hub__painel' }, [h('h2', { txt: 'Atualizações' }), rolo]),
-  ]));
-  const colEsq = hub.lastChild;
+  colEsq.appendChild(h('div', { cls: 'hub__painel' }, [h('h2', { txt: 'Atualizações' }), rolo]));
 
   const secPar = h('div', { cls: 'hub__painel escondido' }, [h('h2', { txt: 'Parceiros' })]);
   colEsq.appendChild(secPar);
@@ -5251,6 +5524,10 @@ function vaiPara(hash) { if (location.hash === hash) rota(); else location.hash 
 function rota() {
   recado('');
   document.body.classList.remove('na-vitrine');
+  pintaCaminho();
+
+  const info = nomeDaTela(location.hash);
+  if (info) guardaVisita(location.hash, info[2] || info[1]);
   /* Tela nova, textos novos: sem remarcar, o modo de edição continuaria
      ligado mas sem nada pra clicar. */
   if (typeof modoEdicao !== 'undefined' && modoEdicao) setTimeout(marcaEditaveis, 60);
@@ -5372,7 +5649,7 @@ async function carrega() {
     /* As abas do painel não servem pra quem não entrou: clicar em qualquer
        uma delas só levaria a uma tela que falha. Some com elas e o que resta
        é a vitrine e o botão de entrar. */
-    ['abaOverlays', 'abaFerramentas', 'abaMeu'].forEach((id) => {
+    ['abaOverlays', 'abaFerramentas', 'abaMeu', 'busca'].forEach((id) => {
       const a = el(id);
       if (a) a.classList.add('escondido');
     });
@@ -5382,6 +5659,7 @@ async function carrega() {
 
   if (!await carrega()) return;
   if (souAdmin) el('abaTextos').classList.remove('escondido');
+  ligaBusca();
   ligaUpgrade();
   rota();
 })();
