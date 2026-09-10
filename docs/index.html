@@ -2222,6 +2222,14 @@ function textoNos(raiz) {
       const pai = no.parentElement;
       if (!pai || EDIT_FORA[pai.tagName]) return NodeFilter.FILTER_REJECT;
       if (pai.closest('.edicao')) return NodeFilter.FILTER_REJECT;
+      /* A BARRA DE CIMA FICA DE FORA.
+
+         Ela é o que te tira do modo de edição e o que leva pra outra tela.
+         Editável, o botão "Sair da edição" abriria a caixa de reescrever em
+         vez de sair — e sem as abas não dava pra ir editar as outras telas.
+         O preço é não poder renomear as abas por aqui, e é um preço barato:
+         são cinco palavras, contra ficar preso na tela em que ligou. */
+      if (pai.closest('.barra')) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });
@@ -2360,6 +2368,10 @@ function ligaModoEdicao(liga) {
 
 document.addEventListener('click', (e) => {
   if (!modoEdicao) return;
+  /* A barra continua clicável: é por ela que se sai do modo e se troca de
+     tela. Sem esta linha, ligar a edição prendia a pessoa onde estava. */
+  if (e.target.closest('.barra')) return;
+
   const alvo = e.target.closest('[data-edit]');
   if (!alvo || alvo.closest('.edicao')) return;
 
@@ -5079,6 +5091,9 @@ function vaiPara(hash) { if (location.hash === hash) rota(); else location.hash 
 function rota() {
   recado('');
   document.body.classList.remove('na-vitrine');
+  /* Tela nova, textos novos: sem remarcar, o modo de edição continuaria
+     ligado mas sem nada pra clicar. */
+  if (typeof modoEdicao !== 'undefined' && modoEdicao) setTimeout(marcaEditaveis, 60);
   const btVolta = el('abaMeusOverlays');
   if (btVolta) btVolta.style.display = 'none';
   const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/');
