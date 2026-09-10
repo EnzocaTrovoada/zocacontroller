@@ -176,6 +176,37 @@
   .pop .passos li { margin-bottom: 7px; color: var(--fraco); font-size: 13.5px; line-height: 1.5; }
   .pop .passos li::marker { color: var(--verde); font-weight: 600; }
 
+  /* ---------- modo edição ---------- */
+  body.editando [data-edit] {
+    outline: 1px dashed var(--verde); outline-offset: 2px;
+    cursor: text; border-radius: 2px;
+  }
+  body.editando [data-edit]:hover { background: var(--verde-fraco); }
+  body.editando [data-edit-mudado] { outline-color: var(--dourado); }
+
+  .aba.editando { color: var(--dourado); }
+
+  /* A caixa de edição. Fixa embaixo pra não empurrar o texto que está sendo
+     editado pra fora da tela no momento em que se olha pra ele. */
+  .edicao {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    background: var(--caixa); border-top: 2px solid var(--verde);
+    padding: 14px 20px; box-shadow: 0 -8px 24px rgba(0,0,0,.2);
+  }
+  .edicao .w2 { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+  .edicao .antes {
+    font: 12px var(--mono); color: var(--apagado);
+    max-height: 44px; overflow: auto;
+  }
+  .edicao textarea {
+    width: 100%; min-height: 70px; resize: vertical;
+    font: 13px/1.5 var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha);
+    padding: 9px 10px; border-radius: 4px;
+  }
+  .edicao textarea:focus { outline: 0; border-color: var(--verde); }
+  .edicao .botoes { display: flex; gap: 8px; align-items: center; }
+
   /* ---------- vitrine da inicial ---------- */
 
   /* A VITRINE PRECISA DA TELA INTEIRA.
@@ -590,6 +621,9 @@
   <!-- Só aparece quando o servidor diz que a cobrança está aberta. Em modo
        de teste, só pra admin. -->
   <button class="aba pro escondido" id="abaUpgrade" type="button">Upgrade</button>
+  <!-- Só admin vê. Liga o modo em que clicar num texto abre a caixa de
+       reescrever. -->
+  <button class="aba escondido" id="abaTextos" type="button">Editar textos</button>
 
   <span class="espaco"></span>
   <!-- De qual conta e este painel. Quando alguem diz que os overlays
@@ -2157,6 +2191,190 @@ const FABRICA = {
   },
 };
 
+/* ---------------- textos editáveis ---------------- */
+
+/* O QUE ISTO FAZ, EM UMA FRASE: troca qualquer frase da tela por outra que o
+   administrador escreveu, sem que nenhuma dessas frases precise ter sido
+   marcada no código.
+
+   Como não existe lista de chaves, a chave é o próprio texto original. O
+   servidor guarda { "texto original": "texto novo" }, e aqui a gente
+   percorre os nós de texto trocando o que bater.
+
+   O PREÇO, e é proposital: mudar a frase no código faz a edição parar de
+   valer, porque a chave era a frase antiga. Uma frase reescrita quase sempre
+   mudou de sentido, e manter por cima dela a edição velha seria pior do que
+   perdê-la. */
+
+let TEXTOS = {};
+let modoEdicao = false;
+
+/* Onde NÃO mexer. Campo de formulário tem valor, não texto; script e style
+   não são conteúdo; e a própria caixa de edição não pode se auto-traduzir
+   enquanto está sendo usada. */
+const EDIT_FORA = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, INPUT: 1, SELECT: 1, OPTION: 1, IFRAME: 1 };
+
+function textoNos(raiz) {
+  const saida = [];
+  const it = document.createNodeIterator(raiz, NodeFilter.SHOW_TEXT, {
+    acceptNode(no) {
+      if (!no.nodeValue || !no.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      const pai = no.parentElement;
+      if (!pai || EDIT_FORA[pai.tagName]) return NodeFilter.FILTER_REJECT;
+      if (pai.closest('.edicao')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  let n;
+  while ((n = it.nextNode())) saida.push(n);
+  return saida;
+}
+
+function aplicaTextos(raiz) {
+  if (!TEXTOS || !Object.keys(TEXTOS).length) return;
+  textoNos(raiz || document.body).forEach((no) => {
+    const cru = no.nodeValue.trim();
+    const novo = TEXTOS[cru];
+    /* Compara com o que já está escrito pra não reescrever o mesmo nó a cada
+       passada — o observador abaixo dispara muito, e trocar nodeValue sem
+       necessidade faria o navegador repintar à toa. */
+    if (novo && novo !== cru) no.nodeValue = no.nodeValue.replace(cru, novo);
+  });
+}
+
+/* A tela é montada por JavaScript o tempo todo, então não dá pra aplicar uma
+   vez só na carga: o observador pega tudo que nasce depois. */
+function observaTextos() {
+  const obs = new MutationObserver((muts) => {
+    muts.forEach((m) => m.addedNodes.forEach((n) => {
+      if (n.nodeType === 1) aplicaTextos(n);
+      else if (n.nodeType === 3 && n.parentElement) aplicaTextos(n.parentElement);
+    }));
+    if (modoEdicao) marcaEditaveis();
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+}
+
+function carregaTextos() {
+  return fetch(API + '/textos.php', { cache: 'no-cache' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => { TEXTOS = (d && d.textos) || {}; aplicaTextos(document.body); })
+    .catch(() => { /* sem substituição: valem os textos do código */ });
+}
+
+/* ---------------- a edição em si ---------------- */
+
+/* Marca o ELEMENTO que contém o texto, e não o nó: nó de texto não recebe
+   contorno nem clique. */
+function marcaEditaveis() {
+  textoNos(document.body).forEach((no) => {
+    const pai = no.parentElement;
+    if (!pai || pai.hasAttribute('data-edit')) return;
+    pai.setAttribute('data-edit', '1');
+    if (TEXTOS[no.nodeValue.trim()]) pai.setAttribute('data-edit-mudado', '1');
+  });
+}
+
+function limpaEditaveis() {
+  document.querySelectorAll('[data-edit]').forEach((e) => {
+    e.removeAttribute('data-edit');
+    e.removeAttribute('data-edit-mudado');
+  });
+}
+
+let caixaEdicao = null;
+
+function fechaEdicao() {
+  if (caixaEdicao) { caixaEdicao.remove(); caixaEdicao = null; }
+}
+
+function abreEdicao(no) {
+  fechaEdicao();
+
+  const atual = no.nodeValue.trim();
+  /* O original é o que está no CÓDIGO, e não o que está na tela: se já houve
+     substituição, editar de novo precisa continuar apontando pra mesma
+     chave, senão cada edição criaria uma linha nova. */
+  let original = atual;
+  Object.keys(TEXTOS).forEach((k) => { if (TEXTOS[k] === atual) original = k; });
+
+  const area = h('textarea');
+  area.value = atual;
+
+  const salvar = h('button', { cls: 'bt principal mini', type: 'button', txt: 'Salvar' });
+  const voltar = h('button', { cls: 'bt mini', type: 'button', txt: 'Voltar ao original' });
+  const fechar = h('button', { cls: 'bt fraco mini', type: 'button', txt: 'Fechar' });
+  const diz = h('span', { cls: 'd', style: 'font-size:12px' });
+
+  voltar.disabled = !TEXTOS[original];
+
+  salvar.onclick = async () => {
+    salvar.disabled = true;
+    diz.textContent = 'salvando…';
+    try {
+      await api('/textos.php', { method: 'POST',
+        body: JSON.stringify({ acao: 'salvar', original, valor: area.value }) });
+      if (area.value.trim() === original) delete TEXTOS[original];
+      else TEXTOS[original] = area.value.trim();
+      no.nodeValue = no.nodeValue.replace(atual, area.value.trim());
+      fechaEdicao();
+      recado('Texto salvo.', 'bom');
+    } catch (e) {
+      diz.textContent = e.message;
+      salvar.disabled = false;
+    }
+  };
+
+  voltar.onclick = async () => {
+    voltar.disabled = true;
+    try {
+      await api('/textos.php', { method: 'POST',
+        body: JSON.stringify({ acao: 'apagar', original }) });
+      delete TEXTOS[original];
+      no.nodeValue = no.nodeValue.replace(atual, original);
+      fechaEdicao();
+      recado('Voltou ao texto original.', 'bom');
+    } catch (e) { diz.textContent = e.message; voltar.disabled = false; }
+  };
+
+  fechar.onclick = fechaEdicao;
+
+  caixaEdicao = h('div', { cls: 'edicao' }, [
+    h('div', { cls: 'w2' }, [
+      h('div', { cls: 'antes', txt: 'Original: ' + original }),
+      area,
+      h('div', { cls: 'botoes' }, [salvar, voltar, fechar, diz]),
+    ]),
+  ]);
+  document.body.appendChild(caixaEdicao);
+  area.focus();
+}
+
+function ligaModoEdicao(liga) {
+  modoEdicao = liga;
+  document.body.classList.toggle('editando', liga);
+  el('abaTextos').classList.toggle('editando', liga);
+  el('abaTextos').textContent = liga ? 'Sair da edição' : 'Editar textos';
+  if (liga) marcaEditaveis(); else { limpaEditaveis(); fechaEdicao(); }
+}
+
+document.addEventListener('click', (e) => {
+  if (!modoEdicao) return;
+  const alvo = e.target.closest('[data-edit]');
+  if (!alvo || alvo.closest('.edicao')) return;
+
+  /* Pega o nó de texto de verdade dentro do elemento clicado. */
+  const no = [...alvo.childNodes].find((n) => n.nodeType === 3 && n.nodeValue.trim());
+  if (!no) return;
+
+  /* Em modo de edição o clique é pra editar, nunca pra acionar o botão. */
+  e.preventDefault();
+  e.stopPropagation();
+  abreEdicao(no);
+}, true);
+
+el('abaTextos').onclick = () => { fechaBandejas(null); ligaModoEdicao(!modoEdicao); };
+
 /* ---------------- Upgrade ---------------- */
 
 /* O QUE O PRO DÁ, NA ORDEM EM QUE IMPORTA.
@@ -2245,8 +2463,7 @@ function abrePro(estado) {
 
   if (estado.modo === 'teste') {
     corpo.appendChild(h('p', { cls: 'aviso', txt:
-      'MODO DE TESTE. Este checkout não move dinheiro e só aceita os cartões de teste '
-      + 'do Mercado Pago. Ninguém além de você está vendo isto.' }));
+      'Modo de teste: não move dinheiro. Só você vê isto.' }));
   }
 
   /* ----- os planos, só depois do "Seja Pro" ----- */
@@ -2327,15 +2544,22 @@ function abrePro(estado) {
   function passoAPasso(url) {
     planos.classList.add('escondido');
 
-    const passos = h('ol', { cls: 'passos' });
+    const passos = h('ol', { cls: 'passos escondido' });
     [
-      'Abra uma janela ANÔNIMA (Ctrl+Shift+N no Chrome).',
-      'Cole o link aí embaixo nela.',
-      'Entre com o usuário de teste COMPRADOR — não com a sua conta.',
-      'Pague com cartão de teste 5480 8328 0103 3311, CVV 123, validade 11/30, '
-        + 'e no nome do titular escreva APRO pra simular aprovado (ou FUND pra recusado).',
-      'Volte aqui e recarregue a página pra ver o plano mudar.',
+      'Janela anônima (Ctrl+Shift+N).',
+      'Cole o link.',
+      'Entre com o usuário de teste comprador.',
+      'Cartão 5480 8328 0103 3311, CVV 123, validade 11/30, titular APRO (ou FUND pra recusar).',
+      'Volte e recarregue.',
     ].forEach((txt) => passos.appendChild(h('li', { txt })));
+
+    /* O passo a passo nasce FECHADO. É instrução de teste, não parte da
+       compra — aberto, tomava a tela inteira e escondia o que se clica. */
+    const verPassos = h('button', { cls: 'bt fraco mini', type: 'button', txt: 'Como testar' });
+    verPassos.onclick = () => {
+      const fechado = passos.classList.toggle('escondido');
+      verPassos.textContent = fechado ? 'Como testar' : 'Esconder';
+    };
 
     const campo = h('input', { type: 'text', value: url, readonly: 'readonly',
       style: 'width:100%;font:12px var(--mono)' });
@@ -2348,16 +2572,19 @@ function abrePro(estado) {
       setTimeout(() => { copiar.textContent = 'Copiar link'; }, 2000);
     };
 
-    const volta = h('button', { cls: 'bt fraco mini', type: 'button', txt: 'Escolher outro plano' });
+    const volta = h('button', { cls: 'bt fraco mini', type: 'button', txt: 'Outro plano' });
     volta.onclick = () => { roteiro.remove(); planos.classList.remove('escondido'); };
 
+    const abrir = h('a', { cls: 'bt principal mini', href: url, target: '_blank',
+      rel: 'noopener noreferrer', txt: 'Abrir pagamento', style: 'text-decoration:none' });
+
     const roteiro = h('div', { style: 'margin-top:4px' }, [
-      h('p', { cls: 'aviso', txt:
-        'O Mercado Pago recusa quando um lado é de teste e o outro é real. Como teste e '
-        + 'produção hoje usam o MESMO endereço, numa aba comum ele pega a sua conta de '
-        + 'verdade e dá "uma das partes é de teste". Na janela anônima não existe conta nenhuma.' }),
-      passos, campo,
-      h('div', { style: 'display:flex;gap:8px;margin-top:8px' }, [copiar, volta]),
+      h('p', { cls: 'd', style: 'margin:0 0 8px',
+        txt: 'Abra em janela anônima e entre com o usuário de teste.' }),
+      campo,
+      h('div', { style: 'display:flex;gap:8px;margin-top:8px;flex-wrap:wrap' },
+        [abrir, copiar, verPassos, volta]),
+      passos,
     ]);
 
     corpo.appendChild(roteiro);
@@ -2428,8 +2655,7 @@ function abrePro(estado) {
   const acao = h('div', { cls: 'pop__acao' }, [
     seja, linhaCupom, cupomDiz, planos,
     h('p', { cls: 'd', style: 'margin:12px 0 0;text-align:center',
-      txt: 'Pix, cartão ou saldo do Mercado Pago. O pagamento acontece no site deles — '
-         + 'os dados do seu cartão não passam por aqui.' }),
+      txt: 'Pix, cartão ou saldo. O pagamento acontece no site do Mercado Pago.' }),
   ]);
   caixa.appendChild(acao);
 
@@ -2785,7 +3011,7 @@ function telaLista(filtro) {
   tela.appendChild(h('h1', { txt: filtro ? TIPOS[filtro].nome : 'Meus overlays' }));
   tela.appendChild(h('p', { cls: 'sub', txt: filtro
     ? TIPOS[filtro].txt + '. Cada um vira um link fixo que atualiza sozinho no OBS.'
-    : 'Cada overlay vira um link fixo. Cola no OBS uma vez e nunca mais mexe: o que você editar aqui aparece na live em até 15 segundos.' }));
+    : 'Cada overlay vira um link fixo. Cole no OBS uma vez; o que você editar aparece na live em 15 s.' }));
 
   const criar = h('button', { cls: 'bt principal', type: 'button', txt: '+ Criar ' + (filtro ? TIPOS[filtro].nome.toLowerCase() : 'overlay') });
   criar.onclick = () => vaiPara('#/novo/' + (filtro || 'meta'));
@@ -2798,9 +3024,7 @@ function telaLista(filtro) {
   if (listaVelha) {
     const cx = h('div', { cls: 'aviso', style: 'margin:16px 0' });
     cx.appendChild(h('p', { style: 'margin:0 0 10px', txt:
-      'Não consegui falar com o servidor agora, então esta é a última lista que eu tinha visto. '
-      + 'Nada foi apagado: os overlays que já estão no OBS continuam funcionando, porque eles falam '
-      + 'com o servidor por conta própria e não dependem desta tela.' }));
+      'Não consegui falar com o servidor. Esta é a última lista que vi — nada foi apagado, e o que está no OBS continua funcionando.' }));
 
     const bt = h('button', { cls: 'bt mini', type: 'button', txt: 'Tentar de novo' });
     bt.onclick = async () => {
@@ -3323,7 +3547,7 @@ function telaControlador() {
   const tela = el('tela');
   tela.innerHTML = '';
   tela.appendChild(h('h1', { txt: 'Meu Controller' }));
-  tela.appendChild(h('p', { cls: 'sub', txt: 'Tudo que é seu num lugar só: a chave, os links que você já tem, e o que cada um faz. Nada aqui aparece destapado sozinho — se você abrir esta página na live, ninguém leva sua chave.' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Sua chave, seus links e sua conta. Nada aparece destapado sozinho.' }));
 
   const base = location.origin + location.pathname.replace(/[^/]*$/, '');
 
@@ -3342,7 +3566,7 @@ function telaControlador() {
     /* Vitalício não tem "até": a data existe no banco só pra caber na mesma
        coluna dos outros, e mostrar "até 31/12/2099" pareceria pegadinha. */
     fatiaPlano.appendChild(h('p', { cls: 'd', txt: proEstado.beta
-      ? 'Testador. Você usou o site antes da cobrança existir, então continua com tudo liberado, sem pagar nada.'
+      ? 'Testador — tudo liberado, sem pagar.'
       : proEstado.plano === 'gratis'
         ? 'Grátis. Dá pra ver o que muda no Pro na aba Upgrade, ali em cima.'
         : proEstado.plano === 'vitalicio'
@@ -3377,8 +3601,7 @@ function telaControlador() {
     };
 
     fatiaPlano.appendChild(h('p', { cls: 'd', style: 'margin-top:14px',
-      txt: 'Pagou e continua no grátis? O aviso do Mercado Pago pode ter se perdido no caminho. '
-         + 'Este botão pergunta direto pra eles.' }));
+      txt: 'Pagou e continua no grátis? Pergunte direto ao Mercado Pago.' }));
     fatiaPlano.appendChild(btPaguei);
     fatiaPlano.appendChild(dizPaguei);
   }
@@ -3443,7 +3666,7 @@ function telaControlador() {
     };
 
     fatiaPlano.appendChild(h('p', { cls: 'd', style: 'margin-top:14px',
-      txt: 'Só você vê isto. Nada aqui mostra o token — só o formato dele e o que o Mercado Pago responde.' }));
+      txt: 'Só você vê. Não mostra o token.' }));
     fatiaPlano.appendChild(bt);
     fatiaPlano.appendChild(saida);
   }
@@ -3451,7 +3674,7 @@ function telaControlador() {
   /* ----- a chave ----- */
   const fatiaChave = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Chave do painel' }),
-    h('p', { cls: 'd', txt: 'É ela que prova que o painel é seu. Quem tiver essa chave controla o seu OBS — trate como senha.' }),
+    h('p', { cls: 'd', txt: 'Quem tiver essa chave controla o seu OBS. Trate como senha.' }),
   ]);
 
   async function redefinir() {
@@ -3467,7 +3690,7 @@ function telaControlador() {
   }
 
   fatiaChave.appendChild(segredo(chave, redefinir));
-  fatiaChave.appendChild(h('p', { cls: 'aviso', txt: 'Trocar a chave para a fonte do OBS: o endereço dela carrega a chave dentro. Só troque se a chave tiver aparecido em print, em VOD ou na tela durante a live — e deixe o OBS aberto pra colar o endereço novo logo em seguida.' }));
+  fatiaChave.appendChild(h('p', { cls: 'aviso', txt: 'Só troque se a chave tiver aparecido em print ou na live. A fonte do OBS para até você colar o endereço novo.' }));
   tela.appendChild(fatiaChave);
 
   /* ----- conta da Twitch ----- */
@@ -3491,7 +3714,7 @@ function telaControlador() {
 
   tela.appendChild(h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Conta da Twitch' }),
-    h('p', { cls: 'd', txt: 'Entrar de novo renova a permissão e o acesso — é o que resolve quando a Twitch para de responder ou quando uma permissão nova foi adicionada ao site. Não desfaz nada: seus overlays, comandos e subathon continuam como estão.' }),
+    h('p', { cls: 'd', txt: 'Renova a permissão com a Twitch. Não desfaz nada: overlays, comandos e subathon continuam.' }),
     h('div', { cls: 'acoes', style: 'display:flex;gap:8px;flex-wrap:wrap' }, [btEntrarDeNovo, btSair]),
     h('p', { cls: 'd', style: 'margin-top:8px', txt: 'Sair só apaga a chave guardada neste navegador. Os overlays que já estão no OBS continuam funcionando.' }),
   ]));
@@ -4427,8 +4650,7 @@ const VITRINE_FATIAS = [
 function blocoVitrine() {
   const cx = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Vitrine da página inicial' }),
-    h('p', { cls: 'd', txt: 'Três painéis, cada um com uma fonte. Painel sem ninguém no ar simplesmente não aparece — '
-      + 'a página não mostra buraco.' }),
+    h('p', { cls: 'd', txt: 'Três painéis. Sem ninguém no ar, o painel não aparece.' }),
   ]);
 
   const corpo = h('div');
@@ -4503,8 +4725,7 @@ function blocoVitrine() {
 
       /* ----- a lista de banidos ----- */
       corpo.appendChild(h('h3', { style: 'margin-top:22px', txt: 'Quem não pode aparecer' }));
-      corpo.appendChild(h('p', { cls: 'd', txt: 'Vale pros três painéis. Banir alguém que está na vitrine agora '
-        + 'tira ele na hora, sem esperar o dia virar.' }));
+      corpo.appendChild(h('p', { cls: 'd', txt: 'Vale pros três painéis, e tira da tela na hora.' }));
 
       const nome = h('input', { type: 'text', placeholder: 'canal na Twitch', style: 'flex:0 0 170px' });
       const motivo = h('input', { type: 'text', placeholder: 'motivo (só você vê)', style: 'flex:1 1 200px' });
@@ -4557,9 +4778,7 @@ const reaisDe = (c) => ((c || 0) / 100).toLocaleString('pt-BR', { style: 'curren
 function blocoParceiros() {
   const cx = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Cupons e parceiros' }),
-    h('p', { cls: 'd', txt: 'Cupom sem parceiro é promoção normal. Cupom COM parceiro é link de '
-      + 'afiliado: desconto pra quem compra e comissão pra quem indicou, calculada sobre o que '
-      + 'realmente entrou — não sobre o preço de tabela.' }),
+    h('p', { cls: 'd', txt: 'Cupom sem parceiro é promoção. Com parceiro, gera comissão sobre o valor pago.' }),
   ]);
 
   const corpo = h('div');
@@ -4697,7 +4916,7 @@ function telaAdmin() {
   const tela = el('tela');
   tela.innerHTML = '';
   tela.appendChild(h('h1', { txt: 'Administração' }));
-  tela.appendChild(h('p', { cls: 'sub', txt: 'Quem entrou no site e o que cada um pode. Deixar um campo vazio devolve o valor do plano — assim o plano continua sendo a regra e a exceção aparece como exceção.' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Quem entrou e o que cada um pode. Campo vazio usa o valor do plano.' }));
 
   tela.appendChild(blocoVitrine());
   tela.appendChild(blocoParceiros());
@@ -4964,6 +5183,8 @@ async function carrega() {
 
 (async function () {
   montaBandejas();
+  observaTextos();
+  carregaTextos();
 
   /* SEM CHAVE NÃO É ERRO: É VISITANTE.
 
@@ -4985,6 +5206,7 @@ async function carrega() {
   }
 
   if (!await carrega()) return;
+  if (souAdmin) el('abaTextos').classList.remove('escondido');
   ligaUpgrade();
   rota();
 })();
