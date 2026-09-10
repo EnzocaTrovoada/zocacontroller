@@ -161,7 +161,6 @@ function recursos_do_plano(string $plano): array
        outro. O que o vitalício compra é não pagar de novo. */
     if ($plano === 'pro' || $plano === 'pro_ano' || $plano === 'vitalicio') {
         return [
-            'marca_dagua'     => false,
             'pokebot'         => true,
             'multiplataforma' => true,
             'temas'           => 'todos',
@@ -178,13 +177,19 @@ function recursos_do_plano(string $plano): array
     }
 
     return [
-        'marca_dagua'     => true,
         'pokebot'         => false,
         'multiplataforma' => false,
         'temas'           => 'basicos',
-        /* Dois era pouco demais: existem NOVE tipos de overlay, e quem chega
-           quer experimentar antes de decidir. O teto existe pra impedir abuso,
-           não pra impedir uso — e a hospedagem está em 5% com tudo junto. */
+        /* NÃO EXISTE MARCA D'ÁGUA EM PLANO NENHUM.
+
+           Foi tirada de propósito: overlay com marca é overlay que a pessoa
+           não usa, e um site que ninguém usa de graça não tem pra quem
+           vender depois. O que separa grátis de pago é o TETO de overlays e
+           os recursos — não um carimbo em cima da transmissão de quem está
+           começando.
+
+           Dois era pouco demais: existem dez tipos de overlay, e quem chega
+           quer experimentar antes de decidir. */
         'perfis_max'      => 8,
         'musica_chat'     => false,
         'oque_streamar'   => false,

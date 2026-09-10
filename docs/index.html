@@ -2480,8 +2480,6 @@ el('abaTextos').onclick = () => { fechaBandejas(null); ligaModoEdicao(!modoEdica
 const PRO_BENEFICIOS = [
   ['Overlays ilimitados',
    'sem teto nenhum; no grátis são 8'],
-  ['Sem a marca do ZocaController na tela',
-   'a live fica com a sua cara, não com a nossa'],
   ['Twitch, YouTube e Kick ao mesmo tempo',
    'a mesma meta contando de todas, sem montar overlay separado pra cada uma'],
   ['Comandos de música no chat',
@@ -5115,7 +5113,7 @@ function telaAdmin() {
 
       const marcas = {};
       const linhaMarcas = h('div', { cls: 'campo', style: 'gap:14px;flex-wrap:wrap' });
-      [['multiplataforma', 'Multiplataforma'], ['pokebot', 'Pokébot'], ['marca_dagua', "Marca d'água"]]
+      [['multiplataforma', 'Multiplataforma'], ['pokebot', 'Pokébot']]
         .forEach(([k, rot]) => {
           const cx = h('input', { type: 'checkbox' });
           cx.checked = !!u.vale[k];
