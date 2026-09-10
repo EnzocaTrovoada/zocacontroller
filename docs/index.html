@@ -2544,6 +2544,20 @@ function ligaBusca() {
 let TEXTOS = {};
 let modoEdicao = false;
 
+// CSS que o admin escreveu, aplicado depois da folha do site pra poder vencer.
+function carregaEstilo() {
+  return fetch(API + '/estilo.php', { cache: 'no-cache' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      if (!d || !d.css) return;
+      const tag = document.createElement('style');
+      tag.id = 'cssExtra';
+      tag.textContent = d.css;
+      document.head.appendChild(tag);
+    })
+    .catch(() => {});
+}
+
 /* Onde NÃO mexer. Campo de formulário tem valor, não texto; script e style
    não são conteúdo; e a própria caixa de edição não pode se auto-traduzir
    enquanto está sendo usada. */
@@ -5444,6 +5458,45 @@ function blocoParceiros() {
   return cx;
 }
 
+function blocoEstilo() {
+  const area = h('textarea', { style: 'width:100%;min-height:150px;font:12.5px/1.5 var(--mono);'
+    + 'color:var(--tinta);background:var(--fundo);border:1px solid var(--linha);padding:10px;border-radius:4px' });
+  const salvar = h('button', { cls: 'bt principal', type: 'button', txt: 'Salvar CSS' });
+  const diz = h('span', { cls: 'd', style: 'margin-left:10px;font-size:12px' });
+
+  api('/estilo.php').then((d) => { area.value = d.css || ''; }).catch(() => {});
+
+  salvar.onclick = async () => {
+    salvar.disabled = true;
+    diz.textContent = 'salvando…';
+    try {
+      await api('/estilo.php', { method: 'POST', body: JSON.stringify({ css: area.value }) });
+      const antiga = el('cssExtra');
+      if (antiga) antiga.remove();
+      const tag = document.createElement('style');
+      tag.id = 'cssExtra';
+      tag.textContent = area.value;
+      document.head.appendChild(tag);
+      diz.textContent = 'salvo e aplicado';
+      diz.style.color = 'var(--verde-forte)';
+    } catch (e) {
+      diz.textContent = e.message;
+      diz.style.color = 'var(--perigo)';
+    }
+    salvar.disabled = false;
+  };
+
+  return h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'CSS extra' }),
+    h('div', { cls: 'so-adm' }, [
+      h('p', { style: 'margin:0 0 8px', txt: 'Entra depois da folha do site, então vence dela. '
+        + 'Vale pra todo mundo. Errar aqui quebra a aparência do site inteiro — esvaziar o campo desfaz.' }),
+      area,
+      h('div', { style: 'margin-top:8px' }, [salvar, diz]),
+    ]),
+  ]);
+}
+
 function telaAdmin() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -5452,6 +5505,7 @@ function telaAdmin() {
 
   tela.appendChild(blocoVitrine());
   tela.appendChild(blocoParceiros());
+  tela.appendChild(blocoEstilo());
 
   const lista = h('div');
   tela.appendChild(h('h3', { style: 'margin-top:26px', txt: 'Contas' }));
@@ -5724,6 +5778,7 @@ async function carrega() {
   montaBandejas();
   observaTextos();
   carregaTextos();
+  carregaEstilo();
 
   /* SEM CHAVE NÃO É ERRO: É VISITANTE.
 
