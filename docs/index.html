@@ -118,7 +118,7 @@
   .pop {
     position: fixed; inset: 0; z-index: 60;
     display: flex; align-items: center; justify-content: center;
-    padding: 20px; background: rgba(6, 12, 8, .68);
+    padding: 14px; background: rgba(6, 12, 8, .68);
   }
   /* TRÊS FAIXAS, E SÓ A DO MEIO ROLA.
 
@@ -133,11 +133,17 @@
   .pop__caixa {
     display: flex; flex-direction: column;
     background: var(--caixa); border: 1px solid var(--linha);
-    width: 100%; max-width: 520px; max-height: 88vh; overflow: hidden;
-    padding: 26px 28px 22px; box-shadow: var(--sombra);
+    width: 100%; max-width: 520px; max-height: 94vh; overflow: hidden;
+    padding: 22px 28px 18px; box-shadow: var(--sombra);
   }
   .pop__topo { flex: 0 0 auto; }
-  .pop__corpo { flex: 1 1 auto; overflow-y: auto; min-height: 0; margin: 0 -4px; padding: 0 4px; }
+  /* O padding embaixo existe pra última linha não encostar no corte: sem
+     ele, o texto aparece serrado ao meio e lê como defeito, não como
+     "tem mais coisa aqui embaixo". A sombra na barra de ação diz o resto. */
+  .pop__corpo {
+    flex: 1 1 auto; overflow-y: auto; min-height: 0;
+    margin: 0 -4px; padding: 0 4px 14px;
+  }
   .pop__x {
     float: right; border: 0; background: none; cursor: pointer;
     color: var(--apagado); font-size: 22px; line-height: 1; padding: 0 2px;
@@ -651,9 +657,63 @@
   }
   .pcard.vital .pcard__comp { color: var(--dourado); }
 
+  /* ANUAL AMARELO, VITALÍCIO ARCO-ÍRIS.
+
+     Os três cartões precisam se diferenciar sem legenda. O anual é o mais
+     escolhido e leva o dourado; o vitalício é o que para de custar, e a
+     onda passando de um lado pro outro é o que faz o olho voltar nele. */
+  .pcard.anual { border-color: rgba(138,98,16,.45); }
+  .pcard.anual:hover, .pcard.anual.on { border-color: var(--dourado); }
+  .pcard.anual.on { background: rgba(138,98,16,.07); box-shadow: inset 0 0 0 1px var(--dourado); }
+  .pcard.anual .pcard__preco, .pcard.anual .pcard__comp { color: var(--dourado); }
+  .pcard.anual .pcard__tag { background: var(--dourado); }
+
+  @keyframes arco { to { background-position: 200% 0; } }
+
+  /* O arco aparece DUAS vezes na imagem, que tem o dobro da largura: a
+     janela visível mostra um arco inteiro, e não um pedaço. Com uma vez só,
+     o preço ficava laranja e a "onda" era só ele mudando de tom. */
+  .pcard.vital .pcard__preco, .pcard.vital .pcard__tag {
+    background-image: linear-gradient(90deg,
+      #E23B2E, #E07A1F, #C9A227, #2C9E4B, #1E9BA8, #3B6FD4, #8B45C6,
+      #E23B2E, #E07A1F, #C9A227, #2C9E4B, #1E9BA8, #3B6FD4, #8B45C6, #E23B2E);
+    background-size: 200% 100%;
+    animation: arco 6s linear infinite;
+  }
+  .pcard.vital .pcard__preco {
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .pcard.vital .pcard__tag { color: #fff; }
+  .pcard.vital .pcard__comp { color: var(--fraco); }
+
+  /* Escolhido: a borda vira o arco. Duas camadas de fundo — a de dentro
+     tapa o miolo com a cor da caixa e a de fora só sobra na borda. */
+  .pcard.vital.on {
+    border-color: transparent; box-shadow: none;
+    background-image:
+      linear-gradient(var(--caixa2), var(--caixa2)),
+      linear-gradient(90deg,
+        #E23B2E, #E07A1F, #C9A227, #2C9E4B, #1E9BA8, #3B6FD4, #8B45C6,
+        #E23B2E, #E07A1F, #C9A227, #2C9E4B, #1E9BA8, #3B6FD4, #8B45C6, #E23B2E);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
+    background-size: auto, 200% 100%;
+    animation: arco 6s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pcard.vital .pcard__preco, .pcard.vital .pcard__tag, .pcard.vital.on { animation: none; }
+  }
+
+  /* Sobe um fio ao passar o mouse, igual aos cartões. */
+  .pop__acao .bt.principal { transition: transform .14s ease-out, background .14s, border-color .14s; }
+  .pop__acao .bt.principal:hover:not(:disabled) { transform: translateY(-2px); }
+  .pop__acao .bt.principal:active:not(:disabled) { transform: translateY(0); }
+
   /* Numa caixa larga a lista de benefícios em coluna única vira uma tira
      comprida que empurra o preço pra fora da tela. */
-  .pop__caixa.largo .pop__lista { columns: 2; column-gap: 28px; margin-bottom: 6px; }
+  .pop__caixa.largo .pop__lista { columns: 2; column-gap: 28px; margin-bottom: 2px; }
+  .pop__caixa.largo .pop__lista li { padding: 7px 0; }
+  .pop__caixa.largo .pop__lista small { font-size: 12px; }
   .pop__caixa.largo .pop__lista li { break-inside: avoid; }
   @media (max-width: 760px) { .pop__caixa.largo .pop__lista { columns: 1; } }
 
@@ -689,6 +749,7 @@
     flex: 0 0 auto;
     background: var(--caixa); padding: 14px 0 0;
     border-top: 1px solid var(--linha);
+    box-shadow: 0 -16px 16px -16px rgba(0, 0, 0, .38);
   }
 
   /* ---------- conteúdo ---------- */
@@ -740,6 +801,33 @@
     border: 1px dashed var(--linha); border-radius: 6px; padding: 34px 20px;
     text-align: center; color: var(--apagado); font-size: 14px;
   }
+
+  /* ---------- selos ---------- */
+  .selo-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font: 600 9.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 3px; white-space: nowrap;
+  }
+  .selo-chip img { width: 14px; height: 14px; object-fit: contain; display: block; }
+  /* Só desenho, sem etiqueta: quando o selo tem imagem, ela fala sozinha. */
+  .selo-img { width: 16px; height: 16px; object-fit: contain; display: block; }
+
+  .selo-lista { display: flex; flex-direction: column; gap: 10px; }
+  .selo-linha { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .selo-linha .previa {
+    width: 30px; height: 30px; display: grid; place-items: center;
+    border: 1px solid var(--linha); border-radius: 4px; flex: none;
+  }
+  .selo-linha .previa img { width: 22px; height: 22px; object-fit: contain; }
+
+  .selo-caixas { display: flex; flex-wrap: wrap; gap: 12px; }
+  .selo-caixas label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+
+  /* O nome de quem postou leva pro canal. */
+  .feed__quem b.vai { cursor: pointer; }
+  .feed__quem b.vai:hover { color: var(--verde-forte); text-decoration: underline; }
+  .feed__foto.vai { cursor: pointer; }
+  .feed__foto.vai:hover { outline: 2px solid var(--verde); outline-offset: 1px; }
 
   /* ---------- luzes ---------- */
   .luz-marcas { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
@@ -3164,7 +3252,8 @@ function abrePro(estado) {
     const preco = h('span', { cls: 'pcard__preco' });
     preco.appendChild(document.createTextNode(reais));
 
-    const b = h('button', { cls: 'pcard' + (pl.periodo === 'vitalicio' ? ' vital' : ''), type: 'button' });
+    const marca2 = pl.periodo === 'vitalicio' ? ' vital' : pl.periodo === 'anual' ? ' anual' : '';
+    const b = h('button', { cls: 'pcard' + marca2, type: 'button' });
     if (ETIQUETA[pl.periodo]) b.appendChild(h('span', { cls: 'pcard__tag', txt: ETIQUETA[pl.periodo] }));
     b.appendChild(h('span', { cls: 'pcard__nome', txt: pl.nome }));
     b.appendChild(preco);
@@ -3534,6 +3623,26 @@ function faz(s) {
   return Math.floor(s / 604800) + ' sem';
 }
 
+const naTwitch = (login) => window.open('https://twitch.tv/' + encodeURIComponent(login),
+  '_blank', 'noopener,noreferrer');
+
+/* O selo desenhado fala sozinho; o sem desenho vira etiqueta escrita na cor
+   dele. É isso que deixa criar selo novo antes de ter o desenho pronto.
+
+   Mora fora do blocoFeed porque a tela de administração desenha os mesmos
+   selos nas caixinhas de cada conta. */
+function chipSelo(s) {
+  if (s.img) {
+    const i = h('img', { cls: 'selo-img', src: s.img, alt: s.nome, loading: 'lazy' });
+    i.title = s.nome;
+    return i;
+  }
+  const c = h('span', { cls: 'selo-chip', txt: s.nome });
+  c.style.color = s.cor;
+  c.style.background = s.cor + '22';
+  return c;
+}
+
 function blocoFeed() {
   const cx = h('div', { cls: 'hub__painel feed' }, [h('h2', { txt: 'Feed' })]);
   const lista = h('div');
@@ -3543,18 +3652,23 @@ function blocoFeed() {
   const fotoDe = (u) => !u.foto ? '' : (/^https?:/i.test(u.foto) ? u.foto : API + u.foto.replace(/^[^/]*/, ''));
 
   function avatar(u, pequeno) {
-    const f = h('div', { cls: 'feed__foto' });
+    const f = h('div', { cls: 'feed__foto vai' });
     const url = fotoDe(u);
     if (url) f.appendChild(h('img', { src: url, alt: '', loading: 'lazy' }));
     else f.textContent = (u.nome || u.login || '?').slice(0, 1).toUpperCase();
     if (pequeno) f.style.flex = 'none';
+    f.title = 'Abrir o canal de ' + (u.nome || u.login) + ' na Twitch';
+    f.onclick = () => naTwitch(u.login);
     return f;
   }
 
   function cabecaDe(u, quando) {
-    const q = h('div', { cls: 'feed__quem' }, [h('b', { txt: u.nome || u.login })]);
-    if (u.streamer) q.appendChild(h('span', { cls: 'feed__selo streamer', txt: 'Streamer' }));
-    if (u.artista) q.appendChild(h('span', { cls: 'feed__selo artista', txt: 'Artista' }));
+    const nome = h('b', { cls: 'vai', txt: u.nome || u.login });
+    nome.title = 'Abrir na Twitch';
+    nome.onclick = () => naTwitch(u.login);
+
+    const q = h('div', { cls: 'feed__quem' }, [nome]);
+    (u.selos || []).forEach((s) => q.appendChild(chipSelo(s)));
     q.appendChild(h('span', { cls: 'arroba', txt: '@' + u.login }));
     if (quando !== null && quando !== undefined) {
       q.appendChild(h('span', { cls: 'quando', txt: '· ' + faz(quando) }));
@@ -6117,10 +6231,39 @@ function blocoParceiros() {
             txt: cu.usos + (cu.usos_max === null ? ' usos' : '/' + cu.usos_max) }),
           h('span', { style: 'flex:0 0 90px;font-size:12.5px;color:'
             + (estado === 'valendo' ? 'var(--verde-forte)' : 'var(--apagado)'), txt: estado }),
+          naLista(cu),
           apagar,
         ]));
       });
       if (!cupons.length) corpo.appendChild(h('p', { cls: 'd', txt: 'Nenhum cupom ainda.' }));
+
+      /* SEM ISTO NÃO DAVA PRA SABER POR QUE A LISTA ESTAVA VAZIA.
+
+         O cupom só aparece pra quem está comprando se estiver marcado como
+         público, e a lista aqui não mostrava essa marca — dava pra criar
+         dez cupons e continuar vendo "nenhum cupom aberto agora" sem
+         nenhuma pista do motivo. */
+      function naLista(cu) {
+        if (cu.parceiro) return h('span', { cls: 'd', style: 'flex:0 0 110px;font-size:11.5px',
+          txt: 'de parceiro' });
+
+        const b = h('button', { cls: 'bt mini', type: 'button', style: 'flex:0 0 110px' });
+        const pinta2 = () => {
+          b.textContent = Number(cu.publico) ? 'na lista' : 'escondido';
+          b.style.color = Number(cu.publico) ? 'var(--verde-forte)' : 'var(--apagado)';
+        };
+        b.title = 'Mostrar ou esconder este cupom de quem está comprando';
+        b.onclick = async () => {
+          try {
+            cu.publico = Number(cu.publico) ? 0 : 1;
+            pinta2();
+            await api('/admin.php', { method: 'POST', body: JSON.stringify({
+              acao: 'cupom_publico', codigo: cu.codigo, publico: !!Number(cu.publico) }) });
+          } catch (e) { cu.publico = Number(cu.publico) ? 0 : 1; pinta2(); recado(e.message, 'ruim'); }
+        };
+        pinta2();
+        return b;
+      }
 
       const cCod = h('input', { type: 'text', placeholder: 'CÓDIGO', style: 'flex:0 0 130px' });
       const cTipo = h('select', { style: 'flex:0 0 120px' });
@@ -6236,6 +6379,7 @@ function telaAdmin() {
 
   tela.appendChild(blocoVitrine());
   tela.appendChild(blocoParceiros());
+  tela.appendChild(blocoSelos());
   tela.appendChild(blocoArtistas());
   tela.appendChild(blocoEstilo());
 
@@ -6279,18 +6423,23 @@ function telaAdmin() {
       const betaCx = h('input', { type: 'checkbox' });
       betaCx.checked = !!u.beta;
 
-      /* Os dois selos do feed, ligados um a um. É a conferência que dá
-         valor ao selo: automático, ele não diria nada. */
-      const selos = {};
-      const linhaSelos = h('div', { cls: 'campo', style: 'gap:14px;flex-wrap:wrap' });
-      [['selo_streamer', 'Streamer verificado'], ['selo_artista', 'Artista verificado']]
-        .forEach(([k, rot]) => {
-          const cxs = h('input', { type: 'checkbox' });
-          cxs.checked = !!u[k];
-          selos[k] = cxs;
-          linhaSelos.appendChild(h('label', { style: 'display:flex;align-items:center;gap:6px;font-size:12.5px' },
-            [cxs, document.createTextNode(rot)]));
-        });
+      /* Um por selo que existir, e quantos quiser na mesma conta. Salva no
+         clique, sem esperar o botão: são independentes do resto da ficha. */
+      const linhaSelos = h('div', { cls: 'selo-caixas', style: 'margin-bottom:9px' });
+      (d.selos_todos || []).forEach((s) => {
+        const cxs = h('input', { type: 'checkbox' });
+        cxs.checked = (u.selos || []).indexOf(s.slug) >= 0;
+        cxs.onchange = async () => {
+          try {
+            await api('/selos.php', { method: 'POST', body: JSON.stringify({
+              acao: 'marcar', usuario_id: u.id, selo_id: s.id, dar: cxs.checked }) });
+          } catch (e) { cxs.checked = !cxs.checked; recado(e.message, 'ruim'); }
+        };
+        const rot = h('label');
+        rot.appendChild(cxs);
+        rot.appendChild(chipSelo(s));
+        linhaSelos.appendChild(rot);
+      });
 
       const salvar = h('button', { cls: 'bt mini', type: 'button', txt: 'Salvar' });
       const recado2 = h('span', { cls: 'd', style: 'font-size:11.5px' });
@@ -6306,8 +6455,6 @@ function telaAdmin() {
             perfis_max: maxi.value === '' ? null : parseInt(maxi.value, 10),
             cortesia_ate: cortesia.value,
             beta: betaCx.checked,
-            selo_streamer: selos.selo_streamer.checked,
-            selo_artista: selos.selo_artista.checked,
             recursos,
           }) });
           recado2.textContent = 'salvo';
@@ -6519,6 +6666,116 @@ function telaArtistas() {
       ir,
     ]));
   }
+}
+
+/* ---------------- selos ----------------
+
+   O desenho é do Enzo. Aqui só existe o lugar de subir, dar e tirar: selo
+   dado por regra automática não vale nada, porque a regra é o que a pessoa
+   contorna. */
+
+function blocoSelos() {
+  const cx = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Selos' }),
+    h('p', { cls: 'd', txt: 'Cada selo pode ter um desenho seu. Sem desenho, ele aparece como etiqueta escrita na cor escolhida. Quem tem qual você marca na ficha de cada conta, ali embaixo.' }),
+  ]);
+
+  const lista = h('div', { cls: 'selo-lista' });
+  cx.appendChild(lista);
+
+  const manda = (corpo) => api('/selos.php', { method: 'POST', body: JSON.stringify(corpo) });
+
+  const subir = (slug, nome, cor, arquivo) => {
+    const fd = new FormData();
+    fd.append('slug', slug);
+    fd.append('nome', nome);
+    fd.append('cor', cor);
+    if (arquivo) fd.append('img', arquivo);
+    return fetch(API + '/selos.php', { method: 'POST', headers: { 'X-Chave': chave }, body: fd })
+      .then(async (r) => {
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.erro || 'não deu');
+        return d;
+      });
+  };
+
+  function pinta(selos) {
+    lista.innerHTML = '';
+
+    selos.forEach((s) => {
+      const previa = h('div', { cls: 'previa' });
+      if (s.img) previa.appendChild(h('img', { src: s.img, alt: '' }));
+      else { previa.textContent = '—'; previa.style.color = s.cor; }
+
+      const nome = h('input', { type: 'text', maxlength: '32', style: 'flex:0 0 140px' });
+      nome.value = s.nome;
+      const cor = h('input', { type: 'color', style: 'flex:0 0 46px;padding:2px' });
+      cor.value = s.cor;
+
+      const arq = h('input', { type: 'file', accept: 'image/png,image/webp,image/gif,image/svg+xml',
+        style: 'display:none' });
+      const desenho = h('button', { cls: 'bt mini', type: 'button', txt: s.img ? 'Trocar desenho' : 'Subir desenho' });
+      desenho.onclick = () => arq.click();
+      arq.onchange = async () => {
+        const f = arq.files && arq.files[0];
+        arq.value = '';
+        if (!f) return;
+        if (f.size > 262144) return recado('O desenho pode ter no máximo 256 KB.', 'ruim');
+        try { const r = await subir(s.slug, nome.value, cor.value, f); pinta(r.selos || []); }
+        catch (e) { recado(e.message, 'ruim'); }
+      };
+
+      const salvar = h('button', { cls: 'bt mini', type: 'button', txt: 'Salvar' });
+      salvar.onclick = async () => {
+        try { const r = await subir(s.slug, nome.value, cor.value, null); pinta(r.selos || []); }
+        catch (e) { recado(e.message, 'ruim'); }
+      };
+
+      const semDesenho = h('button', { cls: 'bt mini', type: 'button', txt: 'Tirar desenho' });
+      semDesenho.style.display = s.img ? '' : 'none';
+      semDesenho.onclick = async () => {
+        try { const r = await manda({ acao: 'tirar_desenho', id: s.id }); pinta(r.selos || []); }
+        catch (e) { recado(e.message, 'ruim'); }
+      };
+
+      const apagar = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×' });
+      apagar.onclick = async () => {
+        if (!confirm('Apagar o selo "' + s.nome + '"? Ele some de quem já tem.')) return;
+        try { const r = await manda({ acao: 'apagar', id: s.id }); pinta(r.selos || []); telaAdmin(); }
+        catch (e) { recado(e.message, 'ruim'); }
+      };
+
+      lista.appendChild(h('div', { cls: 'selo-linha' }, [
+        previa,
+        h('code', { style: 'flex:0 0 90px;font-size:12px', txt: s.slug }),
+        nome, cor, desenho, arq, semDesenho, salvar, apagar,
+      ]));
+    });
+
+    if (!selos.length) lista.appendChild(h('p', { cls: 'd', txt: 'Nenhum selo. Rode o SQL 036.' }));
+
+    const nSlug = h('input', { type: 'text', maxlength: '24', placeholder: 'apelido (sem espaço)', style: 'flex:0 0 160px' });
+    const nNome = h('input', { type: 'text', maxlength: '32', placeholder: 'Nome na tela', style: 'flex:0 0 150px' });
+    const nCor = h('input', { type: 'color', value: '#12A150', style: 'flex:0 0 46px;padding:2px' });
+    const nAdd = h('button', { cls: 'bt mini', type: 'button', txt: '+ Selo' });
+    nAdd.onclick = async () => {
+      if (!nSlug.value.trim()) return recado('O selo precisa de um apelido.', 'ruim');
+      try {
+        const r = await subir(nSlug.value, nNome.value || nSlug.value, nCor.value, null);
+        nSlug.value = ''; nNome.value = '';
+        pinta(r.selos || []);
+        telaAdmin();
+      } catch (e) { recado(e.message, 'ruim'); }
+    };
+    lista.appendChild(h('div', { cls: 'campo', style: 'gap:8px;flex-wrap:wrap;margin-top:6px' },
+      [nSlug, nNome, nCor, nAdd]));
+  }
+
+  lista.appendChild(h('p', { cls: 'd', txt: 'vendo…' }));
+  fetch(API + '/selos.php').then((r) => r.json()).then((d) => pinta(d.selos || []))
+    .catch((e) => { lista.innerHTML = ''; lista.appendChild(h('p', { cls: 'd', txt: 'Não deu: ' + e.message })); });
+
+  return cx;
 }
 
 /* ---------------- moderação dos artistas ---------------- */

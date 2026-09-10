@@ -20,6 +20,7 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/selos.php';
 
 /* QUEM CONTA O TEMPO É O BANCO.
 
@@ -104,7 +105,7 @@ if (($_GET['a'] ?? '') === 'img') {
 
 cors();
 
-function feed_autor(array $u): array
+function feed_autor(array $u, array $selos = []): array
 {
     /* A foto que a pessoa escolheu ganha da que veio da Twitch. */
     $foto = !empty($u['foto_propria'])
@@ -112,11 +113,10 @@ function feed_autor(array $u): array
         : (string) ($u['foto'] ?: '');
 
     return [
-        'login'    => (string) $u['login'],
-        'nome'     => (string) ($u['nome_exibicao'] ?: $u['login']),
-        'foto'     => $foto,
-        'artista'  => (int) ($u['selo_artista'] ?? 0),
-        'streamer' => (int) ($u['selo_streamer'] ?? 0),
+        'login' => (string) $u['login'],
+        'nome'  => (string) ($u['nome_exibicao'] ?: $u['login']),
+        'foto'  => $foto,
+        'selos' => $selos[(int) ($u['usuario_id'] ?? $u['id'] ?? 0)] ?? [],
     ];
 }
 
@@ -162,13 +162,15 @@ function feed_comentarios(int $post): array
           ORDER BY c.id LIMIT 100'
     );
     $st->execute([$post]);
+    $linhas = $st->fetchAll(PDO::FETCH_ASSOC);
+    $selos = selos_de(array_column($linhas, 'usuario_id'));
 
     return array_map(fn($c) => [
         'id'    => (int) $c['id'],
         'texto' => (string) $c['texto'],
         'ha'    => (int) $c['ha'],
-        'autor' => feed_autor($c),
-    ], $st->fetchAll(PDO::FETCH_ASSOC));
+        'autor' => feed_autor($c, $selos),
+    ], $linhas);
 }
 
 /* ---------- comentários de um post ---------- */
@@ -199,8 +201,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
 
         $st = db()->prepare($sql);
         $st->execute([$eu]);
+        $linhas = $st->fetchAll(PDO::FETCH_ASSOC);
+        $selos = selos_de(array_column($linhas, 'usuario_id'));
 
-        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $p) {
+        foreach ($linhas as $p) {
             $lista[] = [
                 'id'          => (int) $p['id'],
                 'texto'       => (string) $p['texto'],
@@ -209,7 +213,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
                 'curtidas'    => (int) $p['curtidas'],
                 'comentarios' => (int) $p['comentarios'],
                 'curti'       => (int) $p['curti'] > 0,
-                'autor'       => feed_autor($p),
+                'autor'       => feed_autor($p, $selos),
             ];
         }
     } catch (Throwable $e) { /* tabela ainda não criada */ }
@@ -222,15 +226,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     }
     if ($sem) {
         feed_completa($sem);
-        $st2 = db()->prepare(
-            'SELECT login, nome_exibicao, foto, foto_propria, selo_artista, selo_streamer
-               FROM usuarios WHERE login = ?'
-        );
+        $st2 = db()->prepare('SELECT id AS usuario_id, login, nome_exibicao, foto, foto_propria
+                                FROM usuarios WHERE login = ?');
         foreach ($lista as &$p) {
             if ($p['autor']['foto'] !== '') continue;
+            $guarda = $p['autor']['selos'];
             $st2->execute([$p['autor']['login']]);
             $u = $st2->fetch(PDO::FETCH_ASSOC);
-            if ($u) $p['autor'] = feed_autor($u);
+            if ($u) {
+                $p['autor'] = feed_autor($u);
+                $p['autor']['selos'] = $guarda;
+            }
         }
         unset($p);
     }

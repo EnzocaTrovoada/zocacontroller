@@ -32,8 +32,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
           LIMIT 200'
     );
 
+    require_once __DIR__ . '/lib/selos.php';
+
+    $contas = $st->fetchAll(PDO::FETCH_ASSOC);
+    $selosPorConta = selos_de(array_column($contas, 'id'));
+
     $lista = [];
-    foreach ($st->fetchAll() as $u) {
+    foreach ($contas as $u) {
         $acesso = acesso_do_usuario((int) $u['id']);
         $plano  = $acesso['ativo'] ? $acesso['plano'] : 'gratis';
         $lista[] = [
@@ -43,8 +48,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
             'visto_em'   => $u['visto_em'],
             'admin'      => (int) $u['admin'],
             'beta'       => (int) ($u['beta'] ?? 0),
-            'selo_artista'  => (int) ($u['selo_artista'] ?? 0),
-            'selo_streamer' => (int) ($u['selo_streamer'] ?? 0),
+            'selos'      => array_column($selosPorConta[(int) $u['id']] ?? [], 'slug'),
             'cortesia_ate' => $u['cortesia_ate'] ?? null,
             'plano'      => $plano,
             'overlays'   => (int) $u['overlays'],
@@ -95,6 +99,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     } catch (Throwable $e) { /* tabelas novas: quem não rodou o SQL vê listas vazias */ }
 
     json_saida(['eu' => $uid, 'usuarios' => $lista, 'spotify' => $spot,
+        'selos_todos' => selo_lista(),
                 'cupons' => $cupons, 'parceiros' => $parceiros, 'padrao' => [
         'gratis' => recursos_do_plano('gratis'),
         'pro'    => recursos_do_plano('pro'),
@@ -177,6 +182,20 @@ if ($acao === 'cupom_apagar') {
     /* Apagar de verdade, e não desligar: cupom desligado já existe como
        opção. Quem escolheu apagar quer que suma da lista. A comissão que ele
        gerou fica, porque a dívida com o parceiro não some junto. */
+/* Mostrar ou esconder o cupom da lista de quem está comprando, sem ter
+   que reescrever o cupom inteiro. */
+if ($acao === 'cupom_publico') {
+    $cod = strtoupper(preg_replace('/[^A-Z0-9_-]/i', '', (string) ($d['codigo'] ?? '')));
+    if ($cod === '') json_saida(['erro' => 'Falta o código.'], 400);
+
+    /* Cupom de parceiro nunca entra: o código dele é o ativo dele, e numa
+       lista dentro do site ninguém passaria pelo link — o desconto valeria
+       e a comissão não aconteceria. */
+    db()->prepare('UPDATE cupons SET publico = ? WHERE codigo = ? AND parceiro_id IS NULL')
+        ->execute([empty($d['publico']) ? 0 : 1, $cod]);
+    json_saida(['ok' => true]);
+}
+
     db()->prepare('DELETE FROM cupons WHERE codigo = ?')
         ->execute([cupom_limpa((string) ($d['codigo'] ?? ''))]);
     json_saida(['ok' => true]);
@@ -229,15 +248,6 @@ if (array_key_exists('beta', $d)) {
    Recebe uma data (ou vazio pra tirar). Com prazo, e não um interruptor,
    porque cortesia sem data é cortesia esquecida: seis meses depois ninguém
    lembra por que aquela conta tem Pro. */
-/* Os dois selos do feed. Ligados à mão, um a um: é isso que os faz valer
-   alguma coisa — verificação automática de "é artista mesmo?" não existe. */
-foreach (['selo_artista', 'selo_streamer'] as $selo) {
-    if (array_key_exists($selo, $d)) {
-        $campos[] = $selo . ' = ?';
-        $vals[]   = empty($d[$selo]) ? 0 : 1;
-    }
-}
-
 if (array_key_exists('cortesia_ate', $d)) {
     $v = trim((string) $d['cortesia_ate']);
     $campos[] = 'cortesia_ate = ?';

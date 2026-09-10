@@ -75,7 +75,13 @@ anual R$ 150, vitalício R$ 330. Sem marca d'água em plano nenhum.
 busca, caminho de navegação, modo de edição de textos, CSS extra, admin com
 usuários, cupons, parceiros e comissões.
 
-**Feed:** posts com texto e uma imagem na coluna do meio da inicial. Nome e
+**Selos:** tabela `selos` + `usuario_selos`, com desenho opcional por selo.
+Dados à mão na administração, quantos couberem por conta. Nada automático —
+selo dado por regra é selo que a regra contorna. Sem desenho, o selo aparece
+como etiqueta escrita na cor dele.
+
+**Feed:** posts com texto e uma imagem na coluna do meio da inicial, com
+curtida, comentário e o perfil levando ao canal na Twitch. Nome e
 foto vêm da Twitch no login e ficam guardados em `usuarios` — pedir o perfil
 de cada autor a cada visita bate no limite deles. Dois selos, ligados à mão
 na administração: `selo_streamer` e `selo_artista`.
@@ -252,7 +258,7 @@ verificação → painéis de mod → guardião da live.
 
 ## 7. Antes de cobrar de alguém
 
-1. Rodar as migrações pendentes (023 a 034)
+1. Rodar as migrações pendentes (023 a 036)
 2. Subir todo o `api/`
 3. `'ligado' => true`, `'modo' => 'producao'`, credenciais de produção
 4. Testar aprovado, recusado e Pix pendente

@@ -202,8 +202,9 @@ if (empty($_FILES['obras'])) {
            precisar ligar de novo na outra tela. */
         if ($selo) {
             db()->prepare(
-                'UPDATE usuarios SET selo_artista = 1
-                  WHERE id = (SELECT usuario_id FROM artistas WHERE id = ?)'
+                "INSERT IGNORE INTO usuario_selos (usuario_id, selo_id)
+                      SELECT a.usuario_id, s.id FROM artistas a JOIN selos s ON s.slug = 'artista'
+                       WHERE a.id = ? AND a.usuario_id IS NOT NULL"
             )->execute([$id]);
         }
         json_saida(['ok' => true]);
