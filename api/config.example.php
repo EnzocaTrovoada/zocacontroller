@@ -55,8 +55,24 @@ return [
         'modo'           => 'teste',   // teste | producao
         'access_token'   => '',        // TEST-... no modo teste, APP_USR-... em producao
         'webhook_secret' => '',        // "Assinatura secreta" no painel de webhooks
-        'url_retorno'    => 'https://zocahop.com/zocacontroller/obrigado.php',
+        'url_retorno'    => 'https://mods.zocahop.com/obrigado.html',
+        /* Esta pagina vive junto do painel, no GitHub Pages, e sobe sozinha
+           com o commit. Endereco fora dali daria uma pagina a mais pra
+           lembrar de subir na mao — e ela e o destino de quem acabou de
+           pagar, o pior lugar possivel pra dar 404. */
     ],
+
+    /* Segredo do agendador da vitrine.
+
+       A escolha do canal em destaque custa dezenas de pedidos a Twitch, e
+       por isso ela roda uma vez por dia pelo cron da hospedagem, de
+       madrugada — assim ja esta pronta quando alguem abre a pagina.
+
+       No hPanel: Avancado > Trabalhos Cron > uma vez por dia, com
+         curl -s "https://api.zocahop.com/vitrine.php?cron=SEGREDO" > /dev/null
+
+       Gere com: php -r "echo bin2hex(random_bytes(16));" */
+    'vitrine_cron' => '',
 
     // O proprio endereco desta API. A Twitch precisa dele para entregar os
     // avisos do EventSub, e tem que ser https com certificado valido.

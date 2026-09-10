@@ -431,6 +431,106 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 
 /* ------------------------------------------------------------------ *
+ *  Atualizar: quem paga a conta de escolher
+ * ------------------------------------------------------------------ */
+
+/* NINGUÉM PODE ESPERAR O SORTEIO.
+
+   A escolha do canal pequeno custa dezenas de pedidos à Twitch — medido em
+   produção, cinco segundos. Feita durante a visita, quem abre a página
+   primeiro depois da virada do dia paga esses cinco segundos sozinho, e é
+   justamente a primeira impressão do site.
+
+   Duas defesas, nesta ordem:
+
+     1. O CRON roda de madrugada e deixa tudo escolhido. Quando alguém abre a
+        página, já está pronto no banco.
+
+     2. Se o cron falhar ou não existir, a visita serve o que estiver
+        guardado — mesmo velho — e refaz a escolha DEPOIS de responder, com
+        litespeed_finish_request. A pessoa recebe a página na hora e a
+        próxima já vem nova.
+
+   Em nenhum dos dois caminhos alguém fica olhando pra tela em branco. */
+
+const VITRINE_TRAVA = 120;   /* segundos que uma atualização segura as outras */
+
+/**
+ * Uma atualização por vez.
+ *
+ * Sem isto, dez visitas simultâneas com o dado vencido disparam dez
+ * caminhadas na Twitch ao mesmo tempo — e aí o limite de chamadas deles
+ * derruba todas as dez.
+ */
+function vitrine_pegou_a_trava(): bool
+{
+    $t = vitrine_le('atualizando');
+    if ($t && $t['idade'] < VITRINE_TRAVA) return false;
+    vitrine_grava('atualizando', 1);
+    return true;
+}
+
+function vitrine_solta_a_trava(): void
+{
+    db()->prepare('DELETE FROM vitrine WHERE chave = ?')->execute(['atualizando']);
+}
+
+/** Refaz as três fatias e os tópicos do idioma padrão. */
+function vitrine_atualiza(array $cfg, array $bloqueados, string $idioma): array
+{
+    $feito = [];
+
+    foreach (VITRINE_FATIAS as $f) {
+        if (!$cfg[$f]['ligado']) continue;
+        try {
+            $cartao = vitrine_sortear($f, $cfg[$f], $idioma, $bloqueados);
+        } catch (Throwable $e) {
+            $cartao = null;
+        }
+        /* GUARDA ATÉ O "NÃO ACHEI": sem isso, uma fatia vazia refaz a busca a
+           cada visita, e a fatia 'pro' consulta o acesso de cada conta do
+           site pra montar a lista. */
+        vitrine_grava('fatia_' . $f, $cartao);
+        $feito[$f] = $cartao ? ($cartao['login'] ?? '?') : null;
+    }
+
+    try {
+        $altas = vitrine_altas($idioma, '', $bloqueados);
+        vitrine_grava('altas_' . substr(md5($idioma . '|'), 0, 20), $altas);
+        $feito['altas'] = count($altas['topicos'] ?? []);
+    } catch (Throwable $e) {
+        $feito['altas'] = 'falhou';
+    }
+
+    return $feito;
+}
+
+/* ------------------------------------------------------------------ *
+ *  O cron
+ * ------------------------------------------------------------------ */
+
+/* Chamado uma vez por dia pelo agendador da hospedagem:
+     curl -s "https://api.zocahop.com/vitrine.php?cron=SEGREDO"
+   O segredo mora no config e existe pra que a rotina cara não possa ser
+   disparada por qualquer um que descubra o endereço. */
+if (isset($_GET['cron'])) {
+    $esperado = (string) (cfg()['vitrine_cron'] ?? '');
+    if ($esperado === '' || !hash_equals($esperado, (string) $_GET['cron'])) {
+        json_saida(['erro' => 'Não encontrado.'], 404);
+    }
+
+    $cfg = vitrine_config();
+    if (!vitrine_pegou_a_trava()) json_saida(['ok' => true, 'pulou' => 'já tem uma rodando']);
+
+    try {
+        $feito = vitrine_atualiza($cfg, vitrine_bloqueados(), (string) $cfg['idioma']);
+    } finally {
+        vitrine_solta_a_trava();
+    }
+    json_saida(['ok' => true, 'feito' => $feito]);
+}
+
+/* ------------------------------------------------------------------ *
  *  A leitura pública
  * ------------------------------------------------------------------ */
 
@@ -442,36 +542,23 @@ $idioma = (string) $cfg['idioma'];
 $idiomaPedido = preg_replace('/[^a-z-]/', '', strtolower((string) ($_GET['idioma'] ?? ''))) ?: $idioma;
 $catPedida    = mb_substr(trim((string) ($_GET['categoria'] ?? '')), 0, 80);
 
+/* ----- as três fatias: sempre o que está guardado ----- */
 $fatias = [];
+$velho = false;
+
 foreach (VITRINE_FATIAS as $f) {
     if (!$cfg[$f]['ligado']) continue;
 
     $g = vitrine_le('fatia_' . $f);
-    $fresco = $g && $g['idade'] < VITRINE_FRESCOR;
+    if (!$g || $g['idade'] >= VITRINE_FRESCOR) $velho = true;
+    if (!$g) continue;
 
-    if ($fresco) {
-        $cartao = $g['valor'];
-    } else {
-        try {
-            $cartao = vitrine_sortear($f, $cfg[$f], $idioma, $bloqueados);
-        } catch (Throwable $e) {
-            $cartao = null;
-        }
-
-        /* GUARDA ATÉ O "NÃO ACHEI".
-
-           Sem isto, uma fatia vazia refaz a busca a CADA visita da página
-           inicial — e a fatia 'pro' consulta o acesso de cada conta do site
-           pra montar a lista. Com quatro contas ninguém sente; com
-           quatrocentas, a home cai sozinha. */
-        vitrine_grava('fatia_' . $f, $cartao);
-    }
+    $cartao = $g['valor'];
 
     /* Banido depois de guardado não pode continuar aparecendo. */
     if ($cartao && in_array(strtolower((string) ($cartao['login'] ?? '')), $bloqueados, true)) {
-        $cartao = null;
+        continue;
     }
-
     if ($cartao) $fatias[$f] = $cartao;
 }
 
@@ -484,21 +571,30 @@ foreach (VITRINE_FATIAS as $f) {
    uma servindo o resultado da outra. Resumir em md5 dá tamanho fixo. */
 $chaveAltas = 'altas_' . substr(md5($idiomaPedido . '|' . mb_strtolower($catPedida)), 0, 20);
 $ga = vitrine_le($chaveAltas);
+$altas = $ga['valor'] ?? null;
 
-if ($ga && $ga['idade'] < VITRINE_FRESCOR) {
-    $altas = $ga['valor'];
-} else {
+/* Filtro que ninguém pediu ainda não tem nada guardado, e aí não dá pra
+   escapar: uma leitura só da Twitch, que é barata (um pedido). O caro é o
+   sorteio das fatias, e esse nunca acontece durante a visita. */
+if ($altas === null) {
     try {
         $altas = vitrine_altas($idiomaPedido, $catPedida, $bloqueados);
+        vitrine_grava($chaveAltas, $altas);
     } catch (Throwable $e) {
-        $altas = $ga['valor'] ?? ['topicos' => [], 'canais' => []];
+        $altas = ['topicos' => [], 'canais' => []];
     }
-    vitrine_grava($chaveAltas, $altas);
+} elseif ($ga['idade'] >= VITRINE_FRESCOR) {
+    $velho = true;
 }
 
-header('Cache-Control: public, max-age=120');
+/* RESPONDE PRIMEIRO, TRABALHA DEPOIS.
 
-json_saida([
+   Escrito à mão em vez de json_saida() porque aquela função encerra a
+   requisição, e aqui ainda tem serviço a fazer depois que o visitante já
+   recebeu a página. É o mesmo caminho do webhook de pagamento. */
+header('Cache-Control: public, max-age=120');
+header('Content-Type: application/json; charset=utf-8');
+echo json_encode([
     'fatias' => $fatias,
     'altas'  => [
         'idioma'    => $idiomaPedido,
@@ -506,4 +602,18 @@ json_saida([
         'topicos'   => $altas['topicos'] ?? [],
         'canais'    => $altas['canais'] ?? [],
     ],
-]);
+], JSON_UNESCAPED_UNICODE);
+
+responder_e_continuar();
+
+/* Daqui pra baixo o visitante já foi embora com a página na mão. */
+if ($velho && vitrine_pegou_a_trava()) {
+    try {
+        vitrine_atualiza($cfg, $bloqueados, $idioma);
+    } catch (Throwable $e) {
+        /* falhou: a próxima visita tenta de novo */
+    } finally {
+        vitrine_solta_a_trava();
+    }
+}
+exit;
