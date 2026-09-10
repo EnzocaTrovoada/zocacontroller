@@ -147,6 +147,18 @@
   }
   .pop .sub { margin: 0 0 18px; }
 
+  /* Entram deslizando, um atrás do outro. O atraso é pequeno de propósito:
+     a lista inteira termina em meio segundo, então a animação é percebida
+     sem ninguém precisar esperar por ela. */
+  @keyframes popEntra {
+    from { opacity: 0; transform: translateX(-14px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .pop__lista li { animation: popEntra .34s ease-out both; }
+  @media (prefers-reduced-motion: reduce) {
+    .pop__lista li { animation: none; }
+  }
+
   .pop__lista { list-style: none; margin: 0 0 22px; padding: 0; }
   .pop__lista li {
     display: grid; grid-template-columns: 20px 1fr; gap: 10px;
@@ -155,7 +167,10 @@
   .pop__lista li:last-child { border-bottom: 0; }
   .pop__lista b { font-weight: 600; }
   .pop__lista small { display: block; color: var(--apagado); font-size: 12.5px; margin-top: 1px; }
-  .pop__ok { color: var(--verde); font-weight: 700; }
+  /* Cada marcador de uma cor. Não é enfeite: uma coluna de dez símbolos
+     iguais some da vista, e a lista de benefícios é a parte que precisa
+     ser lida. */
+  .pop__ok { font-weight: 700; }
   .pop__estrela { color: var(--dourado); font-weight: 700; }
   .pop__lista li.so-vital b { color: var(--dourado); }
   .pop__tag {
@@ -166,6 +181,20 @@
   }
   .pop__plano.vital { border-color: var(--dourado); }
   .pop__plano.vital span { color: var(--dourado); }
+
+  /* O escolhido. Precisa ser óbvio, porque um deles já vem marcado e a
+     pessoa tem que perceber isso sem procurar. */
+  .pop__plano.on { border-color: var(--verde); background: var(--verde-fraco); box-shadow: inset 3px 0 0 var(--verde); }
+  .pop__plano.on.vital { border-color: var(--dourado); box-shadow: inset 3px 0 0 var(--dourado); }
+  .pop__plano .comp { display: block; font-size: 11.5px; color: var(--verde-forte); margin-top: 2px; font-weight: 600; }
+  .pop__plano.vital .comp { color: var(--dourado); }
+  .pop__etiqueta {
+    position: absolute; top: -8px; right: 10px;
+    font: 600 9.5px var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    background: var(--verde); color: #fff; padding: 2px 7px;
+  }
+  .pop__plano { position: relative; }
+  .pop__plano.vital .pop__etiqueta { background: var(--dourado); }
 
   /* Os planos nascem escondidos de propósito: primeiro a pessoa entende o
      que ganha, depois vê quanto custa. Preço antes do motivo só serve pra
@@ -2511,142 +2540,27 @@ function abrePro(estado) {
       : 'Você já é Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '. Pode renovar quando quiser.' }));
 
   const lista = h('ul', { cls: 'pop__lista' });
-  PRO_BENEFICIOS.forEach(([titulo, detalhe]) => {
-    lista.appendChild(h('li', {}, [
-      h('span', { cls: 'pop__ok', txt: '✓' }),
-      h('div', {}, [h('b', { txt: titulo }), h('small', { txt: detalhe })]),
-    ]));
+  PRO_BENEFICIOS.forEach(([titulo, detalhe], i) => {
+    const marca = h('span', { cls: 'pop__ok', txt: '✓' });
+    marca.style.color = PRO_CORES[i % PRO_CORES.length];
+
+    const li = h('li', {}, [marca, h('div', {}, [h('b', { txt: titulo }), h('small', { txt: detalhe })])]);
+    li.style.animationDelay = (i * 45) + 'ms';
+    lista.appendChild(li);
   });
   corpo.appendChild(lista);
 
   if (estado.modo === 'teste') {
-    corpo.appendChild(h('div', { cls: 'so-adm' },
-      [h('p', { style: 'margin:0', txt: 'Modo de teste: não move dinheiro.' })]));
-  }
-
-  /* ----- os planos, só depois do "Seja Pro" ----- */
-  const planos = h('div', { cls: 'pop__planos escondido' });
-  const precos = [];
-
-  /* Mostra "de R$ 13,99 por R$ 11,19" no plano i, ou volta ao preço cheio. */
-  function pintaPreco(i, conta) {
-    const linha = precos[i];
-    if (!linha) return;
-    linha.el.innerHTML = '';
-    if (conta) {
-      linha.el.appendChild(h('span', { cls: 'antes', txt: linha.cheio }));
-      linha.el.appendChild(document.createTextNode(
-        (conta.por / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })));
-    } else {
-      linha.el.appendChild(document.createTextNode(linha.cheio));
-    }
-  }
-
-  (estado.planos || []).forEach((pl) => {
-    const reais = (pl.preco_centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const porMes = pl.periodo === 'vitalicio'
-      ? 'paga uma vez e nunca mais'
-      : pl.periodo === 'anual'
-        ? (pl.preco_centavos / 1200).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + ' por mês'
-        : 'cobrado uma vez, vale 30 dias';
-
-    const preco = h('span', {});
-    preco.appendChild(document.createTextNode(reais));
-
-    const b = h('button', { cls: 'pop__plano' + (pl.periodo === 'vitalicio' ? ' vital' : ''), type: 'button' }, [
-      h('div', {}, [h('b', { txt: pl.nome }), h('small', { txt: porMes })]),
-      preco,
-    ]);
-    precos.push({ el: preco, cheio: reais });
-
-    b.onclick = async () => {
-      b.disabled = true;
-      try {
-        const r = await api('/checkout.php?plano=' + encodeURIComponent(pl.slug)
-          + (cupomAtivo ? '&cupom=' + encodeURIComponent(cupomAtivo) : ''));
-
-        /* EM MODO DE TESTE, ABA NORMAL NÃO FUNCIONA.
-
-           O Mercado Pago exige que as duas pontas sejam do mesmo mundo: se
-           quem VENDE é de teste, quem PAGA também precisa ser. Numa aba
-           comum o navegador manda junto a sessão da sua conta real, e o
-           checkout recusa com "uma das partes é de teste" — erro que não diz
-           o que fazer e parece defeito nosso.
-
-           Por isso aqui o link não abre sozinho: ele aparece pra ser colado
-           numa janela anônima, que é onde não existe sessão nenhuma. */
-        if (estado.modo === 'teste') {
-          /* Reabilitar ANTES de sair: o return pulava o b.disabled = false
-             lá embaixo, então quem voltasse pra lista com "Escolher outro
-             plano" encontrava o botão que já tinha clicado morto — e nada
-             na tela explicava por quê. */
-          b.disabled = false;
-          passoAPasso(r.url);
-          return;
-        }
-
-        /* Aba nova, e não redirecionamento: quem sai do painel pro Mercado
-           Pago e volta numa página deles perde o caminho de volta. */
-        window.open(r.url, '_blank', 'noopener');
-        fechaPop();
-        recado('Abri o pagamento numa aba nova. Depois de pagar, volte aqui e recarregue a página.', 'bom');
-      } catch (e) {
-        recado(e.message, 'ruim');
-      }
-      b.disabled = false;
-    };
-    planos.appendChild(b);
-  });
-
-  /* O roteiro do teste, no lugar do botão que não pode simplesmente abrir. */
-  function passoAPasso(url) {
-    planos.classList.add('escondido');
-
-    const passos = h('ol', { cls: 'passos escondido' });
-    [
-      'Janela anônima (Ctrl+Shift+N).',
-      'Cole o link.',
-      'Entre com o usuário de teste comprador.',
-      'Cartão 5480 8328 0103 3311, CVV 123, validade 11/30, titular APRO (ou FUND pra recusar).',
-      'Volte e recarregue.',
-    ].forEach((txt) => passos.appendChild(h('li', { txt })));
-
-    /* O passo a passo nasce FECHADO. É instrução de teste, não parte da
-       compra — aberto, tomava a tela inteira e escondia o que se clica. */
-    const verPassos = h('button', { cls: 'bt fraco mini', type: 'button', txt: 'Como testar' });
-    verPassos.onclick = () => {
-      const fechado = passos.classList.toggle('escondido');
-      verPassos.textContent = fechado ? 'Como testar' : 'Esconder';
-    };
-
-    const campo = h('input', { type: 'text', value: url, readonly: 'readonly',
-      style: 'width:100%;font:12px var(--mono)' });
-    campo.onclick = () => campo.select();
-
-    const copiar = h('button', { cls: 'bt mini', type: 'button', txt: 'Copiar link' });
-    copiar.onclick = async () => {
-      try { await navigator.clipboard.writeText(url); copiar.textContent = 'Copiado'; }
-      catch (e) { campo.select(); copiar.textContent = 'Use Ctrl+C'; }
-      setTimeout(() => { copiar.textContent = 'Copiar link'; }, 2000);
-    };
-
-    const volta = h('button', { cls: 'bt fraco mini', type: 'button', txt: 'Outro plano' });
-    volta.onclick = () => { roteiro.remove(); planos.classList.remove('escondido'); };
-
-    const abrir = h('a', { cls: 'bt principal mini', href: url, target: '_blank',
-      rel: 'noopener noreferrer', txt: 'Abrir pagamento', style: 'text-decoration:none' });
-
-    const roteiro = h('div', { cls: 'so-adm', style: 'margin-top:4px' }, [
-      h('p', { cls: 'd', style: 'margin:0 0 8px',
-        txt: 'Abra em janela anônima e entre com o usuário de teste.' }),
-      campo,
-      h('div', { style: 'display:flex;gap:8px;margin-top:8px;flex-wrap:wrap' },
-        [abrir, copiar, verPassos, volta]),
-      passos,
-    ]);
-
-    corpo.appendChild(roteiro);
-    corpo.scrollTop = corpo.scrollHeight;
+    /* A caixa de link com cinco passos saiu da tela: ela é instrução de
+       teste, e estava no meio do caminho de quem vai comprar. Sobra o
+       essencial, em vermelho, só pra você. */
+    corpo.appendChild(h('div', { cls: 'so-adm' }, [
+      h('p', { style: 'margin:0 0 4px', txt: 'Modo de teste: não move dinheiro.' }),
+      h('p', { style: 'margin:0;font-size:12px', txt:
+        'Se recusar com "uma das partes é de teste", copie o endereço da aba que abriu e cole '
+        + 'numa janela anônima, entrando com o usuário de teste. Cartão 5480 8328 0103 3311, '
+        + 'CVV 123, validade 11/30, titular APRO.' }),
+    ]));
   }
 
   /* ----- cupom ----- */
@@ -2673,8 +2587,8 @@ function abrePro(estado) {
       /* Pergunta por plano, e não uma vez só: um cupom percentual vale
          valores diferentes no mensal e no vitalício, e mostrar um número
          que não é o que vai ser cobrado é pior do que não mostrar. */
-      const planos = estado.planos || [];
-      const contas = await Promise.all(planos.map((pl) =>
+      const lista2 = estado.planos || [];
+      const contas = await Promise.all(lista2.map((pl) =>
         api('/checkout.php?cupom_teste=' + encodeURIComponent(cod) + '&plano=' + encodeURIComponent(pl.slug))
           .catch(() => null)));
 
@@ -2682,7 +2596,7 @@ function abrePro(estado) {
       if (!bom) {
         const ruim = contas.find((c) => c && c.erro);
         cupomAtivo = '';
-        planos.forEach((_, i) => pintaPreco(i, null));
+        lista2.forEach((_, i) => pintaPreco(i, null));
         return dizCupom(ruim ? ruim.erro : 'Esse código não vale.', false);
       }
 
@@ -2695,23 +2609,138 @@ function abrePro(estado) {
     btCupom.disabled = false;
   };
 
-  const seja = h('button', { cls: 'bt principal', type: 'button',
-    txt: estado.plano === 'gratis' ? 'Seja Pro' : 'Renovar', style: 'width:100%' });
-  seja.onclick = () => {
-    seja.classList.add('escondido');
-    planos.classList.remove('escondido');
-    linhaCupom.classList.remove('escondido');
+  /* ----- os planos ----- */
+  const planos = h('div', { cls: 'pop__planos escondido' });
+  const precos = [];
+  let escolhido = null;
+
+  /* A COMPARAÇÃO É O QUE VENDE, NÃO O PREÇO.
+
+     Sozinho, "R$ 150,00" parece mais caro que "R$ 13,99". Só olhando lado a
+     lado é que o anual aparece como o barato — e o vitalício, como o que
+     para de custar. Tudo calculado a partir dos preços que vieram do
+     servidor: mexer na tabela não obriga a mexer aqui. */
+  function comparacao(pl, mensal) {
+    if (!mensal) return '';
+    const mes = mensal.preco_centavos;
+
+    if (pl.periodo === 'anual') {
+      const ano = mes * 12;
+      const economia = ano - pl.preco_centavos;
+      if (economia <= 0) return '';
+      return 'Sai ' + reaisDe(Math.round(pl.preco_centavos / 12)) + '/mês — economiza '
+           + reaisDe(economia) + ' por ano';
+    }
+
+    if (pl.periodo === 'vitalicio') {
+      /* Arredonda o total de meses ANTES de dividir: 23,6 meses vira 24, e
+         não "1 ano e 12 meses". */
+      const m = Math.round(pl.preco_centavos / mes);
+      const anos = Math.floor(m / 12), resto = m % 12;
+      const quando = anos && resto ? anos + (anos > 1 ? ' anos e ' : ' ano e ') + resto + (resto > 1 ? ' meses' : ' mês')
+                   : anos ? anos + (anos > 1 ? ' anos' : ' ano')
+                   : m + ' meses';
+      return 'Se paga em ' + quando + '. Depois, nunca mais.';
+    }
+
+    return reaisDe(mes * 12) + ' em um ano';
+  }
+
+  const mensal = (estado.planos || []).find((x) => x.periodo === 'mensal');
+
+  (estado.planos || []).forEach((pl, i) => {
+    const reais = reaisDe(pl.preco_centavos);
+
+    const preco = h('span', {});
+    preco.appendChild(document.createTextNode(reais));
+
+    const b = h('button', { cls: 'pop__plano' + (pl.periodo === 'vitalicio' ? ' vital' : ''), type: 'button' }, [
+      h('div', {}, [
+        h('b', { txt: pl.nome }),
+        h('small', { cls: 'comp', txt: comparacao(pl, mensal) }),
+      ]),
+      preco,
+    ]);
+
+    if (pl.periodo === 'anual') b.appendChild(h('span', { cls: 'pop__etiqueta', txt: 'mais escolhido' }));
+    if (pl.periodo === 'vitalicio') b.appendChild(h('span', { cls: 'pop__etiqueta', txt: 'melhor no longo prazo' }));
+
+    precos.push({ el: preco, cheio: reais, plano: pl, botao: b });
+
+    b.onclick = () => marca(i);
+    planos.appendChild(b);
+  });
+
+  function marca(i) {
+    escolhido = precos[i] ? precos[i].plano : null;
+    precos.forEach((x, k) => x.botao.classList.toggle('on', k === i));
+    pagar.disabled = !escolhido;
+    pagar.textContent = escolhido ? 'Seja Pro — ' + reaisDe(escolhido.preco_centavos) : 'Seja Pro';
+  }
+
+  /* Mostra "de R$ 13,99 por R$ 11,19" no plano i, ou volta ao preço cheio. */
+  function pintaPreco(i, conta) {
+    const linha = precos[i];
+    if (!linha) return;
+    linha.el.innerHTML = '';
+    if (conta) {
+      linha.el.appendChild(h('span', { cls: 'antes', txt: linha.cheio }));
+      linha.el.appendChild(document.createTextNode(reaisDe(conta.por)));
+    } else {
+      linha.el.appendChild(document.createTextNode(linha.cheio));
+    }
+    if (escolhido === linha.plano) {
+      pagar.textContent = 'Seja Pro — ' + (conta ? reaisDe(conta.por) : linha.cheio);
+    }
+  }
+
+  /* ----- o botão que paga ----- */
+  const pagar = h('button', { cls: 'bt principal escondido', type: 'button',
+    txt: 'Seja Pro', style: 'width:100%' });
+
+  pagar.onclick = async () => {
+    if (!escolhido) return;
+    pagar.disabled = true;
+    const antes = pagar.textContent;
+    pagar.textContent = 'abrindo…';
+    try {
+      const r = await api('/checkout.php?plano=' + encodeURIComponent(escolhido.slug)
+        + (cupomAtivo ? '&cupom=' + encodeURIComponent(cupomAtivo) : ''));
+
+      /* Aba nova, e não redirecionamento: quem sai do painel pro Mercado
+         Pago e volta numa página deles perde o caminho de volta. */
+      window.open(r.url, '_blank', 'noopener');
+      fechaPop();
+      recado('Abri o pagamento numa aba nova. Depois de pagar, volte e recarregue.', 'bom');
+    } catch (e) {
+      recado(e.message, 'ruim');
+    }
+    pagar.disabled = false;
+    pagar.textContent = antes;
   };
 
-  /* O QUE SE CLICA NÃO PODE FICAR ABAIXO DA DOBRA.
+  /* ----- ver planos ----- */
+  const verPlanos = h('button', { cls: 'bt principal', type: 'button',
+    txt: estado.plano === 'gratis' ? 'Ver planos' : 'Renovar', style: 'width:100%' });
 
-     A lista de benefícios cresceu e passou a empurrar o botão pra fora da
-     área visível da caixa. Como a caixa rola por dentro, de fora isso parece
-     um botão que não dá pra clicar — a pessoa não tem como saber que ele
-     existe mais embaixo. Grudado no rodapé, ele está sempre lá, e a lista
-     rola atrás. */
+  verPlanos.onclick = () => {
+    verPlanos.classList.add('escondido');
+    planos.classList.remove('escondido');
+    linhaCupom.classList.remove('escondido');
+    pagar.classList.remove('escondido');
+
+    /* O ANUAL JÁ VEM MARCADO.
+
+       Ninguém abre a tela sem opção nenhuma escolhida: isso obriga a pessoa
+       a decidir do zero. Vindo marcado no anual, a decisão vira "confirmo ou
+       mudo", que é bem mais fácil — e é o plano que faz mais sentido pra
+       maioria. */
+    const i = precos.findIndex((x) => x.plano.periodo === 'anual');
+    marca(i >= 0 ? i : 0);
+  };
+
   const acao = h('div', { cls: 'pop__acao' }, [
-    seja, linhaCupom, cupomDiz, planos,
+    verPlanos, linhaCupom, cupomDiz, planos, pagar,
     h('p', { cls: 'd', style: 'margin:12px 0 0;text-align:center',
       txt: 'Pix, cartão ou saldo. O pagamento acontece no site do Mercado Pago.' }),
   ]);
@@ -2783,6 +2812,10 @@ el('abaUpgrade').onclick = () => {
    repositório se edita, se comita, e o Pages publica. A live do dia é a
    exceção: essa vem do servidor porque depende da API da Twitch. */
 let hubDados = null;
+
+/* Uma cor por marcador, em ordem. Repete se a lista crescer. */
+const PRO_CORES = ['#3DD47F', '#45B8BF', '#7C8CF8', '#D98CDE', '#E0A82E',
+                   '#4ADE80', '#38BDF8', '#A78BFA', '#F472B6', '#FBBF24'];
 
 const HUB_SELOS = {
   usuario: ['usuario', 'Usa o ZocaController'],
