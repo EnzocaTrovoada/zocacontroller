@@ -169,8 +169,7 @@ if (!empty($_FILES['imagem']) && (int) ($_FILES['imagem']['error'] ?? UPLOAD_ERR
     $mime  = (string) $finfo->file($f['tmp_name']);
     if (!isset(FEED_TIPOS[$mime])) json_saida(['erro' => 'Vale JPG, PNG, WEBP ou GIF.'], 400);
 
-    if (!is_dir(FEED_DIR)) @mkdir(FEED_DIR, 0755, true);
-    if (!is_dir(FEED_DIR) || !is_writable(FEED_DIR)) {
+    if (!pasta_privada(FEED_DIR)) {
         json_saida(['erro' => 'Não consegui guardar a imagem aqui no servidor.'], 500);
     }
 

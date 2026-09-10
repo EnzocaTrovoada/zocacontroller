@@ -162,8 +162,7 @@ if (!isset(SONS_TIPOS[$mime])) {
     json_saida(['erro' => 'Isso não parece um arquivo de som. Vale MP3, OGG, WAV ou WEBM.'], 400);
 }
 
-if (!is_dir(SONS_DIR)) @mkdir(SONS_DIR, 0755, true);
-if (!is_dir(SONS_DIR) || !is_writable(SONS_DIR)) {
+if (!pasta_privada(SONS_DIR)) {
     json_saida(['erro' => 'Não consegui guardar o arquivo aqui no servidor.'], 500);
 }
 

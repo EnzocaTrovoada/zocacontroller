@@ -60,6 +60,38 @@ function contar_erro(string $rotulo): void
     }
 }
 
+/**
+ * Cria a pasta de arquivos enviados e tranca a porta da frente dela.
+ *
+ * A pasta nasce fora de api/, mas "fora de api/" só é fora da web se api/
+ * for a raiz do site. Se ele for uma subpasta de public_html, a mesma
+ * pasta passa a ter endereço — e aí a arte que ainda não foi aprovada e o
+ * arquivo de processo do artista ficam abertos pra quem adivinhar o nome.
+ *
+ * O .htaccess resolve nos dois casos, e conferir a cada envio é barato
+ * perto do que custa descobrir isso depois.
+ */
+function pasta_privada(string $dir): bool
+{
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    if (!is_dir($dir)) return false;
+
+    $tranca = $dir . '/.htaccess';
+    if (!is_file($tranca)) {
+        @file_put_contents($tranca,
+            "# Estes arquivos só saem pelo PHP, com Content-Type nosso.
+"
+            . "Require all denied
+"
+            . "<IfModule !mod_authz_core.c>
+  Deny from all
+</IfModule>
+");
+    }
+
+    return is_writable($dir);
+}
+
 function hash_chave(string $bruta): string
 {
     return hash('sha256', $bruta);

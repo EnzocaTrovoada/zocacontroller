@@ -276,8 +276,7 @@ $qtd = is_array($env['name'] ?? null) ? count($env['name']) : 0;
 if ($qtd < 1) json_saida(['erro' => 'Mande pelo menos uma imagem.'], 400);
 if ($qtd > ARTE_MAX) json_saida(['erro' => 'No máximo ' . ARTE_MAX . ' imagens.'], 400);
 
-if (!is_dir(ARTE_DIR)) @mkdir(ARTE_DIR, 0755, true);
-if (!is_dir(ARTE_DIR) || !is_writable(ARTE_DIR)) {
+if (!pasta_privada(ARTE_DIR)) {
     json_saida(['erro' => 'Não consegui guardar as imagens aqui no servidor.'], 500);
 }
 
