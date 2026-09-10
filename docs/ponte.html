@@ -991,6 +991,22 @@ ACOES.vod = {
   },
 };
 
+/* LUZ: quem fala com a marca é o SERVIDOR.
+
+   O token da conta de luz não pode chegar aqui: esta página é uma fonte do
+   OBS, e qualquer um que abra o endereço dela veria a chave. A ponte só
+   repassa o que o chat digitou. */
+ACOES.luz = {
+  minimo: 'mod', espera: 2500,
+  async fazer(quem, arg, cargo) {
+    if (!arg) return recado('Use: ' + cfg.prefixo + 'luz vermelho');
+    try {
+      const d = await apiRele('/luzes.php', { acao: 'chat', texto: arg, quem: quem, cargo: cargo });
+      if (d && d.ok === false) recado('Luz: ' + (d.erro || 'não deu'), 12000);
+    } catch (e) { recado('Luz: ' + e.message, 12000); }
+  },
+};
+
 ACOES.categoria = {
   minimo: 'mod', espera: 10000,
   async fazer(quem, arg) {

@@ -715,6 +715,24 @@
     text-align: center; color: var(--apagado); font-size: 14px;
   }
 
+  /* ---------- luzes ---------- */
+  .luz-marcas { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .luz-aparelhos { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+  .luz-aparelhos label {
+    display: flex; align-items: center; gap: 6px; font-size: 12.5px;
+    border: 1px solid var(--linha); border-radius: 4px; padding: 5px 9px;
+  }
+  .luz-cores { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+  .luz-bola {
+    width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--linha);
+    padding: 0; cursor: pointer;
+  }
+  .luz-bola:hover { transform: scale(1.12); }
+  .luz-cena { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--linha); }
+  .luz-cena:last-child { border-bottom: 0; }
+  .luz-cena .amostra { width: 20px; height: 20px; border-radius: 4px; border: 1px solid var(--linha); flex: none; }
+  .luz-cena code { font: 600 12.5px var(--mono); }
+
   /* ---------- artistas ---------- */
   .arte-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
   .arte-cartao {
@@ -1887,6 +1905,7 @@ function montaBandejas() {
   [
     ['Subathon', 'Quanto cada sub, bit ou doação soma', '#/subathon'],
     ['Moderadores', 'Criar e revogar o link de cada mod', '#/mods'],
+    ['Luzes', 'O chat muda a cor das suas lâmpadas', '#/luzes'],
   ].forEach(([n, txt, rota]) => {
     const b = h('button', { type: 'button' }, [document.createTextNode(n), h('small', { txt })]);
     b.onclick = () => { fechaBandejas(null); vaiPara(rota); };
@@ -2524,6 +2543,7 @@ const TELAS = [
   ['#/mods',      'Moderadores',   'links de quem te ajuda'],
   ['#/tutorial',  'Tutorial',      'como colar no OBS'],
   ['#/artistas',  'Artistas',      'arte humana, feita à mão'],
+  ['#/luzes',     'Luzes',         'o chat muda a cor das suas lâmpadas'],
 ];
 
 function nomeDaTela(hash) {
@@ -3284,6 +3304,193 @@ const HUB_SELOS = {
 };
 
 const HUB_IDIOMAS = [['pt', 'Português'], ['en', 'Inglês'], ['es', 'Espanhol'], ['ja', 'Japonês']];
+
+/* ---------------- luzes ----------------
+
+   Esta tela não conhece marca nenhuma: ela desenha o formulário a partir
+   dos campos que cada driver declara. Marca nova é um arquivo novo em
+   api/luzes/ — nada aqui muda. */
+
+function telaLuzes() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Luzes' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'O chat muda a cor das suas luzes com !luz. Conecte a marca, escolha quais lâmpadas obedecem e crie as cenas.' }));
+
+  const marcas = h('div', { cls: 'luz-marcas' });
+  const cenasCx = h('div');
+  tela.appendChild(marcas);
+  tela.appendChild(h('h3', { style: 'margin-top:26px', txt: 'Cenas' }));
+  tela.appendChild(h('p', { cls: 'd', txt: 'Uma palavra que o chat digita depois do comando: "!luz festa". Sem cena, o chat também pode dizer a cor direto — !luz vermelho, !luz #FF00AA, !luz off.' }));
+  tela.appendChild(cenasCx);
+
+  marcas.appendChild(h('p', { cls: 'd', txt: 'vendo…' }));
+
+  const manda = (corpo) => api('/luzes.php', { method: 'POST', body: JSON.stringify(corpo) });
+
+  function pinta(d) {
+    const conectadas = {};
+    (d.contas || []).forEach((c) => { conectadas[c.driver] = c; });
+
+    marcas.innerHTML = '';
+    (d.marcas || []).forEach((m) => {
+      const cx = h('div', { cls: 'fatia' }, [h('h3', { txt: m.nome })]);
+      const conta = conectadas[m.id];
+
+      if (!conta) {
+        cx.appendChild(h('p', { cls: 'd', txt: m.ajuda }));
+
+        const campos = {};
+        m.campos.forEach((c) => {
+          const i = h('input', { type: c.segredo ? 'password' : 'text', placeholder: c.rotulo,
+            autocomplete: 'off', style: 'flex:1 1 200px' });
+          campos[c.chave] = i;
+          cx.appendChild(h('div', { cls: 'campo' }, [h('label', { txt: c.rotulo }), i]));
+        });
+
+        const diz = h('p', { cls: 'd' });
+        const bt = h('button', { cls: 'bt principal', type: 'button', txt: 'Conectar' });
+        bt.onclick = async () => {
+          const corpo = { acao: 'salvar', driver: m.id };
+          Object.keys(campos).forEach((k) => { corpo[k] = campos[k].value; });
+          bt.disabled = true;
+          diz.textContent = 'falando com a ' + m.nome + '…';
+          try {
+            await manda(corpo);
+            carregaLuzes();
+          } catch (e) { diz.textContent = e.message; diz.style.color = 'var(--perigo)'; }
+          bt.disabled = false;
+        };
+        cx.appendChild(h('div', { cls: 'campo' }, [bt]));
+        cx.appendChild(diz);
+        marcas.appendChild(cx);
+        return;
+      }
+
+      cx.appendChild(h('p', { cls: 'd', txt: (conta.aparelhos.length || 'nenhuma') + ' '
+        + (conta.aparelhos.length === 1 ? 'luz obedecendo' : 'luzes obedecendo') }));
+
+      const lista = h('div', { cls: 'luz-aparelhos' });
+      cx.appendChild(lista);
+
+      /* A lista de aparelhos vem da marca, não do banco: lâmpada que a
+         pessoa tirou da tomada tem que sumir daqui sozinha. */
+      const verAparelhos = async () => {
+        lista.innerHTML = '';
+        lista.appendChild(h('span', { cls: 'd', txt: 'procurando…' }));
+        try {
+          const r = await manda({ acao: 'reler', driver: m.id });
+          lista.innerHTML = '';
+          const caixas = [];
+          (r.aparelhos || []).forEach((a) => {
+            const cb = h('input', { type: 'checkbox' });
+            cb.checked = conta.aparelhos.indexOf(a.id) >= 0;
+            cb.onchange = () => manda({ acao: 'aparelhos', driver: m.id,
+              aparelhos: caixas.filter((x) => x.cb.checked).map((x) => x.id) }).catch((e) => recado(e.message, 'ruim'));
+            caixas.push({ cb, id: a.id });
+            lista.appendChild(h('label', {}, [cb, document.createTextNode(a.nome)]));
+          });
+        } catch (e) {
+          lista.innerHTML = '';
+          lista.appendChild(h('span', { cls: 'd', txt: e.message }));
+        }
+      };
+      verAparelhos();
+
+      const trocar = h('button', { cls: 'bt mini', type: 'button', txt: 'Trocar credencial' });
+      trocar.onclick = async () => {
+        if (!confirm('Desconectar a ' + m.nome + '? Você vai precisar colar a credencial de novo.')) return;
+        try { await manda({ acao: 'remover', driver: m.id }); carregaLuzes(); }
+        catch (e) { recado(e.message, 'ruim'); }
+      };
+      cx.appendChild(h('div', { cls: 'campo' }, [trocar]));
+      marcas.appendChild(cx);
+    });
+
+    if (!(d.marcas || []).length) {
+      marcas.appendChild(h('div', { cls: 'vazio', txt: 'Nenhuma marca instalada no servidor.' }));
+    }
+
+    /* ----- testar ----- */
+    if ((d.contas || []).length) {
+      const bolas = h('div', { cls: 'luz-cores' });
+      Object.keys(d.cores || {}).forEach((nome) => {
+        const b = h('button', { cls: 'luz-bola', type: 'button', title: nome });
+        b.style.background = d.cores[nome];
+        b.onclick = async () => {
+          try {
+            const r = await manda({ acao: 'testar', texto: nome });
+            recado(r.ok ? 'Mandei ' + nome + '.' : (r.erro || 'não deu'), r.ok ? 'bom' : 'ruim');
+          } catch (e) { recado(e.message, 'ruim'); }
+        };
+        bolas.appendChild(b);
+      });
+      const off = h('button', { cls: 'bt mini', type: 'button', txt: 'Apagar' });
+      off.onclick = () => manda({ acao: 'testar', texto: 'off' }).catch((e) => recado(e.message, 'ruim'));
+
+      marcas.appendChild(h('div', { cls: 'fatia' }, [
+        h('h3', { txt: 'Testar agora' }),
+        h('p', { cls: 'd', txt: 'Clique numa cor pra ver se as luzes obedecem.' }),
+        bolas, h('div', { cls: 'campo' }, [off]),
+      ]));
+    }
+
+    /* ----- cenas ----- */
+    cenasCx.innerHTML = '';
+    (d.cenas || []).forEach((c) => {
+      const amostra = h('span', { cls: 'amostra' });
+      amostra.style.background = c.cor || 'transparent';
+
+      const apagar = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×' });
+      apagar.onclick = async () => {
+        try { const r = await manda({ acao: 'cena_apagar', id: c.id }); pinta(Object.assign({}, d, { cenas: r.cenas })); }
+        catch (e) { recado(e.message, 'ruim'); }
+      };
+
+      cenasCx.appendChild(h('div', { cls: 'luz-cena' }, [
+        amostra,
+        h('code', { txt: '!luz ' + c.palavra }),
+        h('span', { cls: 'd', style: 'flex:1',
+          txt: (c.cor || 'só acende') + (c.brilho !== null ? '  ·  ' + c.brilho + '%' : '')
+             + (c.ms ? '  ·  volta em ' + (c.ms / 1000) + 's' : '') + '  ·  ' + c.cargo }),
+        apagar,
+      ]));
+    });
+    if (!(d.cenas || []).length) cenasCx.appendChild(h('p', { cls: 'd', txt: 'Nenhuma cena ainda.' }));
+
+    const nPalavra = h('input', { type: 'text', maxlength: '32', placeholder: 'palavra', style: 'flex:0 0 130px' });
+    const nCor = h('input', { type: 'color', value: '#12A150', style: 'flex:0 0 46px;padding:2px' });
+    const nBrilho = h('input', { type: 'number', min: '1', max: '100', placeholder: '%', style: 'flex:0 0 70px' });
+    const nMs = h('input', { type: 'number', min: '0', max: '60000', step: '500', placeholder: 'volta em (ms)', style: 'flex:0 0 130px' });
+    const nCargo = h('select', { style: 'flex:0 0 120px' });
+    [['chat', 'Todo mundo'], ['sub', 'Subs'], ['vip', 'VIPs'], ['mod', 'Mods'],
+     ['supermod', 'Supermods'], ['dono', 'Só você']].forEach(([v, r]) =>
+      nCargo.appendChild(h('option', { value: v, txt: r })));
+    nCargo.value = 'mod';
+
+    const nAdd = h('button', { cls: 'bt mini', type: 'button', txt: '+ Cena' });
+    nAdd.onclick = async () => {
+      if (!nPalavra.value.trim()) return recado('A cena precisa de uma palavra.', 'ruim');
+      try {
+        const r = await manda({ acao: 'cena_salvar', palavra: nPalavra.value, cor: nCor.value,
+          brilho: nBrilho.value, ms: parseInt(nMs.value, 10) || 0, cargo: nCargo.value });
+        nPalavra.value = ''; nBrilho.value = ''; nMs.value = '';
+        pinta(Object.assign({}, d, { cenas: r.cenas }));
+      } catch (e) { recado(e.message, 'ruim'); }
+    };
+
+    cenasCx.appendChild(h('div', { cls: 'campo', style: 'gap:8px;flex-wrap:wrap;margin-top:12px' },
+      [nPalavra, nCor, nBrilho, nMs, nCargo, nAdd]));
+  }
+
+  function carregaLuzes() {
+    api('/luzes.php').then(pinta).catch((e) => {
+      marcas.innerHTML = '';
+      marcas.appendChild(h('p', { cls: 'd', txt: 'Não deu: ' + e.message }));
+    });
+  }
+  carregaLuzes();
+}
 
 /* ---------------- feed ---------------- */
 
@@ -4573,6 +4780,7 @@ const DE_FABRICA = [
   ['musica',    'mod',   'Mostra e esconde a overlay de música'],
   ['playlist',  'chat',  'Diz de qual playlist a música está saindo'],
   ['vod',       'dono',  'Tira o som do Spotify do VOD, pra não tomar strike'],
+  ['luz',       'mod',   'Muda a cor das suas luzes — !luz vermelho, !luz festa'],
 ];
 
 function telaComandos() {
@@ -6301,6 +6509,7 @@ function rota() {
   if (p[0] === 'tutorial') return telaTutorial();
   if (p[0] === 'admin') return telaAdmin();
   if (p[0] === 'artistas') return telaArtistas();
+  if (p[0] === 'luzes') return telaLuzes();
   if (p[0] === 'subathon') return telaSubathon();
   if (p[0] === 'mods') return telaMods();
   if (p[0] === 'novo' && TIPOS[p[1]]) return telaEditor(null, p[1]);

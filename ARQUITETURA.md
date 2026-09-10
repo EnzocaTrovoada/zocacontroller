@@ -75,6 +75,13 @@ anual R$ 150, vitalício R$ 330. Sem marca d'água em plano nenhum.
 busca, caminho de navegação, modo de edição de textos, CSS extra, admin com
 usuários, cupons, parceiros e comissões.
 
+**Feed:** posts com texto e uma imagem na coluna do meio da inicial. Nome e
+foto vêm da Twitch no login e ficam guardados em `usuarios` — pedir o perfil
+de cada autor a cada visita bate no limite deles. Dois selos, ligados à mão
+na administração: `selo_streamer` e `selo_artista`.
+
+**Luzes:** o chat muda a cor das lâmpadas com `!luz`. Ver a seção 4.1.
+
 **Artistas:** `#/artistas` é a única tela que abre sem chave — um artista que
 chega por link de divulgação não tem conta e não precisa ter. Inscrição
 pública com até 5 imagens mais um arquivo de processo, tudo pendente até
@@ -102,6 +109,40 @@ Verificados na documentação. Não re-descubra.
   teste.
 - **Instagram:** a Basic Display API morreu em dez/2024. Não há caminho
   oficial pra puxar posts de alguém pelo @.
+
+### 4.1 Luzes: por que a arquitetura é essa
+
+Três fatos, e eles decidem tudo:
+
+1. A hospedagem **não alcança a rede de casa de ninguém**. Qualquer lâmpada
+   que só tenha API local (Nanoleaf, WLED, Hue local) está fora do alcance
+   do PHP.
+2. Uma página em **HTTPS não pode falar com `http://192.168.x.x`** — o
+   Chrome corta como conteúdo misto. `localhost` é exceção (é por isso que a
+   ponte fala com o obs-websocket), mas um IP da rede não é.
+3. Logo: **nuvem agora, local depois**, e o "depois" é a ponte executando o
+   mesmo contrato de driver na máquina de quem transmite.
+
+**Somar uma marca não exige conhecer o projeto.** É um arquivo em
+`api/luzes/`, achado sozinho pelo núcleo, e o contrato inteiro está escrito
+em `api/luzes/_MODELO.php`. A tela do painel se desenha a partir dos campos
+que o driver declara — nem `docs/index.html` precisa mudar. Para uma sessão
+nova: *"leia `api/luzes/_MODELO.php` e escreva `api/luzes/tapo.php`"*, e
+mais nada.
+
+Prontos: `lifx.php` (token, 120 chamadas/min, o efeito `pulse` volta sozinho
+ao estado anterior) e `govee.php` (chave de API; a v2 exige `requestId` +
+`payload{sku,device,capability}`, um aparelho e uma capacidade por chamada).
+
+O que cabe e ainda não existe:
+
+| Marca | Caminho | Custo de entrada |
+|---|---|---|
+| Tuya / Smart Life | nuvem oficial | conta de desenvolvedor Tuya; teste grátis de 1 mês, renovável à mão |
+| Hue remoto | nuvem oficial | app aprovado pela Philips |
+| Tapo (TP-Link) | não oficial | exige guardar usuário e senha da conta — desaconselhado |
+| Nanoleaf, WLED, Hue local | rede de casa | depende da ponte executar drivers |
+| Alexa | não existe | a API dela é pra quem fabrica aparelho, não pra quem controla |
 
 ---
 
@@ -184,6 +225,7 @@ sessão nova refazendo uma descoberta que já custou caro.
 | Painel (`docs/index.html`) | um arquivo gigante | **não** — uma por vez |
 | Overlays (`docs/*.js`, `*.css`) | separados por tipo | sim, um tipo por sessão |
 | Backend novo (artistas, métricas) | arquivos novos em `api/` | sim |
+| Driver de luz | um arquivo em `api/luzes/` | sim — é a área mais isolada que existe aqui |
 | Cobrança | `mercadopago.php`, `checkout.php`, webhook | uma por vez |
 
 `docs/index.html` é o gargalo: quase toda funcionalidade encosta nele. Duas
@@ -210,7 +252,7 @@ verificação → painéis de mod → guardião da live.
 
 ## 7. Antes de cobrar de alguém
 
-1. Rodar as migrações pendentes (023 a 032)
+1. Rodar as migrações pendentes (023 a 034)
 2. Subir todo o `api/`
 3. `'ligado' => true`, `'modo' => 'producao'`, credenciais de produção
 4. Testar aprovado, recusado e Pix pendente

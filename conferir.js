@@ -23,6 +23,7 @@ const ponte  = ler('docs/ponte.html');
 const perfil = ler('api/perfil.php');
 const cmds   = ler('api/comandos.php');
 const musica = ler('api/musica.php');
+const luzes  = ler('api/lib/luzes.php');
 
 const strings = (txt) => (txt.match(/'([\w:-]+)'/g) || []).map((s) => s.replace(/'/g, ''));
 const bloco = (txt, ini, fim) => {
@@ -91,15 +92,18 @@ const cargosPonte = Object.keys(JSON.parse(
 ));
 const cargosCmds  = strings(bloco(cmds, 'QUEM_VALIDO = [', '];') || '');
 const cargosMus   = [...(bloco(musica, 'CARGOS_ORDEM = [', '];') || '').matchAll(/'(\w+)'\s*=>/g)].map((m) => m[1]);
+const cargosLuz   = strings(bloco(luzes, 'LUZ_CARGOS = [', '];') || '');
 
 if (JSON.stringify(cargosPonte) === JSON.stringify(cargosCmds)
-    && JSON.stringify(cargosPonte) === JSON.stringify(cargosMus)) {
+    && JSON.stringify(cargosPonte) === JSON.stringify(cargosMus)
+    && JSON.stringify(cargosPonte) === JSON.stringify(cargosLuz)) {
   console.log(`✓ cargos: ${cargosPonte.length} iguais e na mesma ordem`);
 } else {
   console.log('✗ cargos fora de ordem ou diferentes:');
   console.log('   ponte   ', cargosPonte.join(' < '));
   console.log('   comandos', cargosCmds.join(' < '));
   console.log('   musica  ', cargosMus.join(' < '));
+  console.log('   luzes   ', cargosLuz.join(' < '));
   falhas++;
 }
 
