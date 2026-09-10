@@ -867,6 +867,9 @@ el('btTema').onclick = () => {
    tambem sai: o servidor entrega a mesma pagina em "/", e um endereco
    curto e o que a pessoa consegue repetir de cabeca e mandar pra outra
    sem errar. */
+// Lido ANTES do limpaEndereco, que apaga a query da URL no boot.
+const SEM_CSS = new URLSearchParams(location.search).has('semcss');
+
 function limpaEndereco(hash) {
   var caminho = location.pathname.replace(/index\.html$/, '');
   try { history.replaceState(null, '', caminho + (hash || location.hash || '')); } catch (e) {}
@@ -2545,7 +2548,10 @@ let TEXTOS = {};
 let modoEdicao = false;
 
 // CSS que o admin escreveu, aplicado depois da folha do site pra poder vencer.
+// ?semcss=1 pula ele: é a saída de emergência pra quando o CSS quebra o
+// painel e o painel é justamente onde se conserta.
 function carregaEstilo() {
+  if (SEM_CSS) return Promise.resolve();
   return fetch(API + '/estilo.php', { cache: 'no-cache' })
     .then((r) => (r.ok ? r.json() : null))
     .then((d) => {
@@ -5462,7 +5468,30 @@ function blocoEstilo() {
   const area = h('textarea', { style: 'width:100%;min-height:150px;font:12.5px/1.5 var(--mono);'
     + 'color:var(--tinta);background:var(--fundo);border:1px solid var(--linha);padding:10px;border-radius:4px' });
   const salvar = h('button', { cls: 'bt principal', type: 'button', txt: 'Salvar CSS' });
-  const diz = h('span', { cls: 'd', style: 'margin-left:10px;font-size:12px' });
+  const prever = h('button', { cls: 'bt mini', type: 'button', txt: 'Testar sem salvar' });
+  const limpar = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'Apagar tudo' });
+  const diz = h('span', { cls: 'd', style: 'font-size:12px' });
+
+  const aplica = (css) => {
+    const antiga = el('cssExtra');
+    if (antiga) antiga.remove();
+    const tag = document.createElement('style');
+    tag.id = 'cssExtra';
+    tag.textContent = css;
+    document.head.appendChild(tag);
+  };
+
+  prever.onclick = () => {
+    aplica(area.value);
+    diz.textContent = 'testando — recarregue a página pra desfazer';
+    diz.style.color = 'var(--dourado)';
+  };
+
+  limpar.onclick = async () => {
+    if (!confirm('Apagar todo o CSS extra?')) return;
+    area.value = '';
+    salvar.click();
+  };
 
   api('/estilo.php').then((d) => { area.value = d.css || ''; }).catch(() => {});
 
@@ -5471,12 +5500,7 @@ function blocoEstilo() {
     diz.textContent = 'salvando…';
     try {
       await api('/estilo.php', { method: 'POST', body: JSON.stringify({ css: area.value }) });
-      const antiga = el('cssExtra');
-      if (antiga) antiga.remove();
-      const tag = document.createElement('style');
-      tag.id = 'cssExtra';
-      tag.textContent = area.value;
-      document.head.appendChild(tag);
+      aplica(area.value);
       diz.textContent = 'salvo e aplicado';
       diz.style.color = 'var(--verde-forte)';
     } catch (e) {
@@ -5489,10 +5513,11 @@ function blocoEstilo() {
   return h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'CSS extra' }),
     h('div', { cls: 'so-adm' }, [
-      h('p', { style: 'margin:0 0 8px', txt: 'Entra depois da folha do site, então vence dela. '
-        + 'Vale pra todo mundo. Errar aqui quebra a aparência do site inteiro — esvaziar o campo desfaz.' }),
+      h('p', { style: 'margin:0 0 8px', txt: 'Entra depois da folha do site e vale pra todo mundo. '
+        + 'Se quebrar o painel, abra ?semcss=1 no fim do endereço: o site ignora este CSS e você volta aqui pra apagar.' }),
       area,
-      h('div', { style: 'margin-top:8px' }, [salvar, diz]),
+      h('div', { style: 'margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap' },
+        [salvar, prever, limpar, diz]),
     ]),
   ]);
 }
