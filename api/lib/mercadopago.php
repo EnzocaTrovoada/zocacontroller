@@ -21,6 +21,7 @@
  * campo de cartão em página nossa, nem dentro de iframe.
  */
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/cupons.php';
 
 const MP_API = 'https://api.mercadopago.com';
 
@@ -120,16 +121,33 @@ function mp_referencia_usuario(string $referencia): ?int
  * um pagamento muito rápido (Pix é imediato) poderia trazer o aviso antes da
  * linha existir — e o aviso não teria onde encaixar.
  */
-function mp_criar_cobranca(int $usuario_id, array $plano): array
+function mp_criar_cobranca(int $usuario_id, array $plano, string $codigo = ''): array
 {
     $mp = mp_cfg();
     $ref = mp_referencia($usuario_id, (string) $plano['slug']);
-    $valor = ((int) $plano['preco_centavos']) / 100;
+
+    $centavos = (int) $plano['preco_centavos'];
+    $cupom = '';
+
+    /* O desconto entra AQUI, no preço que vai pro Mercado Pago. Guardar o
+       código na linha da assinatura é o que permite, na aprovação, saber
+       qual parceiro indicou esta venda. */
+    if ($codigo !== '') {
+        $v = cupom_valida($codigo);
+        if (!empty($v['ok'])) {
+            $conta = cupom_aplica($v['cupom'], $centavos);
+            $centavos = $conta['por'];
+            $cupom = cupom_limpa($codigo);
+        }
+    }
+
+    $valor = $centavos / 100;
 
     $corpo = [
         'items' => [[
             'id'          => (string) $plano['slug'],
-            'title'       => 'ZocaController — ' . $plano['nome'],
+            'title'       => 'ZocaController — ' . $plano['nome']
+                             . ($cupom !== '' ? ' (cupom ' . $cupom . ')' : ''),
             'quantity'    => 1,
             'currency_id' => 'BRL',
             'unit_price'  => $valor,
@@ -159,11 +177,12 @@ function mp_criar_cobranca(int $usuario_id, array $plano): array
     }
 
     db()->prepare(
-        'INSERT INTO assinaturas (usuario_id, plano_id, provedor, provedor_id, referencia, status, teste)
-              VALUES (?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO assinaturas (usuario_id, plano_id, provedor, provedor_id, referencia, status, teste, cupom)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     )->execute([
         $usuario_id, (int) $plano['id'], 'mercadopago',
         (string) $r['id'], $ref, 'pendente', $mp['modo'] === 'teste' ? 1 : 0,
+        $cupom !== '' ? $cupom : null,
     ]);
 
     /* SEMPRE O init_point, NUNCA O sandbox_init_point.
@@ -177,7 +196,8 @@ function mp_criar_cobranca(int $usuario_id, array $plano): array
        separa os dois é só qual credencial está carregada, e mais nada. */
     $url = (string) ($r['init_point'] ?? '');
 
-    return ['url' => $url, 'referencia' => $ref, 'preferencia' => (string) $r['id']];
+    return ['url' => $url, 'referencia' => $ref, 'preferencia' => (string) $r['id'],
+            'cupom' => $cupom, 'centavos' => $centavos];
 }
 
 /** O que o Mercado Pago diz sobre um pagamento. Esta é a única verdade. */
@@ -221,6 +241,16 @@ function mp_liberar(int $usuario_id, array $plano, string $referencia, string $p
           WHERE referencia = ? AND usuario_id = ?"
     );
     $up->execute([$ate, $pagamento_id, $centavos, $referencia, $usuario_id]);
+
+    /* Achar a linha DEPOIS de atualizar, e pelo mesmo critério: é dela que
+       sai o id que amarra a comissão à venda. */
+    $ln = db()->prepare('SELECT id, cupom FROM assinaturas WHERE referencia = ? AND usuario_id = ? LIMIT 1');
+    $ln->execute([$referencia, $usuario_id]);
+    $linha = $ln->fetch();
+
+    if ($linha && !empty($linha['cupom'])) {
+        cupom_registra_venda((string) $linha['cupom'], (int) $linha['id'], $centavos);
+    }
 
     if (!$up->rowCount()) {
         db()->prepare(
@@ -312,6 +342,101 @@ function mp_diagnostico(): array
     }
 
     return $r;
+}
+
+/**
+ * Tira o acesso de um pagamento que voltou atrás.
+ *
+ * ISTO NÃO É DETALHE. Sem tratar estorno e contestação, quem pagou, foi
+ * liberado e depois pediu o dinheiro de volta continua com o Pro pra sempre
+ * — e ainda por cima com o dinheiro. É o buraco que qualquer um encontra
+ * sozinho na segunda vez.
+ *
+ * A validade volta pro que era ANTES deste pagamento, e não pra hoje: quem
+ * tinha trinta dias comprados antes e estornou o pagamento seguinte não
+ * pode perder os trinta que já eram dele.
+ */
+function mp_estornar(string $referencia, string $situacao): bool
+{
+    $st = db()->prepare(
+        'SELECT id, usuario_id, plano_id, valido_ate FROM assinaturas WHERE referencia = ? LIMIT 1'
+    );
+    $st->execute([$referencia]);
+    $a = $st->fetch();
+    if (!$a || $a['valido_ate'] === null) return false;
+
+    $plano = mp_plano_por_id((int) $a['plano_id']);
+    $periodo = $plano['periodo'] ?? 'mensal';
+
+    if ($periodo === 'vitalicio') {
+        /* Vitalício estornado não tem "voltar um pouco": ou vale, ou não
+           vale. */
+        $volta = null;
+    } else {
+        $dias = MP_DIAS[$periodo] ?? 30;
+        $volta = date('Y-m-d H:i:s', strtotime((string) $a['valido_ate']) - $dias * 86400);
+        /* Se o que sobra já passou, não há mais acesso a devolver. */
+        if (strtotime($volta) <= time()) $volta = null;
+    }
+
+    db()->prepare(
+        "UPDATE assinaturas SET status = 'cancelada', valido_ate = ? WHERE id = ?"
+    )->execute([$volta, (int) $a['id']]);
+
+    /* Dinheiro que voltou não gera comissão. Marca em vez de apagar: o
+       parceiro pode já ter visto essa venda, e sumir com a linha é pior do
+       que mostrá-la estornada. */
+    cupom_estorna_venda((int) $a['id']);
+
+    return true;
+}
+
+/**
+ * Procura um pagamento aprovado que ficou sem liberar.
+ *
+ * Webhook é entrega "na melhor das intenções": ele se perde, chega fora de
+ * ordem, ou bate num servidor que estava fora do ar. Sem uma forma de a
+ * própria pessoa reconciliar, cada aviso perdido vira uma conversa no
+ * privado — e a pessoa já pagou, então a conversa começa errada.
+ *
+ * Devolve quantas linhas foram liberadas.
+ */
+function mp_reconciliar(int $usuario_id): array
+{
+    $st = db()->prepare(
+        "SELECT referencia, plano_id FROM assinaturas
+          WHERE usuario_id = ? AND status = 'pendente'
+            AND criado_em > DATE_SUB(NOW(), INTERVAL 30 DAY)"
+    );
+    $st->execute([$usuario_id]);
+
+    $liberados = 0;
+    $vistos = 0;
+
+    foreach ($st->fetchAll() as $linha) {
+        $ref = (string) $linha['referencia'];
+        if ($ref === '') continue;
+        $vistos++;
+
+        /* Pergunta ao Mercado Pago o que existe com esta referência. É a
+           mesma verdade que o webhook usaria, só que puxada por nós. */
+        [$http, $r] = mp_http('GET', '/v1/payments/search?external_reference=' . rawurlencode($ref));
+        if ($http !== 200 || empty($r['results'])) continue;
+
+        foreach ($r['results'] as $pag) {
+            if (($pag['status'] ?? '') !== 'approved') continue;
+
+            $plano = mp_plano_por_id((int) $linha['plano_id']);
+            if (!$plano) continue;
+
+            $centavos = (int) round(((float) ($pag['transaction_amount'] ?? 0)) * 100);
+            mp_liberar($usuario_id, $plano, $ref, (string) ($pag['id'] ?? ''), $centavos);
+            $liberados++;
+            break;
+        }
+    }
+
+    return ['pendentes' => $vistos, 'liberados' => $liberados];
 }
 
 function mp_plano_por_slug(string $slug): ?array

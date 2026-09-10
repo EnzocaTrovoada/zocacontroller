@@ -70,6 +70,17 @@ try {
     $situacao = (string) ($pag['status'] ?? '');
     $ref      = (string) ($pag['external_reference'] ?? '');
 
+    /* DINHEIRO QUE VOLTA TIRA O ACESSO.
+
+       'refunded' é estorno, total ou parcial; 'charged_back' é contestação
+       no cartão. Nos dois casos o dinheiro saiu da conta, e manter o Pro
+       ligado seria entregar o produto de graça pra quem pediu reembolso. */
+    if ($situacao === 'refunded' || $situacao === 'charged_back' || $situacao === 'cancelled') {
+        $ref = (string) ($pag['external_reference'] ?? '');
+        if ($ref !== '') mp_estornar($ref, $situacao);
+        throw new RuntimeException('tratado: acesso retirado por ' . $situacao);
+    }
+
     if ($situacao !== 'approved') {
         /* Pendente e recusado não são erro: o Pix aprovado chega depois no
            mesmo canal. Guardar como tratado evita reprocessar pra sempre. */

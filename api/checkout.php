@@ -24,6 +24,67 @@ trava('checkout', 10, 300);
 
 $mp = mp_cfg();
 
+/* CONFERIR UM CUPOM ANTES DE PAGAR.
+
+   Existe pra que a pessoa veja o desconto na tela ANTES de sair do site.
+   Digitar um código e só descobrir no checkout do Mercado Pago se ele valeu
+   é o tipo de dúvida que faz desistir da compra. */
+if (isset($_GET['cupom_teste'])) {
+    require_once __DIR__ . '/lib/cupons.php';
+
+    trava('cupom', 20, 300);
+
+    $slug2 = (string) ($_GET['plano'] ?? 'pro');
+    $pl = mp_plano_por_slug($slug2);
+    if (!$pl) json_saida(['erro' => 'Esse plano não existe.'], 404);
+
+    $v = cupom_valida((string) $_GET['cupom_teste']);
+    if (empty($v['ok'])) json_saida(['ok' => false, 'erro' => $v['erro']]);
+
+    $conta = cupom_aplica($v['cupom'], (int) $pl['preco_centavos']);
+    json_saida([
+        'ok'        => true,
+        'codigo'    => cupom_limpa((string) $_GET['cupom_teste']),
+        'rotulo'    => $conta['rotulo'],
+        'de'        => $conta['de'],
+        'por'       => $conta['por'],
+        'descricao' => $v['cupom']['descricao'] ?? null,
+    ]);
+}
+
+/* JÁ PAGUEI E NÃO LIBEROU.
+
+   O caminho de escape pra quando o webhook se perde. Qualquer pessoa pode
+   chamar pra si mesma — não é privilégio de admin, porque quem precisa disso
+   é justamente o cliente comum no pior momento possível: acabou de pagar e
+   não recebeu.
+
+   Não confia em nada que venha do navegador: a única coisa que decide é o
+   que o Mercado Pago responde sobre as cobranças DESTE usuário. */
+if (isset($_GET['conferir'])) {
+    if (!$mp['ligado']) json_saida(['erro' => 'A cobrança ainda não abriu.'], 503);
+
+    trava('conferir', 6, 300);
+
+    try {
+        $r = mp_reconciliar((int) $quem['usuario_id']);
+    } catch (Throwable $e) {
+        json_saida(['erro' => $e->getMessage()], 502);
+    }
+
+    json_saida([
+        'ok'        => true,
+        'pendentes' => $r['pendentes'],
+        'liberados' => $r['liberados'],
+        'recado'    => $r['liberados'] > 0
+            ? 'Achei o seu pagamento e liberei. Recarregue a página.'
+            : ($r['pendentes'] > 0
+                ? 'Encontrei cobrança aberta, mas o Mercado Pago ainda não confirmou o pagamento. '
+                  . 'Se você pagou por Pix agora, espere um minuto e tente de novo.'
+                : 'Não achei nenhuma cobrança sua dos últimos 30 dias esperando confirmação.'),
+    ]);
+}
+
 /* O DIAGNÓSTICO DA CREDENCIAL. Só admin, porque conta de qual conta do
    Mercado Pago o site está falando. */
 if (isset($_GET['diagnostico'])) {
@@ -98,8 +159,10 @@ if (!$plano || (int) $plano['preco_centavos'] <= 0) {
     json_saida(['erro' => 'Esse plano não existe ou não é pago.'], 404);
 }
 
+$codigo = (string) ($_GET['cupom'] ?? '');
+
 try {
-    $r = mp_criar_cobranca((int) $quem['usuario_id'], $plano);
+    $r = mp_criar_cobranca((int) $quem['usuario_id'], $plano, $codigo);
 } catch (Throwable $e) {
     json_saida(['erro' => $e->getMessage()], 502);
 }
@@ -111,5 +174,10 @@ if (($r['url'] ?? '') === '') {
 json_saida([
     'url'   => $r['url'],
     'modo'  => $mp['modo'],
-    'plano' => ['nome' => $plano['nome'], 'centavos' => (int) $plano['preco_centavos']],
+    'cupom' => $r['cupom'],
+    'plano' => [
+        'nome'     => $plano['nome'],
+        'centavos' => (int) $plano['preco_centavos'],
+        'cobrado'  => (int) $r['centavos'],
+    ],
 ]);
