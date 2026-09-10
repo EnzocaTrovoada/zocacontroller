@@ -99,11 +99,31 @@ function usuario_beta(int $usuario_id): bool
     }
 }
 
+/**
+ * Pro dado à mão pelo administrador, com prazo.
+ *
+ * Diferente de beta: beta é quem chegou antes da cobrança existir e não
+ * perde nada nunca. Cortesia é "eu te dou Pro até tal dia" — parceria,
+ * compensação por um problema, sorteio. Separados porque a pergunta "por
+ * que essa pessoa tem acesso?" precisa ter resposta seis meses depois.
+ */
+function usuario_cortesia(int $usuario_id): bool
+{
+    try {
+        $st = db()->prepare('SELECT cortesia_ate FROM usuarios WHERE id = ?');
+        $st->execute([$usuario_id]);
+        $ate = $st->fetchColumn();
+        return $ate !== null && $ate !== false && strtotime((string) $ate) > time();
+    } catch (Throwable $e) {
+        return false;   /* coluna nova */
+    }
+}
+
 function recursos_do_usuario(int $usuario_id, string $plano): array
 {
-    /* Duas portas pro mesmo lugar: a cobrança ainda não abriu, ou esta pessoa
-       estava aqui antes dela abrir. Nos dois casos, Pro. */
-    $comoPro = !cobranca_aberta() || usuario_beta($usuario_id);
+    /* Três portas pro mesmo lugar: a cobrança ainda não abriu, a pessoa
+       estava aqui antes dela abrir, ou alguém deu Pro pra ela. */
+    $comoPro = !cobranca_aberta() || usuario_beta($usuario_id) || usuario_cortesia($usuario_id);
     $r = recursos_do_plano($comoPro ? 'pro' : $plano);
 
     $st = db()->prepare('SELECT perfis_max, recursos FROM usuarios WHERE id = ?');

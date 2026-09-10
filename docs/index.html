@@ -336,6 +336,18 @@
   #avisoPlano b { font-weight: 600; }
   #avisoPlano .bt { margin-left: auto; }
 
+  /* O cupom. Discreto: quem não tem código não pode sentir que está
+     perdendo desconto por não ter. */
+  .pop__cupom { display: flex; gap: 8px; margin: 0 0 10px; }
+  .pop__cupom input {
+    flex: 1 1 auto; min-width: 0; font: 13px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha);
+    padding: 9px 10px; border-radius: 4px; text-transform: uppercase;
+  }
+  .pop__cupom input:focus { outline: 0; border-color: var(--verde); }
+  .pop__cupomdiz { margin: -4px 0 10px; font-size: 12.5px; }
+  .pop__plano .antes { text-decoration: line-through; opacity: .5; margin-right: 6px; font-weight: 400; }
+
   .pop__acao {
     flex: 0 0 auto;
     background: var(--caixa); padding: 14px 0 0;
@@ -2239,6 +2251,21 @@ function abrePro(estado) {
 
   /* ----- os planos, só depois do "Seja Pro" ----- */
   const planos = h('div', { cls: 'pop__planos escondido' });
+  const precos = [];
+
+  /* Mostra "de R$ 13,99 por R$ 11,19" no plano i, ou volta ao preço cheio. */
+  function pintaPreco(i, conta) {
+    const linha = precos[i];
+    if (!linha) return;
+    linha.el.innerHTML = '';
+    if (conta) {
+      linha.el.appendChild(h('span', { cls: 'antes', txt: linha.cheio }));
+      linha.el.appendChild(document.createTextNode(
+        (conta.por / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })));
+    } else {
+      linha.el.appendChild(document.createTextNode(linha.cheio));
+    }
+  }
 
   (estado.planos || []).forEach((pl) => {
     const reais = (pl.preco_centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -2248,15 +2275,20 @@ function abrePro(estado) {
         ? (pl.preco_centavos / 1200).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + ' por mês'
         : 'cobrado uma vez, vale 30 dias';
 
+    const preco = h('span', {});
+    preco.appendChild(document.createTextNode(reais));
+
     const b = h('button', { cls: 'pop__plano' + (pl.periodo === 'vitalicio' ? ' vital' : ''), type: 'button' }, [
       h('div', {}, [h('b', { txt: pl.nome }), h('small', { txt: porMes })]),
-      h('span', { txt: reais }),
+      preco,
     ]);
+    precos.push({ el: preco, cheio: reais });
 
     b.onclick = async () => {
       b.disabled = true;
       try {
-        const r = await api('/checkout.php?plano=' + encodeURIComponent(pl.slug));
+        const r = await api('/checkout.php?plano=' + encodeURIComponent(pl.slug)
+          + (cupomAtivo ? '&cupom=' + encodeURIComponent(cupomAtivo) : ''));
 
         /* EM MODO DE TESTE, ABA NORMAL NÃO FUNCIONA.
 
@@ -2332,11 +2364,58 @@ function abrePro(estado) {
     corpo.scrollTop = corpo.scrollHeight;
   }
 
+  /* ----- cupom ----- */
+  const campoCupom = h('input', { type: 'text', placeholder: 'Cupom de desconto', maxlength: '24' });
+  const btCupom = h('button', { cls: 'bt mini', type: 'button', txt: 'Aplicar' });
+  const cupomDiz = h('p', { cls: 'pop__cupomdiz escondido' });
+  const linhaCupom = h('div', { cls: 'pop__cupom escondido' }, [campoCupom, btCupom]);
+
+  let cupomAtivo = '';
+
+  const dizCupom = (txt, bom) => {
+    cupomDiz.textContent = txt;
+    cupomDiz.style.color = bom ? 'var(--verde-forte)' : 'var(--perigo)';
+    cupomDiz.classList.remove('escondido');
+  };
+
+  btCupom.onclick = async () => {
+    const cod = campoCupom.value.trim();
+    if (!cod) return;
+    btCupom.disabled = true;
+    cupomDiz.classList.add('escondido');
+
+    try {
+      /* Pergunta por plano, e não uma vez só: um cupom percentual vale
+         valores diferentes no mensal e no vitalício, e mostrar um número
+         que não é o que vai ser cobrado é pior do que não mostrar. */
+      const planos = estado.planos || [];
+      const contas = await Promise.all(planos.map((pl) =>
+        api('/checkout.php?cupom_teste=' + encodeURIComponent(cod) + '&plano=' + encodeURIComponent(pl.slug))
+          .catch(() => null)));
+
+      const bom = contas.find((c) => c && c.ok);
+      if (!bom) {
+        const ruim = contas.find((c) => c && c.erro);
+        cupomAtivo = '';
+        planos.forEach((_, i) => pintaPreco(i, null));
+        return dizCupom(ruim ? ruim.erro : 'Esse código não vale.', false);
+      }
+
+      cupomAtivo = bom.codigo;
+      contas.forEach((c, i) => pintaPreco(i, c && c.ok ? c : null));
+      dizCupom(bom.rotulo + (bom.descricao ? ' — ' + bom.descricao : '') + '. Aplicado.', true);
+    } catch (e) {
+      dizCupom(e.message, false);
+    }
+    btCupom.disabled = false;
+  };
+
   const seja = h('button', { cls: 'bt principal', type: 'button',
     txt: estado.plano === 'gratis' ? 'Seja Pro' : 'Renovar', style: 'width:100%' });
   seja.onclick = () => {
     seja.classList.add('escondido');
     planos.classList.remove('escondido');
+    linhaCupom.classList.remove('escondido');
   };
 
   /* O QUE SE CLICA NÃO PODE FICAR ABAIXO DA DOBRA.
@@ -2347,7 +2426,7 @@ function abrePro(estado) {
      existe mais embaixo. Grudado no rodapé, ele está sempre lá, e a lista
      rola atrás. */
   const acao = h('div', { cls: 'pop__acao' }, [
-    seja, planos,
+    seja, linhaCupom, cupomDiz, planos,
     h('p', { cls: 'd', style: 'margin:12px 0 0;text-align:center',
       txt: 'Pix, cartão ou saldo do Mercado Pago. O pagamento acontece no site deles — '
          + 'os dados do seu cartão não passam por aqui.' }),
@@ -3270,6 +3349,38 @@ function telaControlador() {
           ? 'Vitalício. Não vence.'
           : 'Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '.' }));
     fatiaPlano.classList.remove('escondido');
+  }
+
+  /* ----- já paguei e não liberou -----
+
+     O webhook do Mercado Pago é entrega "na melhor das intenções": ele se
+     perde, chega fora de ordem, ou bate num servidor que estava fora do ar.
+     Sem este botão, cada aviso perdido vira uma conversa no privado — e a
+     pessoa já pagou, então a conversa começa errada. */
+  if (proEstado && proEstado.ligado) {
+    const btPaguei = h('button', { cls: 'bt', type: 'button', txt: 'Já paguei e não liberou' });
+    const dizPaguei = h('p', { cls: 'd', style: 'margin:8px 0 0' });
+
+    btPaguei.onclick = async () => {
+      btPaguei.disabled = true;
+      dizPaguei.style.color = '';
+      dizPaguei.textContent = 'perguntando ao Mercado Pago…';
+      try {
+        const r = await api('/checkout.php?conferir=1');
+        dizPaguei.textContent = r.recado;
+        dizPaguei.style.color = r.liberados > 0 ? 'var(--verde-forte)' : '';
+      } catch (e) {
+        dizPaguei.textContent = e.message;
+        dizPaguei.style.color = 'var(--perigo)';
+      }
+      btPaguei.disabled = false;
+    };
+
+    fatiaPlano.appendChild(h('p', { cls: 'd', style: 'margin-top:14px',
+      txt: 'Pagou e continua no grátis? O aviso do Mercado Pago pode ter se perdido no caminho. '
+         + 'Este botão pergunta direto pra eles.' }));
+    fatiaPlano.appendChild(btPaguei);
+    fatiaPlano.appendChild(dizPaguei);
   }
 
   /* ----- conferir a credencial do Mercado Pago -----
@@ -4439,6 +4550,149 @@ function blocoVitrine() {
   return cx;
 }
 
+/* ---------------- cupons e parceiros ---------------- */
+
+const reaisDe = (c) => ((c || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+function blocoParceiros() {
+  const cx = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Cupons e parceiros' }),
+    h('p', { cls: 'd', txt: 'Cupom sem parceiro é promoção normal. Cupom COM parceiro é link de '
+      + 'afiliado: desconto pra quem compra e comissão pra quem indicou, calculada sobre o que '
+      + 'realmente entrou — não sobre o preço de tabela.' }),
+  ]);
+
+  const corpo = h('div');
+  cx.appendChild(corpo);
+
+  const carrega = () => {
+    corpo.innerHTML = '<p class="d">vendo…</p>';
+
+    api('/admin.php').then((d) => {
+      corpo.innerHTML = '';
+      const parceiros = d.parceiros || [];
+      const cupons = d.cupons || [];
+
+      /* ---------- parceiros ---------- */
+      corpo.appendChild(h('h3', { style: 'margin-top:6px', txt: 'Parceiros' }));
+
+      parceiros.forEach((pa) => {
+        const quitar = h('button', { cls: 'bt mini', type: 'button', txt: 'Marcar como pago' });
+        quitar.disabled = !Number(pa.a_pagar);
+        quitar.onclick = async () => {
+          if (!confirm('Marcar ' + reaisDe(pa.a_pagar) + ' como pago para ' + pa.nome + '?')) return;
+          quitar.disabled = true;
+          try {
+            const r = await api('/admin.php', { method: 'POST',
+              body: JSON.stringify({ acao: 'comissao_pagar', parceiro_id: pa.id }) });
+            recado(r.quitadas + ' comissões quitadas.', 'bom');
+            carrega();
+          } catch (e) { recado(e.message, 'ruim'); }
+        };
+
+        corpo.appendChild(h('div', { cls: 'campo', style: 'gap:12px;flex-wrap:wrap' }, [
+          h('b', { style: 'flex:0 0 150px', txt: pa.nome + (Number(pa.ligado) ? '' : ' (desligado)') }),
+          h('span', { cls: 'd', style: 'flex:0 0 70px', txt: Number(pa.comissao_pct) + '%' }),
+          h('span', { cls: 'd', style: 'flex:0 0 90px', txt: pa.vendas + ' vendas' }),
+          h('span', { style: 'flex:0 0 130px;color:var(--dourado);font:600 13px var(--mono)',
+            txt: 'deve ' + reaisDe(pa.a_pagar) }),
+          h('span', { cls: 'd', style: 'flex:0 0 130px', txt: 'pago ' + reaisDe(pa.ja_pago) }),
+          quitar,
+        ]));
+      });
+      if (!parceiros.length) corpo.appendChild(h('p', { cls: 'd', txt: 'Nenhum parceiro ainda.' }));
+
+      const pNome = h('input', { type: 'text', placeholder: 'nome do parceiro', style: 'flex:0 0 170px' });
+      const pCont = h('input', { type: 'text', placeholder: 'contato / chave Pix', style: 'flex:1 1 170px' });
+      const pPct = h('input', { type: 'number', min: '0', max: '100', step: '0.5',
+        placeholder: '%', style: 'flex:0 0 70px' });
+      const pAdd = h('button', { cls: 'bt mini', type: 'button', txt: '+ Parceiro' });
+      pAdd.onclick = async () => {
+        if (!pNome.value.trim()) return recado('O parceiro precisa de nome.', 'ruim');
+        try {
+          await api('/admin.php', { method: 'POST', body: JSON.stringify({
+            acao: 'parceiro_salvar', nome: pNome.value, contato: pCont.value,
+            comissao_pct: parseFloat(pPct.value) || 0, ligado: true }) });
+          pNome.value = ''; pCont.value = ''; pPct.value = '';
+          carrega();
+        } catch (e) { recado(e.message, 'ruim'); }
+      };
+      corpo.appendChild(h('div', { cls: 'campo', style: 'gap:8px;flex-wrap:wrap;margin-top:10px' },
+        [pNome, pCont, pPct, pAdd]));
+
+      /* ---------- cupons ---------- */
+      corpo.appendChild(h('h3', { style: 'margin-top:22px', txt: 'Cupons' }));
+
+      cupons.forEach((cu) => {
+        const venceu = cu.vale_ate && new Date(String(cu.vale_ate).replace(' ', 'T')) < new Date();
+        const esgotou = cu.usos_max !== null && Number(cu.usos) >= Number(cu.usos_max);
+
+        const apagar = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×' });
+        apagar.onclick = async () => {
+          if (!confirm('Apagar o cupom ' + cu.codigo + '? As comissões que ele já gerou continuam.')) return;
+          try {
+            await api('/admin.php', { method: 'POST',
+              body: JSON.stringify({ acao: 'cupom_apagar', codigo: cu.codigo }) });
+            carrega();
+          } catch (e) { recado(e.message, 'ruim'); }
+        };
+
+        const estado = !Number(cu.ligado) ? 'desligado' : venceu ? 'vencido' : esgotou ? 'esgotado' : 'valendo';
+
+        corpo.appendChild(h('div', { cls: 'campo', style: 'gap:12px;flex-wrap:wrap' }, [
+          h('b', { style: 'flex:0 0 130px;font-family:var(--mono)', txt: cu.codigo }),
+          h('span', { cls: 'd', style: 'flex:0 0 110px', txt: cu.tipo === 'percentual'
+            ? cu.valor + '% off' : reaisDe(cu.valor) + ' off' }),
+          h('span', { cls: 'd', style: 'flex:0 0 140px', txt: cu.parceiro || 'sem parceiro' }),
+          h('span', { cls: 'd', style: 'flex:0 0 90px',
+            txt: cu.usos + (cu.usos_max === null ? ' usos' : '/' + cu.usos_max) }),
+          h('span', { style: 'flex:0 0 90px;font-size:12.5px;color:'
+            + (estado === 'valendo' ? 'var(--verde-forte)' : 'var(--apagado)'), txt: estado }),
+          apagar,
+        ]));
+      });
+      if (!cupons.length) corpo.appendChild(h('p', { cls: 'd', txt: 'Nenhum cupom ainda.' }));
+
+      const cCod = h('input', { type: 'text', placeholder: 'CÓDIGO', style: 'flex:0 0 130px' });
+      const cTipo = h('select', { style: 'flex:0 0 120px' });
+      [['percentual', '% de desconto'], ['valor', 'R$ de desconto']]
+        .forEach(([v, r]) => cTipo.appendChild(h('option', { value: v, txt: r })));
+      const cVal = h('input', { type: 'text', placeholder: 'valor', style: 'flex:0 0 80px' });
+      const cParc = h('select', { style: 'flex:0 0 150px' });
+      cParc.appendChild(h('option', { value: '', txt: 'sem parceiro' }));
+      parceiros.forEach((pa) => cParc.appendChild(h('option', { value: String(pa.id), txt: pa.nome })));
+      const cUsos = h('input', { type: 'number', min: '1', placeholder: 'usos', style: 'flex:0 0 80px' });
+      const cAte = h('input', { type: 'date', style: 'flex:0 0 140px' });
+      const cAdd = h('button', { cls: 'bt mini', type: 'button', txt: '+ Cupom' });
+
+      cAdd.onclick = async () => {
+        if (!cCod.value.trim()) return recado('O cupom precisa de código.', 'ruim');
+        try {
+          await api('/admin.php', { method: 'POST', body: JSON.stringify({
+            acao: 'cupom_salvar', codigo: cCod.value, tipo: cTipo.value, valor: cVal.value,
+            parceiro_id: cParc.value ? parseInt(cParc.value, 10) : 0,
+            usos_max: cUsos.value, vale_ate: cAte.value, ligado: true }) });
+          cCod.value = ''; cVal.value = ''; cUsos.value = ''; cAte.value = '';
+          carrega();
+        } catch (e) { recado(e.message, 'ruim'); }
+      };
+
+      corpo.appendChild(h('div', { cls: 'campo', style: 'gap:8px;flex-wrap:wrap;margin-top:10px' },
+        [cCod, cTipo, cVal, cParc, cUsos, cAte, cAdd]));
+      corpo.appendChild(h('p', { cls: 'd', style: 'margin-top:6px',
+        txt: 'No percentual escreva o número (20 = 20%). No de valor, escreva em reais (5,00). '
+           + 'Usos e data em branco: sem limite e sem vencimento.' }));
+
+    }).catch((e) => {
+      corpo.innerHTML = '';
+      corpo.appendChild(h('p', { cls: 'd', txt: 'Não consegui ler: ' + e.message }));
+    });
+  };
+
+  carrega();
+  return cx;
+}
+
 function telaAdmin() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -4446,6 +4700,7 @@ function telaAdmin() {
   tela.appendChild(h('p', { cls: 'sub', txt: 'Quem entrou no site e o que cada um pode. Deixar um campo vazio devolve o valor do plano — assim o plano continua sendo a regra e a exceção aparece como exceção.' }));
 
   tela.appendChild(blocoVitrine());
+  tela.appendChild(blocoParceiros());
 
   const lista = h('div');
   tela.appendChild(h('h3', { style: 'margin-top:26px', txt: 'Contas' }));
@@ -4476,6 +4731,17 @@ function telaAdmin() {
             [cx, document.createTextNode(rot)]));
         });
 
+      /* PRO DADO À MÃO, COM PRAZO.
+
+         Data e não interruptor: cortesia sem prazo é cortesia esquecida, e
+         seis meses depois ninguém lembra por que aquela conta tem Pro.
+         Campo vazio tira. */
+      const cortesia = h('input', { type: 'date', style: 'flex:0 0 150px' });
+      if (u.cortesia_ate) cortesia.value = String(u.cortesia_ate).slice(0, 10);
+
+      const betaCx = h('input', { type: 'checkbox' });
+      betaCx.checked = !!u.beta;
+
       const salvar = h('button', { cls: 'bt mini', type: 'button', txt: 'Salvar' });
       const recado2 = h('span', { cls: 'd', style: 'font-size:11.5px' });
 
@@ -4488,6 +4754,8 @@ function telaAdmin() {
           await api('/admin.php', { method: 'POST', body: JSON.stringify({
             id: u.id,
             perfis_max: maxi.value === '' ? null : parseInt(maxi.value, 10),
+            cortesia_ate: cortesia.value,
+            beta: betaCx.checked,
             recursos,
           }) });
           recado2.textContent = 'salvo';
@@ -4507,6 +4775,15 @@ function telaAdmin() {
                + '  ·  última vez ' + quando(u.visto_em)
                + '  ·  plano ' + u.plano
                + '  ·  ' + u.overlays + ' de ' + u.vale.perfis_max + ' overlays' }),
+        /* Pro dado à mão. Data e não interruptor: cortesia sem prazo é
+           cortesia esquecida — seis meses depois ninguém lembra por que
+           aquela conta tem Pro. Campo vazio tira. */
+        h('div', { cls: 'campo', style: 'gap:14px;flex-wrap:wrap' }, [
+          h('label', { style: 'display:flex;align-items:center;gap:6px;font-size:12.5px' },
+            [betaCx, document.createTextNode('Testador (Pro pra sempre)')]),
+          h('span', { cls: 'd', style: 'font-size:12.5px', txt: 'Pro até' }),
+          cortesia,
+        ]),
         h('div', { cls: 'campo' }, [
           h('label', { txt: 'Máximo de overlays' }), maxi,
           h('span', { cls: 'd', style: 'font-size:11.5px',
