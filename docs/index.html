@@ -4606,7 +4606,10 @@ function telaControlador() {
      descobrir qual delas é exige comparar credencial com conta. Botão porque
      a alternativa era mandar montar cabeçalho na mão no navegador — e quem
      está tentando abrir a cobrança já está com problema demais pra isso. */
-  if (souAdmin && proEstado && proEstado.modo === 'teste') {
+  /* Em produção TAMBÉM, e principalmente: era só no modo de teste, e a
+     hora de conferir de quem é o token é justamente quando ele passa a
+     mover dinheiro de verdade. */
+  if (souAdmin && proEstado) {
     const saida = h('pre', { cls: 'diag escondido' });
     const bt = h('button', { cls: 'bt', type: 'button', txt: 'Conferir a credencial do Mercado Pago' });
 
