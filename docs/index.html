@@ -497,11 +497,37 @@
     display: block; margin-top: 9px; max-width: 100%; max-height: 420px;
     border: 1px solid var(--linha); border-radius: 4px; cursor: zoom-in;
   }
+  .feed__barra { display: flex; align-items: center; gap: 15px; margin-top: 10px; }
   .feed__acao {
     border: 0; background: none; padding: 0; cursor: pointer;
     color: var(--apagado); font: 500 11.5px var(--mono);
+    display: inline-flex; align-items: center; gap: 5px;
+    transition: color .14s ease, transform .14s ease;
   }
-  .feed__acao:hover { color: var(--perigo); }
+  .feed__acao:hover { color: var(--verde-forte); }
+  .feed__acao.apagar:hover { color: var(--perigo); }
+  .feed__acao.curtiu { color: var(--perigo); }
+  .feed__acao .n { font-variant-numeric: tabular-nums; }
+
+  /* O coração pula quando é clicado. Curtida sem resposta imediata parece
+     que não registrou, e a pessoa clica de novo — desfazendo. */
+  @keyframes feed-pulo { 0% { transform: scale(1); } 45% { transform: scale(1.45); } 100% { transform: scale(1); } }
+  .feed__acao.pulou .ic { display: inline-block; animation: feed-pulo .32s ease-out; }
+  @media (prefers-reduced-motion: reduce) { .feed__acao.pulou .ic { animation: none; } }
+
+  .feed__coment { margin-top: 11px; border-left: 2px solid var(--linha); padding-left: 12px; }
+  .feed__coment .um { display: flex; gap: 8px; padding: 7px 0; }
+  .feed__coment .um .feed__foto { width: 26px; height: 26px; font: 600 12px var(--disp); }
+  .feed__coment .um .txt { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+  .feed__cx { display: flex; gap: 6px; margin-top: 8px; }
+  .feed__cx input {
+    flex: 1; min-width: 0; font: 13px inherit; color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); border-radius: 4px; padding: 7px 9px;
+  }
+  .feed__cx input:focus { outline: 0; border-color: var(--verde); }
+
+  .feed__eu { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .feed__ok { color: var(--verde-forte); font: 600 12px var(--mono); }
 
   /* Um selo, um significado. Verde é quem transmite com a gente; roxo é
      quem desenha à mão. Os dois são conferidos por uma pessoa. */
@@ -3494,78 +3520,195 @@ function telaLuzes() {
 
 /* ---------------- feed ---------------- */
 
-/* Quanto tempo faz. Montado peça por peça porque 'YYYY-MM-DD HH:MM:SS' sem
-   fuso é lido como UTC por alguns navegadores e como local por outros — a
-   diferença de três horas apareceria como "em 3 horas" num post de agora. */
-function faz(quando) {
-  const p = String(quando || '').split(/[- :]/);
-  if (p.length < 6) return '';
-  const q = new Date(p[0], p[1] - 1, p[2], p[3], p[4], p[5]);
-  const s = Math.max(0, (Date.now() - q.getTime()) / 1000);
+/* Quanto tempo faz, a partir dos SEGUNDOS que o banco contou.
+
+   Antes a data crua era remontada aqui, e como o servidor está num fuso e
+   quem olha está noutro, um post de agora aparecia como "3 h". Quem conta
+   agora é o banco, e o número que chega não tem fuso nenhum dentro. */
+function faz(s) {
+  s = Math.max(0, Number(s) || 0);
   if (s < 60) return 'agora';
   if (s < 3600) return Math.floor(s / 60) + ' min';
   if (s < 86400) return Math.floor(s / 3600) + ' h';
   if (s < 604800) return Math.floor(s / 86400) + ' d';
-  return q.toLocaleDateString('pt-BR');
+  return Math.floor(s / 604800) + ' sem';
 }
 
 function blocoFeed() {
   const cx = h('div', { cls: 'hub__painel feed' }, [h('h2', { txt: 'Feed' })]);
   const lista = h('div');
 
+  /* A foto vem pronta do servidor: da Twitch, ou a que a pessoa subiu. Só o
+     caminho relativo precisa de ajuda, caso o api_base esteja vazio. */
+  const fotoDe = (u) => !u.foto ? '' : (/^https?:/i.test(u.foto) ? u.foto : API + u.foto.replace(/^[^/]*/, ''));
+
+  function avatar(u, pequeno) {
+    const f = h('div', { cls: 'feed__foto' });
+    const url = fotoDe(u);
+    if (url) f.appendChild(h('img', { src: url, alt: '', loading: 'lazy' }));
+    else f.textContent = (u.nome || u.login || '?').slice(0, 1).toUpperCase();
+    if (pequeno) f.style.flex = 'none';
+    return f;
+  }
+
+  function cabecaDe(u, quando) {
+    const q = h('div', { cls: 'feed__quem' }, [h('b', { txt: u.nome || u.login })]);
+    if (u.streamer) q.appendChild(h('span', { cls: 'feed__selo streamer', txt: 'Streamer' }));
+    if (u.artista) q.appendChild(h('span', { cls: 'feed__selo artista', txt: 'Artista' }));
+    q.appendChild(h('span', { cls: 'arroba', txt: '@' + u.login }));
+    if (quando !== null && quando !== undefined) {
+      q.appendChild(h('span', { cls: 'quando', txt: '· ' + faz(quando) }));
+    }
+    return q;
+  }
+
+  const mandaJson = (corpo) => api('/feed.php', { method: 'POST', body: JSON.stringify(corpo) });
+
+  /* ---------- os comentários de um post ---------- */
+  function blocoComentarios(p, contador) {
+    const cxc = h('div', { cls: 'feed__coment' });
+    const fila = h('div');
+    cxc.appendChild(fila);
+
+    const desenhaC = (cs) => {
+      fila.innerHTML = '';
+      contador.textContent = cs.length ? String(cs.length) : '';
+      if (!cs.length) fila.appendChild(h('p', { cls: 'd', style: 'margin:6px 0', txt: 'Nenhum comentário.' }));
+
+      cs.forEach((c) => {
+        const corpo = h('div', { style: 'flex:1;min-width:0' }, [
+          cabecaDe(c.autor, c.ha),
+          h('div', { cls: 'txt', txt: c.texto }),
+        ]);
+
+        /* Quem escreveu, o dono do post e o admin. O dono entra porque o
+           comentário aparece embaixo do nome dele. */
+        if (chave && quemSou && (souAdmin || c.autor.login === quemSou || p.autor.login === quemSou)) {
+          const del = h('button', { cls: 'feed__acao apagar', type: 'button', txt: 'apagar' });
+          del.onclick = async () => {
+            try {
+              const r = await mandaJson({ acao: 'comentario_apagar', id: c.id });
+              desenhaC(r.comentarios || []);
+            } catch (e) { recado(e.message, 'ruim'); }
+          };
+          corpo.appendChild(del);
+        }
+
+        fila.appendChild(h('div', { cls: 'um' }, [avatar(c.autor, true), corpo]));
+      });
+    };
+
+    if (chave) {
+      const campo = h('input', { type: 'text', maxlength: '300', placeholder: 'Comentar…' });
+      const env = h('button', { cls: 'bt mini', type: 'button', txt: 'Enviar' });
+
+      const enviar = async () => {
+        if (!campo.value.trim()) return;
+        env.disabled = true;
+        try {
+          const r = await mandaJson({ acao: 'comentar', id: p.id, texto: campo.value });
+          campo.value = '';
+          desenhaC(r.comentarios || []);
+        } catch (e) { recado(e.message, 'ruim'); }
+        env.disabled = false;
+      };
+      env.onclick = enviar;
+      campo.onkeydown = (e) => { if (e.key === 'Enter') enviar(); };
+
+      cxc.appendChild(h('div', { cls: 'feed__cx' }, [campo, env]));
+    }
+
+    fila.appendChild(h('p', { cls: 'd', style: 'margin:6px 0', txt: 'vendo…' }));
+    fetch(API + '/feed.php?a=comentarios&id=' + p.id, { headers: chave ? { 'X-Chave': chave } : {} })
+      .then((r) => r.json()).then((d) => desenhaC(d.comentarios || []))
+      .catch(() => { fila.innerHTML = ''; fila.appendChild(h('p', { cls: 'd', txt: 'não deu pra ler' })); });
+
+    return cxc;
+  }
+
+  /* ---------- um post ---------- */
+  function desenhaPost(p) {
+    const corpo = h('div', { cls: 'feed__corpo' }, [
+      cabecaDe(p.autor, p.ha),
+      h('div', { cls: 'feed__texto', txt: p.texto || '' }),
+    ]);
+
+    if (p.imagem) {
+      const img = h('img', { cls: 'feed__img', loading: 'lazy', alt: '',
+        src: API + '/feed.php?a=img&id=' + p.imagem });
+      img.onclick = () => window.open(img.src, '_blank', 'noopener');
+      corpo.appendChild(img);
+    }
+
+    const barra = h('div', { cls: 'feed__barra' });
+
+    const nCurt = h('span', { cls: 'n', txt: p.curtidas ? String(p.curtidas) : '' });
+    const curtir = h('button', { cls: 'feed__acao' + (p.curti ? ' curtiu' : ''), type: 'button' },
+      [h('span', { cls: 'ic', txt: p.curti ? '♥' : '♡' }), nCurt]);
+    curtir.title = chave ? 'Curtir' : 'Entre pra curtir';
+    curtir.onclick = async () => {
+      if (!chave) return recado('Entre com a Twitch pra curtir.', 'ruim');
+      /* Pinta antes de perguntar: a resposta certa chega logo e corrige, e
+         nesse meio tempo o botão não fica parecendo quebrado. */
+      const antes = curtir.classList.contains('curtiu');
+      curtir.classList.toggle('curtiu', !antes);
+      curtir.querySelector('.ic').textContent = antes ? '♡' : '♥';
+      curtir.classList.remove('pulou');
+      void curtir.offsetWidth;
+      if (!antes) curtir.classList.add('pulou');
+      try {
+        const r = await mandaJson({ acao: 'curtir', id: p.id });
+        curtir.classList.toggle('curtiu', !!r.curti);
+        curtir.querySelector('.ic').textContent = r.curti ? '♥' : '♡';
+        nCurt.textContent = r.curtidas ? String(r.curtidas) : '';
+      } catch (e) {
+        curtir.classList.toggle('curtiu', antes);
+        curtir.querySelector('.ic').textContent = antes ? '♥' : '♡';
+        recado(e.message, 'ruim');
+      }
+    };
+    barra.appendChild(curtir);
+
+    const nCom = h('span', { cls: 'n', txt: p.comentarios ? String(p.comentarios) : '' });
+    const comentar = h('button', { cls: 'feed__acao', type: 'button' },
+      [h('span', { cls: 'ic', txt: '💬' }), nCom]);
+    let aberto = null;
+    comentar.onclick = () => {
+      if (aberto) { aberto.remove(); aberto = null; return; }
+      aberto = blocoComentarios(p, nCom);
+      corpo.appendChild(aberto);
+    };
+    barra.appendChild(comentar);
+
+    if (chave && (souAdmin || (quemSou && p.autor.login === quemSou))) {
+      const del = h('button', { cls: 'feed__acao apagar', type: 'button', txt: 'apagar' });
+      del.onclick = async () => {
+        if (!confirm('Apagar esse post?')) return;
+        try { await mandaJson({ acao: 'apagar', id: p.id }); carregaFeed(); }
+        catch (e) { recado(e.message, 'ruim'); }
+      };
+      barra.appendChild(del);
+    }
+
+    corpo.appendChild(barra);
+    return h('div', { cls: 'feed__post' }, [avatar(p.autor), corpo]);
+  }
+
   const desenha = (posts) => {
     lista.innerHTML = '';
     if (!posts.length) {
-      lista.appendChild(h('p', { cls: 'd', txt: 'Ninguém postou ainda. Comece você.' }));
+      lista.appendChild(h('p', { cls: 'd', txt: 'Ninguém zocou nada ainda. Comece você.' }));
       return;
     }
-
-    posts.forEach((p) => {
-      const a = p.autor || {};
-
-      const foto = h('div', { cls: 'feed__foto' });
-      if (a.foto) foto.appendChild(h('img', { src: a.foto, alt: '', loading: 'lazy' }));
-      else foto.textContent = (a.nome || a.login || '?').slice(0, 1).toUpperCase();
-
-      const quem = h('div', { cls: 'feed__quem' }, [h('b', { txt: a.nome || a.login })]);
-      if (a.streamer) quem.appendChild(h('span', { cls: 'feed__selo streamer', txt: 'Streamer' }));
-      if (a.artista) quem.appendChild(h('span', { cls: 'feed__selo artista', txt: 'Artista' }));
-      quem.appendChild(h('span', { cls: 'arroba', txt: '@' + a.login }));
-      quem.appendChild(h('span', { cls: 'quando', txt: '· ' + faz(p.criado_em) }));
-
-      const corpo = h('div', { cls: 'feed__corpo' }, [
-        quem,
-        h('div', { cls: 'feed__texto', txt: p.texto || '' }),
-      ]);
-
-      if (p.imagem) {
-        const img = h('img', { cls: 'feed__img', loading: 'lazy', alt: '',
-          src: API + '/feed.php?a=img&id=' + p.imagem });
-        img.onclick = () => window.open(img.src, '_blank', 'noopener');
-        corpo.appendChild(img);
-      }
-
-      /* O botão de apagar só nasce pra quem pode: o servidor confere de
-         novo, então esconder aqui é só não oferecer o que não abriria. */
-      if (chave && (souAdmin || (quemSou && a.login === quemSou))) {
-        const del = h('button', { cls: 'feed__acao', type: 'button', txt: 'apagar' });
-        del.style.marginTop = '7px';
-        del.onclick = async () => {
-          if (!confirm('Apagar esse post?')) return;
-          try {
-            await api('/feed.php', { method: 'POST', body: JSON.stringify({ acao: 'apagar', id: p.id }) });
-            carregaFeed();
-          } catch (e) { recado(e.message, 'ruim'); }
-        };
-        corpo.appendChild(del);
-      }
-
-      lista.appendChild(h('div', { cls: 'feed__post' }, [foto, corpo]));
-    });
+    posts.forEach((p) => lista.appendChild(desenhaPost(p)));
   };
 
   const carregaFeed = () => {
-    fetch(API + '/feed.php').then((r) => r.json())
+    /* no-store: o feed é guardado por quinze segundos pra quem não entrou, e
+       era isso que fazia o post recém-escrito demorar a aparecer pra quem
+       escreveu. */
+    fetch(API + '/feed.php', { cache: 'no-store', headers: chave ? { 'X-Chave': chave } : {} })
+      .then((r) => r.json())
       .then((d) => desenha(d.posts || []))
       .catch(() => { lista.innerHTML = ''; lista.appendChild(h('p', { cls: 'd', txt: 'Não consegui carregar o feed.' })); });
   };
@@ -3575,8 +3718,32 @@ function blocoFeed() {
     const foto  = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif',
       style: 'display:none' });
     const anexo = h('button', { cls: 'bt mini', type: 'button', txt: 'Imagem' });
-    const publicar = h('button', { cls: 'bt principal', type: 'button', txt: 'Publicar' });
+    const zocar = h('button', { cls: 'bt principal', type: 'button', txt: 'Zocar' });
     const conta = h('span', { cls: 'conta', txt: '500' });
+    const feito = h('span', { cls: 'feed__ok' });
+
+    /* ----- foto de perfil ----- */
+    const arqFoto = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif',
+      style: 'display:none' });
+    const trocaFoto = h('button', { cls: 'feed__acao', type: 'button', txt: 'trocar minha foto' });
+    trocaFoto.onclick = () => arqFoto.click();
+    arqFoto.onchange = async () => {
+      const f = arqFoto.files && arqFoto.files[0];
+      arqFoto.value = '';
+      if (!f) return;
+      if (f.size > 1048576) return recado('A foto pode ter no máximo 1 MB.', 'ruim');
+
+      const fd = new FormData();
+      fd.append('acao', 'foto');
+      fd.append('foto', f);
+      try {
+        const r = await fetch(API + '/feed.php', { method: 'POST', headers: { 'X-Chave': chave }, body: fd });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.erro || 'não deu');
+        recado('Foto trocada.', 'bom');
+        carregaFeed();
+      } catch (e) { recado(e.message, 'ruim'); }
+    };
 
     anexo.onclick = () => foto.click();
     foto.onchange = () => {
@@ -3587,9 +3754,10 @@ function blocoFeed() {
       const resta = 500 - campo.value.length;
       conta.textContent = String(resta);
       conta.classList.toggle('perto', resta < 60);
+      feito.textContent = '';
     };
 
-    publicar.onclick = async () => {
+    zocar.onclick = async () => {
       const f = foto.files && foto.files[0];
       if (!campo.value.trim()) return recado('Escreva alguma coisa.', 'ruim');
       if (f && f.size > 4194304) return recado('A imagem pode ter no máximo 4 MB.', 'ruim');
@@ -3598,22 +3766,34 @@ function blocoFeed() {
       fd.append('texto', campo.value);
       if (f) fd.append('imagem', f);
 
-      publicar.disabled = true;
+      zocar.disabled = true;
+      zocar.textContent = 'zocando…';
+      feito.textContent = '';
       try {
-        /* Sem Content-Type na mão: o boundary do multipart é o navegador
-           que escreve. */
         const r = await fetch(API + '/feed.php', { method: 'POST', headers: { 'X-Chave': chave }, body: fd });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.erro || 'não deu');
+
         campo.value = ''; foto.value = ''; anexo.textContent = 'Imagem'; conta.textContent = '500';
+        /* O retorno é escrito DUAS vezes de propósito: do lado do botão pra
+           quem está olhando ali, e na linha de recado pra quem já rolou a
+           tela. Sem isso, escrever e não ver nada acontecer faz clicar de
+           novo — e postar duas vezes. */
+        feito.textContent = '✓ zocado';
+        recado('Zocado! Seu post está no topo do feed.', 'bom');
         carregaFeed();
       } catch (e) { recado(e.message, 'ruim'); }
-      publicar.disabled = false;
+      zocar.disabled = false;
+      zocar.textContent = 'Zocar';
     };
 
+    cx.appendChild(h('div', { cls: 'feed__eu' }, [
+      h('span', { cls: 'd', style: 'font-size:12px', txt: 'A foto vem da sua Twitch.' }),
+      trocaFoto, arqFoto,
+    ]));
     cx.appendChild(h('div', { cls: 'feed__novo' }, [
       campo,
-      h('div', { cls: 'feed__linha' }, [anexo, publicar, foto, conta]),
+      h('div', { cls: 'feed__linha' }, [anexo, zocar, feito, foto, conta]),
     ]));
   }
 

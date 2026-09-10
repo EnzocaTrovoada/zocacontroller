@@ -150,6 +150,29 @@ function quem_chama(): array
     json_saida(['erro' => 'Faltou a chave de acesso.'], 401);
 }
 
+/**
+ * Quem está chamando, ou zero. NÃO derruba a requisição.
+ *
+ * O quem_chama() responde 401 e encerra quando a chave não vale — certo pra
+ * quem exige chave, errado pra quem só quer saber se conhece o visitante. O
+ * feed é público: uma chave velha guardada no navegador tem que resultar em
+ * "não sei quem é", e não em página quebrada pra quem nem sabe o que é
+ * chave.
+ */
+function quem_talvez(): int
+{
+    $chave = $_SERVER['HTTP_X_CHAVE'] ?? '';
+    if ($chave === '') return 0;
+
+    try {
+        $st = db()->prepare('SELECT id FROM usuarios WHERE chave_painel = ? LIMIT 1');
+        $st->execute([hash_chave($chave)]);
+        return (int) ($st->fetchColumn() ?: 0);
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
 function exige_painel(): array
 {
     $q = quem_chama();

@@ -248,13 +248,7 @@ $semIa   = empty($_POST['sem_ia']) ? 0 : 1;
 
 /* Quem já tem conta manda a chave junto: é o que permite acender o selo de
    artista no feed quando a inscrição for aprovada. */
-$doDono = null;
-if (($_SERVER['HTTP_X_CHAVE'] ?? '') !== '') {
-    try {
-        $q = quem_chama();
-        if ($q['tipo'] === 'painel') $doDono = (int) $q['usuario_id'];
-    } catch (Throwable $e) { /* chave velha: a inscrição continua valendo */ }
-}
+$doDono = quem_talvez() ?: null;
 
 $pend = (int) db()->query("SELECT COUNT(*) FROM artistas WHERE estado = 'pendente'")->fetchColumn();
 if ($pend >= ARTE_PENDENTES) {
