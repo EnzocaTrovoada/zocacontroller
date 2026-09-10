@@ -1,453 +1,254 @@
-# O que falta, e como fazer
+# ZocaController — estado e o que falta
 
-Este arquivo é a teoria. Ele descreve o que ainda não existe no
-ZocaController, por que cada coisa é feita do jeito descrito, e o que a
-plataforma de fora realmente permite — não o que seria bom se permitisse.
-
-Cada bloco tem a mesma forma: **o problema**, **o limite real da API**,
-**as tabelas**, **os arquivos**, **a ordem de execução** e **o que pode
-quebrar**. Quem for executar não precisa decidir arquitetura, só escrever.
-
-Ordem sugerida: 0 → 1 → 4 → 2 → 5 → 3 → 6.
-O 0 é obrigatório antes de qualquer outro: sem ele, metade do que já existe
-está no repositório e não está no ar.
+Ponto de partida de qualquer sessão nova. Leia antes de escrever a primeira
+linha.
 
 ---
 
-## 0. O que já está pronto e ainda não está no ar
+## 1. Como o projeto é montado
 
-Nada aqui é código novo. É o que falta subir e rodar para o que já foi feito
-começar a funcionar.
-
-### Arquivos para subir no servidor
-Tudo em `api/` e tudo em `docs/`. Em especial os que mudaram por último:
-`api/lib/contagem.php`, `api/lib/twitch.php`, `api/lib/lastfm.php`,
-`api/lib/youtube.php`, `api/lastfm.php`, `api/youtube.php`, `api/admin.php`,
-`api/perfil.php`, `api/config-overlay.php`, `docs/index.html`,
-`docs/overlay.html`.
-
-### SQL para rodar, na ordem
-| Arquivo | O que faz | Quebra o quê se faltar |
+| Onde | O quê | Como sobe |
 |---|---|---|
-| `sql/019-metas-subathon.sql` | alvos de seguidores/subs que empurram o cronômetro | subathon não ganha tempo por meta |
-| `sql/020-admin.sql` | `usuarios.admin`, `perfis_max`, `recursos`, `visto_em` | **`perfil.php` devolve erro 500 e o painel inteiro fica sem lista** |
-| `sql/021-plataformas.sql` | `contagens.fonte` cresce para 32, `usuarios.yt_canal/yt_handle` | meta de YouTube e de Kick não conta |
-| `sql/022-lastfm.sql` | `usuarios.lastfm_user` | Last.fm não liga |
+| `docs/` | painel e overlays (HTML/JS puro) | commit no `main` → GitHub Pages → `mods.zocahop.com` |
+| `api/` | PHP 8.3 sem framework | **upload manual** na Hostinger → `api.zocahop.com` |
+| `sql/` | migrações numeradas | **rodadas à mão** no phpMyAdmin, em ordem |
 
-O 020 é o mais perigoso da lista: `recursos_do_usuario()` faz
-`SELECT perfis_max, recursos FROM usuarios`, e sem as colunas isso derruba a
-listagem de overlays de **todo mundo**, não só a de quem é admin.
-
-### Chaves no `api/config.php`
-```php
-'youtube' => ['api_key' => '...'],   // Google Cloud > YouTube Data API v3
-'lastfm'  => ['api_key' => '...'],   // last.fm/api/account/create
-```
-
-### Teste de aceitação (faça na ordem, é rápido)
-1. Abrir o painel: a barra de cima mostra `@seulogin` no canto direito.
-   Se não mostrar, o `perfil.php` novo não subiu.
-2. Criar uma meta de seguidores da Twitch: o número tem que aparecer sozinho
-   em até um minuto.
-3. `curl -I` num `config-overlay.php?k=...` duas vezes, repetindo o ETag da
-   primeira no `If-None-Match` da segunda: a segunda tem que responder **304**.
-   Se responder 200, o `config-overlay.php` novo não subiu.
-4. Ligar o Last.fm com música tocando: a tela tem que dizer o nome da faixa.
+Não existe build, bundler nem `npm install`. O `docs/index.html` tem ~7 mil
+linhas e é o painel inteiro.
 
 ---
 
-## 1. Confiabilidade — o guardião da live
+## 2. Regras que não podem ser quebradas
 
-### O problema
-Hoje o site não sabe se o canal está no ar. Três consequências, todas já
-observadas ou inevitáveis:
+Cada uma custou um defeito em produção.
 
-- O cronômetro do subathon queima tempo com a live caída. Quem cai por vinte
-  minutos volta com vinte minutos a menos de subathon, sem ter recebido nada.
-- A contagem automática pergunta viewers para um canal offline a cada minuto,
-  gastando chamada para receber zero.
-- Ninguém avisa o streamer quando a ponte do OBS morre no meio da live. O
-  chat manda `!cena` e não acontece nada, e a descoberta é sempre tarde.
+**Rode `node conferir.js` antes de commitar.** Ele guarda três listas
+duplicadas em arquivos diferentes: tipos de overlay, ações de chat e cargos.
+Adicionar um tipo de overlay exige mexer em `TIPOS` (index.html),
+`PERFIL_TIPOS` (perfil.php) e no roteador de `overlay.html`. Esquecer um dá
+"tipo desconhecido" sem dizer onde.
 
-### O limite real da API
-`stream.online` e `stream.offline` são EventSub versão 1, condição
-`broadcaster_user_id`, e **não exigem escopo nenhum** — é dado público. Isso
-significa que dá para assinar para todo usuário já cadastrado sem pedir
-autorização nova a ninguém. É o item mais barato desta lista inteira.
+**Mexeu em `.js` ou `.css` de `docs/`? Suba o `?v=` em todos os HTML.** O
+LiteSpeed guarda esses arquivos por 7 dias. Sem o número novo, o HTML atualiza
+e o script continua o velho — a página parece nova e se comporta como velha.
+HTML não é cacheado; só JS e CSS.
 
-O Kick tem `livestream.status.updated` no webhook, mesmo formato dos que já
-tratamos em `kick-eventos.php`. O YouTube não tem evento equivalente e fica
-de fora — quem escolher YouTube não ganha guardião, e a tela precisa dizer
-isso em vez de fingir que ganhou.
+**Nada de ES2020 em arquivo que roda no OBS** (`overlay.html`, `ponte.html`,
+`clock.js`, `chat.js`, `musica.js`, `alerta.js`, `spd.js`). O navegador
+embutido do OBS fica versões atrás: sem `?.`, sem `??`, sem `catch {}` vazio.
 
-### Tabelas
-```sql
-ALTER TABLE usuarios
-  ADD COLUMN ao_vivo     TINYINT(1) NOT NULL DEFAULT 0,
-  ADD COLUMN ao_vivo_em  DATETIME   NULL DEFAULT NULL;
+**Tempo em overlay se calcula a partir de um instante, nunca somando.** O OBS
+congela `setTimeout` e animação de CSS quando a fonte não está sendo
+desenhada. Guardar "quando acaba" e subtrair é o que mantém o número certo
+depois de horas escondido. Ver `modo`/`fim`/`restante` no subathon.
 
-/* Por que a coluna nova no subathon:
-   pausa de pessoa e pausa de queda de live são coisas diferentes. Sem
-   separar, o stream.online despausaria um subathon que o streamer tinha
-   pausado de propósito — e ele veria o cronômetro voltar a andar sozinho. */
-ALTER TABLE subathon
-  ADD COLUMN pausa_auto  TINYINT(1) NOT NULL DEFAULT 0,
-  ADD COLUMN guardiao    TINYINT(1) NOT NULL DEFAULT 0;
-```
+**A hospedagem é compartilhada.** Sem Node, sem WebSocket, sem processo longo.
+Trabalho pesado vai depois da resposta com `responder_e_continuar()`
+(`litespeed_finish_request`, não `fastcgi_`). Cron existe no hPanel.
 
-`guardiao = 0` por padrão de propósito: ligar sozinho um comportamento que
-para o cronômetro de alguém é o tipo de surpresa que faz a pessoa desconfiar
-do site.
-
-### Regra de ouro do pausa/despausa
-```
-stream.offline + guardiao ligado + modo == 'rodando'
-    -> restante = fim - agora;  modo = 'pausado';  pausa_auto = 1
-
-stream.online  + pausa_auto == 1
-    -> fim = agora + restante;  modo = 'rodando';  pausa_auto = 0
-
-pessoa pausa na mão
-    -> pausa_auto = 0    (e aí o stream.online não mexe)
-```
-A conversão `fim <-> restante` já existe e está certa em
-`api/lib/subathon-somar.php` e no controle `pausa` do painel. Reaproveite,
-não reescreva: são duas representações do mesmo tempo e um terceiro lugar
-convertendo é um terceiro lugar para errar.
-
-### Arquivos
-- `api/eventsub.php` — somar `stream.online` e `stream.offline` à lista de
-  tópicos assinados e tratar os dois no recebimento.
-- `api/lib/canal.php` (novo, pequeno) — `canal_ao_vivo(int $usuario_id): bool`
-  e `canal_marcar(int $usuario_id, bool $ao_vivo): void`. Todo mundo pergunta
-  aqui, ninguém lê a coluna direto.
-- `api/lib/contagem.php` — quando `canal_ao_vivo()` for falso, `viewers`
-  devolve 0 sem chamar a Twitch. Seguidores e subs continuam contando: eles
-  mudam com o canal offline.
-- `api/kick-eventos.php` — mesmo tratamento para `livestream.status.updated`.
-- `docs/index.html` — a chave do guardião dentro da aba do subathon, com a
-  frase explicando o que ela faz. E um ponto verde/cinza ao lado do `@login`
-  na barra dizendo se o site acha que o canal está no ar.
-
-### A ponte caída
-Separado, e mais simples do que parece: a `ponte.html` já fala com o servidor.
-Ela passa a mandar um sinal de vida a cada 30 s (`api/estado.php`), que grava
-`pontes.visto_em`. Quando o painel vê um sinal com mais de 90 s, mostra
-"a ponte não está respondendo" com o link para reabrir. Não precisa de
-notificação nem de nada empurrado: quem está com o painel aberto vê, e quem
-não está não seria avisado de qualquer jeito.
-
-### O que pode quebrar
-- **EventSub duplicado.** Assinar de novo o que já está assinado devolve 409.
-  Trate 409 como sucesso, senão o cadastro falha para quem já tinha a
-  assinatura.
-- **Entrega fora de ordem.** A Twitch entrega "pelo menos uma vez" e sem
-  garantia de ordem. Um `offline` atrasado chegando depois de um `online`
-  pausaria uma live que está no ar. Guarde o `event_timestamp` da mensagem em
-  `ao_vivo_em` e **ignore evento mais velho do que o que já está gravado**.
-- **Live que pisca.** Quedas curtas de encoder geram online/offline em
-  segundos. Segure o offline por 90 s antes de pausar — na prática, isso é
-  um `offline_em` gravado e a decisão tomada no próximo poll, porque em
-  hospedagem compartilhada não existe processo esperando.
+**Comentário curto.** Só o que não dá pra deduzir lendo o código: armadilha de
+plataforma, "por que não do jeito óbvio", unidade que engana. O raciocínio
+longo vem pra este arquivo.
 
 ---
 
-## 2. Steam
+## 3. O que já está pronto
 
-Este é o maior bloco, e o único que vale quebrar em partes que entregam
-sozinhas. Faça na ordem; cada número já é útil sem o seguinte.
+**Overlays (10 tipos):** meta, subathon, relógio, contador, placar, chat,
+feed, música, alerta, speedrun. Cada um é um link fixo colado no OBS.
 
-### O limite real da API
-- `ISteamUser/GetPlayerSummaries/v2` devolve `gameextrainfo` (nome do jogo) e
-  `gameid` **só quando o perfil é público**. Perfil privado devolve o jogo
-  vazio, e não existe contorno.
-- `IPlayerService/GetOwnedGames/v1` com `include_appinfo=1` devolve a
-  biblioteca inteira com horas jogadas. Também depende de perfil público.
-- `ISteamUserStats/GetPlayerAchievements/v1` devolve as conquistas de um app,
-  com `achieved` 0/1. Não avisa quando muda: **só dá para saber comparando
-  duas leituras**.
-- Preço: `https://store.steampowered.com/api/appdetails?appids=X&cc=br&l=pt`
-  — não é documentado, não tem chave, e é o que todo mundo usa. Trate como
-  algo que pode sumir: cache longo e falha silenciosa.
-- Não existe login OAuth de Steam. O que existe é **OpenID 2.0**, que devolve
-  só o SteamID64 e mais nada. Isso é suficiente para tudo acima e é o caminho.
+**Ponte com o OBS:** `docs/ponte.html` roda como fonte no OBS e fala
+obs-websocket v5 em `localhost`. Chat troca cena, silencia mic, dispara
+gatilhos. Moderadores têm links próprios revogáveis.
 
-### Ordem
-**2.1 — Overlay "jogando agora".**
-Poll de `GetPlayerSummaries` a cada 60 s, guardado igual à música. Mostra capa
-(`https://cdn.cloudflare.steamstatic.com/steam/apps/<appid>/header.jpg`), nome
-do jogo e horas totais. Reaproveite `docs/musica.js` como forma: é o mesmo
-desenho — capa, título, subtítulo — e o mesmo ciclo de aparecer/sumir.
+**Integrações:** Twitch (Helix + EventSub), YouTube (Data API), Kick (OAuth
+2.1 + PKCE + webhook RSA), Spotify, Last.fm, LivePix.
 
-**2.2 — Jogo manual.**
-Um campo no painel para escrever o jogo à mão, com um interruptor
-"usar o manual em vez do que a Steam diz". Isto não é um extra: Minecraft,
-emuladores, jogos de Epic e Game Pass são metade do que se joga em live, e
-sem o campo o overlay some justo nessas horas.
+**Cobrança (Mercado Pago):** checkout, webhook com assinatura, estorno,
+reconciliação, cupons, comissão de parceiro. Ligada por
+`cfg()['mercadopago']['ligado']`.
 
-**2.3 — `!preco`.**
-Comando de chat que responde o preço em BRL do jogo em que a pessoa está.
-Cache de 6 h por appid numa tabela `steam_precos`, porque o endpoint não é
-oficial e não convém bater nele por mensagem de chat.
+**Planos:** grátis (8 overlays, travados além disso), Pro mensal R$ 13,99,
+anual R$ 150, vitalício R$ 330. Sem marca d'água em plano nenhum.
 
-**2.4 — Conquistas.**
-A cada 5 min, ler as conquistas do appid atual e comparar com a leitura
-anterior guardada. O que virou 1 desde a última vez vira evento no `eventos`
-e cai no feed e no alerta — que já sabem desenhar evento, sem código novo.
-Guarde apenas os IDs conquistados (JSON), não o histórico: o que interessa é
-o diff.
+**Painel:** vitrine na home (carrossel de canais + em alta + atualizações),
+busca, caminho de navegação, modo de edição de textos, CSS extra, admin com
+usuários, cupons, parceiros e comissões.
 
-**2.5 — Roleta de backlog.**
-`GetOwnedGames` filtrando `playtime_forever == 0`, sorteia um. É o comando
-mais simples da lista e o de maior chance de virar quadro de live.
+---
 
-**2.6 — A ponte com o "o que streamar".**
-O recomendador de jogos já existe como projeto separado dele. Aqui ele entra
-como **leitura**, não como fusão: um endpoint no lado de lá devolvendo
-`[{jogo, nota, motivo}]`, e um overlay/comando aqui que mostra a sugestão do
-dia. Não misture os bancos. São dois produtos, e um deles depende de cron
-pesado que esta hospedagem não deve carregar junto.
+## 4. Limites reais das plataformas
 
-### Tabelas
+Verificados na documentação. Não re-descubra.
+
+- **Spotify:** modo de desenvolvimento atende **5 contas**. Extensão de cota
+  exige 250 mil usuários/mês — inalcançável. Last.fm é a fonte pública.
+  Biblioteca virou `PUT /me/library?uris=` (query, não corpo); os antigos
+  devolvem 403.
+- **Kick:** não expõe contagem de seguidores em endpoint nenhum.
+- **YouTube:** arredonda inscritos em 3 algarismos significativos, até pro dono.
+- **TikTok:** só `follower_count`, e depois de análise do app. Não existe API
+  oficial de eventos ao vivo.
+- **Mercado Pago:** o sandbox foi desligado — sempre `init_point`. O `ts` do
+  webhook vem em milissegundos. Testar exige janela anônima com usuário de
+  teste.
+- **Instagram:** a Basic Display API morreu em dez/2024. Não há caminho
+  oficial pra puxar posts de alguém pelo @.
+
+---
+
+## 5. O que falta
+
+### 5.1 Artistas
+
+Seção do site pra divulgar arte humana, sem IA.
+
+Como o Instagram não deixa puxar por @, o conteúdo é cadastrado — o que dá
+curadoria de graça: você escolhe qual arte aparece, com autorização explícita.
+
 ```sql
-ALTER TABLE usuarios
-  ADD COLUMN steam_id     VARCHAR(20) NULL DEFAULT NULL,
-  ADD COLUMN steam_manual VARCHAR(80) NULL DEFAULT NULL;
+CREATE TABLE artistas (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(80) NOT NULL,
+  arroba VARCHAR(64) NULL,
+  link VARCHAR(200) NULL,
+  bio VARCHAR(240) NULL,
+  estado ENUM('pendente','aprovado','recusado') NOT NULL DEFAULT 'pendente',
+  sem_ia TINYINT(1) NOT NULL DEFAULT 0,
+  verificado_em DATETIME NULL,
+  criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE artista_obras (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  artista_id INT UNSIGNED NOT NULL,
+  arquivo VARCHAR(64) NOT NULL,
+  titulo VARCHAR(120) NULL,
+  ordem INT NOT NULL DEFAULT 0
+);
+```
 
-CREATE TABLE steam_cache (
+Arquivos: `api/artistas.php` (inscrição pública, listagem, moderação) e uma
+tela nova. Upload reaproveita as regras do `api/som.php`: nome sorteado por
+nós, tipo decidido pelo conteúdo e não pela extensão, teto de tamanho,
+servido por PHP com Content-Type fixo.
+
+**Inscrição:** formulário público com nome, @, link e 1 a 5 imagens. Entra
+como `pendente`; ninguém aparece sem aprovação.
+
+**Verificação "sem IA":** não existe detector confiável — não prometa detecção
+automática. O que dá é declaração mais evidência: o artista marca "feito à
+mão" e envia **um arquivo de processo** (PSD, rascunho, timelapse) que só o
+admin vê. Aprovado, ganha o selo. O selo é a palavra do Enzo, não a de um
+algoritmo, e o texto do site precisa dizer isso.
+
+### 5.2 Estatísticas da transmissão
+
+Já existe `contagens` (seguidores, subs, viewers por usuário). Falta o
+histórico: uma linha por dia.
+
+```sql
+CREATE TABLE metricas_dia (
   usuario_id INT UNSIGNED NOT NULL,
-  chave      VARCHAR(32)  NOT NULL,   /* 'agora', 'conquistas:<appid>', 'lib' */
-  valor      MEDIUMTEXT   NULL,
-  visto_em   DATETIME     NOT NULL,
-  PRIMARY KEY (usuario_id, chave)
-);
-
-CREATE TABLE steam_precos (
-  appid    INT UNSIGNED NOT NULL PRIMARY KEY,
-  json     TEXT         NULL,
-  visto_em DATETIME     NOT NULL
+  dia DATE NOT NULL,
+  seguidores INT UNSIGNED NULL,
+  subs INT UNSIGNED NULL,
+  pico_viewers INT UNSIGNED NULL,
+  minutos_ao_vivo INT UNSIGNED NULL,
+  PRIMARY KEY (usuario_id, dia)
 );
 ```
 
-### Arquivos
-`api/lib/steam.php`, `api/steam.php` (ligar/desligar conta, estado),
-`api/steam-openid.php` (a volta do OpenID), `docs/steam.js` + `docs/steam.css`
-(o desenho), e o tipo `steam` entrando nas **três** listas que o `conferir.js`
-vigia: `TIPOS` no `index.html`, `PERFIL_TIPOS` no `perfil.php`, e o roteador
-de renderizadores no `overlay.html`.
+Alimentada pelo mesmo caminho da `contagens`, mais o cron da vitrine.
 
-### O que pode quebrar
-- **Perfil privado** é o caso comum, não a exceção. A tela tem que dizer
-  "seu perfil da Steam está privado, e por isso não dá para ver o jogo",
-  com o caminho do ajuste. Sem isso, vira o mesmo tipo de bilhete inútil que
-  o do Spotify era.
-- **Chave da Steam é do servidor**, uma só, com limite de 100 mil chamadas por
-  dia. Com 60 s de poll por usuário são 1.440 chamadas/dia por pessoa: cabem
-  ~60 usuários. Antes disso, o poll precisa ser sob demanda — só busca quando
-  algum overlay daquele usuário pediu config nos últimos 2 minutos.
-- **`appdetails` sem contrato.** Se sumir, `!preco` para. Ele não pode
-  derrubar mais nada junto.
+**Regra de exibição, decidida e fechada:** cresceu → mostra o crescimento
+("+18% desde que você começou a usar"). Caiu ou empatou → mostra **só o número
+atual**, sem porcentagem e sem elogio inventado, com uma linha de incentivo
+("continue transmitindo", "constância é o que move esse número"). Elogio de
+verdade só quando existe fato: recorde de espectadores, sequência de dias,
+primeiro sub.
 
----
+### 5.3 Painéis de mod pelo site
 
-## 3. TikTok
+O que começou o projeto. Hoje o moderador recebe um link solto
+(`docs/mods.html`). Falta: quem é mod de vários canais entrar no site e ver
+todos num lugar, com a live embutida ao lado dos controles.
 
-### O limite real da API
-`GET /v2/user/info/` com escopo `user.info.stats` devolve `follower_count`.
-Isso funciona e é tudo o que dá para fazer.
-
-O que **não** existe: qualquer API oficial de eventos ao vivo. Presente,
-entrada na live, comentário — nada disso tem endpoint. O que circula por aí
-são bibliotecas que fingem ser o app e leem o WebSocket interno. Elas quebram
-sozinhas, e usar uma delas num produto pago é escolher a hora em que ele vai
-parar. **Não vá por aí.**
-
-Além disso, antes da aprovação do app o TikTok só atende **10 contas de teste**
-cadastradas à mão — mesma armadilha do Spotify em modo de desenvolvimento,
-com a diferença de que aqui a aprovação existe e é alcançável.
-
-### O que fazer
-Só meta de seguidores. Nada de alerta, nada de feed, nada de chat.
-
-E antes do código, o processo, que é a parte demorada: o TikTok exige vídeo
-demonstrando cada escopo pedido, política de privacidade e termos de uso
-publicados. Os termos já existem em `zocahop.com/termos/` — falta o vídeo e
-o preenchimento. **Comece por isso**, porque a análise leva dias e o código
-são poucas horas.
-
-### Arquitetura
-Idêntica à do Kick, e é por isso que ele vem depois: OAuth com PKCE, tokens
-guardados por usuário, `contagem_plataformas` ganhando
-`'tiktok' => ['seguidores']`, e o seletor de plataforma do painel ganhando
-mais uma opção. Nenhuma estrutura nova.
+Já existe `convites_mod` com `usuario_id`, `token_hash` e permissões. Falta
+amarrar o convite à conta Twitch do moderador em vez de só ao token, pra que
+ele veja a lista ao entrar:
 
 ```sql
-ALTER TABLE usuarios
-  ADD COLUMN tt_open_id VARCHAR(64) NULL DEFAULT NULL,
-  ADD COLUMN tt_token   TEXT        NULL DEFAULT NULL,
-  ADD COLUMN tt_refresh TEXT        NULL DEFAULT NULL,
-  ADD COLUMN tt_expira  DATETIME    NULL DEFAULT NULL;
+ALTER TABLE convites_mod ADD COLUMN mod_usuario_id INT UNSIGNED NULL;
 ```
 
-### O que pode quebrar
-O token do TikTok vale 24 h e o refresh vale 365 dias — bem mais curto que o
-da Twitch. O renovador tem que rodar no caminho da leitura, igual ao do
-Spotify, e não num cron: cron que falha em silêncio deixa a meta parada sem
-ninguém saber por quê.
+Tela: lista dos canais onde ele é mod → escolhe um → player da Twitch embutido
+ao lado dos controles que a permissão dele permite. Reaproveita o embed do
+carrossel da vitrine e o `docs/painel.html`, que já tem os controles.
+
+### 5.4 Verificação de streamer na Descoberta
+
+Hoje a vitrine sorteia qualquer canal pequeno em português, com filtro de
+conteúdo adulto e lista de banidos. Falta um selo de "conferido".
+
+Mais simples do que parece: uma tabela `vitrine_aprovados(login, aprovado_em)`
+e um botão no admin. Canal aprovado ganha selo e entra num sorteio separado; o
+resto continua aparecendo sem selo. Não precisa de automação.
+
+### 5.5 Menores
+
+- `!split` pelo chat (o comando já tem estrutura; falta a ação que mexe no
+  `spcor`)
+- Guardião da live: `stream.online`/`offline` não pedem escopo nenhum
+- Link assinado pro recomendador de jogos (`link_assinar` já existe)
+- App local de música (SMTC do Windows) — resolve o Spotify sem cota
+- Steam, TikTok, histórico de seguidores
+- Suporte: formulário no site marcando quem é Pro
 
 ---
 
-## 4. Spotify — sair do modo de desenvolvimento
+## 6. Trabalhando em várias sessões
 
-### O problema, com o diagnóstico já fechado
-O app está em Development Mode. Nesse modo o Spotify atende **5 contas**,
-escritas à mão no painel deles, e devolve **403 para todas as outras**. Não é
-bug, não é token, não é vínculo: é o modo do app. Foi o que aconteceu com os
-testadores.
+O maior risco não é o código: é duas sessões mexendo no mesmo arquivo, ou uma
+sessão nova refazendo uma descoberta que já custou caro.
 
-### As duas saídas, e por que a ordem é essa
-**Curto prazo — coletar o e-mail para poder cadastrar.**
-Hoje o site não sabe o e-mail de quem conectou, então cadastrar alguém na
-lista exige perguntar por fora. Somar `user-read-email` ao `SP_ESCOPOS` em
-`api/lib/spotify.php`, ler `/v1/me` logo depois da troca do código, e guardar
-`sp_email`. O `api/admin.php` ganha uma lista com esses e-mails e um botão de
-copiar. Aí cadastrar vira colar.
+**Uma sessão por área, não por tarefa.**
 
-Isso **não** resolve o limite de 5. Resolve o atrito de usar os 5 que existem,
-e é meia hora de trabalho.
+| Área | Arquivos | Dá pra paralelizar? |
+|---|---|---|
+| Painel (`docs/index.html`) | um arquivo gigante | **não** — uma por vez |
+| Overlays (`docs/*.js`, `*.css`) | separados por tipo | sim, um tipo por sessão |
+| Backend novo (artistas, métricas) | arquivos novos em `api/` | sim |
+| Cobrança | `mercadopago.php`, `checkout.php`, webhook | uma por vez |
 
-**Médio prazo — pedir a extensão de cota.** O formulário de Quota Extension
-exige app publicado, política de privacidade e a descrição do uso. Com ele
-aprovado, o limite de 5 acaba. É o caminho de verdade; o de cima é ponte.
+`docs/index.html` é o gargalo: quase toda funcionalidade encosta nele. Duas
+sessões ali ao mesmo tempo dão conflito de merge num arquivo de 7 mil linhas,
+que é o pior lugar possível pra resolver conflito.
 
-**Vários apps não é caminho.** Distribuir os usuários entre apps do mesmo
-dono para furar o teto é exatamente o que os termos proíbem, e o custo do
-tombo é o app principal ser derrubado. Se for para gastar esforço, gaste no
-formulário.
+**Como abrir uma sessão nova:**
 
-### O que já está certo e deve continuar
-O Last.fm é o padrão para quem chega. O Spotify fica para quem precisa de
-`!pular`, `!fila` e `!like`, que o Last.fm não faz por ser só leitura. Essa
-divisão está implementada e é a decisão certa — não a desfaça quando a cota
-sair.
+1. `git pull`
+2. Peça pra ela ler `ARQUITETURA.md` e rodar `node conferir.js`
+3. Diga a ÁREA, não a lista de tarefas: "trabalhe só na parte de artistas,
+   arquivos novos em `api/` e uma tela nova em `docs/`"
+4. No fim: `node conferir.js`, `php -l` em cada PHP, commit e push
 
----
+**O que dizer sempre:** que `api/` sobe à mão, que SQL é rodado à mão, e que
+mexer em `.js`/`.css` exige subir o `?v=`.
 
-## 5. Histórico de seguidores
+**O que não precisa dizer:** os limites das plataformas — estão na seção 4.
 
-Você já tem um `seguidores.php` que guarda cada seguidor com dia, hora,
-segundo e nick. O que ele faz e o ZocaController não faz: **saber quem
-deixou de seguir**. A Twitch não expõe unfollow em lugar nenhum, e a única
-forma é comparar duas fotos da lista.
-
-O caminho é o mesmo do outro projeto seu: `seguidores-cron.php` tira a foto,
-o painel mostra a diferença. Aqui isso vira duas coisas úteis:
-
-- Um overlay "quem seguiu por último" que aguenta o boot — hoje o feed começa
-  vazio quando a fonte do OBS carrega, porque ele vive do que chega por
-  evento. Com a tabela, ele nasce cheio.
-- Um número de seguidores que não depende do EventSub ter funcionado: a
-  contagem vira `SELECT COUNT(*)`, e o webhook vira só o que acelera.
-
-Escopo necessário: `moderator:read:followers`, que a `api/lib/twitch.php` já
-pede. Nada novo para autorizar.
-
-**Cuidado:** isso é lista de pessoas, com nome e data. Fica atrás da chave do
-painel, nunca sai por `config-overlay.php`, e o overlay recebe no máximo os
-últimos nomes — nunca a lista inteira. O link do overlay é público por
-natureza e vaza com um print da tela.
+**Ordem sugerida**, do mais isolado pro mais entrelaçado: artistas →
+estatísticas → verificação → painéis de mod → guardião da live.
 
 ---
 
-## 6. Cobrança
+## 7. Antes de cobrar de alguém
 
-**Correção do que este arquivo dizia antes:** `api/checkout.php` e
-`api/webhook-mercadopago.php` não são código pronto e sem teste — são
-ESQUELETO. O checkout tem 39 linhas e a chamada à API deles está comentada;
-o webhook tem a moldura certa (assinatura, idempotência, resposta rápida) mas
-a consulta que confirma o pagamento é um TODO. Ou seja: hoje ninguém
-consegue pagar, e se conseguisse ninguém seria liberado.
+1. Rodar as migrações pendentes (023 a 031)
+2. Subir todo o `api/`
+3. `'ligado' => true`, `'modo' => 'producao'`, credenciais de produção
+4. Testar aprovado, recusado e Pix pendente
+5. Cloudflare na frente de `api.zocahop.com`
 
-O que JÁ está pronto e conferido é a verificação de assinatura
-(`mp_webhook_valido` em `api/lib/seguranca.php`) — inclusive um defeito que
-reprovaria todo pagamento legítimo: o `ts` do Mercado Pago vem em
-MILISSEGUNDOS e a janela de cinco minutos comparava com segundos.
-
-**Estado em 2026-09-09: a estrutura está escrita e desligada.**
-`api/lib/mercadopago.php`, `api/checkout.php` e
-`api/webhook-mercadopago.php` estão fechados; `sql/023-cobranca.sql` cria as
-colunas que amarram cobrança e pagamento. A chave `mercadopago.ligado` no
-config nasce **falsa**: o checkout responde 503 e nenhum botão de pagar
-existe no painel. Nada pode ser cobrado por acidente.
-
-**Pagamento avulso, não assinatura recorrente.** A recorrência do Mercado
-Pago só aceita cartão, e Pix não pode ser recorrente. Para streamer
-brasileiro pequeno, tirar o Pix da mesa é tirar metade do público. Cada
-pagamento empurra a validade 30 ou 365 dias a partir do que for maior entre
-hoje e a validade atual — quem renova adiantado não perde os dias que
-faltavam. O custo honesto: ninguém é cobrado sozinho, então quem esquece cai
-pro grátis.
-
-O que falta, e é tudo do lado de fora do código:
-
-1. **Criar o app no painel do Mercado Pago** e pegar as credenciais de
-   TESTE, mais a "Assinatura secreta" do webhook.
-2. **Rodar o `sql/023-cobranca.sql`.**
-3. **Testar de ponta a ponta em modo teste** — aprovado, recusado, Pix
-   pendente que aprova depois.
-4. **Só então** virar `ligado => true` e trocar as credenciais pelas de
-   produção. Elas são pares: access_token de teste com segredo de produção dá
-   erro de assinatura sem explicação.
-4. **Decidir o que acontece com quem não paga.** Hoje `acesso_do_usuario()`
-   dá cortesia de alguns dias e depois cai para o plano grátis, que agora tem
-   8 overlays. Quem tiver 20 no plano pago e cair para o grátis fica com 20 e
-   não pode criar mais — não perde nada. Confirme que é isso mesmo que você
-   quer, porque é o comportamento que está no código.
-
----
-
-## 6.5. Cronômetro de speedrun — FEITO
-
-Existe desde 2026-09-09: tipo de overlay `speedrun`, em `docs/spd.js` e
-`docs/spd.css`. Lista de trechos, diferença contra o recorde, trecho recorde
-em dourado e soma dos melhores, no formato que o LiveSplit consagrou.
-
-O que ficou de fora, e por quê: **tecla global não existe numa página.** O
-LiveSplit é programa de desktop e escuta a tecla com o jogo em primeiro
-plano; uma aba de navegador só recebe tecla quando ela mesma está em foco.
-Por isso os atalhos valem com o painel na frente, e quem joga em tela cheia
-depende do chat.
-
-Duas continuações possíveis, em ordem de utilidade:
-
-1. **`!split` pelo chat.** O comando já tem toda a estrutura pronta em
-   `api/comando.php` — falta a ação que mexe no `spcor` do overlay. É a que
-   resolve o caso real de quem joga em tela cheia.
-2. **Tecla global de verdade, pela ponte.** A `ponte.html` já fala
-   obs-websocket. O OBS tem tecla global para ligar e desligar fonte; a ponte
-   pode ouvir `SceneItemEnableStateChanged` de uma fonte-isca e traduzir isso
-   em split. Dá tecla global de verdade sem instalar nada, ao custo de uma
-   configuração a mais.
-
----
-
-## 7. O teste que nunca foi feito
-
-Nada disso — nem o que já está pronto — foi testado numa live de verdade.
-Overlay funcionando na aba de um navegador é evidência fraca: a fonte do OBS
-congela `setTimeout` e animação de CSS quando não está sendo pintada, e esse
-detalhe já produziu leitura falsa várias vezes durante a construção.
-
-Uma live de teste de trinta minutos, com o painel aberto de um lado e o OBS do
-outro, vale mais do que qualquer item desta lista. Sugestão de roteiro:
-
-1. Subir os arquivos e rodar os SQLs (bloco 0).
-2. Abrir os overlays no OBS **antes** de começar, e conferir que todos
-   desenham dentro de 15 s.
-3. Começar a live. Conferir a meta de seguidores mexendo sozinha.
-4. Mandar um bit e um sub de teste; ver o alerta e o feed.
-5. Pausar e despausar o subathon; conferir que o tempo não andou.
-6. Derrubar a live de propósito por dois minutos e voltar. **Hoje o
-   cronômetro vai ter queimado esses dois minutos** — é justamente o que o
-   bloco 1 conserta, e é bom ver o problema antes de consertar.
-7. Fechar o OBS e reabrir; conferir que tudo volta sozinho.
+E o que vale mais que a lista toda: **uma live de teste de trinta minutos**.
+Nada aqui foi testado ao vivo.
