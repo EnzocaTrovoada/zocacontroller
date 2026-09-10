@@ -24,6 +24,44 @@ trava('checkout', 10, 300);
 
 $mp = mp_cfg();
 
+/* OS CUPONS QUE VALEM AGORA.
+
+   Só os marcados como públicos. Cupom de parceiro fica FORA: o código dele
+   é o ativo dele, e numa lista dentro do site ninguém precisaria passar
+   pelo link — o desconto continuaria valendo e a comissão não aconteceria.
+   O parceiro teria trabalhado de graça. */
+if (isset($_GET['cupons'])) {
+    require_once __DIR__ . '/lib/cupons.php';
+
+    $lista = [];
+    try {
+        $q = db()->query(
+            "SELECT codigo, descricao, tipo, valor, vale_ate, usos, usos_max
+               FROM cupons
+              WHERE publico = 1 AND ligado = 1 AND parceiro_id IS NULL
+                AND (vale_ate IS NULL OR vale_ate > NOW())
+                AND (usos_max IS NULL OR usos < usos_max)
+              ORDER BY valor DESC LIMIT 8"
+        );
+        foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $c) {
+            $lista[] = [
+                'codigo'    => $c['codigo'],
+                'descricao' => $c['descricao'],
+                'rotulo'    => $c['tipo'] === 'percentual'
+                    ? ((int) $c['valor']) . '% de desconto'
+                    : 'R$ ' . number_format(((int) $c['valor']) / 100, 2, ',', '.') . ' de desconto',
+                'vale_ate'  => $c['vale_ate'],
+                /* Quantos ainda restam, quando há limite: "faltam 3" faz
+                   decidir agora, e é verdade. */
+                'restam'    => $c['usos_max'] === null ? null
+                    : max(0, (int) $c['usos_max'] - (int) $c['usos']),
+            ];
+        }
+    } catch (Throwable $e) { /* tabela ou coluna nova */ }
+
+    json_saida(['cupons' => $lista]);
+}
+
 /* CONFERIR UM CUPOM ANTES DE PAGAR.
 
    Existe pra que a pessoa veja o desconto na tela ANTES de sair do site.

@@ -148,17 +148,24 @@ if ($acao === 'cupom_salvar') {
     $ate      = trim((string) ($d['vale_ate'] ?? ''));
     $ate      = $ate === '' ? null : date('Y-m-d 23:59:59', strtotime($ate) ?: time());
 
+    /* Cupom de parceiro nunca entra na lista pública, mesmo que marquem
+       sem querer: é o ativo dele, e a regra tem que valer aqui e não só na
+       tela. */
+    $publico = (!empty($d['publico']) && !$parceiro) ? 1 : 0;
+
     db()->prepare(
-        'INSERT INTO cupons (codigo, descricao, tipo, valor, parceiro_id, usos_max, vale_ate, ligado)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        'INSERT INTO cupons (codigo, descricao, tipo, valor, parceiro_id, usos_max, vale_ate, ligado, publico)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE descricao = VALUES(descricao), tipo = VALUES(tipo),
               valor = VALUES(valor), parceiro_id = VALUES(parceiro_id),
-              usos_max = VALUES(usos_max), vale_ate = VALUES(vale_ate), ligado = VALUES(ligado)'
+              usos_max = VALUES(usos_max), vale_ate = VALUES(vale_ate),
+              ligado = VALUES(ligado), publico = VALUES(publico)'
     )->execute([
         $cod,
         mb_substr(trim((string) ($d['descricao'] ?? '')), 0, 120) ?: null,
         $tipo, $valor, $parceiro, $usos_max, $ate,
         empty($d['ligado']) ? 0 : 1,
+        $publico,
     ]);
     json_saida(['ok' => true, 'codigo' => $cod]);
 }
