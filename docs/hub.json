@@ -15,6 +15,41 @@
   "novidades": [
     {
       "data": "2026-09-10",
+      "titulo": "Selos",
+      "texto": "Verificado, Pro, Artista e Testador aparecem ao lado do nome, no feed e em quem é sorteado no Descobrir. Passe o mouse em cima pra ver o que cada um quer dizer."
+    },
+    {
+      "data": "2026-09-10",
+      "titulo": "Entrada nova, tema escuro e ícone novo",
+      "texto": "Uma tela de entrada com a Twitch, o site seguindo o tema claro ou escuro do seu computador, e o controle em pixel art como ícone."
+    },
+    {
+      "data": "2026-09-10",
+      "titulo": "Feed na página inicial",
+      "texto": "Conte o que está rolando na sua live, com texto e imagem. Dá pra curtir, comentar e clicar no perfil pra ir direto pro canal. A foto vem da sua Twitch, ou você escolhe outra."
+    },
+    {
+      "data": "2026-09-10",
+      "titulo": "Planos lado a lado, sem marca d'água",
+      "texto": "Os três planos em cartões, com quanto cada um economiza, e a lista dos cupons que estão valendo. Nenhum overlay tem marca d'água, em plano nenhum."
+    },
+    {
+      "data": "2026-09-10",
+      "titulo": "Artistas",
+      "texto": "Uma galeria de arte feita por gente, conferida à mão, sem IA. Desenha, pinta ou modela? Clique em \"Divulgue suas artes aqui também\"."
+    },
+    {
+      "data": "2026-09-10",
+      "titulo": "Descobrir com setas",
+      "texto": "O carrossel mostra os três canais inteiros, com setas dos lados e a troca deslizando de um pro outro."
+    },
+    {
+      "data": "2026-09-10",
+      "titulo": "Busca e \"Onde você parou\"",
+      "texto": "Uma busca na barra de cima leva direto a qualquer tela, e a página inicial lembra as últimas que você abriu."
+    },
+    {
+      "data": "2026-09-10",
       "titulo": "Cronômetro de speedrun",
       "texto": "Lista de trechos, diferença contra o seu recorde e trecho recorde em dourado, no formato que o LiveSplit consagrou."
     },
