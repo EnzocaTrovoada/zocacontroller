@@ -14,6 +14,11 @@
 
   "novidades": [
     {
+      "data": "2026-09-11",
+      "titulo": "Cores novas",
+      "texto": "O site ficou mais escuro e mais colorido, cada painel com um tom próprio, e a página inicial agora ocupa a tela toda, com as laterais acompanhando enquanto você rola o feed."
+    },
+    {
       "data": "2026-09-10",
       "titulo": "Galeria de artistas viva",
       "texto": "As artes de cada artista passam sozinhas, crescem quando você passa o mouse, e clicar no cartão leva direto pra rede social de quem fez. Quem transmite ganha um botão pra Twitch, e quem já está na galeria manda mais artes pelo próprio cartão."

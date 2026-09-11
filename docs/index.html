@@ -31,7 +31,7 @@ try {
      definida uma vez só lá dentro, senão o claro fica sem ela. */
   :root {
     color-scheme: light;
-    --fundo:#FFFFFF; --caixa:#F6F8F6; --caixa2:#EDF2EE; --linha:#DCE4DD;
+    --fundo:#FFFFFF; --caixa:#F6F8F6; --caixa2:#EDF2EE; --linha:#DCE4DD; --linha2:#C9D5CC;
     --tinta:#101A14; --fraco:#5C6C62; --apagado:#8A9990;
     --verde:#12A150; --verde-fraco:#E4F5EA; --verde-forte:#0B7A3B;
     --perigo:#C4432B;
@@ -40,22 +40,40 @@ try {
        4.5:1 que texto pequeno precisa — era o "texto apagado" do vitalicio.
        Em #8A6210 da 4.8:1, no mesmo patamar do verde. */
     --dourado:#8A6210;
+    /* O VERDE SOZINHO DEIXAVA O SITE MONOCROMATICO. Cada painel da inicial
+       ganha um tom proprio desta familia, e os tons repetem de proposito
+       nos detalhes do painel (data, numero, seta) — e isso que amarra. */
+    --violeta:#6D4AE0; --ambar:#B7791F; --ciano:#0E7490; --coral:#C2410C;
+    --vidro:rgba(255,255,255,.7);
+    --barra-fundo:rgba(255,255,255,.86);
+    --brilho:radial-gradient(900px 520px at 6% -12%, rgba(18,161,80,.07), transparent 60%),
+             radial-gradient(800px 520px at 100% -8%, rgba(109,74,224,.06), transparent 60%);
+    --barra:48px;
     --disp:"Archivo",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
     --sombra:0 1px 2px rgba(16,26,20,.06), 0 8px 24px rgba(16,26,20,.06);
   }
   :root[data-tema="escuro"] {
     color-scheme: dark;
-    --fundo:#0E1411; --caixa:#161F1A; --caixa2:#1D2822; --linha:#2A3830;
-    --tinta:#E4EDE7; --fraco:#93A69B; --apagado:#71857A;
-    --verde:#3DD47F; --verde-fraco:#14301F; --verde-forte:#69E39C;
+    --fundo:#070B09; --caixa:#0E1512; --caixa2:#141D18; --linha:#1E2A23; --linha2:#2C3B33;
+    --tinta:#E8F0EB; --fraco:#9DB0A5; --apagado:#7A8E83;
+    --verde:#3DD47F; --verde-fraco:#10261A; --verde-forte:#69E39C;
     --perigo:#E4735A;
     --dourado:#E0A82E;
+    --violeta:#A78BFA; --ambar:#F5B942; --ciano:#38BDF8; --coral:#FB7185;
+    --vidro:rgba(255,255,255,.028);
+    --barra-fundo:rgba(7,11,9,.82);
+    --brilho:radial-gradient(900px 520px at 6% -12%, rgba(61,212,127,.11), transparent 60%),
+             radial-gradient(800px 520px at 100% -8%, rgba(167,139,250,.11), transparent 60%),
+             radial-gradient(1000px 640px at 50% 112%, rgba(56,189,248,.07), transparent 60%);
     --sombra:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
   }
 
   * { box-sizing: border-box; }
+  /* O brilho fica parado enquanto a página rola: é luz de ambiente, não
+     parte do conteúdo. */
   body {
-    margin: 0; background: var(--fundo); color: var(--tinta);
+    margin: 0; color: var(--tinta);
+    background-color: var(--fundo); background-image: var(--brilho); background-attachment: fixed;
     font: 15px/1.55 var(--mono); -webkit-font-smoothing: antialiased;
   }
   a { color: var(--verde-forte); }
@@ -63,8 +81,14 @@ try {
   /* ---------- barra de cima ---------- */
   .barra {
     display: flex; align-items: stretch; gap: 0;
-    border-bottom: 1px solid var(--linha); background: var(--fundo);
+    border-bottom: 1px solid var(--linha); background: var(--barra-fundo);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
     position: sticky; top: 0; z-index: 30;
+  }
+  .barra::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; pointer-events: none;
+    background: linear-gradient(90deg, var(--verde), var(--violeta) 50%, var(--ciano));
+    opacity: .45;
   }
   .marca {
     display: flex; align-items: center; gap: 9px;
@@ -325,7 +349,7 @@ try {
      O resto do site cabe em 1080px porque é formulário e lista, que ficam
      ruins largos demais. A vitrine é o contrário: três painéis lado a lado
      em 1080px espremem tudo — foi o que deixou a primeira versão feia. */
-  body.na-vitrine .w { max-width: 1600px; }
+  body.na-vitrine .w { max-width: none; padding: 16px 16px 60px; }
 
   /* O meio leva 5 de 11 porque agora paga por três coisas, e não uma: os
      dois vizinhos ficaram grandes o bastante pra se entender que são lives,
@@ -334,25 +358,67 @@ try {
      O minmax(0,...) é o que impede uma coluna de crescer por causa de
      conteúdo comprido e comer as vizinhas. */
   .hub {
-    display: grid; gap: 18px; padding: 14px 0 40px;
+    display: grid; gap: 16px; padding: 0;
     grid-template-columns: minmax(0, 3fr) minmax(0, 5fr) minmax(0, 3fr);
     align-items: start;
   }
   @media (max-width: 1180px) { .hub { grid-template-columns: 1fr; } }
 
+  /* AS LATERAIS SÃO TRILHOS, NÃO CARTÕES SOLTOS.
+
+     Cada coluna do lado ocupa a altura da tela e acompanha enquanto o feed
+     rola; o último painel de cada uma estica até o fim e rola por dentro.
+     Soltos, os painéis terminavam no meio da página e o resto era fundo
+     vazio — a "folha em branco" com coisas coladas em cima. */
+  @media (min-width: 1181px) {
+    .hub__lateral {
+      position: sticky; top: calc(var(--barra) + 16px);
+      height: calc(100vh - var(--barra) - 32px);
+      display: flex; flex-direction: column; gap: 16px;
+      overflow-y: auto; scrollbar-width: thin;
+    }
+    .hub__lateral .hub__painel + .hub__painel { margin-top: 0; }
+    .hub__estica { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 180px; }
+    .hub__estica .hub__rolo { flex: 1 1 0; max-height: none; min-height: 0; }
+  }
+
   /* Cada coisa no seu painel, com borda própria — foi o que faltava antes:
      três listas soltas no branco não pareciam três seções, pareciam uma
      bagunça só. */
   .hub__painel {
-    border: 1px solid var(--linha); background: var(--caixa);
-    padding: 16px 18px; min-width: 0;
+    position: relative; min-width: 0; padding: 16px 18px;
+    border: 1px solid var(--linha); border-radius: 8px;
+    background: linear-gradient(180deg, var(--vidro), transparent 140px), var(--caixa);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .16);
+  }
+  .hub__painel::before {
+    content: ''; position: absolute; left: 16px; right: 16px; top: 0; height: 2px;
+    border-radius: 0 0 2px 2px; background: var(--acento, var(--verde)); opacity: .9;
   }
   .hub__painel + .hub__painel { margin-top: 16px; }
 
+  .acento-verde   { --acento: var(--verde); }
+  .acento-violeta { --acento: var(--violeta); }
+  .acento-ambar   { --acento: var(--ambar); }
+  .acento-ciano   { --acento: var(--ciano); }
+  .acento-coral   { --acento: var(--coral); }
+
   .hub h2 {
+    display: flex; align-items: center; gap: 8px;
     margin: 0 0 14px; font: 600 11px var(--mono);
-    letter-spacing: .18em; text-transform: uppercase; color: var(--fraco);
+    letter-spacing: .18em; text-transform: uppercase; color: var(--acento, var(--fraco));
   }
+  .hub h2::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%; flex: none;
+    background: var(--acento, var(--verde)); box-shadow: 0 0 10px var(--acento, var(--verde));
+  }
+
+  /* O tom do painel volta nos detalhes dele. */
+  .hub__painel .hub__nov time,
+  .hub__painel .hub__volta .seta,
+  .hub__painel .hub__topico .v,
+  .hub__painel .hub__canal .v { color: var(--acento, var(--verde-forte)); }
+  .hub__painel .hub__volta:hover .nm { color: var(--acento, var(--verde-forte)); }
 
   /* ---- esquerda: onde você parou ---- */
   .hub__voltar { display: flex; flex-direction: column; }
@@ -367,7 +433,7 @@ try {
   .hub__volta .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hub__volta .seta { color: var(--apagado); flex: none; }
 
-  .hub__pro { border-color: var(--verde); }
+
 
   /* ---- esquerda: atualizações ---- */
   .hub__rolo { max-height: 460px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
@@ -442,8 +508,9 @@ try {
   }
 
   .hub__video {
-    position: relative; width: 100%; aspect-ratio: 16/9;
+    position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 8px;
     background: #000; overflow: hidden; border: 1px solid var(--linha);
+    box-shadow: 0 16px 44px rgba(0, 0, 0, .38);
   }
   .hub__video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   .hub__video img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -850,6 +917,10 @@ try {
     transition: opacity .12s ease, transform .12s ease;
   }
   .selo-dica:hover::after, .selo-dica:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+  .selo-dica img, .selo-dica .selo-chip { transition: transform .16s ease; }
+  .selo-dica:hover img, .selo-dica:focus-visible img { transform: scale(1.35); }
+  .selo-dica:hover .selo-chip, .selo-dica:focus-visible .selo-chip { transform: scale(1.12); }
+  @media (prefers-reduced-motion: reduce) { .selo-dica img, .selo-dica .selo-chip { transition: none; } }
   .hub__nome { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 
   .selo-lista { display: flex; flex-direction: column; gap: 10px; }
@@ -2882,8 +2953,10 @@ function pintaCaminho() {
    nesta máquina, não dado da conta. */
 const guardaVisita = (hash, nome) => {
   try {
+    /* Pelo nome também: '#/overlays' e o endereço vazio são a mesma tela,
+       e apareciam duas vezes em "Onde você parou". */
     const v = JSON.parse(localStorage.getItem('zc:visitas') || '[]')
-      .filter((x) => x.hash !== hash);
+      .filter((x) => x.hash !== hash && x.nome !== nome);
     v.unshift({ hash, nome });
     localStorage.setItem('zc:visitas', JSON.stringify(v.slice(0, 6)));
   } catch (e) { /* modo anônimo: sem histórico, e tudo bem */ }
@@ -2892,7 +2965,9 @@ const guardaVisita = (hash, nome) => {
 const leVisitas = () => {
   try {
     const v = JSON.parse(localStorage.getItem('zc:visitas') || '[]');
-    return Array.isArray(v) ? v : [];
+    if (!Array.isArray(v)) return [];
+    const vistos = new Set();
+    return v.filter((x) => x && !vistos.has(x.nome) && vistos.add(x.nome));
   } catch (e) { return []; }
 };
 
@@ -3853,7 +3928,7 @@ function chipSelo(s) {
 }
 
 function blocoFeed() {
-  const cx = h('div', { cls: 'hub__painel feed' }, [h('h2', { txt: 'Feed' })]);
+  const cx = h('div', { cls: 'hub__painel feed acento-verde' }, [h('h2', { txt: 'Feed' })]);
   const lista = h('div');
 
   /* A foto vem pronta do servidor: da Twitch, ou a que a pessoa subiu. Só o
@@ -4144,7 +4219,7 @@ function telaInicio() {
   tela.appendChild(hub);
 
   /* ================= esquerda ================= */
-  const colEsq = h('div', { cls: 'hub__col' });
+  const colEsq = h('div', { cls: 'hub__col hub__lateral' });
   hub.appendChild(colEsq);
 
   /* ----- onde você parou -----
@@ -4154,7 +4229,7 @@ function telaInicio() {
      motivo de ela ter aberto a página. */
   const visitas = leVisitas();
   if (chave && visitas.length) {
-    const cxV = h('div', { cls: 'hub__painel' }, [h('h2', { txt: 'Onde você parou' })]);
+    const cxV = h('div', { cls: 'hub__painel acento-ciano' }, [h('h2', { txt: 'Onde você parou' })]);
     const listaV = h('div', { cls: 'hub__voltar' });
 
     visitas.slice(0, 5).forEach((v) => {
@@ -4180,7 +4255,7 @@ function telaInicio() {
     const btPro = h('button', { cls: 'bt principal', type: 'button', txt: 'Ver planos', style: 'width:100%' });
     btPro.onclick = () => abrePro(proEstado);
 
-    colEsq.appendChild(h('div', { cls: 'hub__painel hub__pro' }, [
+    colEsq.appendChild(h('div', { cls: 'hub__painel hub__pro acento-ambar' }, [
       h('h2', { txt: 'Seja Pro' }),
       h('p', { cls: 'd', style: 'margin:0 0 12px',
         txt: 'Overlays ilimitados, Twitch + YouTube + Kick juntos e suporte direto.' }),
@@ -4190,9 +4265,9 @@ function telaInicio() {
 
   /* ----- atualizações ----- */
   const rolo = h('div', { cls: 'hub__rolo' });
-  colEsq.appendChild(h('div', { cls: 'hub__painel' }, [h('h2', { txt: 'Atualizações' }), rolo]));
+  colEsq.appendChild(h('div', { cls: 'hub__painel acento-coral hub__estica' }, [h('h2', { txt: 'Atualizações' }), rolo]));
 
-  const secPar = h('div', { cls: 'hub__painel escondido' }, [h('h2', { txt: 'Parceiros' })]);
+  const secPar = h('div', { cls: 'hub__painel acento-ambar escondido' }, [h('h2', { txt: 'Parceiros' })]);
   colEsq.appendChild(secPar);
 
   /* ================= meio: o carrossel ================= */
@@ -4226,15 +4301,15 @@ function telaInicio() {
 
   const campoCat = h('input', { type: 'text', placeholder: 'Buscar categoria…' });
   const listaTop = h('div');
-  const listaCanais = h('div');
+  const listaCanais = h('div', { cls: 'hub__rolo' });
 
-  hub.appendChild(h('div', { cls: 'hub__col' }, [
-    h('div', { cls: 'hub__painel' }, [
+  hub.appendChild(h('div', { cls: 'hub__col hub__lateral' }, [
+    h('div', { cls: 'hub__painel acento-violeta' }, [
       h('h2', { txt: 'Em alta na Twitch' }),
       h('div', { cls: 'hub__busca' }, [selIdioma, campoCat]),
       listaTop,
     ]),
-    h('div', { cls: 'hub__painel' }, [
+    h('div', { cls: 'hub__painel acento-ciano hub__estica' }, [
       h('h2', { txt: 'Canais do filtro' }),
       listaCanais,
     ]),
