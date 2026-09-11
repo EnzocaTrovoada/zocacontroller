@@ -77,6 +77,16 @@
     border-top: 5px solid currentColor; opacity: .7;
   }
   .espaco { flex: 1; }
+
+  /* O único botão cheio da barra: pra quem chegou sem conta, é a próxima
+     coisa a fazer em qualquer tela — inclusive na de artistas, que abre
+     sem conta e não tinha porta nenhuma pra entrar. */
+  .aba.entrar {
+    margin: 9px 12px; padding: 0 16px; border: 0; border-radius: 4px;
+    background: #9146FF; color: #fff; text-decoration: none; white-space: nowrap;
+    transition: transform .14s ease-out, background .14s;
+  }
+  .aba.entrar:hover { background: #7C2EF0; color: #fff; transform: translateY(-1px); }
 /* A conta em que a tela esta. Discreta de proposito: e informacao de
    conferencia, nao de navegacao. */
 .quem { color: var(--fraco); font-size: 13px; letter-spacing: .01em; }
@@ -1078,6 +1088,10 @@
   <!-- A porta de volta pro painel. No canto direito porque é onde o olho vai
        procurar a ação, e não no meio do conteúdo da vitrine. -->
   <button class="aba" id="abaMeusOverlays" type="button" style="display:none">Meus overlays</button>
+  <!-- Pra quem ainda não entrou, em qualquer tela. <a> e não <button>
+       dentro de <a>: aninhar os dois é HTML inválido, e em alguns
+       navegadores o clique morre no botão. -->
+  <a class="aba entrar escondido" id="abaEntrar" href="https://api.zocahop.com/entrar.php">Entrar com a Twitch</a>
   <button class="lua" id="btTema" type="button" title="Trocar tema" aria-label="Trocar tema">🌙</button>
 </nav>
 
@@ -7019,6 +7033,7 @@ async function carrega() {
        Nada foi apagado nesse caso, e a tela precisa dizer isso. */
     if (e.status === 401 || e.status === 403) {
       esqueceChave();
+      el('abaEntrar').classList.remove('escondido');
       const cx = el('semChave');
       const p2 = cx.querySelector('p');
       if (p2) p2.textContent = 'Esta chave não vale mais — ela troca quando você entra de novo na Twitch. '
@@ -7066,6 +7081,7 @@ async function carrega() {
       const a = el(id);
       if (a) a.classList.add('escondido');
     });
+    el('abaEntrar').classList.remove('escondido');
     /* A galeria não pede conta: quem chega por um link de artista tem que
        cair nela, e não na vitrine. */
     if (location.hash === '#/artistas') rota(); else telaInicio();
