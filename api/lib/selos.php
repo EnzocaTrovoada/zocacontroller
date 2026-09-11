@@ -24,7 +24,7 @@ function selo_caminho(string $arquivo): string
 
 function selo_url(int $id): string
 {
-    return rtrim((string) (cfg()['api_base'] ?? ''), '/') . '/selos.php?a=img&id=' . $id;
+    return api_base() . '/selos.php?a=img&id=' . $id;
 }
 
 function selo_lista(): array

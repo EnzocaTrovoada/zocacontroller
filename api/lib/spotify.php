@@ -45,7 +45,7 @@ function sp_cfg(): array
 
 function sp_redirect(): string
 {
-    return rtrim(cfg()['api_base'] ?? 'https://api.zocahop.com', '/') . '/spotify.php';
+    return api_base() . '/spotify.php';
 }
 
 function sp_http(string $metodo, string $url, array $cabecalhos = [], $corpo = null): array

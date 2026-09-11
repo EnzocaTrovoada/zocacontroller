@@ -109,7 +109,7 @@ function feed_autor(array $u, array $selos = []): array
 {
     /* A foto que a pessoa escolheu ganha da que veio da Twitch. */
     $foto = !empty($u['foto_propria'])
-        ? rtrim((string) (cfg()['api_base'] ?? ''), '/') . '/feed.php?a=foto&login=' . rawurlencode((string) $u['login'])
+        ? api_base() . '/feed.php?a=foto&login=' . rawurlencode((string) $u['login'])
         : (string) ($u['foto'] ?: '');
 
     return [

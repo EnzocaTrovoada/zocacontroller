@@ -153,7 +153,7 @@ function mp_criar_cobranca(int $usuario_id, array $plano, string $codigo = ''): 
             'unit_price'  => $valor,
         ]],
         'external_reference' => $ref,
-        'notification_url'   => rtrim(cfg()['api_base'] ?? '', '/') . '/webhook-mercadopago.php',
+        'notification_url'   => api_base() . '/webhook-mercadopago.php',
         /* Boleto fica de fora: ele demora dias pra compensar e o streamer
            que pagou fica sem o recurso achando que o site quebrou. */
         'payment_methods' => [
@@ -319,7 +319,7 @@ function mp_diagnostico(): array
         'token_tamanho'   => strlen($tk),
         'token_forma'     => $forma,
         'tem_segredo'     => $mp['webhook_secret'] !== '',
-        'notification_url'=> rtrim(cfg()['api_base'] ?? '', '/') . '/webhook-mercadopago.php',
+        'notification_url'=> api_base() . '/webhook-mercadopago.php',
     ];
 
     /* De quem é o token. Este endereço aceita qualquer access token válido,

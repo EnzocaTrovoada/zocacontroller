@@ -171,7 +171,7 @@ if ($segredo === '') {
         ->execute([$segredo, $quem['usuario_id']]);
 }
 
-$callback = rtrim(cfg()['api_base'] ?? 'https://api.zocahop.com', '/') . '/eventsub.php';
+$callback = api_base() . '/eventsub.php';
 $feitas = [];
 $erros  = [];
 

@@ -37,12 +37,12 @@ function kick_cfg(): array
 
 function kick_redirect(): string
 {
-    return rtrim(cfg()['api_base'] ?? 'https://api.zocahop.com', '/') . '/kick.php';
+    return api_base() . '/kick.php';
 }
 
 function kick_webhook(): string
 {
-    return rtrim(cfg()['api_base'] ?? 'https://api.zocahop.com', '/') . '/kick-eventos.php';
+    return api_base() . '/kick-eventos.php';
 }
 
 function kick_http(string $metodo, string $url, array $cabecalhos = [], $corpo = null): array

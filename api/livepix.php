@@ -142,7 +142,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         // Nunca devolve o segredo do cliente. A URL sim, porque ela precisa
         // ser colada no painel do LivePix.
         'url'         => $conta
-            ? rtrim(cfg()['api_base'] ?? '', '/') . '/livepix.php?k=' . $conta['segredo_url']
+            ? api_base() . '/livepix.php?k=' . $conta['segredo_url']
             : null,
     ]);
 }
@@ -178,5 +178,5 @@ db()->prepare(
 
 json_saida([
     'ok'  => true,
-    'url' => rtrim(cfg()['api_base'] ?? '', '/') . '/livepix.php?k=' . $url_segredo,
+    'url' => api_base() . '/livepix.php?k=' . $url_segredo,
 ]);

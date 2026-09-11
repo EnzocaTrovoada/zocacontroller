@@ -101,17 +101,18 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') ===
         if ($velho !== '') @unlink(selo_caminho($velho));
     }
 
+    /* A ordem só é escrita na criação. Reescrever ao salvar zerava a ordem
+       de todo selo editado, e eles trocavam de lugar no feed. */
     if ($arquivo === null) {
         db()->prepare(
             'INSERT INTO selos (slug, nome, cor, ordem) VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE nome = VALUES(nome), cor = VALUES(cor), ordem = VALUES(ordem)'
-        )->execute([$slug, $nome, $cor, (int) ($_POST['ordem'] ?? 0)]);
+             ON DUPLICATE KEY UPDATE nome = VALUES(nome), cor = VALUES(cor)'
+        )->execute([$slug, $nome, $cor, (int) ($_POST['ordem'] ?? 99)]);
     } else {
         db()->prepare(
             'INSERT INTO selos (slug, nome, cor, arquivo, ordem) VALUES (?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE nome = VALUES(nome), cor = VALUES(cor),
-                  arquivo = VALUES(arquivo), ordem = VALUES(ordem)'
-        )->execute([$slug, $nome, $cor, $arquivo, (int) ($_POST['ordem'] ?? 0)]);
+             ON DUPLICATE KEY UPDATE nome = VALUES(nome), cor = VALUES(cor), arquivo = VALUES(arquivo)'
+        )->execute([$slug, $nome, $cor, $arquivo, (int) ($_POST['ordem'] ?? 99)]);
     }
 
     json_saida(['ok' => true, 'selos' => selo_lista()]);

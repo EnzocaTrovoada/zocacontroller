@@ -3745,9 +3745,14 @@ const naTwitch = (login) => window.open('https://twitch.tv/' + encodeURIComponen
 
    Mora fora do blocoFeed porque a tela de administração desenha os mesmos
    selos nas caixinhas de cada conta. */
+/* Endereço que chegou pela metade ("/selos.php?...") é completado com o
+   da API. Sem isto o navegador completa com o do próprio site, onde o
+   arquivo não existe, e a imagem aparece quebrada. */
+const daApi = (u) => !u ? '' : /^https?:/i.test(u) ? u : API + (u.charAt(0) === '/' ? u : '/' + u);
+
 function chipSelo(s) {
   if (s.img) {
-    const i = h('img', { cls: 'selo-img', src: s.img, alt: s.nome, loading: 'lazy' });
+    const i = h('img', { cls: 'selo-img', src: daApi(s.img), alt: s.nome, loading: 'lazy' });
     i.title = s.nome;
     return i;
   }
@@ -3763,7 +3768,7 @@ function blocoFeed() {
 
   /* A foto vem pronta do servidor: da Twitch, ou a que a pessoa subiu. Só o
      caminho relativo precisa de ajuda, caso o api_base esteja vazio. */
-  const fotoDe = (u) => !u.foto ? '' : (/^https?:/i.test(u.foto) ? u.foto : API + u.foto.replace(/^[^/]*/, ''));
+  const fotoDe = (u) => daApi(u.foto);
 
   function avatar(u, pequeno) {
     const f = h('div', { cls: 'feed__foto vai' });
@@ -6910,7 +6915,7 @@ function blocoSelos() {
 
     selos.forEach((s) => {
       const previa = h('div', { cls: 'previa' });
-      if (s.img) previa.appendChild(h('img', { src: s.img, alt: '' }));
+      if (s.img) previa.appendChild(h('img', { src: daApi(s.img), alt: '' }));
       else { previa.textContent = '—'; previa.style.color = s.cor; }
 
       const nome = h('input', { type: 'text', maxlength: '32', style: 'flex:0 0 140px' });

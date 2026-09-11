@@ -172,7 +172,7 @@ if ($perfil['tipo'] === 'feed') {
    overlay: a fonte não tem a chave do painel, e não deveria ter. */
 $som = null;
 if ($perfil['tipo'] === 'alerta' && !empty($config['asomid'])) {
-    $som = rtrim(cfg()['api_base'] ?? '', '/')
+    $som = api_base()
          . '/som.php?a=tocar&k=' . rawurlencode($chave)
          . '&id=' . (int) $config['asomid'];
 }

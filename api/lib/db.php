@@ -14,6 +14,23 @@ function cfg(): array
     return $c;
 }
 
+/**
+ * O endereço da API, com https e sem barra no fim.
+ *
+ * Vem do config; sem ele, o endereço fixo. Faltando no config, cada lugar
+ * montava um endereço pela metade ("/selos.php") e o navegador completava
+ * com o domínio do site, onde o arquivo não existe — o desenho do selo, o
+ * som do alerta e o aviso de pagamento do Mercado Pago iam pra lugar nenhum.
+ *
+ * Nunca do cabeçalho Host: ele é de quem chama, e uma resposta guardada em
+ * cache levaria o endereço inventado pra todo mundo.
+ */
+function api_base(): string
+{
+    $b = rtrim((string) (cfg()['api_base'] ?? ''), '/');
+    return $b !== '' ? $b : 'https://api.zocahop.com';
+}
+
 function db(): PDO
 {
     static $pdo = null;
