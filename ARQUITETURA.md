@@ -50,6 +50,13 @@ Trabalho pesado vai depois da resposta com `responder_e_continuar()`
 plataforma, "por que não do jeito óbvio", unidade que engana. O raciocínio
 longo vem pra este arquivo.
 
+**Texto que o admin editou no painel é guardado pelo texto original do
+código.** Reescrever em `docs/index.html` uma frase que já foi editada no
+modo de edição deixa a edição sem par, e ela some do site — continua no
+banco, mas não acha mais onde ficar. O `node conferir.js` lê as edições
+que estão no ar e falha quando isso acontece. A correção é pôr o texto
+novo apontando pro antigo em `TEXTOS_ANTIGOS`, no próprio `index.html`.
+
 ---
 
 ## 3. O que já está pronto
