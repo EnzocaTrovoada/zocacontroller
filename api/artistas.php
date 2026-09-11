@@ -29,6 +29,17 @@ const ARTE_PROC_BYTES = 16777216;
 const ARTE_PENDENTES  = 80;
 const ARTE_TOTAL      = 12;
 
+/* Só o @ não diz em que rede ele está: com a rede escolhida, o cartão
+   ganha o link do perfil, que é pra onde ele leva. */
+const ARTE_REDES = [
+    'instagram'  => 'https://www.instagram.com/%s',
+    'x'          => 'https://x.com/%s',
+    'tiktok'     => 'https://www.tiktok.com/@%s',
+    'bluesky'    => 'https://bsky.app/profile/%s',
+    'artstation' => 'https://www.artstation.com/%s',
+    'deviantart' => 'https://www.deviantart.com/%s',
+];
+
 const ARTE_TIPOS = [
     'image/jpeg' => 'jpg',
     'image/png'  => 'png',
@@ -154,8 +165,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $lista = [];
     try {
         $artistas = db()->query(
-            "SELECT id, nome, arroba, link, bio, sem_ia
-               FROM artistas WHERE estado = 'aprovado' ORDER BY criado_em DESC LIMIT 60"
+            "SELECT a.*, u.login AS conta_login
+               FROM artistas a LEFT JOIN usuarios u ON u.id = a.usuario_id
+              WHERE a.estado = 'aprovado' ORDER BY a.criado_em DESC LIMIT 60"
         )->fetchAll(PDO::FETCH_ASSOC);
 
         if ($artistas) {
@@ -183,6 +195,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
                     'link'   => $a['link'],
                     'bio'    => $a['bio'],
                     'sem_ia' => (int) $a['sem_ia'],
+                    'twitch' => ($a['twitch'] ?? '') ?: ($a['conta_login'] ?? null),
                     'obras'  => $porArtista[(int) $a['id']] ?? [],
                 ];
             }
@@ -222,8 +235,9 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !==
         require_once __DIR__ . '/lib/seguranca.php';
 
         $todos = db()->query(
-            "SELECT id, nome, arroba, link, bio, contato, estado, sem_ia, criado_em
-               FROM artistas ORDER BY estado = 'pendente' DESC, criado_em DESC LIMIT 200"
+            "SELECT a.*, u.login AS conta_login
+               FROM artistas a LEFT JOIN usuarios u ON u.id = a.usuario_id
+              ORDER BY a.estado = 'pendente' DESC, a.criado_em DESC LIMIT 200"
         )->fetchAll(PDO::FETCH_ASSOC);
 
         $obras = [];
@@ -240,6 +254,7 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !==
         foreach ($todos as &$a) {
             $a['id']     = (int) $a['id'];
             $a['sem_ia'] = (int) $a['sem_ia'];
+            $a['twitch'] = ($a['twitch'] ?? '') ?: ($a['conta_login'] ?? null);
             $a['obras']  = $obras[$a['id']] ?? [];
         }
         json_saida(['artistas' => $todos]);
@@ -271,6 +286,37 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !==
         $apagaArquivos($id);
         db()->prepare('DELETE FROM artista_obras WHERE artista_id = ?')->execute([$id]);
         db()->prepare("UPDATE artistas SET estado = 'recusado', sem_ia = 0 WHERE id = ?")->execute([$id]);
+        json_saida(['ok' => true]);
+    }
+
+    /* O link é a rede social, pra onde o cartão leva. A Twitch de quem tem
+       conta aqui amarra a inscrição à conta: é o que dá o selo no feed e o
+       "+ Adicionar artes" no cartão. */
+    if ($acao === 'editar') {
+        $link = trim((string) ($d['link'] ?? ''));
+        if ($link !== '' && !preg_match('#^https?://[^\s<>"]{4,190}$#i', $link)) {
+            json_saida(['erro' => 'O link precisa começar com http:// ou https://.'], 400);
+        }
+        $tw = strtolower(preg_replace('/[^A-Za-z0-9_]/', '', ltrim(trim((string) ($d['twitch'] ?? '')), '@')));
+        $tw = substr($tw, 0, 25);
+
+        $conta = null;
+        if ($tw !== '') {
+            $st = db()->prepare('SELECT id FROM usuarios WHERE login = ? LIMIT 1');
+            $st->execute([$tw]);
+            $conta = (int) ($st->fetchColumn() ?: 0) ?: null;
+        }
+
+        db()->prepare('UPDATE artistas SET link = ?, twitch = ?, usuario_id = COALESCE(?, usuario_id) WHERE id = ?')
+            ->execute([$link ?: null, $tw ?: null, $conta, $id]);
+
+        if ($conta) {
+            db()->prepare(
+                "INSERT IGNORE INTO usuario_selos (usuario_id, selo_id)
+                      SELECT ?, s.id FROM artistas a JOIN selos s ON s.slug = 'artista'
+                       WHERE a.id = ? AND a.estado = 'aprovado' AND a.sem_ia = 1"
+            )->execute([$conta, $id]);
+        }
         json_saida(['ok' => true]);
     }
 
@@ -360,6 +406,11 @@ if ($link !== '' && !preg_match('#^https?://[^\s<>"]{4,190}$#i', $link)) {
     json_saida(['erro' => 'O link precisa começar com http:// ou https://.'], 400);
 }
 $link = $link ?: null;
+
+$rede = (string) ($_POST['rede'] ?? '');
+if ($link === null && $arroba !== null && isset(ARTE_REDES[$rede])) {
+    $link = sprintf(ARTE_REDES[$rede], rawurlencode($arroba));
+}
 
 $bio     = mb_substr(trim((string) ($_POST['bio'] ?? '')), 0, 240) ?: null;
 $contato = mb_substr(trim((string) ($_POST['contato'] ?? '')), 0, 160) ?: null;

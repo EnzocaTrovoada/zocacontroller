@@ -1006,6 +1006,17 @@ try {
   .arte-pontos span.on { background: #fff; }
   .arte-link { font-size: 12.5px; color: var(--verde-forte); }
   .arte-mais { margin-top: 6px; align-self: flex-start; }
+  .arte-acoes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+  .arte-acoes .arte-mais { margin-top: 0; }
+  .arte-twitch {
+    display: inline-flex; align-items: center; padding: 5px 11px; cursor: pointer;
+    border: 0; border-radius: 4px; background: #9146FF; color: #fff; font: 600 12px var(--disp);
+    transition: background .14s, transform .14s;
+  }
+  .arte-twitch:hover { background: #7C2EF0; transform: translateY(-1px); }
+  /* A mãozinha no cartão inteiro, inclusive em cima do selo e da letra —
+     os dois têm cursor próprio e desmentiriam o resto do cartão. */
+  .arte-cartao.vai .selo-dica, .arte-cartao.vai .arte-capa--letra { cursor: inherit; }
   @media (prefers-reduced-motion: reduce) {
     .arte-capa, .arte-cartao { transition: none; }
     .arte-cartao:hover .arte-capa { transform: none; }
@@ -6797,7 +6808,15 @@ function cartaoArtista(a, seloArtista, eMeu) {
     corpo.appendChild(h('span', { cls: 'arte-link',
       txt: (a.arroba ? '@' + a.arroba : 'Ver o trabalho') + (url ? '  ↗' : '') }));
   }
-  if (eMeu) corpo.appendChild(botaoMaisArtes());
+  const acoes = h('div', { cls: 'arte-acoes' });
+  if (a.twitch) {
+    const tw = h('button', { cls: 'arte-twitch', type: 'button', txt: 'Twitch' });
+    tw.title = 'Abrir twitch.tv/' + a.twitch;
+    tw.onclick = (e) => { e.stopPropagation(); naTwitch(a.twitch); };
+    acoes.appendChild(tw);
+  }
+  if (eMeu) acoes.appendChild(botaoMaisArtes());
+  if (acoes.children.length) corpo.appendChild(acoes);
   cx.appendChild(corpo);
 
   if (url) {
@@ -6864,7 +6883,11 @@ function abreInscricao() {
 
   const nome    = h('input', { type: 'text', maxlength: '80',  placeholder: 'Seu nome de artista' });
   const arroba  = h('input', { type: 'text', maxlength: '64',  placeholder: '@ do seu perfil de arte' });
-  const link    = h('input', { type: 'url',  maxlength: '190', placeholder: 'https://… onde ver o seu trabalho' });
+  const rede    = h('select', { title: 'Em que rede está esse @' });
+  [['instagram', 'Instagram'], ['x', 'X (Twitter)'], ['tiktok', 'TikTok'], ['bluesky', 'Bluesky'],
+   ['artstation', 'ArtStation'], ['deviantart', 'DeviantArt'], ['', 'Outra rede']]
+    .forEach(([v, r]) => rede.appendChild(h('option', { value: v, txt: r })));
+  const link    = h('input', { type: 'url',  maxlength: '190', placeholder: 'ou o link direto do seu portfólio (opcional)' });
   const bio     = h('input', { type: 'text', maxlength: '240', placeholder: 'Uma linha sobre o que você faz' });
   const contato = h('input', { type: 'text', maxlength: '160', placeholder: 'Contato pra te responder (e-mail, @, Discord)' });
   const semIa   = h('input', { type: 'checkbox' });
@@ -6920,6 +6943,7 @@ function abreInscricao() {
     const fd = new FormData();
     fd.append('nome', nome.value);
     fd.append('arroba', arroba.value);
+    fd.append('rede', rede.value);
     fd.append('link', link.value);
     fd.append('bio', bio.value);
     fd.append('contato', contato.value);
@@ -6960,7 +6984,8 @@ function abreInscricao() {
   ]));
   caixa.appendChild(h('div', { cls: 'pop__corpo arte-form' }, [
     h('div', { cls: 'campo' }, [nome]),
-    h('div', { cls: 'campo' }, [arroba, link]),
+    h('div', { cls: 'campo' }, [arroba, rede]),
+    h('div', { cls: 'campo' }, [link]),
     h('div', { cls: 'campo' }, [contato]),
     h('div', { cls: 'campo' }, [bio]),
     zona, arq, miniaturas,
@@ -7232,6 +7257,14 @@ function blocoArtistas() {
         if (a.bio) dentro.push(h('p', { cls: 'd', txt: a.bio }));
         if (url) dentro.push(h('p', {}, [h('a', { href: url, target: '_blank',
           rel: 'noopener noreferrer nofollow', txt: url })]));
+        const eLink = h('input', { type: 'url', placeholder: 'https://… rede social', style: 'flex:1 1 220px' });
+        eLink.value = a.link || '';
+        const eTw = h('input', { type: 'text', placeholder: 'twitch (opcional)', style: 'flex:0 0 150px' });
+        eTw.value = a.twitch || '';
+        const eSalva = h('button', { cls: 'bt mini', type: 'button', txt: 'Salvar' });
+        eSalva.onclick = () => manda('editar', { link: eLink.value, twitch: eTw.value });
+        dentro.push(h('div', { cls: 'campo', style: 'gap:6px;flex-wrap:wrap' }, [eLink, eTw, eSalva]));
+
         dentro.push(tiras, acoes);
 
         corpo.appendChild(h('div', { style: 'border-top:1px solid var(--linha);padding-top:12px;margin-top:12px' }, dentro));
