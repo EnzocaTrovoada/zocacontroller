@@ -148,7 +148,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
 }
 
 /* ---------- moderação ---------- */
-if (empty($_FILES['obras'])) {
+/* Pelo cabeçalho, e não pela presença de imagens: uma inscrição só com o @
+   chega sem arquivo nenhum, e cairia aqui pedindo chave de admin. */
+if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !== 0) {
     $quem = exige_painel();
     $ad = db()->prepare('SELECT admin FROM usuarios WHERE id = ?');
     $ad->execute([(int) $quem['usuario_id']]);
@@ -266,12 +268,18 @@ if ($arroba !== null) {
 
 /* multipart com obras[] chega como colunas paralelas: cada campo do $_FILES
    é um array indexado pela posição, não uma lista de arquivos. */
-$env = $_FILES['obras'];
+$env = $_FILES['obras'] ?? [];
 $qtd = is_array($env['name'] ?? null) ? count($env['name']) : 0;
-if ($qtd < 1) json_saida(['erro' => 'Mande pelo menos uma imagem.'], 400);
-if ($qtd > ARTE_MAX) json_saida(['erro' => 'No máximo ' . ARTE_MAX . ' imagens.'], 400);
 
-if (!pasta_privada(ARTE_DIR)) {
+/* Imagem OU @: quem manda o perfil onde a arte já está publicada não
+   precisa subir nada, a conferência é feita lá. */
+if ($qtd < 1 && $arroba === null) {
+    json_saida(['erro' => 'Mande pelo menos uma imagem, ou o @ do perfil onde a sua arte está.'], 400);
+}
+if ($qtd > ARTE_MAX) json_saida(['erro' => 'No máximo ' . ARTE_MAX . ' imagens.'], 400);
+if ($contato === null) json_saida(['erro' => 'Falta um contato pra gente te responder.'], 400);
+
+if ($qtd > 0 && !pasta_privada(ARTE_DIR)) {
     json_saida(['erro' => 'Não consegui guardar as imagens aqui no servidor.'], 500);
 }
 

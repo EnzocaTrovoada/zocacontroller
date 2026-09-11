@@ -12,6 +12,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>ZocaController</title>
+<!-- O tema entra ANTES do primeiro quadro. Aplicado lá embaixo, no script
+     principal, a página piscava clara e só depois escurecia. -->
+<script>
+try {
+  var zcTema = localStorage.getItem('zc:tema');
+  if (!zcTema) zcTema = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'claro' : 'escuro';
+  document.documentElement.setAttribute('data-tema', zcTema);
+} catch (e) { document.documentElement.setAttribute('data-tema', 'escuro'); }
+</script>
 <link rel="icon" href="icone.png?v=1" type="image/png">
 <link rel="apple-touch-icon" href="icone.png?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -857,6 +866,79 @@
   .luz-cena .amostra { width: 20px; height: 20px; border-radius: 4px; border: 1px solid var(--linha); flex: none; }
   .luz-cena code { font: 600 12.5px var(--mono); }
 
+  /* ---------- entrada ---------- */
+  .entrada {
+    max-width: 460px; margin: 11vh auto 0; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .entrada h1 { margin: 10px 0 2px; font: 700 34px var(--disp); letter-spacing: -.02em; }
+  .entrada__sub { margin: 0 0 22px; color: var(--fraco); font-size: 15px; line-height: 1.55; }
+  .entrada__bt {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; max-width: 320px; padding: 14px 22px; border-radius: 6px;
+    background: #9146FF; color: #fff; text-decoration: none; font: 700 15px var(--disp);
+    box-shadow: 0 6px 18px rgba(145, 70, 255, .28);
+    transition: transform .14s ease-out, background .14s, box-shadow .14s;
+  }
+  .entrada__bt:hover { background: #7C2EF0; transform: translateY(-2px); box-shadow: 0 9px 22px rgba(145, 70, 255, .36); }
+  .entrada__bt .ic { font-size: 11px; }
+  .entrada__nota { margin: 12px 0 0; color: var(--apagado); font-size: 12.5px; }
+  .entrada__outro {
+    margin-top: 26px; border: 0; background: none; cursor: pointer;
+    color: var(--verde-forte); font: 600 13px var(--disp);
+  }
+  .entrada__outro:hover { text-decoration: underline; }
+
+  /* ---------- artistas: o convite e o popup ---------- */
+  .arte-cta {
+    display: flex; align-items: center; gap: 14px; width: 100%; margin: 0 0 18px;
+    padding: 16px 18px; text-align: left; cursor: pointer; color: var(--tinta);
+    border: 1px solid var(--verde); border-radius: 7px; background: var(--verde-fraco);
+    transition: transform .14s ease-out, box-shadow .14s;
+  }
+  .arte-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(18, 161, 80, .18); }
+  .arte-cta .ic { font-size: 22px; color: var(--verde-forte); }
+  .arte-cta b { display: block; font: 700 16px var(--disp); }
+  .arte-cta small { display: block; color: var(--fraco); font-size: 13px; margin-top: 2px; }
+  .arte-cta .seta { margin-left: auto; font-size: 20px; color: var(--verde-forte); }
+
+  .arte-form .campo input { flex: 1 1 200px; }
+  .arte-escolher {
+    display: flex; flex-direction: column; align-items: center; gap: 3px; width: 100%;
+    margin: 6px 0 10px; padding: 20px 14px; cursor: pointer; color: var(--tinta);
+    border: 1.5px dashed var(--linha2); border-radius: 7px; background: var(--fundo);
+    transition: border-color .14s, background .14s;
+  }
+  .arte-escolher:hover, .arte-escolher.sobre { border-color: var(--verde); background: var(--verde-fraco); }
+  .arte-escolher .ic { font-size: 24px; }
+  .arte-escolher b { font: 600 14px var(--disp); }
+  .arte-escolher small { color: var(--apagado); font-size: 11.5px; }
+  .arte-mini { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+  .arte-mini button {
+    width: 64px; height: 52px; padding: 0; overflow: hidden; cursor: pointer;
+    border: 1px solid var(--linha); border-radius: 4px; background: none;
+  }
+  .arte-mini button:hover { border-color: var(--perigo); opacity: .8; }
+  .arte-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .arte-decl { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; margin: 4px 0 2px; }
+  .arte-diz { margin: 9px 0 0; min-height: 1em; font-size: 13px; font-weight: 600; text-align: center; }
+  .arte-feito { text-align: center; padding: 26px 6px 10px; }
+  .arte-feito .ic {
+    display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 50%;
+    background: var(--verde-fraco); color: var(--verde-forte); font: 700 26px var(--disp);
+  }
+  .arte-capa--letra {
+    display: grid; place-items: center; font: 700 44px var(--disp);
+    color: var(--verde-forte); background: var(--verde-fraco); cursor: default;
+  }
+
+  .bt-grande {
+    width: 100%; padding: 13px 18px; font-size: 15px;
+    transition: transform .14s ease-out, background .14s, border-color .14s;
+  }
+  .bt-grande:hover:not(:disabled) { transform: translateY(-2px); }
+  .bt-grande:active:not(:disabled) { transform: translateY(0); }
+
   /* ---------- artistas ---------- */
   .arte-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
   .arte-cartao {
@@ -1131,15 +1213,33 @@ const el = (id) => document.getElementById(id);
 /* ---------------- tema ---------------- */
 /* Fica no navegador de quem usa. Se o localStorage estiver bloqueado (aba
    anônima, site sem permissão), o site abre no claro e segue funcionando. */
-function poeTema(t) {
+/* O TEMA DO SISTEMA MANDA ATÉ A PESSOA ESCOLHER.
+
+   Só a escolha feita no botão é guardada. Guardar o padrão também, como
+   era antes, congelava quem nunca clicou no tema do dia em que abriu o site
+   pela primeira vez: trocava o sistema pra escuro e o site continuava
+   claro. Sem preferência nenhuma no sistema, o escuro. */
+function temaDoSistema() {
+  try { return window.matchMedia('(prefers-color-scheme: light)').matches ? 'claro' : 'escuro'; }
+  catch (e) { return 'escuro'; }
+}
+function temaGuardado() {
+  try { return localStorage.getItem('zc:tema') || ''; } catch (e) { return ''; }
+}
+function poeTema(t, guardar) {
   document.documentElement.setAttribute('data-tema', t);
   el('btTema').textContent = t === 'escuro' ? '☀️' : '🌙';
-  try { localStorage.setItem('zc:tema', t); } catch (e) {}
+  if (guardar) try { localStorage.setItem('zc:tema', t); } catch (e) {}
 }
-try { poeTema(localStorage.getItem('zc:tema') || 'claro'); } catch (e) { poeTema('claro'); }
+poeTema(temaGuardado() || temaDoSistema(), false);
 el('btTema').onclick = () => {
-  poeTema(document.documentElement.getAttribute('data-tema') === 'escuro' ? 'claro' : 'escuro');
+  poeTema(document.documentElement.getAttribute('data-tema') === 'escuro' ? 'claro' : 'escuro', true);
 };
+try {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (!temaGuardado()) poeTema(temaDoSistema(), false);
+  });
+} catch (e) {}
 
 /* ---------------- chave do painel ---------------- */
 /* A CHAVE NUNCA FICA NA BARRA DE ENDEREÇOS: Ela chega de dois jeitos: no
@@ -1199,7 +1299,7 @@ try {
   const achada = (cru && cru[0] !== '/') ? cru : (naBusca || '');
   if (achada) {
     guardaChave(achada.trim());
-    limpaEndereco('#/overlays');
+    limpaEndereco('#/inicio');
   }
   chave = leChave();
   if (!achada) limpaEndereco();     /* tira o index.html mesmo sem chave */
@@ -6512,16 +6612,43 @@ function telaAdmin() {
   });
 }
 
+/* ---------------- entrada ---------------- */
+
+function telaEntrar() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  document.body.classList.remove('na-vitrine');
+
+  const logo = document.querySelector('#irInicio svg');
+  const marca = logo ? logo.cloneNode(true) : h('span');
+  marca.setAttribute('width', '64');
+  marca.setAttribute('height', '64');
+
+  const galeria = h('button', { cls: 'entrada__outro', type: 'button', txt: 'Conhecer os artistas' });
+  galeria.onclick = () => vaiPara('#/artistas');
+
+  tela.appendChild(h('div', { cls: 'entrada' }, [
+    marca,
+    h('h1', { txt: 'ZocaController' }),
+    h('p', { cls: 'entrada__sub', txt: 'Overlays que se atualizam sozinhos, o chat mandando no OBS e a sua live no centro de tudo.' }),
+    h('a', { cls: 'entrada__bt', href: API + '/entrar.php' }, [
+      h('span', { cls: 'ic', txt: '▶' }),
+      document.createTextNode('Entrar com a Twitch'),
+    ]),
+    h('p', { cls: 'entrada__nota', txt: 'Você entra com a sua conta da Twitch. Sem senha nova pra decorar.' }),
+    galeria,
+  ]));
+}
+
 /* ---------------- artistas ----------------
 
    A verificação é humana e o site diz isso: detector de imagem gerada erra
    dos dois lados, e errar contra um artista humano é pior do que deixar
    passar. */
 
-const ARTE_SELO = 'Quer dizer que a inscrição foi conferida na mão, uma por uma, '
-  + 'olhando o arquivo de processo que a pessoa mandou: rascunho, PSD ou gravação de tela. '
-  + 'Não é detector automático — eles erram, e errar contra quem desenhou de verdade é pior '
-  + 'do que deixar passar.';
+const ARTE_SELO = 'Quer dizer que cada inscrição foi conferida na mão, uma por uma, '
+  + 'olhando o trabalho da pessoa. Não é detector automático — eles erram, e errar contra '
+  + 'quem desenhou de verdade é pior do que deixar passar.';
 
 const urlObra = (o) => API + '/artistas.php?a=obra&id=' + o.id + (o.t ? '&t=' + encodeURIComponent(o.t) : '');
 const linkSeguro = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u : '';
@@ -6529,6 +6656,10 @@ const linkSeguro = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u
 function cartaoArtista(a) {
   const obras = (a.obras || []).filter((o) => !o.processo);
   const cx = h('div', { cls: 'arte-cartao' });
+
+  if (!obras.length) {
+    cx.appendChild(h('div', { cls: 'arte-capa arte-capa--letra', txt: (a.nome || '?').slice(0, 1).toUpperCase() }));
+  }
 
   if (obras.length) {
     const capa = h('img', { cls: 'arte-capa', loading: 'lazy', alt: a.nome, src: urlObra(obras[0]) });
@@ -6571,30 +6702,77 @@ function cartaoArtista(a) {
   return cx;
 }
 
-function formArtista() {
-  const nome    = h('input', { type: 'text', maxlength: '80',  placeholder: 'Seu nome de artista', style: 'flex:1 1 200px' });
-  const arroba  = h('input', { type: 'text', maxlength: '64',  placeholder: '@ (opcional)', style: 'flex:0 0 150px' });
-  const link    = h('input', { type: 'url',  maxlength: '190', placeholder: 'https://… onde ver o seu trabalho', style: 'flex:1 1 240px' });
-  const bio     = h('input', { type: 'text', maxlength: '240', placeholder: 'Uma linha sobre o que você faz', style: 'flex:1 1 100%' });
-  const contato = h('input', { type: 'text', maxlength: '160', placeholder: 'Contato pra te responder (e-mail, @, Discord)', style: 'flex:1 1 240px' });
+/* A inscrição num popup, aberto pelo convite na galeria.
 
-  const semIa = h('input', { type: 'checkbox' });
-  const fotos = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif', multiple: '' });
-  const proc  = h('input', { type: 'file' });
+   Imagem OU @: quem manda o perfil onde a arte já está publicada não
+   precisa subir nada, porque a conferência é feita lá mesmo. O arquivo de
+   processo (rascunho, PSD) saiu: pedia trabalho de quem ainda nem sabia se
+   ia entrar, e a conferência na mão não depende dele. */
+function abreInscricao() {
+  fechaPop();
 
-  const diz     = h('p', { cls: 'd', style: 'margin:8px 0 0' });
-  const mandar  = h('button', { cls: 'bt principal', type: 'button', txt: 'Mandar inscrição' });
+  const caixa = h('div', { cls: 'pop__caixa' });
+  const fundo = h('div', { cls: 'pop', id: 'pop' }, [caixa]);
+  fundo.onclick = (e) => { if (e.target === fundo) fechaPop(); };
+  document.addEventListener('keydown', popTecla);
+
+  const x = h('button', { cls: 'pop__x', type: 'button', txt: '×', title: 'Fechar' });
+  x.onclick = fechaPop;
+
+  const nome    = h('input', { type: 'text', maxlength: '80',  placeholder: 'Seu nome de artista' });
+  const arroba  = h('input', { type: 'text', maxlength: '64',  placeholder: '@ do seu perfil de arte' });
+  const link    = h('input', { type: 'url',  maxlength: '190', placeholder: 'https://… onde ver o seu trabalho' });
+  const bio     = h('input', { type: 'text', maxlength: '240', placeholder: 'Uma linha sobre o que você faz' });
+  const contato = h('input', { type: 'text', maxlength: '160', placeholder: 'Contato pra te responder (e-mail, @, Discord)' });
+  const semIa   = h('input', { type: 'checkbox' });
+
+  /* ----- as imagens ----- */
+  let escolhidas = [];
+  const arq = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif',
+    multiple: '', style: 'display:none' });
+  const miniaturas = h('div', { cls: 'arte-mini' });
+  const zona = h('button', { cls: 'arte-escolher', type: 'button' }, [
+    h('span', { cls: 'ic', txt: '🖼' }),
+    h('b', { txt: 'Escolher imagens' }),
+    h('small', { txt: 'ou arraste aqui · JPG, PNG, WEBP ou GIF · até 5, com 4 MB cada' }),
+  ]);
+
+  const pintaMini = () => {
+    miniaturas.innerHTML = '';
+    escolhidas.forEach((f, i) => {
+      const tira = h('button', { type: 'button', title: 'Tirar ' + f.name });
+      tira.appendChild(h('img', { src: URL.createObjectURL(f), alt: '' }));
+      tira.onclick = () => { escolhidas.splice(i, 1); pintaMini(); };
+      miniaturas.appendChild(tira);
+    });
+    zona.querySelector('b').textContent = escolhidas.length
+      ? escolhidas.length + (escolhidas.length === 1 ? ' imagem escolhida' : ' imagens escolhidas')
+      : 'Escolher imagens';
+  };
+  const soma = (lista) => {
+    Array.prototype.slice.call(lista || []).forEach((f) => {
+      if (escolhidas.length < 5 && /^image\//.test(f.type)) escolhidas.push(f);
+    });
+    pintaMini();
+  };
+  zona.onclick = () => arq.click();
+  arq.onchange = () => { soma(arq.files); arq.value = ''; };
+  zona.ondragover = (e) => { e.preventDefault(); zona.classList.add('sobre'); };
+  zona.ondragleave = () => zona.classList.remove('sobre');
+  zona.ondrop = (e) => { e.preventDefault(); zona.classList.remove('sobre'); soma(e.dataTransfer.files); };
+
+  /* ----- mandar ----- */
+  const diz = h('p', { cls: 'arte-diz' });
+  const falta = (m) => { diz.textContent = m; diz.style.color = 'var(--perigo)'; };
+  const mandar = h('button', { cls: 'bt principal bt-grande', type: 'button', txt: 'Enviar minhas artes' });
 
   mandar.onclick = async () => {
-    const fs = fotos.files ? Array.prototype.slice.call(fotos.files) : [];
-    if (!nome.value.trim()) { diz.textContent = 'Falta o seu nome.'; return; }
-    if (!fs.length) { diz.textContent = 'Escolha pelo menos uma imagem.'; return; }
-    if (fs.length > 5) { diz.textContent = 'No máximo 5 imagens.'; return; }
-    if (fs.some((f) => f.size > 4194304)) { diz.textContent = 'Cada imagem pode ter no máximo 4 MB.'; return; }
-
-    const pf = proc.files && proc.files[0];
-    if (semIa.checked && !pf) { diz.textContent = 'Pro selo, mande também o arquivo de processo.'; return; }
-    if (pf && pf.size > 16777216) { diz.textContent = 'O arquivo de processo pode ter no máximo 16 MB.'; return; }
+    if (!nome.value.trim()) return falta('Falta o seu nome de artista.');
+    if (!escolhidas.length && !arroba.value.trim()) {
+      return falta('Mande pelo menos uma imagem, ou o @ do perfil onde a sua arte está.');
+    }
+    if (escolhidas.some((f) => f.size > 4194304)) return falta('Cada imagem pode ter no máximo 4 MB.');
+    if (!contato.value.trim()) return falta('Falta um contato pra gente te responder.');
 
     const fd = new FormData();
     fd.append('nome', nome.value);
@@ -6603,47 +6781,53 @@ function formArtista() {
     fd.append('bio', bio.value);
     fd.append('contato', contato.value);
     if (semIa.checked) fd.append('sem_ia', '1');
-    fs.forEach((f) => fd.append('obras[]', f));
-    if (pf) fd.append('processo', pf);
+    escolhidas.forEach((f) => fd.append('obras[]', f));
 
     mandar.disabled = true;
-    diz.textContent = 'Mandando…';
+    mandar.textContent = 'Enviando…';
+    diz.textContent = '';
     try {
       /* Sem Content-Type na mão: o boundary do multipart é o navegador que
-         escreve. */
-      /* Com conta, a chave vai junto: é o que amarra a inscrição ao
-         perfil e faz o selo aparecer no feed depois de aprovada. */
+         escreve. Com conta, a chave vai junto — é o que amarra a inscrição
+         ao perfil e acende o selo no feed depois de aprovada. */
       const r = await fetch(API + '/artistas.php', { method: 'POST', body: fd,
         headers: chave ? { 'X-Chave': chave } : {} });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.erro || 'não deu');
-      diz.textContent = 'Inscrição recebida. A resposta vai pelo contato que você deixou.';
-      diz.style.color = 'var(--verde-forte)';
-      [nome, arroba, link, bio, contato].forEach((i) => { i.value = ''; });
-      fotos.value = ''; proc.value = ''; semIa.checked = false;
+
+      caixa.innerHTML = '';
+      caixa.appendChild(h('div', { cls: 'arte-feito' }, [
+        h('span', { cls: 'ic', txt: '✓' }),
+        h('h2', { txt: 'Recebido!' }),
+        h('p', { cls: 'sub', txt: 'Sua inscrição entrou na fila. A resposta vai pelo contato que você deixou.' }),
+        h('button', { cls: 'bt principal bt-grande', type: 'button', txt: 'Fechar' }),
+      ]));
+      caixa.querySelector('.bt-grande').onclick = fechaPop;
     } catch (e) {
-      diz.textContent = e.message;
-      diz.style.color = 'var(--perigo)';
+      falta(e.message);
+      mandar.disabled = false;
+      mandar.textContent = 'Enviar minhas artes';
     }
-    mandar.disabled = false;
   };
 
-  return h('div', { cls: 'fatia' }, [
-    h('h3', { txt: 'Quero aparecer aqui' }),
-    h('p', { cls: 'd', txt: 'Até 5 imagens. Nada entra no site antes de alguém olhar.' }),
-    h('div', { cls: 'campo' }, [nome, arroba]),
-    h('div', { cls: 'campo' }, [link, contato]),
+  caixa.appendChild(h('div', { cls: 'pop__topo' }, [
+    x,
+    h('h2', { txt: 'Divulgue suas artes' }),
+    h('p', { cls: 'sub', txt: 'Mande as imagens ou o @ onde elas estão. Nada entra no site antes de alguém olhar.' }),
+  ]));
+  caixa.appendChild(h('div', { cls: 'pop__corpo arte-form' }, [
+    h('div', { cls: 'campo' }, [nome]),
+    h('div', { cls: 'campo' }, [arroba, link]),
+    h('div', { cls: 'campo' }, [contato]),
     h('div', { cls: 'campo' }, [bio]),
-    h('div', { cls: 'campo' }, [h('label', { txt: 'Imagens' }), fotos]),
-    h('label', { style: 'display:flex;align-items:flex-start;gap:8px;font-size:13px;margin:10px 0 4px' },
-      [semIa, document.createTextNode('Isto é arte minha, feita à mão, sem imagem gerada por IA.')]),
-    h('div', { cls: 'campo' }, [
-      h('label', { txt: 'Processo' }), proc,
-      h('span', { cls: 'd', style: 'font-size:11.5px', txt: 'rascunho, PSD ou gravação de tela — só quem modera vê' }),
-    ]),
-    h('div', { cls: 'campo' }, [mandar]),
-    diz,
-  ]);
+    zona, arq, miniaturas,
+    h('label', { cls: 'arte-decl' },
+      [semIa, document.createTextNode('É arte minha, feita à mão, sem imagem gerada por IA.')]),
+  ]));
+  caixa.appendChild(h('div', { cls: 'pop__acao' }, [mandar, diz]));
+
+  document.body.appendChild(fundo);
+  nome.focus();
 }
 
 function telaArtistas() {
@@ -6657,9 +6841,17 @@ function telaArtistas() {
     h('p', { cls: 'd', txt: ARTE_SELO }),
   ]));
 
+  const convite = h('button', { cls: 'arte-cta', type: 'button' }, [
+    h('span', { cls: 'ic', txt: '✦' }),
+    h('span', {}, [h('b', { txt: 'Divulgue suas artes aqui também' }),
+      h('small', { txt: 'Desenha, pinta, modela? Mande o seu trabalho.' })]),
+    h('span', { cls: 'seta', txt: '→' }),
+  ]);
+  convite.onclick = abreInscricao;
+  tela.appendChild(convite);
+
   const grade = h('div', { cls: 'arte-grade' });
   tela.appendChild(grade);
-  tela.appendChild(formArtista());
 
   fetch(API + '/artistas.php').then((r) => r.json()).then((d) => {
     const as = d.artistas || [];
@@ -6836,8 +7028,6 @@ function blocoArtistas() {
           const vp = h('button', { cls: 'bt mini', type: 'button', txt: 'Abrir o processo' });
           vp.onclick = () => window.open(urlObra(processo), '_blank', 'noopener');
           acoes.appendChild(vp);
-        } else {
-          acoes.appendChild(h('span', { cls: 'd', style: 'font-size:11.5px', txt: 'sem processo' }));
         }
 
         if (a.estado !== 'aprovado' || !a.sem_ia) {
@@ -6950,13 +7140,23 @@ function rota() {
   pintaCaminho();
 
   const info = nomeDaTela(location.hash);
-  if (info) guardaVisita(location.hash, info[2] || info[1]);
+  if (info && chave) guardaVisita(location.hash, info[2] || info[1]);
   /* Tela nova, textos novos: sem remarcar, o modo de edição continuaria
      ligado mas sem nada pra clicar. */
   if (typeof modoEdicao !== 'undefined' && modoEdicao) setTimeout(marcaEditaveis, 60);
   const btVolta = el('abaMeusOverlays');
   if (btVolta) btVolta.style.display = 'none';
   const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/');
+
+  /* Sem conta, tudo leva pra entrada — menos a galeria, que um artista
+     abre por um link de divulgação e não precisa de conta pra ver. O botão
+     de entrar da barra só aparece na galeria: na tela de entrada ele seria
+     o mesmo botão duas vezes. */
+  if (!chave) {
+    el('abaEntrar').classList.toggle('escondido', p[0] !== 'artistas');
+    if (p[0] !== 'artistas') return telaEntrar();
+  }
+
   if (p[0] === 'inicio') return telaInicio();
   if (p[0] === 'meu') return telaControlador();
   if (p[0] === 'comandos') return telaComandos();
@@ -7081,10 +7281,7 @@ async function carrega() {
       const a = el(id);
       if (a) a.classList.add('escondido');
     });
-    el('abaEntrar').classList.remove('escondido');
-    /* A galeria não pede conta: quem chega por um link de artista tem que
-       cair nela, e não na vitrine. */
-    if (location.hash === '#/artistas') rota(); else telaInicio();
+    rota();
     return;
   }
 
