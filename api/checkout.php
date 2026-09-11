@@ -26,10 +26,9 @@ $mp = mp_cfg();
 
 /* OS CUPONS QUE VALEM AGORA.
 
-   Só os marcados como públicos. Cupom de parceiro fica FORA: o código dele
-   é o ativo dele, e numa lista dentro do site ninguém precisaria passar
-   pelo link — o desconto continuaria valendo e a comissão não aconteceria.
-   O parceiro teria trabalhado de graça. */
+   Só os marcados como públicos na administração, cupom a cupom. O cupom
+   de desconto maior, feito pra alguém específico, fica escondido e só vale
+   pra quem tem o código. */
 if (isset($_GET['cupons'])) {
     require_once __DIR__ . '/lib/cupons.php';
 
@@ -39,7 +38,7 @@ if (isset($_GET['cupons'])) {
         $q = db()->query(
             "SELECT codigo, descricao, tipo, valor, vale_ate, usos, usos_max
                FROM cupons
-              WHERE publico = 1 AND ligado = 1 AND parceiro_id IS NULL
+              WHERE publico = 1 AND ligado = 1
                 AND (vale_ate IS NULL OR vale_ate > NOW())
                 AND (usos_max IS NULL OR usos < usos_max)
               ORDER BY valor DESC LIMIT 8"

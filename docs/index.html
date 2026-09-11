@@ -920,6 +920,11 @@ try {
   .selo-dica img, .selo-dica .selo-chip { transition: transform .16s ease; }
   .selo-dica:hover img, .selo-dica:focus-visible img { transform: scale(1.35); }
   .selo-dica:hover .selo-chip, .selo-dica:focus-visible .selo-chip { transform: scale(1.12); }
+  /* Passar pelo post já acorda os selos dele; em cima do selo, ele cresce mais. */
+  .feed__post:hover .selo-dica img { transform: scale(1.18); }
+  .feed__post:hover .selo-dica .selo-chip { transform: scale(1.05); }
+  .feed__post .selo-dica:hover img { transform: scale(1.35); }
+  .feed__post .selo-dica:hover .selo-chip { transform: scale(1.12); }
   @media (prefers-reduced-motion: reduce) { .selo-dica img, .selo-dica .selo-chip { transition: none; } }
   .hub__nome { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 
@@ -6518,6 +6523,7 @@ function blocoParceiros() {
           h('span', { style: 'flex:0 0 90px;font-size:12.5px;color:'
             + (estado === 'valendo' ? 'var(--verde-forte)' : 'var(--apagado)'), txt: estado }),
           naLista(cu),
+          editar(cu),
           apagar,
         ]));
       });
@@ -6530,9 +6536,6 @@ function blocoParceiros() {
          dez cupons e continuar vendo "nenhum cupom aberto agora" sem
          nenhuma pista do motivo. */
       function naLista(cu) {
-        if (cu.parceiro) return h('span', { cls: 'd', style: 'flex:0 0 110px;font-size:11.5px',
-          txt: 'de parceiro' });
-
         const b = h('button', { cls: 'bt mini', type: 'button', style: 'flex:0 0 110px' });
         const pinta2 = () => {
           b.textContent = Number(cu.publico) ? 'na lista' : 'escondido';
@@ -6540,8 +6543,12 @@ function blocoParceiros() {
         };
         b.title = 'Mostrar ou esconder este cupom de quem está comprando';
         b.onclick = async () => {
+          const liga = !Number(cu.publico);
+          if (liga && cu.parceiro && !confirm('Este cupom é do parceiro ' + cu.parceiro
+            + '. Na lista, quem pegar daqui gera comissão pra ele mesmo sem ter vindo pelo link dele. '
+            + 'Mostrar mesmo assim?')) return;
           try {
-            cu.publico = Number(cu.publico) ? 0 : 1;
+            cu.publico = liga ? 1 : 0;
             pinta2();
             await api('/admin.php', { method: 'POST', body: JSON.stringify({
               acao: 'cupom_publico', codigo: cu.codigo, publico: !!Number(cu.publico) }) });
@@ -6561,33 +6568,78 @@ function blocoParceiros() {
       parceiros.forEach((pa) => cParc.appendChild(h('option', { value: String(pa.id), txt: pa.nome })));
       const cUsos = h('input', { type: 'number', min: '1', placeholder: 'usos', style: 'flex:0 0 80px' });
       const cAte = h('input', { type: 'date', style: 'flex:0 0 140px' });
+      const cDesc = h('input', { type: 'text', maxlength: '120', style: 'flex:1 1 220px',
+        placeholder: 'descrição (aparece pra quem compra)' });
       const cPub = h('input', { type: 'checkbox' });
+      const cLig = h('input', { type: 'checkbox' });
+      cLig.checked = true;
       const cAdd = h('button', { cls: 'bt mini', type: 'button', txt: '+ Cupom' });
+      const cCancela = h('button', { cls: 'bt mini fraco', type: 'button', txt: 'cancelar', style: 'display:none' });
+
+      /* EDITAR É SALVAR DE NOVO COM O MESMO CÓDIGO.
+
+         O código é a chave do cupom: o servidor atualiza o que já existe e
+         mantém quantas vezes ele foi usado. Por isso o código trava durante
+         a edição — mudá-lo criaria um cupom novo e deixaria o velho lá. */
+      const limpaForm = () => {
+        cCod.readOnly = false;
+        cCod.value = ''; cVal.value = ''; cUsos.value = ''; cAte.value = ''; cDesc.value = '';
+        cParc.value = ''; cTipo.value = 'percentual'; cPub.checked = false; cLig.checked = true;
+        cAdd.textContent = '+ Cupom';
+        cCancela.style.display = 'none';
+      };
+      cCancela.onclick = limpaForm;
+
+      function editar(cu) {
+        const b = h('button', { cls: 'bt mini', type: 'button', txt: 'editar' });
+        b.onclick = () => {
+          cCod.value = cu.codigo;
+          cCod.readOnly = true;
+          cTipo.value = cu.tipo;
+          cVal.value = cu.tipo === 'percentual' ? String(cu.valor)
+            : (Number(cu.valor) / 100).toFixed(2).replace('.', ',');
+          cParc.value = cu.parceiro_id ? String(cu.parceiro_id) : '';
+          cUsos.value = cu.usos_max === null ? '' : String(cu.usos_max);
+          cAte.value = cu.vale_ate ? String(cu.vale_ate).slice(0, 10) : '';
+          cDesc.value = cu.descricao || '';
+          cPub.checked = !!Number(cu.publico);
+          cLig.checked = !!Number(cu.ligado);
+          cAdd.textContent = 'Salvar ' + cu.codigo;
+          cCancela.style.display = '';
+          cCod.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        };
+        return b;
+      }
 
       cAdd.onclick = async () => {
         if (!cCod.value.trim()) return recado('O cupom precisa de código.', 'ruim');
+        if (cPub.checked && cParc.value && !confirm('Cupom de parceiro na lista: quem pegar daqui gera '
+          + 'comissão pro parceiro mesmo sem ter vindo pelo link dele. Continuar?')) return;
         try {
           await api('/admin.php', { method: 'POST', body: JSON.stringify({
             acao: 'cupom_salvar', codigo: cCod.value, tipo: cTipo.value, valor: cVal.value,
-            parceiro_id: cParc.value ? parseInt(cParc.value, 10) : 0,
-            usos_max: cUsos.value, vale_ate: cAte.value, ligado: true,
+            descricao: cDesc.value, parceiro_id: cParc.value ? parseInt(cParc.value, 10) : 0,
+            usos_max: cUsos.value, vale_ate: cAte.value, ligado: cLig.checked,
             publico: cPub.checked }) });
-          cCod.value = ''; cVal.value = ''; cUsos.value = ''; cAte.value = '';
+          limpaForm();
           carrega();
         } catch (e) { recado(e.message, 'ruim'); }
       };
 
       corpo.appendChild(h('div', { cls: 'campo', style: 'gap:8px;flex-wrap:wrap;margin-top:10px' }, [
-        cCod, cTipo, cVal, cParc, cUsos, cAte,
+        cCod, cTipo, cVal, cParc, cUsos, cAte, cDesc,
         h('label', { style: 'display:flex;align-items:center;gap:5px;font-size:12px' },
           [cPub, document.createTextNode('aparece na lista')]),
-        cAdd,
+        h('label', { style: 'display:flex;align-items:center;gap:5px;font-size:12px' },
+          [cLig, document.createTextNode('ligado')]),
+        cAdd, cCancela,
       ]));
       corpo.appendChild(h('p', { cls: 'd', style: 'margin-top:6px',
         txt: 'No percentual escreva o número (20 = 20%). No de valor, escreva em reais (5,00). '
            + 'Usos e data em branco: sem limite e sem vencimento. '
-           + '"Aparece na lista" mostra o cupom pra quem está comprando — cupom de parceiro nunca entra, '
-           + 'porque aí ninguém precisaria passar pelo link dele.' }));
+           + '"Aparece na lista" mostra o cupom pra quem está comprando; o de desconto maior, feito '
+           + 'pra alguém específico, deixe escondido. Cupom de parceiro também pode ir pra lista, mas '
+           + 'aí quem pegar de lá gera comissão pra ele.' }));
 
     }).catch((e) => {
       corpo.innerHTML = '';

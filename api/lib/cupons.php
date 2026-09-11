@@ -159,8 +159,7 @@ function cupons_motivo(?string $falhou): string
     try {
         $r = db()->query(
             "SELECT COUNT(*) AS total,
-                    COALESCE(SUM(ligado = 1 AND parceiro_id IS NULL AND publico = 0), 0) AS escondidos,
-                    COALESCE(SUM(parceiro_id IS NOT NULL), 0) AS parceiro,
+                    COALESCE(SUM(ligado = 1 AND publico = 0), 0) AS escondidos,
                     COALESCE(SUM(ligado = 0), 0) AS desligados,
                     COALESCE(SUM(vale_ate IS NOT NULL AND vale_ate <= NOW()), 0) AS vencidos,
                     COALESCE(SUM(usos_max IS NOT NULL AND usos >= usos_max), 0) AS esgotados
@@ -175,7 +174,6 @@ function cupons_motivo(?string $falhou): string
     $partes = [];
     foreach ([
         'escondidos' => 'escondidos: clique em "escondido" na lista de cupons da Administração pra pôr na lista',
-        'parceiro'   => 'de parceiro, que nunca entram na lista',
         'desligados' => 'desligados',
         'vencidos'   => 'vencidos',
         'esgotados'  => 'esgotados',

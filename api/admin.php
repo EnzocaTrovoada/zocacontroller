@@ -155,10 +155,10 @@ if ($acao === 'cupom_salvar') {
     $ate      = trim((string) ($d['vale_ate'] ?? ''));
     $ate      = $ate === '' ? null : date('Y-m-d 23:59:59', strtotime($ate) ?: time());
 
-    /* Cupom de parceiro nunca entra na lista pública, mesmo que marquem
-       sem querer: é o ativo dele, e a regra tem que valer aqui e não só na
-       tela. */
-    $publico = (!empty($d['publico']) && !$parceiro) ? 1 : 0;
+    /* Público é escolha de quem administra, cupom a cupom — o de parceiro
+       também: quem pegar da lista gera comissão pra ele, e a tela avisa
+       isso antes de mostrar. */
+    $publico = empty($d['publico']) ? 0 : 1;
 
     db()->prepare(
         'INSERT INTO cupons (codigo, descricao, tipo, valor, parceiro_id, usos_max, vale_ate, ligado, publico)
@@ -188,10 +188,7 @@ if ($acao === 'cupom_publico') {
     $cod = strtoupper(preg_replace('/[^A-Z0-9_-]/i', '', (string) ($d['codigo'] ?? '')));
     if ($cod === '') json_saida(['erro' => 'Falta o código.'], 400);
 
-    /* Cupom de parceiro nunca entra: o código dele é o ativo dele, e numa
-       lista dentro do site ninguém passaria pelo link — o desconto valeria
-       e a comissão não aconteceria. */
-    db()->prepare('UPDATE cupons SET publico = ? WHERE codigo = ? AND parceiro_id IS NULL')
+    db()->prepare('UPDATE cupons SET publico = ? WHERE codigo = ?')
         ->execute([empty($d['publico']) ? 0 : 1, $cod]);
     json_saida(['ok' => true]);
 }
