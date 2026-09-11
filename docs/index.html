@@ -21,8 +21,8 @@ try {
   document.documentElement.setAttribute('data-tema', zcTema);
 } catch (e) { document.documentElement.setAttribute('data-tema', 'escuro'); }
 </script>
-<link rel="icon" href="icone.png?v=1" type="image/png">
-<link rel="apple-touch-icon" href="icone.png?v=1">
+<link rel="icon" href="icone.png?v=2" type="image/png">
+<link rel="apple-touch-icon" href="icone-192.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -689,38 +689,47 @@ try {
 
   @keyframes arco { to { background-position: 200% 0; } }
 
-  /* O arco aparece DUAS vezes na imagem, que tem o dobro da largura: a
+  /* O VITALÍCIO É O ARCO INTEIRO: borda, etiqueta e todas as letras.
+
+     O arco aparece DUAS vezes na imagem, que tem o dobro da largura: a
      janela visível mostra um arco inteiro, e não um pedaço. Com uma vez só,
-     o preço ficava laranja e a "onda" era só ele mudando de tom. */
-  .pcard.vital .pcard__preco, .pcard.vital .pcard__tag {
-    background-image: linear-gradient(90deg,
+     o preço ficava laranja e a "onda" era só ele mudando de tom.
+
+     A borda é o mesmo arco em duas camadas de fundo: a de dentro tapa o
+     miolo com a cor da caixa, e a de fora só sobra nos 3px da borda. O
+     padding desconta os 2px a mais, pro texto alinhar com os vizinhos. */
+  .pcard.vital {
+    --arco: linear-gradient(90deg,
       #E23B2E, #E07A1F, #C9A227, #2C9E4B, #1E9BA8, #3B6FD4, #8B45C6,
       #E23B2E, #E07A1F, #C9A227, #2C9E4B, #1E9BA8, #3B6FD4, #8B45C6, #E23B2E);
-    background-size: 200% 100%;
-    animation: arco 6s linear infinite;
+    padding: 15px 14px 14px;
   }
-  .pcard.vital .pcard__preco {
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  .pcard.vital .pcard__tag { color: #fff; }
-  .pcard.vital .pcard__comp { color: var(--fraco); }
-
-  /* Escolhido: a borda vira o arco. Duas camadas de fundo — a de dentro
-     tapa o miolo com a cor da caixa e a de fora só sobra na borda. */
-  .pcard.vital.on {
-    border-color: transparent; box-shadow: none;
-    background-image:
-      linear-gradient(var(--caixa2), var(--caixa2)),
-      linear-gradient(90deg,
-        #E23B2E, #E07A1F, #C9A227, #2C9E4B, #1E9BA8, #3B6FD4, #8B45C6,
-        #E23B2E, #E07A1F, #C9A227, #2C9E4B, #1E9BA8, #3B6FD4, #8B45C6, #E23B2E);
+  .pcard.vital, .pcard.vital:hover, .pcard.vital.on {
+    border: 3px solid transparent;
+    background-image: linear-gradient(var(--caixa), var(--caixa)), var(--arco);
     background-origin: border-box;
     background-clip: padding-box, border-box;
     background-size: auto, 200% 100%;
     animation: arco 6s linear infinite;
   }
+  .pcard.vital.on {
+    background-image: linear-gradient(var(--caixa2), var(--caixa2)), var(--arco);
+    box-shadow: 0 8px 24px rgba(139, 69, 198, .30);
+  }
+  .pcard.vital .pcard__nome, .pcard.vital .pcard__preco,
+  .pcard.vital .pcard__periodo, .pcard.vital .pcard__comp {
+    background-image: var(--arco); background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: arco 6s linear infinite;
+  }
+  .pcard.vital .pcard__periodo { font-weight: 600; }
+  .pcard.vital .pcard__tag {
+    background-image: var(--arco); background-size: 200% 100%;
+    color: #fff; animation: arco 6s linear infinite;
+  }
   @media (prefers-reduced-motion: reduce) {
-    .pcard.vital .pcard__preco, .pcard.vital .pcard__tag, .pcard.vital.on { animation: none; }
+    .pcard.vital, .pcard.vital .pcard__nome, .pcard.vital .pcard__preco,
+    .pcard.vital .pcard__periodo, .pcard.vital .pcard__comp, .pcard.vital .pcard__tag { animation: none; }
   }
 
   /* Sobe um fio ao passar o mouse, igual aos cartões. */
@@ -830,6 +839,18 @@ try {
   .selo-chip img { width: 14px; height: 14px; object-fit: contain; display: block; }
   /* Só desenho, sem etiqueta: quando o selo tem imagem, ela fala sozinha. */
   .selo-img { width: 16px; height: 16px; object-fit: contain; display: block; }
+
+  .selo { position: relative; display: inline-flex; align-items: center; outline: 0; cursor: default; }
+  .selo::after {
+    content: attr(data-dica); position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 20;
+    width: max-content; max-width: 240px; padding: 6px 9px; border-radius: 5px;
+    background: #101412; color: #F2F5F3; box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+    font: 500 12px/1.4 var(--disp); letter-spacing: normal; text-transform: none; text-align: center;
+    opacity: 0; transform: translate(-50%, 4px); pointer-events: none;
+    transition: opacity .12s ease, transform .12s ease;
+  }
+  .selo:hover::after, .selo:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+  .hub__nome { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 
   .selo-lista { display: flex; flex-direction: column; gap: 10px; }
   .selo-linha { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -3750,16 +3771,22 @@ const naTwitch = (login) => window.open('https://twitch.tv/' + encodeURIComponen
    arquivo não existe, e a imagem aparece quebrada. */
 const daApi = (u) => !u ? '' : /^https?:/i.test(u) ? u : API + (u.charAt(0) === '/' ? u : '/' + u);
 
+/* A dica é desenhada pelo CSS, e não pelo title: o do navegador demora um
+   segundo pra aparecer, e no celular não aparece nunca. O tabindex é o que
+   deixa um toque mostrar a dica também. */
 function chipSelo(s) {
+  const dica = s.dica ? s.nome + ' · ' + s.dica : s.nome;
+  const cx = h('span', { cls: 'selo', tabindex: '0', 'data-dica': dica, 'aria-label': dica });
+
   if (s.img) {
-    const i = h('img', { cls: 'selo-img', src: daApi(s.img), alt: s.nome, loading: 'lazy' });
-    i.title = s.nome;
-    return i;
+    cx.appendChild(h('img', { cls: 'selo-img', src: daApi(s.img), alt: '', loading: 'lazy' }));
+  } else {
+    const c = h('span', { cls: 'selo-chip', txt: s.nome });
+    c.style.color = s.cor;
+    c.style.background = s.cor + '22';
+    cx.appendChild(c);
   }
-  const c = h('span', { cls: 'selo-chip', txt: s.nome });
-  c.style.color = s.cor;
-  c.style.background = s.cor + '22';
-  return c;
+  return cx;
 }
 
 function blocoFeed() {
@@ -4206,7 +4233,9 @@ function telaInicio() {
     const [selCls, selTxt] = HUB_SELOS[c.origem || c.fatia] || ['', ''];
     const info = infoBox;
     info.appendChild(h('span', { cls: 'hub__selo ' + selCls, txt: selTxt }));
-    info.appendChild(h('b', { txt: c.nome || c.login }));
+    const nomeLinha = h('div', { cls: 'hub__nome' }, [h('b', { txt: c.nome || c.login })]);
+    (c.selos || []).forEach((s) => nomeLinha.appendChild(chipSelo(s)));
+    info.appendChild(nomeLinha);
     info.appendChild(h('span', { cls: 'tit', txt: c.titulo || '' }));
 
     const meta = h('span', { cls: 'meta' });
@@ -6896,11 +6925,12 @@ function blocoSelos() {
 
   const manda = (corpo) => api('/selos.php', { method: 'POST', body: JSON.stringify(corpo) });
 
-  const subir = (slug, nome, cor, arquivo) => {
+  const subir = (slug, nome, cor, arquivo, dica) => {
     const fd = new FormData();
     fd.append('slug', slug);
     fd.append('nome', nome);
     fd.append('cor', cor);
+    fd.append('descricao', dica || '');
     if (arquivo) fd.append('img', arquivo);
     return fetch(API + '/selos.php', { method: 'POST', headers: { 'X-Chave': chave }, body: fd })
       .then(async (r) => {
@@ -6922,6 +6952,9 @@ function blocoSelos() {
       nome.value = s.nome;
       const cor = h('input', { type: 'color', style: 'flex:0 0 46px;padding:2px' });
       cor.value = s.cor;
+      const dica = h('input', { type: 'text', maxlength: '120', style: 'flex:1 1 220px',
+        placeholder: 'o que aparece ao passar o mouse' });
+      dica.value = s.dica || '';
 
       const arq = h('input', { type: 'file', accept: 'image/png,image/webp,image/gif,image/svg+xml',
         style: 'display:none' });
@@ -6932,13 +6965,13 @@ function blocoSelos() {
         arq.value = '';
         if (!f) return;
         if (f.size > 262144) return recado('O desenho pode ter no máximo 256 KB.', 'ruim');
-        try { const r = await subir(s.slug, nome.value, cor.value, f); pinta(r.selos || []); }
+        try { const r = await subir(s.slug, nome.value, cor.value, f, dica.value); pinta(r.selos || []); }
         catch (e) { recado(e.message, 'ruim'); }
       };
 
       const salvar = h('button', { cls: 'bt mini', type: 'button', txt: 'Salvar' });
       salvar.onclick = async () => {
-        try { const r = await subir(s.slug, nome.value, cor.value, null); pinta(r.selos || []); }
+        try { const r = await subir(s.slug, nome.value, cor.value, null, dica.value); pinta(r.selos || []); }
         catch (e) { recado(e.message, 'ruim'); }
       };
 
@@ -6959,7 +6992,7 @@ function blocoSelos() {
       lista.appendChild(h('div', { cls: 'selo-linha' }, [
         previa,
         h('code', { style: 'flex:0 0 90px;font-size:12px', txt: s.slug }),
-        nome, cor, desenho, arq, semDesenho, salvar, apagar,
+        nome, cor, dica, desenho, arq, semDesenho, salvar, apagar,
       ]));
     });
 

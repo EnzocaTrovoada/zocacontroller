@@ -66,6 +66,7 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') ===
     if ($slug === '') json_saida(['erro' => 'O selo precisa de um apelido curto (só letras).'], 400);
 
     $nome = mb_substr(trim((string) ($_POST['nome'] ?? '')), 0, 32) ?: $slug;
+    $dica = mb_substr(trim((string) ($_POST['descricao'] ?? '')), 0, 120) ?: null;
     $cor  = strtoupper(trim((string) ($_POST['cor'] ?? '')));
     if (!preg_match('/^#[0-9A-F]{6}$/', $cor)) $cor = '#12A150';
 
@@ -105,14 +106,15 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') ===
        de todo selo editado, e eles trocavam de lugar no feed. */
     if ($arquivo === null) {
         db()->prepare(
-            'INSERT INTO selos (slug, nome, cor, ordem) VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE nome = VALUES(nome), cor = VALUES(cor)'
-        )->execute([$slug, $nome, $cor, (int) ($_POST['ordem'] ?? 99)]);
+            'INSERT INTO selos (slug, nome, cor, descricao, ordem) VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE nome = VALUES(nome), cor = VALUES(cor), descricao = VALUES(descricao)'
+        )->execute([$slug, $nome, $cor, $dica, (int) ($_POST['ordem'] ?? 99)]);
     } else {
         db()->prepare(
-            'INSERT INTO selos (slug, nome, cor, arquivo, ordem) VALUES (?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE nome = VALUES(nome), cor = VALUES(cor), arquivo = VALUES(arquivo)'
-        )->execute([$slug, $nome, $cor, $arquivo, (int) ($_POST['ordem'] ?? 99)]);
+            'INSERT INTO selos (slug, nome, cor, descricao, arquivo, ordem) VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE nome = VALUES(nome), cor = VALUES(cor),
+                  descricao = VALUES(descricao), arquivo = VALUES(arquivo)'
+        )->execute([$slug, $nome, $cor, $dica, $arquivo, (int) ($_POST['ordem'] ?? 99)]);
     }
 
     json_saida(['ok' => true, 'selos' => selo_lista()]);

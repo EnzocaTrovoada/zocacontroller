@@ -30,7 +30,9 @@ function selo_url(int $id): string
 function selo_lista(): array
 {
     try {
-        $st = db()->query('SELECT id, slug, nome, cor, arquivo, ordem, ligado FROM selos ORDER BY ordem, id');
+        /* SELECT * e não a lista de colunas: a descrição chegou depois, e
+           assim quem ainda não rodou o SQL dela continua vendo os selos. */
+        $st = db()->query('SELECT * FROM selos ORDER BY ordem, id');
     } catch (Throwable $e) {
         return [];
     }
@@ -41,6 +43,7 @@ function selo_lista(): array
         'nome'   => (string) $s['nome'],
         'cor'    => (string) $s['cor'],
         'img'    => $s['arquivo'] ? selo_url((int) $s['id']) : null,
+        'dica'   => (string) ($s['descricao'] ?? ''),
         'ordem'  => (int) $s['ordem'],
         'ligado' => (int) $s['ligado'],
     ], $st->fetchAll(PDO::FETCH_ASSOC));
@@ -56,7 +59,7 @@ function selos_de(array $ids): array
 
     try {
         $st = db()->prepare(
-            "SELECT us.usuario_id, s.id, s.slug, s.nome, s.cor, s.arquivo
+            "SELECT us.usuario_id, s.*
                FROM usuario_selos us JOIN selos s ON s.id = us.selo_id
               WHERE s.ligado = 1 AND us.usuario_id IN ($vaz)
               ORDER BY s.ordem, s.id"
@@ -73,6 +76,7 @@ function selos_de(array $ids): array
             'nome' => (string) $r['nome'],
             'cor'  => (string) $r['cor'],
             'img'  => $r['arquivo'] ? selo_url((int) $r['id']) : null,
+            'dica' => (string) ($r['descricao'] ?? ''),
         ];
     }
     return $saida;

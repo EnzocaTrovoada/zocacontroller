@@ -583,6 +583,28 @@ foreach (VITRINE_FATIAS as $f) {
     if ($cartao) $fatias[$f] = $cartao;
 }
 
+/* ----- os selos de quem foi sorteado ----- */
+/* Canal sorteado que tem conta aqui mostra os selos dela. O da Twitch pode
+   ter ou não: o sorteio de lá não sabe quem usa o site. */
+if ($fatias) {
+    try {
+        require_once __DIR__ . '/lib/selos.php';
+        $logins = array_values(array_unique(array_filter(array_map(
+            fn($c) => strtolower((string) ($c['login'] ?? '')), $fatias))));
+        $vaz = implode(',', array_fill(0, count($logins), '?'));
+        $st = db()->prepare("SELECT id, login FROM usuarios WHERE LOWER(login) IN ($vaz)");
+        $st->execute($logins);
+
+        $idDe = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $u) $idDe[strtolower((string) $u['login'])] = (int) $u['id'];
+        $selos = selos_de(array_values($idDe));
+
+        foreach ($fatias as $f => $c) {
+            $fatias[$f]['selos'] = $selos[$idDe[strtolower((string) ($c['login'] ?? ''))] ?? 0] ?? [];
+        }
+    } catch (Throwable $e) { /* sem selo, o cartão sai igual */ }
+}
+
 /* ----- tópicos em alta ----- */
 /* A CHAVE PRECISA CABER EM VARCHAR(32).
 
