@@ -840,8 +840,8 @@ try {
   /* Só desenho, sem etiqueta: quando o selo tem imagem, ela fala sozinha. */
   .selo-img { width: 16px; height: 16px; object-fit: contain; display: block; }
 
-  .selo { position: relative; display: inline-flex; align-items: center; outline: 0; cursor: default; }
-  .selo::after {
+  .selo-dica { position: relative; display: inline-flex; align-items: center; outline: 0; cursor: default; }
+  .selo-dica::after {
     content: attr(data-dica); position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 20;
     width: max-content; max-width: 240px; padding: 6px 9px; border-radius: 5px;
     background: #101412; color: #F2F5F3; box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
@@ -849,7 +849,7 @@ try {
     opacity: 0; transform: translate(-50%, 4px); pointer-events: none;
     transition: opacity .12s ease, transform .12s ease;
   }
-  .selo:hover::after, .selo:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+  .selo-dica:hover::after, .selo-dica:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
   .hub__nome { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 
   .selo-lista { display: flex; flex-direction: column; gap: 10px; }
@@ -984,6 +984,32 @@ try {
   .arte-corpo .bio { font-size: 13px; color: var(--fraco); }
   .arte-corpo a { font-size: 12.5px; color: var(--verde-forte); text-decoration: none; }
   .arte-corpo a:hover { text-decoration: underline; }
+
+  /* O cartão inteiro leva pro perfil; a arte cresce enquanto o mouse está
+     em cima, e é também quando ela para de girar. */
+  .arte-cartao { transition: transform .18s ease, box-shadow .18s ease; }
+  .arte-cartao.vai { cursor: pointer; }
+  .arte-cartao:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0, 0, 0, .28); }
+  .arte-cartao:focus-visible { outline: 2px solid var(--verde); outline-offset: 2px; }
+  .arte-quadro { position: relative; overflow: hidden; }
+  .arte-capa { cursor: inherit; transition: transform .5s ease, opacity .28s ease; }
+  .arte-cartao:hover .arte-capa { transform: scale(1.08); }
+  .arte-capa.troca { opacity: 0; }
+  .arte-pontos {
+    position: absolute; left: 0; right: 0; bottom: 8px; pointer-events: none;
+    display: flex; justify-content: center; gap: 5px;
+  }
+  .arte-pontos span {
+    width: 6px; height: 6px; border-radius: 50%; transition: background .2s;
+    background: rgba(255, 255, 255, .45); box-shadow: 0 0 2px rgba(0, 0, 0, .5);
+  }
+  .arte-pontos span.on { background: #fff; }
+  .arte-link { font-size: 12.5px; color: var(--verde-forte); }
+  .arte-mais { margin-top: 6px; align-self: flex-start; }
+  @media (prefers-reduced-motion: reduce) {
+    .arte-capa, .arte-cartao { transition: none; }
+    .arte-cartao:hover .arte-capa { transform: none; }
+  }
 
 
   /* ---------- editor ---------- */
@@ -2999,11 +3025,31 @@ function textoNos(raiz) {
   return saida;
 }
 
+/* TEXTO DO CÓDIGO QUE MUDOU, EDIÇÃO QUE CONTINUA.
+
+   A edição é guardada pelo texto original do código. Reescrever esse texto
+   deixava a edição sem par: ela continuava no banco, mas sumia da tela.
+   Todo texto do código que mudar depois de editado entra aqui, o novo
+   apontando pro antigo. O conferir.js lê as edições que estão no ar e
+   falha se alguma ficar sem par — é isso que impede de acontecer de novo. */
+const TEXTOS_ANTIGOS = {
+  'É arte minha, feita à mão, sem imagem gerada por IA.':
+    'Isto é arte minha, feita à mão, sem imagem gerada por IA.',
+  'Quer dizer que cada inscrição foi conferida na mão, uma por uma, olhando o trabalho da pessoa. Não é detector automático — eles erram, e errar contra quem desenhou de verdade é pior do que deixar passar.':
+    'Quer dizer que a inscrição foi conferida na mão, uma por uma, olhando o arquivo de processo que a pessoa mandou: rascunho, PSD ou gravação de tela. Não é detector automático — eles erram, e errar contra quem desenhou de verdade é pior do que deixar passar.',
+};
+
+function textoEditado(cru) {
+  if (TEXTOS[cru]) return TEXTOS[cru];
+  const antigo = TEXTOS_ANTIGOS[cru];
+  return antigo ? TEXTOS[antigo] : undefined;
+}
+
 function aplicaTextos(raiz) {
   if (!TEXTOS || !Object.keys(TEXTOS).length) return;
   textoNos(raiz || document.body).forEach((no) => {
     const cru = no.nodeValue.trim();
-    const novo = TEXTOS[cru];
+    const novo = textoEditado(cru);
     /* Compara com o que já está escrito pra não reescrever o mesmo nó a cada
        passada — o observador abaixo dispara muito, e trocar nodeValue sem
        necessidade faria o navegador repintar à toa. */
@@ -3040,7 +3086,7 @@ function marcaEditaveis() {
     const pai = no.parentElement;
     if (!pai || pai.hasAttribute('data-edit')) return;
     pai.setAttribute('data-edit', '1');
-    if (TEXTOS[no.nodeValue.trim()]) pai.setAttribute('data-edit-mudado', '1');
+    if (textoEditado(no.nodeValue.trim())) pai.setAttribute('data-edit-mudado', '1');
   });
 }
 
@@ -3272,6 +3318,12 @@ function abrePro(estado) {
       if (!(r.cupons || []).length) {
         temCupom.textContent = 'Nenhum cupom aberto agora';
         temCupom.disabled = true;
+        if (r.motivo) {
+          listaCupons.innerHTML = '';
+          listaCupons.appendChild(h('div', { cls: 'so-adm', style: 'margin:0' }, [
+            h('p', { style: 'margin:0;font-size:12.5px', txt: r.motivo })]));
+          listaCupons.classList.remove('escondido');
+        }
         return;
       }
 
@@ -3776,7 +3828,7 @@ const daApi = (u) => !u ? '' : /^https?:/i.test(u) ? u : API + (u.charAt(0) === 
    deixa um toque mostrar a dica também. */
 function chipSelo(s) {
   const dica = s.dica ? s.nome + ' · ' + s.dica : s.nome;
-  const cx = h('span', { cls: 'selo', tabindex: '0', 'data-dica': dica, 'aria-label': dica });
+  const cx = h('span', { cls: 'selo-dica', tabindex: '0', 'data-dica': dica, 'aria-label': dica });
 
   if (s.img) {
     cx.appendChild(h('img', { cls: 'selo-img', src: daApi(s.img), alt: '', loading: 'lazy' }));
@@ -6687,54 +6739,111 @@ const ARTE_SELO = 'Quer dizer que cada inscrição foi conferida na mão, uma po
 const urlObra = (o) => API + '/artistas.php?a=obra&id=' + o.id + (o.t ? '&t=' + encodeURIComponent(o.t) : '');
 const linkSeguro = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u : '';
 
-function cartaoArtista(a) {
+/* O CARTÃO INTEIRO LEVA PRO PERFIL DO ARTISTA.
+
+   As artes giram sozinhas e param enquanto o mouse está em cima, que é
+   quando a pessoa está olhando. */
+function cartaoArtista(a, seloArtista, eMeu) {
   const obras = (a.obras || []).filter((o) => !o.processo);
-  const cx = h('div', { cls: 'arte-cartao' });
+  const url = linkSeguro(a.link);
+  const cx = h('div', { cls: 'arte-cartao' + (url ? ' vai' : '') });
+  const quadro = h('div', { cls: 'arte-quadro' });
 
   if (!obras.length) {
-    cx.appendChild(h('div', { cls: 'arte-capa arte-capa--letra', txt: (a.nome || '?').slice(0, 1).toUpperCase() }));
-  }
-
-  if (obras.length) {
+    quadro.appendChild(h('div', { cls: 'arte-capa arte-capa--letra', txt: (a.nome || '?').slice(0, 1).toUpperCase() }));
+  } else {
     const capa = h('img', { cls: 'arte-capa', loading: 'lazy', alt: a.nome, src: urlObra(obras[0]) });
-    let atual = obras[0];
-    capa.onclick = () => window.open(urlObra(atual), '_blank', 'noopener');
-    cx.appendChild(capa);
+    quadro.appendChild(capa);
 
     if (obras.length > 1) {
-      const tiras = h('div', { cls: 'arte-tiras' });
-      obras.forEach((o, i) => {
-        const b = h('button', { type: 'button', title: o.titulo || ('imagem ' + (i + 1)) },
-          [h('img', { src: urlObra(o), loading: 'lazy', alt: '' })]);
-        b.setAttribute('aria-current', i === 0 ? 'true' : 'false');
-        b.onclick = () => {
-          atual = o;
-          capa.src = urlObra(o);
-          tiras.querySelectorAll('button').forEach((x) => x.setAttribute('aria-current', x === b ? 'true' : 'false'));
+      const pontos = h('div', { cls: 'arte-pontos' });
+      obras.forEach((_, k) => pontos.appendChild(h('span', { cls: k === 0 ? 'on' : '' })));
+      quadro.appendChild(pontos);
+
+      /* Cada cartão começa numa hora diferente, senão a galeria inteira
+         trocaria de arte no mesmo instante. A próxima é carregada antes
+         de sumir com a atual, pra troca não passar por um quadro vazio. */
+      let i = 0;
+      let espera = Math.floor(Math.random() * 3);
+      cx.__gira = () => {
+        if (cx.matches(':hover') || espera-- > 0) return;
+        espera = 2;
+        const k = (i + 1) % obras.length;
+        const pre = new Image();
+        pre.onload = () => {
+          capa.classList.add('troca');
+          setTimeout(() => {
+            i = k;
+            capa.src = urlObra(obras[k]);
+            capa.classList.remove('troca');
+            [...pontos.children].forEach((p, n) => p.classList.toggle('on', n === k));
+          }, 280);
         };
-        tiras.appendChild(b);
-      });
-      cx.appendChild(tiras);
+        pre.src = urlObra(obras[k]);
+      };
     }
   }
+  cx.appendChild(quadro);
 
   const topo = h('div', { cls: 'topo' }, [h('span', { cls: 'nm', txt: a.nome })]);
-  if (a.sem_ia) topo.appendChild(h('span', { cls: 'selo', txt: 'Sem IA' }));
+  if (a.sem_ia) {
+    topo.appendChild(chipSelo(seloArtista
+      || { nome: 'Artista', cor: '#6B3FA0', dica: 'Artista conferido pelo ZocaController, sem IA' }));
+  }
 
   const corpo = h('div', { cls: 'arte-corpo' }, [topo]);
   if (a.bio) corpo.appendChild(h('span', { cls: 'bio', txt: a.bio }));
-
-  const url = linkSeguro(a.link);
-  if (url) {
-    corpo.appendChild(h('a', { href: url, target: '_blank', rel: 'noopener noreferrer nofollow',
-      txt: a.arroba ? '@' + a.arroba : 'Ver o trabalho' }));
-  } else if (a.arroba) {
-    corpo.appendChild(h('span', { cls: 'd', txt: '@' + a.arroba }));
+  if (a.arroba || url) {
+    corpo.appendChild(h('span', { cls: 'arte-link',
+      txt: (a.arroba ? '@' + a.arroba : 'Ver o trabalho') + (url ? '  ↗' : '') }));
   }
-
+  if (eMeu) corpo.appendChild(botaoMaisArtes());
   cx.appendChild(corpo);
+
+  if (url) {
+    const abre = () => window.open(url, '_blank', 'noopener,noreferrer');
+    cx.setAttribute('role', 'link');
+    cx.setAttribute('tabindex', '0');
+    cx.title = 'Abrir ' + url;
+    cx.onclick = abre;
+    cx.onkeydown = (e) => { if (e.key === 'Enter') abre(); };
+  }
   return cx;
 }
+
+/* Mais artes de quem já está na galeria. Entram esperando conferência: o
+   selo foi dado olhando a primeira leva. */
+function botaoMaisArtes() {
+  const arq = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif',
+    multiple: '', style: 'display:none' });
+  const bt = h('button', { cls: 'bt mini arte-mais', type: 'button', txt: '+ Adicionar artes' });
+  bt.onclick = (e) => { e.stopPropagation(); arq.click(); };
+  arq.onclick = (e) => e.stopPropagation();
+
+  arq.onchange = async () => {
+    const fs = Array.prototype.slice.call(arq.files || []);
+    arq.value = '';
+    if (!fs.length) return;
+    if (fs.some((f) => f.size > 4194304)) return recado('Cada imagem pode ter no máximo 4 MB.', 'ruim');
+
+    const fd = new FormData();
+    fd.append('acao', 'mais_obras');
+    fs.forEach((f) => fd.append('obras[]', f));
+    bt.disabled = true;
+    bt.textContent = 'Enviando…';
+    try {
+      const r = await fetch(API + '/artistas.php', { method: 'POST', headers: { 'X-Chave': chave }, body: fd });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.erro || 'não deu');
+      recado('Recebido! As artes novas aparecem aqui depois de conferidas.', 'bom');
+    } catch (e) { recado(e.message, 'ruim'); }
+    bt.disabled = false;
+    bt.textContent = '+ Adicionar artes';
+  };
+  return h('span', {}, [bt, arq]);
+}
+
+let galeriaGiro = null;
 
 /* A inscrição num popup, aberto pelo convite na galeria.
 
@@ -6887,13 +6996,23 @@ function telaArtistas() {
   const grade = h('div', { cls: 'arte-grade' });
   tela.appendChild(grade);
 
-  fetch(API + '/artistas.php').then((r) => r.json()).then((d) => {
+  const meu = chave ? api('/artistas.php?a=meu').then((m) => m.id || 0).catch(() => 0) : Promise.resolve(0);
+
+  Promise.all([fetch(API + '/artistas.php').then((r) => r.json()), meu]).then(([d, meuId]) => {
     const as = d.artistas || [];
     if (!as.length) {
       grade.appendChild(h('div', { cls: 'vazio', txt: 'Ainda não tem ninguém aqui. Pode ser você.' }));
       return;
     }
-    as.forEach((a) => grade.appendChild(cartaoArtista(a)));
+    as.forEach((a) => grade.appendChild(cartaoArtista(a, d.selo, a.id === meuId)));
+
+    /* Um relógio só pra galeria inteira, que some sozinho quando ela sai
+       da tela. */
+    if (galeriaGiro) clearInterval(galeriaGiro);
+    galeriaGiro = setInterval(() => {
+      if (!document.body.contains(grade)) { clearInterval(galeriaGiro); galeriaGiro = null; return; }
+      grade.querySelectorAll('.arte-cartao').forEach((c) => { if (c.__gira) c.__gira(); });
+    }, 1200);
   }).catch(() => {
     grade.appendChild(h('div', { cls: 'vazio', txt: 'Não consegui carregar a galeria agora.' }));
   });
@@ -6902,7 +7021,7 @@ function telaArtistas() {
     const ir = h('button', { cls: 'bt mini', type: 'button', txt: 'Moderar inscrições' });
     ir.onclick = () => vaiPara('#/admin');
     tela.appendChild(h('div', { cls: 'so-adm' }, [
-      h('p', { txt: 'A fila de inscrições e o arquivo de processo de cada uma ficam na Administração.' }),
+      h('p', { txt: 'A fila de inscrições e as artes novas esperando conferência ficam na Administração.' }),
       ir,
     ]));
   }
@@ -7041,6 +7160,11 @@ function blocoArtistas() {
       const as = d.artistas || [];
       if (!as.length) return corpo.appendChild(h('p', { cls: 'd', txt: 'Nenhuma inscrição ainda.' }));
 
+      /* Quem tem alguma coisa esperando vem primeiro: inscrição nova ou
+         arte nova de quem já está na galeria. */
+      const espera = (a) => (a.estado === 'pendente' || (a.obras || []).some((o) => o.aprovada === 0)) ? 1 : 0;
+      as.sort((x, y) => espera(y) - espera(x));
+
       as.forEach((a) => {
         const manda = async (acao, extra) => {
           try {
@@ -7056,7 +7180,16 @@ function blocoArtistas() {
           const b = h('button', { type: 'button', style: 'width:64px;height:52px',
             title: o.titulo || 'abrir' }, [h('img', { src: urlObra(o), loading: 'lazy', alt: '' })]);
           b.onclick = () => window.open(urlObra(o), '_blank', 'noopener');
-          tiras.appendChild(b);
+          if (o.aprovada !== 0) { tiras.appendChild(b); return; }
+
+          /* Arte nova de quem já está na galeria: só aparece depois daqui. */
+          b.style.borderColor = 'var(--dourado)';
+          const sim = h('button', { cls: 'bt mini', type: 'button', txt: '✓', title: 'Aprovar esta arte' });
+          const nao = h('button', { cls: 'bt mini perigo', type: 'button', txt: '✕', title: 'Recusar esta arte' });
+          sim.onclick = () => manda('obra_aprovar', { id: o.id });
+          nao.onclick = () => { if (confirm('Recusar esta arte? Ela é apagada.')) manda('obra_recusar', { id: o.id }); };
+          tiras.appendChild(h('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:4px' }, [
+            b, h('div', { style: 'display:flex;gap:4px' }, [sim, nao])]));
         });
 
         const acoes = h('div', { cls: 'campo', style: 'gap:6px;flex-wrap:wrap' });

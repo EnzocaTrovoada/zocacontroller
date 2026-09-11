@@ -27,6 +27,7 @@ const ARTE_MAX        = 5;
 const ARTE_BYTES      = 4194304;
 const ARTE_PROC_BYTES = 16777216;
 const ARTE_PENDENTES  = 80;
+const ARTE_TOTAL      = 12;
 
 const ARTE_TIPOS = [
     'image/jpeg' => 'jpg',
@@ -57,13 +58,43 @@ function arte_caminho(string $arquivo): string
     return ARTE_DIR . '/' . basename($arquivo);
 }
 
+/**
+ * Confere as imagens de um envio, TODAS antes de gravar qualquer uma:
+ * metade das imagens no disco com o cadastro pela metade é lixo que
+ * ninguém vai limpar.
+ */
+function arte_aceitas(array $env, int $qtd): array
+{
+    $finfo   = new finfo(FILEINFO_MIME_TYPE);
+    $titulos = is_array($_POST['titulos'] ?? null) ? $_POST['titulos'] : [];
+    $aceitos = [];
+
+    for ($i = 0; $i < $qtd; $i++) {
+        if ((int) ($env['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            json_saida(['erro' => 'Uma das imagens não chegou inteira. Tente de novo.'], 400);
+        }
+        if ((int) $env['size'][$i] > ARTE_BYTES) json_saida(['erro' => 'Cada imagem pode ter no máximo 4 MB.'], 400);
+        if (!is_uploaded_file($env['tmp_name'][$i])) json_saida(['erro' => 'Arquivo inválido.'], 400);
+
+        $mime = (string) $finfo->file($env['tmp_name'][$i]);
+        if (!isset(ARTE_TIPOS[$mime])) json_saida(['erro' => 'Vale JPG, PNG, WEBP ou GIF.'], 400);
+
+        $aceitos[] = [
+            'tmp'    => $env['tmp_name'][$i],
+            'ext'    => ARTE_TIPOS[$mime],
+            'titulo' => mb_substr(trim((string) ($titulos[$i] ?? '')), 0, 120) ?: null,
+        ];
+    }
+    return $aceitos;
+}
+
 /* ---------- entregar uma imagem ---------- */
 if (($_GET['a'] ?? '') === 'obra') {
     $id = (int) ($_GET['id'] ?? 0);
     if ($id <= 0) { http_response_code(400); exit; }
 
     $st = db()->prepare(
-        'SELECT o.arquivo, o.processo, a.estado
+        'SELECT o.*, a.estado
            FROM artista_obras o JOIN artistas a ON a.id = o.artista_id
           WHERE o.id = ? LIMIT 1'
     );
@@ -76,7 +107,8 @@ if (($_GET['a'] ?? '') === 'obra') {
        Uma <img> não manda cabeçalho, então a chave do painel não serve aqui.
        O que serve é um link assinado de 15 minutos, que a listagem do admin
        devolve junto de cada obra. */
-    $publica = (int) $o['processo'] === 0 && $o['estado'] === 'aprovado';
+    $publica = (int) $o['processo'] === 0 && $o['estado'] === 'aprovado'
+            && (int) ($o['aprovada'] ?? 1) === 1;
     if (!$publica) {
         require_once __DIR__ . '/lib/seguranca.php';
         if (link_verificar((string) ($_GET['t'] ?? '')) !== 'obra:' . $id) {
@@ -104,6 +136,19 @@ if (($_GET['a'] ?? '') === 'obra') {
 
 cors();
 
+/* ---------- o cartão da conta que está olhando ---------- */
+if (($_GET['a'] ?? '') === 'meu') {
+    header('Cache-Control: private, no-store');
+    $eu = quem_talvez();
+    $id = 0;
+    if ($eu) {
+        $st = db()->prepare("SELECT id FROM artistas WHERE usuario_id = ? AND estado = 'aprovado' ORDER BY id DESC LIMIT 1");
+        $st->execute([$eu]);
+        $id = (int) ($st->fetchColumn() ?: 0);
+    }
+    json_saida(['id' => $id]);
+}
+
 /* ---------- a galeria ---------- */
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $lista = [];
@@ -117,13 +162,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
             $ids = array_column($artistas, 'id');
             $vaz = implode(',', array_fill(0, count($ids), '?'));
             $ob  = db()->prepare(
-                "SELECT id, artista_id, titulo FROM artista_obras
+                "SELECT * FROM artista_obras
                   WHERE processo = 0 AND artista_id IN ($vaz) ORDER BY artista_id, ordem, id"
             );
             $ob->execute($ids);
 
             $porArtista = [];
             foreach ($ob->fetchAll(PDO::FETCH_ASSOC) as $o) {
+                if ((int) ($o['aprovada'] ?? 1) !== 1) continue;
                 $porArtista[(int) $o['artista_id']][] = [
                     'id' => (int) $o['id'], 'titulo' => $o['titulo'],
                 ];
@@ -143,8 +189,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         }
     } catch (Throwable $e) { /* tabela ainda não criada */ }
 
+    require_once __DIR__ . '/lib/selos.php';
+    $seloArtista = null;
+    foreach (selo_lista() as $s) {
+        if ($s['slug'] === 'artista' && $s['ligado']) $seloArtista = $s;
+    }
+
     header('Cache-Control: public, max-age=120');
-    json_saida(['artistas' => $lista, 'max' => ARTE_MAX]);
+    json_saida(['artistas' => $lista, 'max' => ARTE_MAX, 'selo' => $seloArtista]);
 }
 
 /* ---------- moderação ---------- */
@@ -175,12 +227,13 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !==
         )->fetchAll(PDO::FETCH_ASSOC);
 
         $obras = [];
-        foreach (db()->query('SELECT id, artista_id, titulo, processo FROM artista_obras ORDER BY ordem, id')
+        foreach (db()->query('SELECT * FROM artista_obras ORDER BY ordem, id')
                      ->fetchAll(PDO::FETCH_ASSOC) as $o) {
             $obras[(int) $o['artista_id']][] = [
                 'id'       => (int) $o['id'],
                 'titulo'   => $o['titulo'],
                 'processo' => (int) $o['processo'],
+                'aprovada' => (int) ($o['aprovada'] ?? 1),
                 't'        => link_assinar('obra:' . (int) $o['id'], 900),
             ];
         }
@@ -221,6 +274,20 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !==
         json_saida(['ok' => true]);
     }
 
+    if ($acao === 'obra_aprovar') {
+        db()->prepare('UPDATE artista_obras SET aprovada = 1 WHERE id = ?')->execute([$id]);
+        json_saida(['ok' => true]);
+    }
+
+    if ($acao === 'obra_recusar') {
+        $st = db()->prepare('SELECT arquivo FROM artista_obras WHERE id = ?');
+        $st->execute([$id]);
+        $arq = (string) ($st->fetchColumn() ?: '');
+        if ($arq !== '') @unlink(arte_caminho($arq));
+        db()->prepare('DELETE FROM artista_obras WHERE id = ?')->execute([$id]);
+        json_saida(['ok' => true]);
+    }
+
     if ($acao === 'apagar') {
         $apagaArquivos($id);
         db()->prepare('DELETE FROM artistas WHERE id = ?')->execute([$id]);
@@ -228,6 +295,55 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !==
     }
 
     json_saida(['erro' => 'Ação desconhecida.'], 400);
+}
+
+/* ---------- mais artes, de quem já está na galeria ---------- */
+/* Entram esperando conferência: o selo "sem IA" foi dado olhando a
+   primeira leva, e só vale pra próxima se alguém olhar também. */
+if (($_POST['acao'] ?? '') === 'mais_obras') {
+    $eu = quem_talvez();
+    if (!$eu) json_saida(['erro' => 'Entre com a Twitch pra mandar mais artes.'], 401);
+    trava('mais_obras', 10, 3600);
+
+    $st = db()->prepare("SELECT id FROM artistas WHERE usuario_id = ? AND estado = 'aprovado' ORDER BY id DESC LIMIT 1");
+    $st->execute([$eu]);
+    $artistaId = (int) ($st->fetchColumn() ?: 0);
+    if (!$artistaId) json_saida(['erro' => 'Só quem já está na galeria pode mandar mais artes.'], 403);
+
+    $env = $_FILES['obras'] ?? [];
+    $qtd = is_array($env['name'] ?? null) ? count($env['name']) : 0;
+    if ($qtd < 1) json_saida(['erro' => 'Escolha pelo menos uma imagem.'], 400);
+
+    $ja = db()->prepare('SELECT COUNT(*) FROM artista_obras WHERE artista_id = ? AND processo = 0');
+    $ja->execute([$artistaId]);
+    $tem = (int) $ja->fetchColumn();
+    if ($tem + $qtd > ARTE_TOTAL) {
+        json_saida(['erro' => 'A galeria guarda até ' . ARTE_TOTAL . ' artes suas, e você já tem ' . $tem . '.'], 400);
+    }
+
+    $aceitos = arte_aceitas($env, $qtd);
+    if (!pasta_privada(ARTE_DIR)) json_saida(['erro' => 'Não consegui guardar as imagens aqui no servidor.'], 500);
+
+    $pdo = db();
+    $pdo->beginTransaction();
+    $gravados = [];
+    try {
+        foreach ($aceitos as $i => $f) {
+            $arquivo = bin2hex(random_bytes(16)) . '.' . $f['ext'];
+            if (!move_uploaded_file($f['tmp'], arte_caminho($arquivo))) throw new RuntimeException('gravar');
+            $gravados[] = $arquivo;
+            $pdo->prepare(
+                'INSERT INTO artista_obras (artista_id, arquivo, titulo, processo, ordem, aprovada) VALUES (?, ?, ?, 0, ?, 0)'
+            )->execute([$artistaId, $arquivo, $f['titulo'], $tem + $i]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        foreach ($gravados as $arq) @unlink(arte_caminho($arq));
+        json_saida(['erro' => 'Não consegui guardar as artes. Tente de novo.'], 500);
+    }
+
+    json_saida(['ok' => true, 'enviadas' => count($gravados)]);
 }
 
 /* ---------- inscrição ---------- */
@@ -284,31 +400,7 @@ if ($qtd > 0 && !pasta_privada(ARTE_DIR)) {
 }
 
 $finfo   = new finfo(FILEINFO_MIME_TYPE);
-$titulos = is_array($_POST['titulos'] ?? null) ? $_POST['titulos'] : [];
-
-/* Confere tudo ANTES de gravar qualquer coisa: metade das imagens no disco
-   com o cadastro pela metade é lixo que ninguém vai limpar. */
-$aceitos = [];
-for ($i = 0; $i < $qtd; $i++) {
-    if ((int) ($env['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        json_saida(['erro' => 'Uma das imagens não chegou inteira. Tente de novo.'], 400);
-    }
-    if ((int) $env['size'][$i] > ARTE_BYTES) {
-        json_saida(['erro' => 'Cada imagem pode ter no máximo 4 MB.'], 400);
-    }
-    if (!is_uploaded_file($env['tmp_name'][$i])) json_saida(['erro' => 'Arquivo inválido.'], 400);
-
-    $mime = (string) $finfo->file($env['tmp_name'][$i]);
-    if (!isset(ARTE_TIPOS[$mime])) {
-        json_saida(['erro' => 'Vale JPG, PNG, WEBP ou GIF.'], 400);
-    }
-
-    $aceitos[] = [
-        'tmp'    => $env['tmp_name'][$i],
-        'ext'    => ARTE_TIPOS[$mime],
-        'titulo' => mb_substr(trim((string) ($titulos[$i] ?? '')), 0, 120) ?: null,
-    ];
-}
+$aceitos = arte_aceitas($env, $qtd);
 
 $proc = null;
 if (!empty($_FILES['processo']) && (int) ($_FILES['processo']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {

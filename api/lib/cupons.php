@@ -149,3 +149,38 @@ function cupom_estorna_venda(int $assinatura_id): void
             ->execute([$assinatura_id]);
     } catch (Throwable $e) { /* tabela nova */ }
 }
+
+/** Por que a lista de cupons abertos está vazia. Só vai pra quem administra. */
+function cupons_motivo(?string $falhou): string
+{
+    $sql030 = ' Rodou o sql/030-cupom-publico.sql?';
+    if ($falhou !== null) return 'A consulta falhou (' . $falhou . ').' . $sql030;
+
+    try {
+        $r = db()->query(
+            "SELECT COUNT(*) AS total,
+                    COALESCE(SUM(ligado = 1 AND parceiro_id IS NULL AND publico = 0), 0) AS escondidos,
+                    COALESCE(SUM(parceiro_id IS NOT NULL), 0) AS parceiro,
+                    COALESCE(SUM(ligado = 0), 0) AS desligados,
+                    COALESCE(SUM(vale_ate IS NOT NULL AND vale_ate <= NOW()), 0) AS vencidos,
+                    COALESCE(SUM(usos_max IS NOT NULL AND usos >= usos_max), 0) AS esgotados
+               FROM cupons"
+        )->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return 'A consulta falhou (' . $e->getMessage() . ').' . $sql030;
+    }
+
+    if (!(int) $r['total']) return 'Nenhum cupom criado ainda. Crie em Administração, em Cupons e parceiros.';
+
+    $partes = [];
+    foreach ([
+        'escondidos' => 'escondidos: clique em "escondido" na lista de cupons da Administração pra pôr na lista',
+        'parceiro'   => 'de parceiro, que nunca entram na lista',
+        'desligados' => 'desligados',
+        'vencidos'   => 'vencidos',
+        'esgotados'  => 'esgotados',
+    ] as $k => $txt) {
+        if ((int) $r[$k]) $partes[] = (int) $r[$k] . ' ' . $txt;
+    }
+    return 'Você tem ' . (int) $r['total'] . ' cupom(ns) e nenhum aparece. ' . implode('; ', $partes) . '.';
+}

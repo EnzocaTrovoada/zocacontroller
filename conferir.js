@@ -107,5 +107,44 @@ if (JSON.stringify(cargosPonte) === JSON.stringify(cargosCmds)
   falhas++;
 }
 
-console.log(falhas ? `\n${falhas} lista(s) fora de sincronia.` : '\nTudo batendo.');
-process.exit(falhas ? 1 : 0);
+/* ---- edições de texto que o código deixou sem par ----
+
+   A edição feita no modo de edição é guardada pelo texto ORIGINAL do
+   código. Reescrever esse texto aqui sem avisar o motor deixava a edição
+   sem par: ela continuava no banco e sumia do site. Isto lê as edições que
+   estão no ar e confere se cada original ainda existe no código — direto,
+   ou como texto antigo em TEXTOS_ANTIGOS, no docs/index.html. */
+const TEXTOS_DINAMICOS = [
+  'Novo Meta',   // título montado na hora: 'Novo ' + o nome do tipo
+];
+
+async function confereTextos() {
+  let d;
+  try {
+    const r = await fetch('https://api.zocahop.com/textos.php', { signal: AbortSignal.timeout(8000) });
+    d = await r.json();
+  } catch (e) {
+    console.log('? edições de texto: não consegui ler as que estão no ar (' + e.message + ')');
+    return;
+  }
+
+  /* Texto comprido fica quebrado em 'pedaço' + 'pedaço' no código; juntar
+     os pedaços é o que deixa achar a frase inteira. */
+  const juntos = hub.replace(/'\s*\+\s*'/g, '');
+  const todas = Object.keys((d && d.textos) || {});
+  const sem = todas.filter((k) => !juntos.includes(k) && !TEXTOS_DINAMICOS.includes(k));
+
+  if (sem.length) {
+    console.log('✗ edições de texto sem par no código (o texto original mudou):');
+    sem.forEach((k) => console.log('   "' + k.slice(0, 90) + (k.length > 90 ? '…' : '') + '"'));
+    console.log('   → no docs/index.html, em TEXTOS_ANTIGOS: texto novo apontando pro antigo');
+    falhas++;
+  } else {
+    console.log(`✓ edições de texto: ${todas.length} no ar, todas com par no código`);
+  }
+}
+
+confereTextos().then(() => {
+  console.log(falhas ? `\n${falhas} lista(s) fora de sincronia.` : '\nTudo batendo.');
+  process.exit(falhas ? 1 : 0);
+});

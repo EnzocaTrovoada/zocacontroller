@@ -34,6 +34,7 @@ if (isset($_GET['cupons'])) {
     require_once __DIR__ . '/lib/cupons.php';
 
     $lista = [];
+    $falhou = null;
     try {
         $q = db()->query(
             "SELECT codigo, descricao, tipo, valor, vale_ate, usos, usos_max
@@ -57,9 +58,23 @@ if (isset($_GET['cupons'])) {
                     : max(0, (int) $c['usos_max'] - (int) $c['usos']),
             ];
         }
-    } catch (Throwable $e) { /* tabela ou coluna nova */ }
+    } catch (Throwable $e) {
+        $falhou = $e->getMessage();
+    }
 
-    json_saida(['cupons' => $lista]);
+    /* LISTA VAZIA PRO ADMIN VEM COM O MOTIVO.
+
+       Ela apareceu vazia duas vezes com cupons criados, e de fora não havia
+       como saber o porquê. Pra quem administra, a resposta diz o que está
+       tirando cada cupom da lista. */
+    $motivo = null;
+    if (!$lista) {
+        $ad = db()->prepare('SELECT admin FROM usuarios WHERE id = ?');
+        $ad->execute([(int) $quem['usuario_id']]);
+        if ($ad->fetchColumn()) $motivo = cupons_motivo($falhou);
+    }
+
+    json_saida(['cupons' => $lista, 'motivo' => $motivo]);
 }
 
 /* CONFERIR UM CUPOM ANTES DE PAGAR.
