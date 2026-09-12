@@ -14,6 +14,11 @@
 
   "novidades": [
     {
+      "data": "2026-09-12",
+      "titulo": "O link do moderador não se perde mais",
+      "texto": "Se o seu mod perdeu o link dele, agora dá pra mostrar de novo aqui mesmo, ou gerar outro na hora — o antigo para de funcionar no mesmo instante."
+    },
+    {
       "data": "2026-09-11",
       "titulo": "Cores novas",
       "texto": "O site ficou mais escuro e mais colorido, cada painel com um tom próprio, e a página inicial agora ocupa a tela toda, com as laterais acompanhando enquanto você rola o feed."
