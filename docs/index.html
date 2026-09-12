@@ -114,6 +114,18 @@ try {
   }
   .espaco { flex: 1; }
 
+  .sino { position: relative; }
+  .sino .n {
+    min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px; border-radius: 9px;
+    background: var(--perigo); color: #fff; font: 700 10px var(--mono);
+    display: none; align-items: center; justify-content: center;
+  }
+  .sino .n.tem { display: inline-flex; }
+  #bandejaAvisos { width: 340px; max-height: 60vh; overflow-y: auto; }
+  .aviso-item { display: block; width: 100%; text-align: left; }
+  .aviso-item.novo { background: var(--verde-fraco); }
+  .aviso-item small { color: var(--apagado); }
+
   /* Tudo que mora na barra precisa se centrar sozinho: ela estica cada item
      até a altura toda, e quem não é caixa flexível fica com o texto colado
      no topo — era isso que deixava o @ torto. */
@@ -1309,6 +1321,14 @@ try {
   <!-- De qual conta e este painel. Quando alguem diz que os overlays
        sumiram, a primeira coisa a saber e se a tela esta olhando pra conta
        certa: uma chave de outra conta mostra uma lista vazia legitima. -->
+  <!-- Reaproveita a bandeja das abas: abrir, fechar clicando fora e o Esc
+       já funcionam do mesmo jeito que em Overlays e Ferramentas. -->
+  <button class="aba sino escondido" id="abaAvisos" type="button" aria-expanded="false" aria-haspopup="true"
+          title="Avisos">
+    Avisos<span class="n" id="avisosN"></span>
+    <span class="bandeja" id="bandejaAvisos"></span>
+  </button>
+
   <span class="quem" id="quemSou"></span>
   <!-- A porta de volta pro painel. No canto direito porque é onde o olho vai
        procurar a ação, e não no meio do conteúdo da vitrine. -->
@@ -2178,6 +2198,63 @@ function mudou(k, v) {
   marcaHistorico();
 }
 
+/* ---------------- avisos ----------------
+
+   A hospedagem não empurra nada: a tela pergunta de minuto em minuto, e só
+   com a aba à vista — perguntar com a aba escondida é gastar servidor pra
+   ninguém ler. */
+
+let avisosRelogio = null;
+
+function pintaAvisos(d) {
+    const n = el('avisosN');
+    const quantos = (d && d.nao_lidas) || 0;
+    n.textContent = quantos > 99 ? '99+' : String(quantos || '');
+    n.classList.toggle('tem', quantos > 0);
+
+    const cx = el('bandejaAvisos');
+    cx.innerHTML = '';
+    const itens = (d && d.itens) || [];
+    if (!itens.length) {
+      cx.appendChild(h('button', { cls: 'aviso-item', type: 'button', txt: 'Nenhum aviso ainda.' }));
+      return;
+    }
+
+    itens.forEach((a) => {
+      const b = h('button', { cls: 'aviso-item' + (a.lida ? '' : ' novo'), type: 'button' }, [
+        document.createTextNode(a.texto),
+        h('small', { txt: faz(a.ha) }),
+      ]);
+      b.onclick = () => { fechaBandejas(null); if (a.rota) vaiPara(a.rota); };
+      cx.appendChild(b);
+    });
+}
+
+function buscaAvisos() {
+  if (!chave) return;
+  api('/notificacoes.php').then(pintaAvisos).catch(() => {});
+}
+
+function ligaAvisos() {
+  el('abaAvisos').classList.remove('escondido');
+  buscaAvisos();
+
+  /* Abrir a caixa já marca tudo como lido: o número existe pra dizer "tem
+     coisa nova", e quem abriu já viu. */
+  el('abaAvisos').addEventListener('click', () => {
+    if (el('abaAvisos').getAttribute('aria-expanded') !== 'true') return;
+    if (!el('avisosN').classList.contains('tem')) return;
+    api('/notificacoes.php', { method: 'POST', body: JSON.stringify({ acao: 'lidas' }) })
+      .then(() => { el('avisosN').classList.remove('tem'); el('avisosN').textContent = ''; })
+      .catch(() => {});
+  });
+
+  const tique = () => { if (!document.hidden) buscaAvisos(); };
+  if (avisosRelogio) clearInterval(avisosRelogio);
+  avisosRelogio = setInterval(tique, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) buscaAvisos(); });
+}
+
 /* ---------------- bandejas ---------------- */
 function fechaBandejas(menos) {
   document.querySelectorAll('.aba').forEach((a) => {
@@ -2194,6 +2271,7 @@ function ligaAba(aba) {
 }
 ligaAba(el('abaOverlays'));
 ligaAba(el('abaFerramentas'));
+ligaAba(el('abaAvisos'));
 document.addEventListener('click', (e) => { if (!e.target.closest('.aba')) fechaBandejas(null); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fechaBandejas(null); });
 
@@ -3990,7 +4068,7 @@ function blocoFeed() {
       cs.forEach((c) => {
         const corpo = h('div', { style: 'flex:1;min-width:0' }, [
           cabecaDe(c.autor, c.ha),
-          h('div', { cls: 'txt', txt: c.texto }),
+          textoComMarcados(c.texto, 'txt'),
         ]);
 
         /* Quem escreveu, o dono do post e o admin. O dono entra porque o
@@ -4039,10 +4117,23 @@ function blocoFeed() {
   }
 
   /* ---------- um post ---------- */
+  /* O @ vira um pedaço clicável, sem virar HTML: cada parte entra como nó
+     de texto, e só o nome ganha um elemento. */
+  function textoComMarcados(txt, cls) {
+    const cx = h('div', { cls: cls || 'feed__texto' });
+    String(txt || '').split(/(@[A-Za-z0-9_]{3,25})/).forEach((parte) => {
+      if (parte.charAt(0) !== '@') { cx.appendChild(document.createTextNode(parte)); return; }
+      const a = h('b', { cls: 'vai', txt: parte });
+      a.onclick = () => naTwitch(parte.slice(1));
+      cx.appendChild(a);
+    });
+    return cx;
+  }
+
   function desenhaPost(p) {
     const corpo = h('div', { cls: 'feed__corpo' }, [
       cabecaDe(p.autor, p.ha),
-      h('div', { cls: 'feed__texto', txt: p.texto || '' }),
+      textoComMarcados(p.texto),
     ]);
 
     if (p.imagem) {
@@ -4080,6 +4171,25 @@ function blocoFeed() {
       }
     };
     barra.appendChild(curtir);
+
+    /* Seguir é daqui de dentro: a Twitch não deixa site nenhum seguir um
+       canal por você desde 2021. Quem quiser seguir lá clica no nome. */
+    if (chave && quemSou && p.autor.login !== quemSou) {
+      const seg = h('button', { cls: 'feed__acao', type: 'button' });
+      let sigo = !!p.sigo;
+      const pinta = () => { seg.textContent = sigo ? 'seguindo' : 'seguir'; };
+      pinta();
+      seg.onclick = async () => {
+        seg.disabled = true;
+        try {
+          const r = await mandaJson({ acao: sigo ? 'deixar_de_seguir' : 'seguir', login: p.autor.login });
+          sigo = !!r.sigo;
+          pinta();
+        } catch (e) { recado(e.message, 'ruim'); }
+        seg.disabled = false;
+      };
+      barra.appendChild(seg);
+    }
 
     const nCom = h('span', { cls: 'n', txt: p.comentarios ? String(p.comentarios) : '' });
     const comentar = h('button', { cls: 'feed__acao', type: 'button' },
@@ -6766,6 +6876,7 @@ function telaAdmin() {
 
   tela.appendChild(blocoVitrine());
   tela.appendChild(blocoParceiros());
+  tela.appendChild(blocoAvisos());
   tela.appendChild(blocoSelos());
   tela.appendChild(blocoArtistas());
   tela.appendChild(blocoEstilo());
@@ -7228,6 +7339,47 @@ function telaArtistas() {
   }
 }
 
+/* ---------------- recado pra quem usa o site ---------------- */
+
+function blocoAvisos() {
+  const grupo = h('select', { style: 'flex:0 0 210px' });
+  [['todos', 'Todo mundo'], ['pro', 'Só quem é Pro'], ['nao_pro', 'Só quem não é Pro'],
+   ['testadores', 'Testadores'], ['sem_overlay', 'Quem nunca criou overlay'],
+   ['inativos:30', 'Quem sumiu há 30 dias'], ['login', 'Uma pessoa só']]
+    .forEach(([v, r]) => grupo.appendChild(h('option', { value: v, txt: r })));
+
+  const login = h('input', { type: 'text', placeholder: '@ da pessoa', style: 'flex:0 0 160px;display:none' });
+  grupo.onchange = () => { login.style.display = grupo.value === 'login' ? '' : 'none'; };
+
+  const texto = h('input', { type: 'text', maxlength: '300', placeholder: 'o recado, curto',
+    style: 'flex:1 1 260px' });
+  const rota = h('input', { type: 'text', maxlength: '80', placeholder: 'abrir em (ex.: #/artistas)',
+    style: 'flex:0 0 200px' });
+  const diz = h('span', { cls: 'd', style: 'font-size:12px' });
+  const bt = h('button', { cls: 'bt mini', type: 'button', txt: 'Enviar' });
+
+  bt.onclick = async () => {
+    if (!texto.value.trim()) return recado('Escreva o recado.', 'ruim');
+    if (!confirm('Mandar este aviso? Ele aparece no sininho de quem receber.')) return;
+    bt.disabled = true;
+    diz.textContent = 'enviando…';
+    try {
+      const r = await api('/notificacoes.php', { method: 'POST', body: JSON.stringify({
+        acao: 'enviar', grupo: grupo.value, login: login.value, texto: texto.value, rota: rota.value }) });
+      diz.textContent = r.enviados + (r.enviados === 1 ? ' pessoa avisada' : ' pessoas avisadas');
+      texto.value = '';
+    } catch (e) { diz.textContent = e.message; }
+    bt.disabled = false;
+  };
+
+  return h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Mandar aviso' }),
+    h('p', { cls: 'd', txt: 'Aparece no sininho de quem receber. O endereço é opcional e só vale pra tela do próprio site.' }),
+    h('div', { cls: 'campo', style: 'gap:8px;flex-wrap:wrap' }, [grupo, login, texto, rota, bt]),
+    diz,
+  ]);
+}
+
 /* ---------------- selos ----------------
 
    O desenho é do Enzo. Aqui só existe o lugar de subir, dar e tirar: selo
@@ -7667,6 +7819,7 @@ async function carrega() {
 
   if (!await carrega()) return;
   if (souAdmin) el('abaTextos').classList.remove('escondido');
+  ligaAvisos();
   ligaBusca();
   ligaUpgrade();
   rota();

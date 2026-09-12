@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-12",
+      "titulo": "Avisos, seguir e marcar gente",
+      "texto": "Um sininho na barra avisa quando curtem, comentam ou marcam você com @ num zoc. Dá pra seguir quem você gosta aqui dentro, e o nome marcado leva pro canal da pessoa."
+    },
+    {
+      "data": "2026-09-12",
       "titulo": "O link do moderador não se perde mais",
       "texto": "Se o seu mod perdeu o link dele, agora dá pra mostrar de novo aqui mesmo, ou gerar outro na hora — o antigo para de funcionar no mesmo instante."
     },

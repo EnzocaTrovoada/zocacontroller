@@ -21,6 +21,7 @@
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
 require_once __DIR__ . '/lib/selos.php';
+require_once __DIR__ . '/lib/notificacoes.php';
 
 /* QUEM CONTA O TEMPO É O BANCO.
 
@@ -204,6 +205,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         $linhas = $st->fetchAll(PDO::FETCH_ASSOC);
         $selos = selos_de(array_column($linhas, 'usuario_id'));
 
+        /* Em consulta separada, e não como subconsulta: a tabela de quem
+           segue quem chegou depois, e sem isso o feed inteiro sumiria em
+           quem ainda não rodou o SQL 045. */
+        $sigo = [];
+        if ($eu) {
+            try {
+                $sg = db()->prepare('SELECT seguido_id FROM feed_seguidores WHERE seguidor_id = ?');
+                $sg->execute([$eu]);
+                $sigo = array_flip(array_map('intval', $sg->fetchAll(PDO::FETCH_COLUMN)));
+            } catch (Throwable $e) { /* sem a tabela, ninguém segue ninguém */ }
+        }
+        if (!empty($_GET['seguindo']) && $eu) {
+            $linhas = array_values(array_filter($linhas, fn($p) => isset($sigo[(int) $p['usuario_id']])));
+        }
+
         foreach ($linhas as $p) {
             $lista[] = [
                 'id'          => (int) $p['id'],
@@ -213,6 +229,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
                 'curtidas'    => (int) $p['curtidas'],
                 'comentarios' => (int) $p['comentarios'],
                 'curti'       => (int) $p['curti'] > 0,
+                'sigo'        => isset($sigo[(int) $p['usuario_id']]),
                 'autor'       => feed_autor($p, $selos),
             ];
         }
@@ -260,19 +277,63 @@ $ad = db()->prepare('SELECT admin FROM usuarios WHERE id = ?');
 $ad->execute([$uid]);
 $souAdmin = (bool) $ad->fetchColumn();
 
+/** O nome de quem está agindo, pro texto do aviso. */
+function feed_meu_nome(int $uid): string
+{
+    static $nome = null;
+    if ($nome !== null) return $nome;
+    $st = db()->prepare('SELECT COALESCE(NULLIF(nome_exibicao, ""), login) FROM usuarios WHERE id = ?');
+    $st->execute([$uid]);
+    return $nome = (string) ($st->fetchColumn() ?: 'alguém');
+}
+
 /* ---------- apagar e esconder ---------- */
 /* Pelo cabeçalho, e não por adivinhar dos campos: um post sem texto tem que
    receber "escreva alguma coisa", e não cair no caminho de apagar. */
 if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !== 0) {
     $d    = corpo_json();
     $acao = (string) ($d['acao'] ?? '');
-    $id   = (int) ($d['id'] ?? 0);
+
+    /* SEGUIR AQUI DENTRO, E NÃO NA TWITCH.
+
+       A Twitch desligou em 2021 a API que deixava um site seguir um canal
+       por você — era usada pra fabricar seguidor. Este seguir é do site:
+       serve pro filtro do feed e pro aviso de quem ganhou o seguidor. */
+    if ($acao === 'seguir' || $acao === 'deixar_de_seguir') {
+        $login = strtolower(preg_replace('/[^A-Za-z0-9_]/', '', (string) ($d['login'] ?? '')));
+        if ($login === '') json_saida(['erro' => 'Falta dizer quem.'], 400);
+
+        $st = db()->prepare('SELECT id FROM usuarios WHERE LOWER(login) = ? LIMIT 1');
+        $st->execute([$login]);
+        $alvo = (int) ($st->fetchColumn() ?: 0);
+        if (!$alvo) json_saida(['erro' => 'Essa conta não existe aqui.'], 404);
+        if ($alvo === $uid) json_saida(['erro' => 'Você não segue você mesmo.'], 400);
+
+        try {
+            if ($acao === 'seguir') {
+                db()->prepare('INSERT IGNORE INTO feed_seguidores (seguidor_id, seguido_id) VALUES (?, ?)')
+                    ->execute([$uid, $alvo]);
+                notifica($alvo, 'seguidor', feed_meu_nome($uid) . ' começou a seguir você',
+                         '#/inicio', $uid, 'seguidor:' . $uid);
+            } else {
+                db()->prepare('DELETE FROM feed_seguidores WHERE seguidor_id = ? AND seguido_id = ?')
+                    ->execute([$uid, $alvo]);
+            }
+        } catch (Throwable $e) {
+            json_saida(['erro' => 'Ainda não dá pra seguir neste servidor.'], 503);
+        }
+
+        json_saida(['ok' => true, 'sigo' => $acao === 'seguir']);
+    }
+
+    $id = (int) ($d['id'] ?? 0);
     if ($id <= 0) json_saida(['erro' => 'Falta dizer qual post.'], 400);
 
     if ($acao === 'curtir') {
-        $st = db()->prepare('SELECT 1 FROM posts WHERE id = ? AND escondido = 0');
+        $st = db()->prepare('SELECT usuario_id FROM posts WHERE id = ? AND escondido = 0');
         $st->execute([$id]);
-        if (!$st->fetchColumn()) json_saida(['erro' => 'Esse post não existe mais.'], 404);
+        $dono = (int) ($st->fetchColumn() ?: 0);
+        if (!$dono) json_saida(['erro' => 'Esse post não existe mais.'], 404);
 
         /* Vai e volta no mesmo botão: apagar primeiro e conferir quantas
            linhas sumiram diz se era pra curtir ou descurtir, sem consulta
@@ -287,6 +348,13 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !==
             $curti = true;
         }
 
+        /* Só na curtida, nunca na descurtida — e o ref impede que
+           descurtir e curtir de novo vire aviso novo. */
+        if ($curti) {
+            notifica($dono, 'curtida', feed_meu_nome($uid) . ' curtiu o seu zoc',
+                     '#/inicio', $uid, 'curtida:' . $id . ':' . $uid);
+        }
+
         $c = db()->prepare('SELECT COUNT(*) FROM post_curtidas WHERE post_id = ?');
         $c->execute([$id]);
         json_saida(['ok' => true, 'curti' => $curti, 'curtidas' => (int) $c->fetchColumn()]);
@@ -299,9 +367,10 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !==
         $texto = mb_substr($texto, 0, FEED_COMENTA);
         if ($texto === '') json_saida(['erro' => 'Escreva alguma coisa.'], 400);
 
-        $st = db()->prepare('SELECT 1 FROM posts WHERE id = ? AND escondido = 0');
+        $st = db()->prepare('SELECT usuario_id FROM posts WHERE id = ? AND escondido = 0');
         $st->execute([$id]);
-        if (!$st->fetchColumn()) json_saida(['erro' => 'Esse post não existe mais.'], 404);
+        $dono = (int) ($st->fetchColumn() ?: 0);
+        if (!$dono) json_saida(['erro' => 'Esse post não existe mais.'], 404);
 
         $ja = db()->prepare(
             'SELECT COUNT(*) FROM post_comentarios
@@ -312,6 +381,10 @@ if (strpos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data') !==
 
         db()->prepare('INSERT INTO post_comentarios (post_id, usuario_id, texto) VALUES (?, ?, ?)')
             ->execute([$id, $uid, $texto]);
+
+        $eu = feed_meu_nome($uid);
+        notifica($dono, 'comentario', $eu . ' comentou no seu zoc', '#/inicio', $uid, null);
+        notifica_marcados($texto, $uid, $eu, '#/inicio', 'men-c:' . db()->lastInsertId());
 
         json_saida(['ok' => true, 'comentarios' => feed_comentarios($id)]);
     }
@@ -422,5 +495,7 @@ if (!empty($_FILES['imagem']) && (int) ($_FILES['imagem']['error'] ?? UPLOAD_ERR
 
 db()->prepare('INSERT INTO posts (usuario_id, texto, arquivo) VALUES (?, ?, ?)')
     ->execute([$uid, $texto, $arquivo]);
+
+notifica_marcados($texto, $uid, feed_meu_nome($uid), '#/inicio', 'men-p:' . db()->lastInsertId());
 
 json_saida(['ok' => true]);
