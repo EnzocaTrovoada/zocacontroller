@@ -2355,6 +2355,7 @@ function montaBandejas() {
     ['Subathon', 'Quanto cada sub, bit ou doação soma', '#/subathon'],
     ['Moderadores', 'Criar e revogar o link de cada mod', '#/mods'],
     ['Luzes', 'O chat muda a cor das suas lâmpadas', '#/luzes'],
+    ['Suporte', 'Fale comigo quando algo não funcionar', '#/suporte'],
   ].forEach(([n, txt, rota]) => {
     const b = h('button', { type: 'button' }, [document.createTextNode(n), h('small', { txt })]);
     b.onclick = () => { fechaBandejas(null); vaiPara(rota); };
@@ -2993,6 +2994,7 @@ const TELAS = [
   ['#/tutorial',  'Tutorial',      'como colar no OBS'],
   ['#/artistas',  'Artistas',      'arte humana, feita à mão'],
   ['#/luzes',     'Luzes',         'o chat muda a cor das suas lâmpadas'],
+  ['#/suporte',   'Suporte',       'fale comigo quando algo não funcionar'],
 ];
 
 function nomeDaTela(hash) {
@@ -6876,6 +6878,7 @@ function telaAdmin() {
 
   tela.appendChild(blocoVitrine());
   tela.appendChild(blocoParceiros());
+  tela.appendChild(blocoSuporte());
   tela.appendChild(blocoAvisos());
   tela.appendChild(blocoSelos());
   tela.appendChild(blocoArtistas());
@@ -7339,6 +7342,165 @@ function telaArtistas() {
   }
 }
 
+/* ---------------- suporte ---------------- */
+
+function telaSuporte() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Suporte' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Conte o que aconteceu e eu respondo aqui mesmo. A resposta chega no sininho.' }));
+
+  if (!chave) {
+    tela.appendChild(h('div', { cls: 'vazio', txt: 'Entre com a Twitch pra abrir um chamado.' }));
+    return;
+  }
+
+  const assunto = h('input', { type: 'text', maxlength: '80', placeholder: 'o que está acontecendo, em poucas palavras' });
+  const mensagem = h('textarea', { maxlength: '2000', placeholder: 'Conte com detalhe: o que você fez, o que esperava e o que apareceu.',
+    style: 'width:100%;min-height:110px;font:14px inherit;color:var(--tinta);background:var(--fundo);'
+         + 'border:1px solid var(--linha);border-radius:4px;padding:10px 11px' });
+  const contato = h('input', { type: 'text', maxlength: '120', placeholder: 'e-mail ou Discord (opcional)' });
+
+  /* O print resolve metade dos chamados sem uma pergunta de ida e volta. */
+  const arq = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif', style: 'display:none' });
+  const btPrint = h('button', { cls: 'bt mini', type: 'button', txt: 'Anexar print' });
+  btPrint.onclick = () => arq.click();
+  arq.onchange = () => {
+    const f = arq.files && arq.files[0];
+    btPrint.textContent = f ? f.name.slice(0, 22) : 'Anexar print';
+  };
+
+  const enviar = h('button', { cls: 'bt principal', type: 'button', txt: 'Enviar' });
+  const meus = h('div');
+
+  const carrega = () => {
+    meus.innerHTML = '<p class="d">vendo…</p>';
+    api('/suporte.php').then((d) => {
+      meus.innerHTML = '';
+      const cs = d.chamados || [];
+      if (!cs.length) { meus.appendChild(h('p', { cls: 'd', txt: 'Você ainda não abriu nenhum chamado.' })); return; }
+
+      cs.forEach((s) => {
+        const cor = s.estado === 'respondido' ? 'var(--verde-forte)'
+                  : s.estado === 'fechado' ? 'var(--apagado)' : 'var(--dourado)';
+        const cx = h('div', { cls: 'fatia' }, [
+          h('div', { cls: 'campo', style: 'gap:10px' }, [
+            h('b', { style: 'flex:1', txt: s.assunto }),
+            h('span', { style: 'font-size:12px;color:' + cor, txt: s.estado }),
+            h('span', { cls: 'd', style: 'font-size:12px', txt: faz(s.ha) }),
+          ]),
+          h('p', { cls: 'd', style: 'white-space:pre-wrap', txt: s.mensagem }),
+        ]);
+        if (s.resposta) {
+          cx.appendChild(h('div', { style: 'border-left:3px solid var(--verde);padding-left:11px;margin-top:8px' }, [
+            h('p', { style: 'margin:0;white-space:pre-wrap;font-size:14px', txt: s.resposta }),
+          ]));
+        }
+        meus.appendChild(cx);
+      });
+    }).catch((e) => { meus.innerHTML = ''; meus.appendChild(h('p', { cls: 'd', txt: 'Não deu: ' + e.message })); });
+  };
+
+  enviar.onclick = async () => {
+    if (assunto.value.trim().length < 3) return recado('Escreva um assunto.', 'ruim');
+    if (mensagem.value.trim().length < 10) return recado('Conte com um pouco mais de detalhe.', 'ruim');
+
+    const f = arq.files && arq.files[0];
+    if (f && f.size > 4194304) return recado('O print pode ter no máximo 4 MB.', 'ruim');
+
+    const fd = new FormData();
+    fd.append('assunto', assunto.value);
+    fd.append('mensagem', mensagem.value);
+    fd.append('contato', contato.value);
+    if (f) fd.append('print', f);
+
+    enviar.disabled = true;
+    enviar.textContent = 'enviando…';
+    try {
+      const r = await fetch(API + '/suporte.php', { method: 'POST', headers: { 'X-Chave': chave }, body: fd });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.erro || 'não deu');
+      assunto.value = ''; mensagem.value = ''; arq.value = ''; btPrint.textContent = 'Anexar print';
+      recado('Chamado aberto. A resposta chega no sininho.', 'bom');
+      carrega();
+    } catch (e) { recado(e.message, 'ruim'); }
+    enviar.disabled = false;
+    enviar.textContent = 'Enviar';
+  };
+
+  tela.appendChild(h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Abrir um chamado' }),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Assunto' }), assunto]),
+    h('div', { cls: 'campo' }, [mensagem]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Contato' }), contato]),
+    h('div', { cls: 'campo', style: 'gap:8px' }, [btPrint, arq, enviar]),
+  ]));
+  tela.appendChild(h('h3', { style: 'margin-top:26px', txt: 'Os seus chamados' }));
+  tela.appendChild(meus);
+  carrega();
+}
+
+/* ---------------- a caixa de entrada do suporte ---------------- */
+
+function blocoSuporte() {
+  const cx = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Suporte' }),
+    h('p', { cls: 'd', txt: 'Quem é Pro vem na frente: suporte pessoal é o que o plano promete.' }),
+  ]);
+  const corpo = h('div');
+  cx.appendChild(corpo);
+
+  const carrega = () => {
+    corpo.innerHTML = '<p class="d">vendo…</p>';
+    api('/suporte.php?a=caixa').then((d) => {
+      corpo.innerHTML = '';
+      const cs = d.chamados || [];
+      if (!cs.length) return corpo.appendChild(h('p', { cls: 'd', txt: 'Nenhum chamado ainda.' }));
+
+      cs.forEach((s) => {
+        const resp = h('textarea', { maxlength: '4000', placeholder: 'sua resposta',
+          style: 'width:100%;min-height:70px;font:13px inherit;color:var(--tinta);background:var(--fundo);'
+               + 'border:1px solid var(--linha);border-radius:4px;padding:8px 9px' });
+        resp.value = s.resposta || '';
+
+        const manda = async (acao, extra) => {
+          try {
+            await api('/suporte.php', { method: 'POST',
+              body: JSON.stringify(Object.assign({ acao, id: s.id }, extra || {})) });
+            carrega();
+          } catch (e) { recado(e.message, 'ruim'); }
+        };
+
+        const bResp = h('button', { cls: 'bt mini', type: 'button', txt: 'Responder' });
+        bResp.onclick = () => manda('responder', { resposta: resp.value });
+        const bFecha = h('button', { cls: 'bt mini fraco', type: 'button', txt: 'Fechar' });
+        bFecha.onclick = () => manda('fechar');
+
+        const dentro = [
+          h('div', { cls: 'campo', style: 'gap:10px' }, [
+            h('b', { style: 'flex:1', txt: s.assunto }),
+            s.pro ? h('span', { cls: 'selo', txt: 'Pro' }) : h('span'),
+            h('span', { cls: 'd', style: 'font-size:12px', txt: '@' + s.login + '  ·  ' + faz(s.ha) + '  ·  ' + s.estado }),
+          ]),
+          h('p', { cls: 'd', style: 'white-space:pre-wrap', txt: s.mensagem }),
+        ];
+        if (s.contato) dentro.push(h('p', { cls: 'd', style: 'font-size:12px', txt: 'contato: ' + s.contato }));
+        if (s.print) {
+          const b = h('button', { cls: 'bt mini', type: 'button', txt: 'Ver o print' });
+          b.onclick = () => window.open(s.print, '_blank', 'noopener');
+          dentro.push(h('p', { style: 'margin:6px 0' }, [b]));
+        }
+        dentro.push(resp, h('div', { cls: 'campo', style: 'gap:6px;margin-top:6px' }, [bResp, bFecha]));
+
+        corpo.appendChild(h('div', { style: 'border-top:1px solid var(--linha);padding-top:12px;margin-top:12px' }, dentro));
+      });
+    }).catch((e) => { corpo.innerHTML = ''; corpo.appendChild(h('p', { cls: 'd', txt: 'Não deu: ' + e.message })); });
+  };
+
+  carrega();
+  return cx;
+}
+
 /* ---------------- recado pra quem usa o site ---------------- */
 
 function blocoAvisos() {
@@ -7696,6 +7858,7 @@ function rota() {
   if (p[0] === 'admin') return telaAdmin();
   if (p[0] === 'artistas') return telaArtistas();
   if (p[0] === 'luzes') return telaLuzes();
+  if (p[0] === 'suporte') return telaSuporte();
   if (p[0] === 'subathon') return telaSubathon();
   if (p[0] === 'mods') return telaMods();
   if (p[0] === 'novo' && TIPOS[p[1]]) return telaEditor(null, p[1]);

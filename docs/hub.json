@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-12",
+      "titulo": "Suporte",
+      "texto": "Deu problema? Conte na tela de Suporte, com um print se ajudar. A resposta chega no sininho, aqui mesmo, sem e-mail no meio."
+    },
+    {
+      "data": "2026-09-12",
       "titulo": "Avisos, seguir e marcar gente",
       "texto": "Um sininho na barra avisa quando curtem, comentam ou marcam você com @ num zoc. Dá pra seguir quem você gosta aqui dentro, e o nome marcado leva pro canal da pessoa."
     },
