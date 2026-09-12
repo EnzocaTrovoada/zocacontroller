@@ -1161,6 +1161,19 @@ try {
     width: 22px; text-align: right; color: var(--apagado);
     font: 500 12px var(--mono); font-variant-numeric: tabular-nums;
   }
+  .trecho-ic {
+    width: 30px; height: 26px; flex: none; padding: 0; cursor: pointer;
+    border: 1px dashed var(--linha2); border-radius: 4px; background: none;
+    display: grid; place-items: center; color: var(--apagado); font-size: 14px;
+  }
+  .trecho-ic:hover { border-color: var(--verde); border-style: solid; color: var(--verde); }
+  .trecho-ic img { width: 20px; height: 20px; object-fit: contain; display: block; }
+  .modelo-linha {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid var(--linha);
+  }
+  .modelo-linha:last-child { border-bottom: 0; }
+  .modelo-linha small { display: block; color: var(--apagado); font-size: 12px; margin-top: 2px; }
   /* O tempo de referência de cada trecho: só leitura, e discreto de
      propósito — ele é medido correndo, não digitado. */
   /* A saída do diagnóstico. Monoespaçada e com quebra preservada: são
@@ -2090,13 +2103,20 @@ function empurra() {
   futuro = [];
 }
 
-function aplicaEstado(s) {
-  cfg = JSON.parse(s);
-  manda();
+/* Põe na tela o que a config diz. Quem mexe em cfg por fora do campo —
+   desfazer, estilo pronto, modelo de speedrun — precisa chamar isto, senão
+   o valor novo vale mas o campo continua mostrando o velho. */
+function sincronizaCampos() {
   Object.keys(camposPorChave).forEach((k) => {
     const c = camposPorChave[k];
     if (c && c.controle && c.controle.__sincroniza) c.controle.__sincroniza();
   });
+}
+
+function aplicaEstado(s) {
+  cfg = JSON.parse(s);
+  manda();
+  sincronizaCampos();
   redesenhar.forEach((f) => f());
 }
 
@@ -2197,7 +2217,9 @@ const observador = ('IntersectionObserver' in window) ? new IntersectionObserver
 let exemploPendente = null;
 function manda() {
   if (!quadro || !quadro.contentWindow) return;
-  try { quadro.contentWindow.postMessage({ type: 'zc:config', config: cfg }, location.origin); } catch (e) {}
+  try {
+    quadro.contentWindow.postMessage({ type: 'zc:config', config: comIcones(cfg) }, location.origin);
+  } catch (e) {}
   /* Trocar de tipo remonta o desenhista e esvazia a lista. Repovoo depois de
      um respiro, e so uma vez por rajada de ajustes. */
   if (cfg.tipo === 'chat' || cfg.tipo === 'feed' || cfg.tipo === 'musica') {
@@ -2390,6 +2412,245 @@ function montaBandejas() {
   ].forEach(([n, txt, url]) => {
     bf.appendChild(h('a', { href: url }, [document.createTextNode(n), h('small', { txt })]));
   });
+}
+
+/* ---------------- ícones, modelos e o arquivo do LiveSplit ---------------- */
+
+/* Qualquer chave pública da conta abre a imagem: o endereço confere a chave
+   com o DONO, não com um overlay. É por isso que o ícone aparece igual na
+   prévia do editor e dentro do OBS. */
+function chaveDeImagem() {
+  if (editando && editando.chave_publica) return editando.chave_publica;
+  const p = perfis.filter((x) => x && x.chave_publica)[0];
+  return p ? p.chave_publica : '';
+}
+
+function urlDaImagem(id, chavePub) {
+  const k = chavePub || chaveDeImagem();
+  return k ? API + '/imagens.php?a=ver&k=' + encodeURIComponent(k) + '&id=' + id : '';
+}
+
+/* O endereço do ícone não mora na config: quem o escreve é o servidor, na
+   hora de entregar a overlay pro OBS. A prévia aqui do site não passa por
+   lá, então monta o dela na mão — numa CÓPIA, porque o que está em cfg é o
+   que vai ser salvo, e endereço salvo envelhece. */
+function comIcones(c, chavePub) {
+  if (c.tipo !== 'speedrun' || !Array.isArray(c.sptre)) return c;
+
+  const k = chavePub || chaveDeImagem();
+  if (!k) return c;
+
+  return Object.assign({}, c, { sptre: c.sptre.map((tr) => (tr && tr.i)
+    ? Object.assign({}, tr, { iu: urlDaImagem(tr.i, k) })
+    : tr) });
+}
+
+/* Sobe sem passar pelo api(): multipart precisa que o navegador escreva o
+   Content-Type com a fronteira dentro, e o api() força application/json. */
+async function subaImagem(arquivo, nome) {
+  const fd = new FormData();
+  fd.append('img', arquivo);
+  if (nome) fd.append('nome', nome);
+
+  const r = await fetch(API + '/imagens.php', { method: 'POST',
+    headers: { 'X-Chave': chave }, body: fd });
+  let d = {};
+  try { d = await r.json(); } catch (e) {}
+  if (!r.ok || !d.id) throw new Error(d.erro || 'não consegui guardar o ícone');
+  return d.id;
+}
+
+/* O ícone dentro do .lss é um objeto do .NET em base64, com cabeçalho na
+   frente da imagem. Achar a assinatura do PNG e cortar dali cobre tanto o
+   arquivo antigo quanto o novo, que já grava o PNG puro. */
+function pngDoLss(base64) {
+  let bruto;
+  try { bruto = atob(String(base64).replace(/[^A-Za-z0-9+/=]/g, '')); } catch (e) { return null; }
+
+  const assinatura = String.fromCharCode(137, 80, 78, 71, 13, 10, 26, 10);
+  const i = bruto.indexOf(assinatura);
+  if (i < 0) return null;
+
+  const corte = bruto.slice(i);
+  const bytes = new Uint8Array(corte.length);
+  for (let k = 0; k < corte.length; k++) bytes[k] = corte.charCodeAt(k) & 255;
+  return new Blob([bytes], { type: 'image/png' });
+}
+
+/* 64 pixels bastam num ícone de trecho, e o do LiveSplit costuma vir bem
+   maior: encolher aqui evita subir meio megabyte por trecho. */
+function encolhe(blob, lado) {
+  return new Promise((ok, falha) => {
+    const endereco = URL.createObjectURL(blob);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(endereco);
+      const c = document.createElement('canvas');
+      c.width = lado; c.height = lado;
+      const g = c.getContext('2d');
+      const e = Math.min(lado / img.width, lado / img.height, 1);
+      const w = Math.max(1, Math.round(img.width * e));
+      const a = Math.max(1, Math.round(img.height * e));
+      g.drawImage(img, Math.round((lado - w) / 2), Math.round((lado - a) / 2), w, a);
+      c.toBlob((b) => (b ? ok(b) : falha(new Error('não consegui encolher o ícone'))), 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(endereco); falha(new Error('ícone inválido')); };
+    img.src = endereco;
+  });
+}
+
+const msDoLss = (txt) => {
+  const m = /(\d+):(\d\d):(\d\d(?:\.\d+)?)/.exec(String(txt || ''));
+  return m ? Math.round(((+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3])) * 1000) : null;
+};
+
+/**
+ * Monta os trechos a partir de um .lss do LiveSplit.
+ *
+ * O arquivo é lido aqui no navegador de propósito: XML de estranho nunca
+ * chega no servidor, que é onde essa classe de ataque mora.
+ */
+async function importaLss(arquivo, grava) {
+  const doc = new DOMParser().parseFromString(await arquivo.text(), 'application/xml');
+  if (doc.querySelector('parsererror')) throw new Error('Esse arquivo não parece um .lss.');
+
+  const segs = [].slice.call(doc.querySelectorAll('Segments > Segment'));
+  if (!segs.length) throw new Error('Não achei trechos nesse arquivo.');
+  if (!confirm(Math.min(segs.length, 40) + ' trechos encontrados. Trazer pra cá?\n\n'
+    + 'Isso substitui os trechos que estão aí agora. Ctrl+Z desfaz.')) return;
+
+  recado('Lendo o arquivo…');
+  const trechos = [];
+
+  for (let i = 0; i < Math.min(segs.length, 40); i++) {
+    const s = segs[i];
+    const nomeEl = s.querySelector('Name');
+    const item = { n: nomeEl ? nomeEl.textContent.slice(0, 40) : 'Trecho ' + (i + 1),
+                   p: null, b: null };
+
+    /* O recorde de cada trecho é o tempo acumulado do "Personal Best". */
+    [].slice.call(s.querySelectorAll('SplitTimes > SplitTime')).forEach((x) => {
+      if (x.getAttribute('name') !== 'Personal Best') return;
+      const rt = x.querySelector('RealTime');
+      if (rt) item.p = msDoLss(rt.textContent);
+    });
+
+    const melhor = s.querySelector('BestSegmentTime > RealTime');
+    if (melhor) item.b = msDoLss(melhor.textContent);
+
+    const icone = s.querySelector('Icon');
+    if (icone && icone.textContent.trim()) {
+      const png = pngDoLss(icone.textContent);
+      /* Um ícone que não sobe não pode derrubar a importação inteira. */
+      if (png) {
+        try { item.i = await subaImagem(await encolhe(png, 64), item.n); } catch (e) {}
+      }
+    }
+    trechos.push(item);
+  }
+
+  const jogo = doc.querySelector('GameName');
+  const cat  = doc.querySelector('CategoryName');
+  if (jogo && jogo.textContent.trim()) cfg.sptit = jogo.textContent.trim().slice(0, 40);
+  if (cat  && cat.textContent.trim())  cfg.spcat = cat.textContent.trim().slice(0, 40);
+
+  grava(trechos);
+  sincronizaCampos();
+  recado(trechos.length + ' trechos vieram do LiveSplit, com ícones e tudo.', 'bom');
+}
+
+/** A prateleira de modelos que outras pessoas publicaram. */
+function abreModelos(grava) {
+  fechaPop();
+
+  const caixa = h('div', { cls: 'pop__caixa' });
+  const fundo = h('div', { cls: 'pop', id: 'pop' }, [caixa]);
+  fundo.onclick = (e) => { if (e.target === fundo) fechaPop(); };
+  document.addEventListener('keydown', popTecla);
+
+  const x = h('button', { cls: 'pop__x', type: 'button', txt: '×', title: 'Fechar' });
+  x.onclick = fechaPop;
+
+  const busca = h('input', { type: 'text', placeholder: 'Procurar por jogo…' });
+  const lista = h('div');
+
+  const carrega = () => {
+    lista.textContent = 'procurando…';
+    fetch(API + '/corridas.php?q=' + encodeURIComponent(busca.value.trim()))
+      .then((r) => r.json())
+      .then((d) => {
+        lista.textContent = '';
+        const ms = d.modelos || [];
+        if (!ms.length) {
+          lista.appendChild(h('p', { cls: 'sub', txt: busca.value.trim()
+            ? 'Nenhum modelo desse jogo ainda. Publique o seu e ele fica aqui.'
+            : 'Ainda não tem modelo nenhum publicado. O primeiro pode ser o seu.' }));
+          return;
+        }
+
+        ms.forEach((m) => {
+          const usar = h('button', { cls: 'bt mini', type: 'button', txt: 'Usar' });
+          usar.onclick = async () => {
+            if (!confirm('Usar o modelo "' + m.jogo + '"?\n\nEle substitui os trechos que estão '
+              + 'aí agora. Os tempos começam do zero — são seus, não de quem publicou.')) return;
+
+            usar.disabled = true;
+            try {
+              const r = await api('/corridas.php', { method: 'POST',
+                body: JSON.stringify({ acao: 'aplicar', id: m.id }) });
+              if (r.jogo) cfg.sptit = r.jogo.slice(0, 40);
+              cfg.spcat = (r.categoria || '').slice(0, 40);
+              grava((r.trechos || []).map((tr) => Object.assign({ p: null, b: null }, tr)));
+              sincronizaCampos();
+              fechaPop();
+              recado('Modelo aplicado. Ctrl+Z volta como estava.', 'bom');
+            } catch (e) { recado(e.message, 'ruim'); usar.disabled = false; }
+          };
+
+          const acoes = [usar];
+          if (souAdmin || (quemSou && m.autor === quemSou)) {
+            const fora = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×',
+              title: 'Tirar este modelo do ar' });
+            fora.onclick = async () => {
+              if (!confirm('Tirar "' + m.jogo + '" da lista de modelos?')) return;
+              fora.disabled = true;
+              try {
+                await api('/corridas.php', { method: 'POST', body: JSON.stringify({
+                  acao: m.autor === quemSou ? 'apagar' : 'ocultar', id: m.id }) });
+                carrega();
+              } catch (e) { recado(e.message, 'ruim'); fora.disabled = false; }
+            };
+            acoes.push(fora);
+          }
+
+          lista.appendChild(h('div', { cls: 'modelo-linha' }, [
+            h('div', { style: 'flex:1 1 auto;min-width:0' }, [
+              h('b', { txt: m.jogo }),
+              h('small', { txt: (m.categoria || 'sem categoria') + ' · ' + m.quantos
+                + (m.quantos === 1 ? ' trecho' : ' trechos') + ' · de @' + m.autor
+                + (m.usos ? ' · usado ' + m.usos + (m.usos === 1 ? ' vez' : ' vezes') : '') }),
+            ]),
+          ].concat(acoes)));
+        });
+      })
+      .catch(() => { lista.textContent = 'Não consegui buscar agora. Tente de novo.'; });
+  };
+
+  let bateu = null;
+  busca.oninput = () => { clearTimeout(bateu); bateu = setTimeout(carrega, 400); };
+
+  caixa.appendChild(h('div', { cls: 'pop__topo' }, [
+    x,
+    h('h2', { txt: 'Modelos de speedrun' }),
+    h('p', { cls: 'sub', txt: 'Listas de trechos que outras pessoas já montaram. '
+      + 'Os ícones vêm junto; os tempos, não — esses só existem correndo.' }),
+    h('div', { cls: 'campo' }, [busca]),
+  ]));
+  caixa.appendChild(h('div', { cls: 'pop__corpo' }, [lista]));
+
+  document.body.appendChild(fundo);
+  carrega();
 }
 
 /* ---------------- fábrica de controles ---------------- */
@@ -2785,10 +3046,48 @@ const FABRICA = {
         const marca = h('span', { cls: 'trecho-t', txt:
           tr.p != null ? Speedrun.tempo(tr.p, false) : '—' });
 
-        caixa.appendChild(h('div', { cls: 'trecho' }, [
-          h('span', { cls: 'trecho-n', txt: String(i + 1) }),
-          nome, marca, sobe, desce, fora,
-        ]));
+        /* O ícone do trecho, como no LiveSplit. Fica no depósito de
+           imagens da conta e é servido pela chave pública do overlay, que
+           é a única que a fonte do OBS tem. */
+        const arq = h('input', { type: 'file', style: 'display:none',
+          accept: 'image/png,image/webp,image/gif,image/jpeg' });
+        const bic = h('button', { cls: 'trecho-ic', type: 'button',
+          title: tr.i ? 'Trocar o ícone' : 'Pôr um ícone' });
+        const url = tr.i ? urlDaImagem(tr.i) : '';
+        if (url) bic.appendChild(h('img', { src: url, alt: '' }));
+        else bic.textContent = tr.i ? '✓' : '+';
+
+        bic.onclick = () => arq.click();
+        arq.onchange = async () => {
+          const f = arq.files && arq.files[0];
+          arq.value = '';
+          if (!f) return;
+          if (f.size > 262144) return recado('O ícone pode ter no máximo 256 KB.', 'ruim');
+          bic.disabled = true;
+          try {
+            const id = await subaImagem(f, tr.n);
+            const l = cfg[it.k].slice();
+            l[i] = Object.assign({}, l[i], { i: id });
+            grava(l);
+          } catch (e) { bic.disabled = false; recado(e.message, 'ruim'); }
+        };
+
+        const linha = [h('span', { cls: 'trecho-n', txt: String(i + 1) }), bic, arq, nome, marca];
+        if (tr.i) {
+          const semIc = h('button', { cls: 'bt mini', type: 'button', txt: '⌫',
+            title: 'Tirar o ícone deste trecho' });
+          semIc.onclick = () => {
+            const l = cfg[it.k].slice();
+            const novo = Object.assign({}, l[i]);
+            delete novo.i;
+            l[i] = novo;
+            grava(l);
+          };
+          linha.push(semIc);
+        }
+        linha.push(sobe, desce, fora);
+
+        caixa.appendChild(h('div', { cls: 'trecho' }, linha));
       });
 
       const mais = h('button', { cls: 'bt mini', type: 'button', txt: '+ Adicionar trecho' });
@@ -2798,7 +3097,47 @@ const FABRICA = {
         l.push({ n: '', p: null, b: null });
         grava(l);
       };
-      caixa.appendChild(mais);
+
+      const lss = h('input', { type: 'file', style: 'display:none',
+        accept: '.lss,application/xml,text/xml' });
+      const btLss = h('button', { cls: 'bt mini', type: 'button', txt: 'Trazer do LiveSplit',
+        title: 'Abrir um arquivo .lss e montar os trechos a partir dele' });
+      btLss.onclick = () => lss.click();
+      lss.onchange = async () => {
+        const f = lss.files && lss.files[0];
+        lss.value = '';
+        if (!f) return;
+        btLss.disabled = true;
+        try { await importaLss(f, grava); } catch (e) { recado(e.message, 'ruim'); }
+        btLss.disabled = false;
+      };
+
+      const btModelos = h('button', { cls: 'bt mini', type: 'button', txt: 'Modelos prontos',
+        title: 'Trechos que outras pessoas já montaram' });
+      btModelos.onclick = () => abreModelos(grava);
+
+      const btPublicar = h('button', { cls: 'bt mini', type: 'button', txt: 'Publicar como modelo' });
+      btPublicar.onclick = async () => {
+        const atuais = Array.isArray(cfg[it.k]) ? cfg[it.k] : [];
+        if (!atuais.length) return recado('Monte os trechos antes de publicar.', 'ruim');
+
+        const jogo = (cfg.sptit || '').trim();
+        if (!jogo) return recado('Escreva o nome do jogo lá em cima antes de publicar o modelo.', 'ruim');
+        if (!confirm('Publicar "' + jogo + '" como modelo?\n\nQualquer pessoa vai poder usar os '
+          + 'nomes e os ícones dos seus trechos. Os seus tempos não vão junto.')) return;
+
+        btPublicar.disabled = true;
+        try {
+          await api('/corridas.php', { method: 'POST', body: JSON.stringify({
+            acao: 'publicar', jogo, categoria: cfg.spcat || '',
+            trechos: atuais.map((x) => ({ n: x.n, i: x.i })) }) });
+          recado('Modelo publicado. Ele já aparece em "Modelos prontos" pra todo mundo.', 'bom');
+        } catch (e) { recado(e.message, 'ruim'); }
+        btPublicar.disabled = false;
+      };
+
+      caixa.appendChild(h('div', { cls: 'campo', style: 'gap:6px;margin:8px 0 0' },
+        [mais, btLss, lss, btModelos, btPublicar]));
     };
 
     redesenhar.push(pinta);
@@ -4788,7 +5127,8 @@ function telaLista(filtro) {
       : (TIPOS[p.tipo] ? TIPOS[p.tipo].txt : p.tipo);
 
     const previa = h('div', { cls: 'previa xadrez' });
-    previa.dataset.cfg = JSON.stringify(Object.assign(padraoDe(p.tipo), c));
+    previa.dataset.cfg = JSON.stringify(
+      comIcones(Object.assign(padraoDe(p.tipo), c), p.chave_publica));
     if (observador) observador.observe(previa);
 
     /* PAROU DE APARECER, MAS NÃO SUMIU.
@@ -5143,10 +5483,7 @@ function telaEditor(perfil, tipoNovo) {
     b.onclick = () => {
       Object.keys(pr[2]).forEach((k) => { cfg[k] = pr[2][k]; });
       manda();
-      Object.keys(camposPorChave).forEach((k) => {
-        const c = camposPorChave[k];
-        if (c && c.controle && c.controle.__sincroniza) c.controle.__sincroniza();
-      });
+      sincronizaCampos();
       redesenhar.forEach((f) => f());
       marcaHistorico(true);
       recado('Estilo "' + pr[0] + '" aplicado. Ctrl+Z volta.');

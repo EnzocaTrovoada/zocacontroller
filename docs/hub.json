@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-12",
+      "titulo": "Speedrun: ícone por trecho, modelos prontos e o seu .lss",
+      "texto": "Cada trecho pode ter o ícone dele, igual ao LiveSplit. Dá pra abrir o seu arquivo .lss e a lista se monta sozinha, com ícones e tempos. E quem monta uma boa lista pode publicar como modelo: os outros aplicam num clique, sem digitar trecho por trecho."
+    },
+    {
+      "data": "2026-09-12",
       "titulo": "O feed virou a coluna da esquerda",
       "texto": "Ele ocupa a lateral inteira da tela, colado na borda, e rola por dentro enquanto o resto da página fica parado. O Descobrir e as novidades foram pro meio."
     },
