@@ -99,6 +99,11 @@ return [
              . 'A sua ponte (aquela caixinha branca) precisa estar ligada na internet.',
     'nuvem' => true,
 
+    /* Sem o app cadastrado no config, a Philips nem aparece na lista de
+       marcas: oferecer um botão que só sabe dar erro é pior do que não
+       oferecer marca nenhuma. */
+    'oculto' => empty(cfg()['philips_hue']['client_id']),
+
     /* Nada pra digitar: quem pergunta é a Philips, na casa dela. */
     'campos' => [],
 
