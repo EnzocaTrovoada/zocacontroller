@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-12",
+      "titulo": "Um botão 'Como usar' em cada tela",
+      "texto": "Na ponta direita da linha de cima. Ele abre quatro ou cinco passos da tela em que você está, e só dela — em vez de um manual gigante onde você teria que achar o parágrafo certo."
+    },
+    {
+      "data": "2026-09-12",
       "titulo": "Philips Hue, Positivo, Avant Neo e Smart Life",
       "texto": "O !luz agora fala com mais marcas. A Philips Hue conecta com um clique — você entra na conta da Philips e pronto. Positivo Casa Inteligente, Avant Neo e Smart Life entram pela Tuya, que é a nuvem de todas elas por dentro."
     },

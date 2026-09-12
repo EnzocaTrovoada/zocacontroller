@@ -272,6 +272,29 @@ try {
   .caminho b { color: var(--tinta); font-weight: 600; }
   .caminho span { color: var(--linha2); }
 
+  /* O "Como usar" fica na ponta direita da linha do caminho: perto de onde
+     a pessoa está, longe do que ela está fazendo. */
+  .caminho__ajuda {
+    margin-left: auto; flex: none;
+    border: 1px solid var(--linha2) !important; border-radius: 999px;
+    padding: 3px 11px !important; color: var(--fraco);
+    background: var(--caixa) !important;
+  }
+  .caminho__ajuda:hover {
+    border-color: var(--verde) !important; color: var(--verde-forte);
+    text-decoration: none !important;
+  }
+  .passo { display: flex; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--linha); }
+  .passo:last-child { border-bottom: 0; }
+  .passo__n {
+    flex: none; width: 24px; height: 24px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--verde-fraco); color: var(--verde-forte);
+    font: 600 12px var(--mono);
+  }
+  .passo b { display: block; font: 600 14px var(--disp); margin-bottom: 2px; }
+  .passo span { font-size: 13px; color: var(--fraco); line-height: 1.5; }
+
   .busca { position: relative; margin-left: 6px; }
   .busca input {
     width: 190px; font: 12.5px var(--mono); color: var(--tinta);
@@ -3340,6 +3363,116 @@ const FABRICA = {
   },
 };
 
+/* ---------------- como usar cada tela ----------------
+
+   Quatro ou cinco passos por tela, e só da tela em que a pessoa está.
+   Um manual único obrigaria a achar o parágrafo certo no meio de tudo — e
+   quem abre um manual pra achar uma coisa não lê, desiste.
+
+   A chave é o primeiro pedaço do endereço. Tela que não está aqui
+   simplesmente não mostra o botão. */
+const COMO_USAR = {
+  inicio: ['A página inicial', [
+    ['O feed é a coluna da esquerda', 'Quem usa o site posta ali. Curtir, comentar e marcar alguém com @ funcionam como em qualquer rede — e quem for marcado recebe o aviso no sininho.'],
+    ['Zocar é postar', 'O botão "Zocar" manda o seu recado pro feed. O seu nome leva pro seu canal na Twitch.'],
+    ['Descobrir', 'O carrossel do meio mostra quem está ao vivo agora usando o site. É de lá que sai gente nova pra seguir.'],
+    ['O sininho', 'Curtida, comentário, marcação e recado meu chegam ali. Nada disso vai pro seu e-mail.'],
+  ]],
+
+  overlays: ['Overlays no OBS', [
+    ['Um overlay, uma coisa', 'Relógio, meta, chat, alerta, speedrun: cada um é uma fonte separada no OBS. Crie quantos quiser.'],
+    ['Monte aqui, veja aqui', 'A prévia do editor é o mesmo desenho que vai pro OBS. Arraste as peças com o mouse.'],
+    ['Cole o link no OBS', 'Copie o link do overlay, e no OBS faça: + → Fonte de navegador → cole em URL. Largura 1920, altura 1080.'],
+    ['Pode fechar esta aba', 'O overlay não depende do site aberto: ele busca a configuração sozinho. Mudou aqui, muda lá.'],
+    ['O link não carrega a sua chave', 'Ele só mostra o desenho. Pode aparecer na live sem risco nenhum.'],
+  ]],
+
+  novo: ['Montando o overlay', [
+    ['Arraste as peças', 'Clique e arraste direto na prévia. Segure Shift pra travar no eixo, e dê dois cliques numa peça pra pular pro campo dela.'],
+    ['Ctrl+Z volta', 'E Ctrl+Shift+Z refaz. Dá pra experimentar sem medo.'],
+    ['Os estilos prontos', 'Os botões em cima da prévia trocam cor, fonte e tamanho de uma vez. São um ponto de partida, não uma prisão.'],
+    ['Salve no fim', 'Enquanto você mexe, nada muda no OBS de quem está assistindo. Só o salvar publica.'],
+  ]],
+
+  meu: ['Meu Controller', [
+    ['A chave é sua senha', 'Ela abre este painel. Nunca mostre na live, e não cole em site nenhum além deste.'],
+    ['A ponte é o que fala com o OBS', 'Ponha o link da ponte como Fonte de navegador numa cena que fique sempre ativa. Sem ela, comando do chat não mexe no OBS.'],
+    ['Ligue os avisos da Twitch', 'Follow e alguns eventos não passam pelo chat. Sem ligar isso, o alerta de follow nunca dispara.'],
+    ['Plano', 'O grátis funciona. O Pro tira os limites de quantidade e libera o que é mais pesado.'],
+  ]],
+
+  comandos: ['Comandos do chat', [
+    ['Os de fábrica já funcionam', 'Não precisa criar nada pra usar !cena, !mute ou !luz. A etiqueta ao lado diz quem pode cada um.'],
+    ['Os seus são apelidos', 'Um comando seu não é código novo: é um nome curto pra uma ação que já existe, com o argumento pronto. "!brb" vira "cena Cenário BRB".'],
+    ['Um comando pode ter vários passos', 'Trocar de cena, mutar o microfone e mudar a luz, tudo com uma palavra só.'],
+    ['Gatilhos são sem comando', 'Em vez do chat digitar, quem dispara é o que acontece: sub, bits, follow, raid.'],
+  ]],
+
+  subathon: ['Subathon', [
+    ['O overlay é o relógio, isto aqui é a regra', 'Criar o overlay não basta: é nesta tela que você diz quanto cada sub, bit ou real soma.'],
+    ['Ligue', 'Com a chave desligada o cronômetro fica parado, e ninguém entende por quê.'],
+    ['O teto existe por um motivo', 'Sem limite, um raid generoso transforma o subathon em uma semana. Ponha um máximo que você aguenta.'],
+  ]],
+
+  mods: ['Moderadores', [
+    ['Cada um tem o link dele', 'Não existe senha compartilhada: cada moderador recebe um link só dele, que abre só o que você liberou.'],
+    ['O link fica tapado', 'Clique no olho pra ver e copiar. Ele nasce escondido pra não aparecer num print ou no VOD.'],
+    ['Perdeu ou vazou? Gere outro', 'Gerar um novo derruba o antigo na hora. Quem tinha o velho fica de fora.'],
+  ]],
+
+  luzes: ['Luzes pelo chat', [
+    ['Conecte a marca', 'Philips Hue é um clique. LIFX e Govee pedem um token do aplicativo delas. Positivo, Avant Neo e Smart Life entram pela Tuya.'],
+    ['Escolha quais obedecem', 'Só as lâmpadas marcadas mudam de cor. As outras ficam fora do alcance do chat.'],
+    ['O chat diz a cor', '!luz vermelho, !luz #FF00AA, !luz off. Sem saber hexadecimal.'],
+    ['Cenas são palavras suas', 'Cadastre "festa" com uma cor e um brilho, e o chat só digita !luz festa. Cada cena escolhe quem pode usar.'],
+  ]],
+
+  artistas: ['Artistas', [
+    ['A galeria é aberta', 'Qualquer um vê, com conta ou sem. O artista se inscreve pelo botão e manda as artes.'],
+    ['O selo "sem IA" é conferido na mão', 'Eu olho arte por arte. Não é algoritmo, e é por isso que ele vale alguma coisa.'],
+    ['Serve pra contratar', 'O perfil leva pro portfólio da pessoa. O combinado é entre vocês dois — o site não fica no meio.'],
+  ]],
+
+  suporte: ['Suporte', [
+    ['Conte o que aconteceu', 'Sem formulário gigante: o que você fez, o que esperava e o que apareceu.'],
+    ['O print ajuda muito', 'Uma imagem da tela costuma resolver em um recado o que três mensagens não resolvem.'],
+    ['A resposta chega no sininho', 'Aqui mesmo, sem e-mail no meio. Quem responde sou eu.'],
+  ]],
+};
+
+/** O "Como usar" da tela aberta, se houver. */
+function abreComoUsar(chaveTela) {
+  const item = COMO_USAR[chaveTela];
+  if (!item) return;
+
+  fechaPop();
+
+  const caixa = h('div', { cls: 'pop__caixa' });
+  const fundo = h('div', { cls: 'pop', id: 'pop' }, [caixa]);
+  fundo.onclick = (e) => { if (e.target === fundo) fechaPop(); };
+  document.addEventListener('keydown', popTecla);
+
+  const x = h('button', { cls: 'pop__x', type: 'button', txt: '×', title: 'Fechar' });
+  x.onclick = fechaPop;
+
+  const corpo = h('div', { cls: 'pop__corpo' });
+  item[1].forEach((p, i) => {
+    corpo.appendChild(h('div', { cls: 'passo' }, [
+      h('span', { cls: 'passo__n', txt: String(i + 1) }),
+      h('div', {}, [h('b', { txt: p[0] }), h('span', { txt: p[1] })]),
+    ]));
+  });
+
+  const ajuda = h('button', { cls: 'bt mini', type: 'button', txt: 'Ainda ficou dúvida? Me chame' });
+  ajuda.onclick = () => { fechaPop(); vaiPara('#/suporte'); };
+  corpo.appendChild(h('div', { cls: 'campo', style: 'margin-top:14px' }, [ajuda]));
+
+  caixa.appendChild(h('div', { cls: 'pop__topo' }, [x, h('h2', { txt: item[0] })]));
+  caixa.appendChild(corpo);
+
+  document.body.appendChild(fundo);
+}
+
 /* ---------------- onde você está, e como chegar ---------------- */
 
 /* O NOME DE CADA TELA, num lugar só.
@@ -3397,6 +3530,16 @@ function pintaCaminho() {
     cx.appendChild(h('b', { txt: folha }));
   } else {
     cx.appendChild(h('b', { txt: meio }));
+  }
+
+  /* 'editar' e 'novo' são a mesma tela pra quem usa. */
+  const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/')[0];
+  const qual = p === 'editar' ? 'novo' : (p || 'overlays');
+  if (COMO_USAR[qual]) {
+    const b = h('button', { cls: 'caminho__ajuda', type: 'button', txt: 'Como usar',
+      title: 'O essencial desta tela, em quatro linhas' });
+    b.onclick = () => abreComoUsar(qual);
+    cx.appendChild(b);
   }
 
   cx.classList.remove('escondido');
