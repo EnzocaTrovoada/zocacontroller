@@ -177,6 +177,18 @@ if ($perfil['tipo'] === 'alerta' && !empty($config['asomid'])) {
          . '&id=' . (int) $config['asomid'];
 }
 
+/* O ÍCONE DE CADA TRECHO, COM O ENDEREÇO PRONTO.
+
+   Montado aqui pelo mesmo motivo do som: quem sabe onde a API mora é o
+   servidor, e a fonte dentro do OBS só tem a chave pública. */
+if ($perfil['tipo'] === 'speedrun' && !empty($config['sptre']) && is_array($config['sptre'])) {
+    foreach ($config['sptre'] as $k => $tr) {
+        if (empty($tr['i'])) continue;
+        $config['sptre'][$k]['iu'] = api_base() . '/imagens.php?a=ver&k=' . rawurlencode($chave)
+                                   . '&id=' . (int) $tr['i'];
+    }
+}
+
 /* ETag: quase toda resposta vira um 304 de poucos bytes. O polling sai de graça.
    O número automático entra na conta — sem ele o 304 devolveria o valor velho
    pra sempre e a meta ficaria congelada, justo a que deveria se mexer sozinha. */

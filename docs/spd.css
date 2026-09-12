@@ -149,3 +149,10 @@
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
+
+/* O ícone do trecho acompanha o tamanho da letra: a overlay é redimensionada
+   pelo tamanho da fonte, e um ícone em pixel fixo descolaria dela. */
+.sp__ic {
+  width: 1.15em; height: 1.15em; object-fit: contain;
+  vertical-align: -.18em; margin-right: .45em;
+}

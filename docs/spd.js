@@ -171,8 +171,12 @@
         var direita = passou ? tempo(feitos[i], false)
                              : (tr.p != null ? tempo(tr.p, false) : '—');
 
+        /* O ícone vem com o endereço pronto do servidor: a fonte do OBS não
+           sabe onde a API mora. */
+        var ic = tr.iu ? '<img class="sp__ic" src="' + esc(tr.iu) + '" alt="">' : '';
+
         html += '<div class="' + cls + '">'
-              +   '<span class="sp__nome">' + esc(tr.n || ('Trecho ' + (i + 1))) + '</span>'
+              +   '<span class="sp__nome">' + ic + esc(tr.n || ('Trecho ' + (i + 1))) + '</span>'
               +   '<span class="sp__d ' + meioCls + '">' + meio + '</span>'
               +   '<span class="sp__pb">' + direita + '</span>'
               + '</div>';
