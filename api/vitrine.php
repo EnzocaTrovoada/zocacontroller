@@ -543,8 +543,13 @@ if (isset($_GET['cron'])) {
     $cfg = vitrine_config();
     if (!vitrine_pegou_a_trava()) json_saida(['ok' => true, 'pulou' => 'já tem uma rodando']);
 
+    /* A rotina dos avisos pega carona: um cron só na hospedagem. */
+    require_once __DIR__ . '/lib/notificacoes.php';
+    $avisos = notificacoes_rotina();
+
     try {
         $feito = vitrine_atualiza($cfg, vitrine_bloqueados(), (string) $cfg['idioma']);
+        $feito['avisos'] = $avisos;
     } finally {
         vitrine_solta_a_trava();
     }

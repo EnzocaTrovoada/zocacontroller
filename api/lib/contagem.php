@@ -219,6 +219,11 @@ function contagem(int $usuario_id, string $fonte, int $maxIdade = 60, string $pl
        no mesmo alvo daria um numero que nao quer dizer nada. */
     if ($plataforma === 'twitch') meta_bateu($usuario_id, $fonte, $valor);
 
+    if ($plataforma === 'twitch' && $fonte === 'seguidores') {
+        require_once __DIR__ . '/notificacoes.php';
+        notifica_marco($usuario_id, (int) ($anterior ?? 0), $valor);
+    }
+
     return $valor;
 }
 

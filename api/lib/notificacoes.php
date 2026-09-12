@@ -141,3 +141,111 @@ function notifica_so_plano(string $grupo, ?string $ref): int
     }
     return $ficam;
 }
+
+/* ------------------------------------------------------------------ *
+ *  Os que avisam sozinhos
+ * ------------------------------------------------------------------ */
+
+/* Nada de marco a cada 10: aviso que chega sempre vira aviso que ninguém lê. */
+const NOTIF_MARCOS = [50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
+
+/**
+ * Passou de um número redondo de seguidores.
+ *
+ * Só com um valor anterior de verdade: na primeira leitura de um canal que
+ * já tem mil seguidores, "antes" seria zero e a pessoa receberia os seis
+ * marcos de uma vez.
+ */
+function notifica_marco(int $uid, int $antes, int $agora): void
+{
+    if ($antes <= 0 || $agora <= $antes) return;
+
+    foreach (NOTIF_MARCOS as $m) {
+        if ($antes < $m && $agora >= $m) {
+            notifica($uid, 'marco', 'Você passou de ' . number_format($m, 0, ',', '.')
+                . ' seguidores na Twitch', '#/meu', null, 'marco:' . $m);
+        }
+    }
+}
+
+/** Assinatura que acaba em 7 dias, e de novo no último dia. */
+function notifica_vencendo(): int
+{
+    require_once __DIR__ . '/assinatura.php';
+
+    $st = db()->query(
+        "SELECT a.id, a.usuario_id, DATEDIFF(a.valido_ate, NOW()) AS dias
+           FROM assinaturas a
+          WHERE a.status = 'ativa'
+            AND a.valido_ate BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY)"
+    );
+
+    $n = 0;
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $a) {
+        $dias = (int) $a['dias'];
+        if ($dias !== 7 && $dias !== 1) continue;
+
+        /* Testador não tem o que renovar. */
+        if (usuario_beta((int) $a['usuario_id'])) continue;
+
+        notifica((int) $a['usuario_id'], 'assinatura',
+            $dias === 1 ? 'O seu Pro acaba amanhã. Renove pra não perder nada.'
+                        : 'O seu Pro acaba em uma semana.',
+            '#/meu', null, 'fim:' . (int) $a['id'] . ':' . $dias);
+        $n++;
+    }
+    return $n;
+}
+
+/**
+ * Novidade nova na aba Atualizações vira aviso pra todo mundo.
+ *
+ * O hub.json mora no GitHub Pages e o servidor não fica sabendo quando ele
+ * muda: a rotina lê o arquivo e compara com a última que anunciou.
+ */
+function notifica_novidade(): bool
+{
+    $ch = curl_init('https://mods.zocahop.com/hub.json');
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8]);
+    $bruto = curl_exec($ch);
+    curl_close($ch);
+
+    $d = json_decode((string) $bruto, true);
+    $nova = $d['novidades'][0] ?? null;
+    if (!is_array($nova) || empty($nova['titulo'])) return false;
+
+    $ref = 'nov:' . substr(md5(($nova['data'] ?? '') . '|' . $nova['titulo']), 0, 12);
+
+    $st = db()->prepare('SELECT valor FROM ajustes WHERE chave = ?');
+    $st->execute(['notif_hub']);
+    if ((string) $st->fetchColumn() === $ref) return false;
+
+    notifica_grupo('todos', 'Novidade no site: ' . $nova['titulo'], '#/inicio', $ref);
+    db()->prepare('INSERT INTO ajustes (chave, valor) VALUES (?, ?)
+                   ON DUPLICATE KEY UPDATE valor = VALUES(valor)')
+        ->execute(['notif_hub', $ref]);
+    return true;
+}
+
+/**
+ * A rotina de uma vez por dia. Roda junto do cron da vitrine, que já existe:
+ * um cron a menos pra configurar na hospedagem.
+ *
+ * Cada parte no seu try: a Twitch fora do ar, ou uma tabela que ainda não
+ * foi criada, não podem impedir as outras de acontecer.
+ */
+function notificacoes_rotina(): array
+{
+    $feito = [];
+    try { $feito['vencendo'] = notifica_vencendo(); } catch (Throwable $e) { $feito['vencendo'] = 'falhou'; }
+    try { $feito['novidade'] = notifica_novidade(); } catch (Throwable $e) { $feito['novidade'] = 'falhou'; }
+
+    /* Aviso lido de três meses atrás não serve pra nada e a tabela só cresce. */
+    try {
+        $st = db()->prepare('DELETE FROM notificacoes WHERE lida = 1 AND criado_em < DATE_SUB(NOW(), INTERVAL 90 DAY)');
+        $st->execute();
+        $feito['limpos'] = $st->rowCount();
+    } catch (Throwable $e) { $feito['limpos'] = 'falhou'; }
+
+    return $feito;
+}

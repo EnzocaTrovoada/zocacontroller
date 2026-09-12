@@ -81,6 +81,12 @@ try {
 
     $chave = chave_nova(24);
 
+    /* Antes de gravar: depois do INSERT, conta nova e conta que voltou ficam
+       iguais, e a boas-vindas cairia em todo login. */
+    $ja = db()->prepare('SELECT 1 FROM usuarios WHERE twitch_user_id = ?');
+    $ja->execute([$perfil['id']]);
+    $primeiraVez = !$ja->fetchColumn();
+
     /* Nome e foto vêm de graça nesta resposta e ficam guardados: desenhar
        um feed pedindo o perfil de cada autor à Twitch a cada visita bate no
        limite deles num site que funcione. */
@@ -115,6 +121,13 @@ try {
     $st = db()->prepare('SELECT id FROM usuarios WHERE twitch_user_id = ?');
     $st->execute([$perfil['id']]);
     $usuario_id = (int) $st->fetchColumn();
+
+    if ($primeiraVez) {
+        require_once __DIR__ . '/lib/notificacoes.php';
+        notifica($usuario_id, 'boas-vindas',
+            'Bem-vindo ao ZocaController! Comece criando a sua primeira overlay.',
+            '#/overlays', null, 'boas-vindas');
+    }
 
     tw_guardar($usuario_id, $tokens);
 

@@ -184,12 +184,37 @@ if ($acao === 'cupom_apagar') {
        gerou fica, porque a dívida com o parceiro não some junto. */
 /* Mostrar ou esconder o cupom da lista de quem está comprando, sem ter
    que reescrever o cupom inteiro. */
+/* Cupom que entra na lista avisa quem ainda não é Pro. Uma vez por cupom:
+   tirar e pôr de volta na lista não manda aviso de novo. */
+function cupom_avisa(string $codigo): void
+{
+    require_once __DIR__ . '/lib/notificacoes.php';
+
+    $st = db()->prepare('SELECT tipo, valor FROM cupons WHERE codigo = ?');
+    $st->execute([$codigo]);
+    $c = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$c) return;
+
+    $quanto = $c['tipo'] === 'percentual'
+        ? ((int) $c['valor']) . '% de desconto'
+        : 'R$ ' . number_format(((int) $c['valor']) / 100, 2, ',', '.') . ' de desconto';
+
+    notifica_grupo('nao_pro', 'Cupom novo pra assinar o Pro: ' . $codigo . ', ' . $quanto,
+                   '#/meu', 'cupom:' . $codigo);
+}
+
 if ($acao === 'cupom_publico') {
     $cod = strtoupper(preg_replace('/[^A-Z0-9_-]/i', '', (string) ($d['codigo'] ?? '')));
     if ($cod === '') json_saida(['erro' => 'Falta o código.'], 400);
 
-    db()->prepare('UPDATE cupons SET publico = ? WHERE codigo = ?')
-        ->execute([empty($d['publico']) ? 0 : 1, $cod]);
+    $antes = db()->prepare('SELECT publico FROM cupons WHERE codigo = ?');
+    $antes->execute([$cod]);
+    $era = (int) $antes->fetchColumn();
+
+    $vira = empty($d['publico']) ? 0 : 1;
+    db()->prepare('UPDATE cupons SET publico = ? WHERE codigo = ?')->execute([$vira, $cod]);
+
+    if ($vira && !$era) cupom_avisa($cod);
     json_saida(['ok' => true]);
 }
 
