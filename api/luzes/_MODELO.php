@@ -38,11 +38,42 @@
  *           Devolve ['ok' => true] ou ['ok' => false, 'erro' => '...'].
  *
  * ---------------------------------------------------------------------
+ * MARCA QUE NÃO DÁ TOKEN PRA COLAR
+ *
+ * Algumas marcas — a Philips Hue é uma — não entregam credencial nenhuma
+ * pra pessoa. Quem pergunta a senha é a marca, no site dela, e o que volta
+ * pra cá é um código. Nesse caso 'campos' fica VAZIO e o arquivo ganha um
+ * bloco 'oauth' com três funções:
+ *
+ *   entrar  function(string $estado): string
+ *           Devolve a URL pra onde mandar a pessoa. O $estado vem assinado
+ *           pelo núcleo e tem que ir junto: é ele que prova, na volta, que
+ *           foi esta pessoa que pediu. Nunca invente outro.
+ *
+ *   voltar  function(array $query): array
+ *           $query é o que a marca mandou de volta ($_GET). Devolve
+ *           ['ok' => true, 'config' => [...]] — e essa config é o que fica
+ *           guardado e chega depois no 'testar' e no 'aplicar'. Ou
+ *           ['ok' => false, 'erro' => 'texto pra quem não é técnico'].
+ *
+ *   renovar function(array $cfg): ?array
+ *           Só quando o acesso vence. Devolve a config nova, ou null se
+ *           não deu. Pra o núcleo saber a hora, ponha em 'config' a chave
+ *           'expira' com o horário unix em que o acesso morre — sem ela,
+ *           renovar nunca é chamado.
+ *
+ * O endereço de volta é sempre o mesmo, pra qualquer marca:
+ * https://api.zocahop.com/luzes.php — cadastre exatamente esse no site
+ * de quem fornece a API.
+ *
+ * ---------------------------------------------------------------------
  * REGRAS QUE NÃO PODEM SER QUEBRADAS
  *
  *   Use luz_http() pra falar com a internet. Ela já tem tempo limite. Uma
  *   chamada sem tempo limite trava a requisição inteira quando a marca cai,
- *   e o chat da pessoa fica esperando.
+ *   e o chat da pessoa fica esperando. Quando a marca exigir senha no
+ *   esquema Digest, use luz_http_digest() — mesma coisa, com a ida e volta
+ *   do desafio feita pelo curl.
  *
  *   Nunca devolva a credencial em lugar nenhum, nem dentro de 'erro'.
  *
@@ -57,12 +88,16 @@
  *
  *   lifx.php   nuvem, token
  *   govee.php  nuvem, chave de API
+ *   hue.php    nuvem, autorização (o exemplo vivo do bloco 'oauth')
+ *   tuya.php   nuvem, Access ID e Secret — atende Positivo Casa
+ *              Inteligente, Avant Neo, Smart Life e as lâmpadas genéricas,
+ *              que são todas Tuya por dentro
  *
- * O que ainda não existe e cabe aqui: Tuya/Smart Life (nuvem, precisa de
- * conta de desenvolvedor Tuya), Philips Hue remoto (nuvem, precisa de app
- * aprovado), Nanoleaf, WLED e Hue local (rede de casa, dependem da ponte).
- * A Alexa não tem caminho: a API dela é pra quem fabrica aparelho, não pra
- * quem controla.
+ * O que ainda não existe e cabe aqui: Nanoleaf, WLED e Hue local (rede de
+ * casa, dependem da ponte). A TP-Link Tapo não tem API oficial nenhuma, só
+ * bibliotecas que imitam o aplicativo — e isso quebra a cada atualização
+ * deles. A Alexa também não tem caminho: a API dela é pra quem fabrica
+ * aparelho, não pra quem controla.
  */
 
 return [

@@ -4183,6 +4183,33 @@ function telaLuzes() {
       if (!conta) {
         cx.appendChild(h('p', { cls: 'd', txt: m.ajuda }));
 
+        /* MARCA QUE PEDE AUTORIZAÇÃO NÃO TEM O QUE DIGITAR.
+
+           A Philips não entrega token pra colar: quem pergunta a senha é
+           ela, no site dela. Aqui só existe o botão que leva pra lá — e é
+           melhor assim, porque senha de ninguém passa por este campo. */
+        if (m.oauth) {
+          const dizOa = h('p', { cls: 'd' });
+          const btOa = h('button', { cls: 'bt principal', type: 'button',
+            txt: 'Conectar com a ' + m.nome });
+          btOa.onclick = async () => {
+            btOa.disabled = true;
+            dizOa.textContent = 'abrindo o site da ' + m.nome + '…';
+            try {
+              const r = await manda({ acao: 'entrar', driver: m.id });
+              location.href = r.url;
+            } catch (e) {
+              dizOa.textContent = e.message;
+              dizOa.style.color = 'var(--perigo)';
+              btOa.disabled = false;
+            }
+          };
+          cx.appendChild(h('div', { cls: 'campo' }, [btOa]));
+          cx.appendChild(dizOa);
+          marcas.appendChild(cx);
+          return;
+        }
+
         const campos = {};
         m.campos.forEach((c) => {
           const i = h('input', { type: c.segredo ? 'password' : 'text', placeholder: c.rotulo,
@@ -4240,9 +4267,11 @@ function telaLuzes() {
       };
       verAparelhos();
 
-      const trocar = h('button', { cls: 'bt mini', type: 'button', txt: 'Trocar credencial' });
+      const trocar = h('button', { cls: 'bt mini', type: 'button',
+        txt: m.oauth ? 'Desconectar' : 'Trocar credencial' });
       trocar.onclick = async () => {
-        if (!confirm('Desconectar a ' + m.nome + '? Você vai precisar colar a credencial de novo.')) return;
+        if (!confirm('Desconectar a ' + m.nome + '? Você vai precisar '
+          + (m.oauth ? 'autorizar de novo.' : 'colar a credencial de novo.'))) return;
         try { await manda({ acao: 'remover', driver: m.id }); carregaLuzes(); }
         catch (e) { recado(e.message, 'ruim'); }
       };

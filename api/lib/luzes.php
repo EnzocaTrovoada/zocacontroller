@@ -34,6 +34,37 @@ function luz_http(string $metodo, string $url, array $cabecalhos = [], $corpo = 
     return [$http, is_array($d) ? $d : []];
 }
 
+/**
+ * A mesma chamada, com senha no esquema Digest.
+ *
+ * A Philips só aceita o token dela assim: a primeira resposta é um 401 com
+ * o desafio, e a segunda leva o hash. O curl faz essa ida e volta sozinho —
+ * escrever o MD5 na mão aqui seria repetir o que ele já sabe.
+ */
+function luz_http_digest(string $metodo, string $url, string $usuario, string $senha,
+                         array $cabecalhos = [], $corpo = null): array
+{
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST  => $metodo,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => LUZ_TIMEOUT,
+        CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_HTTPHEADER     => $cabecalhos,
+        CURLOPT_HTTPAUTH       => CURLAUTH_DIGEST,
+        CURLOPT_USERPWD        => $usuario . ':' . $senha,
+    ]);
+    if ($corpo !== null) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, is_string($corpo) ? $corpo : json_encode($corpo));
+    }
+    $bruto = curl_exec($ch);
+    $http  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    $d = json_decode((string) $bruto, true);
+    return [$http, is_array($d) ? $d : []];
+}
+
 /** '#RRGGBB' em [r, g, b] de 0 a 255. */
 function luz_rgb(string $hex): array
 {
@@ -74,6 +105,9 @@ function luz_catalogo(): array
             'nome'   => (string) ($d['nome'] ?? $id),
             'ajuda'  => (string) ($d['ajuda'] ?? ''),
             'nuvem'  => !empty($d['nuvem']),
+            /* Marca que conecta por autorização não tem campo pra preencher:
+               a tela mostra um botão que leva pro site da marca. */
+            'oauth'  => !empty($d['oauth']),
             'campos' => array_map(fn($c) => [
                 'chave'   => (string) $c['chave'],
                 'rotulo'  => (string) ($c['rotulo'] ?? $c['chave']),
@@ -104,6 +138,49 @@ function luz_contas(int $uid): array
     return $saida;
 }
 
+/** A config guardada de uma marca — tokens inclusive. Nunca vai pra tela. */
+function luz_config(int $uid, string $driver): array
+{
+    $st = db()->prepare('SELECT config FROM luzes_contas WHERE usuario_id = ? AND driver = ?');
+    $st->execute([$uid, $driver]);
+    return json_decode((string) ($st->fetchColumn() ?: '{}'), true) ?: [];
+}
+
+/** Guarda a config sem encostar nos aparelhos que a pessoa escolheu. */
+function luz_config_grava(int $uid, string $driver, array $cfg): void
+{
+    db()->prepare(
+        'INSERT INTO luzes_contas (usuario_id, driver, config, aparelhos, ligado)
+              VALUES (?, ?, ?, ?, 1)
+         ON DUPLICATE KEY UPDATE config = VALUES(config), ligado = 1'
+    )->execute([$uid, $driver, json_encode($cfg), '[]']);
+}
+
+/**
+ * Renova o acesso antes de usar, quando a marca é das que vencem.
+ *
+ * Quem conectou por autorização tem um acesso com prazo. Renovar só quando
+ * a chamada falha custaria a primeira ordem de cada semana — a luz não
+ * mudaria de cor e ninguém saberia por quê. Então renova antes, e o token
+ * novo já fica guardado.
+ */
+function luz_renova(int $uid, string $driver, array $d, array $cfg): array
+{
+    $renovar = $d['oauth']['renovar'] ?? null;
+    if (!$renovar || empty($cfg['expira'])) return $cfg;
+    if (time() < (int) $cfg['expira'] - 120) return $cfg;
+
+    try {
+        $novo = $renovar($cfg);
+    } catch (Throwable $e) {
+        return $cfg;      /* marca fora do ar: tenta com o que tem */
+    }
+    if (!is_array($novo) || empty($novo['expira'])) return $cfg;
+
+    luz_config_grava($uid, $driver, $novo);
+    return $novo;
+}
+
 /**
  * Manda a mesma ordem pra todas as luzes ligadas da pessoa.
  *
@@ -126,7 +203,8 @@ function luz_aplicar(int $uid, array $ordem): array
         if (!$d) continue;
         try {
             $r = ($d['aplicar'])(
-                json_decode((string) ($c['config'] ?: '{}'), true) ?: [],
+                luz_renova($uid, (string) $c['driver'], $d,
+                    json_decode((string) ($c['config'] ?: '{}'), true) ?: []),
                 $ordem,
                 json_decode((string) ($c['aparelhos'] ?: '[]'), true) ?: []
             );

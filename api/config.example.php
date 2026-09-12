@@ -123,6 +123,25 @@ return [
         'api_key' => '',
     ],
 
+    /* Philips Hue, pra o !luz mexer nas lampadas.
+
+       Cadastre um app em developers.meethue.com (aba "My Apps"). A
+       aprovacao e na hora; o que demora e o cadastro de desenvolvedor.
+
+       Callback URL, letra por letra:  https://api.zocahop.com/luzes.php
+
+       Sem isto a Philips simplesmente nao aparece na lista de marcas. As
+       outras marcas nao precisam de nada aqui: a credencial delas e de
+       cada usuario, e vai no painel.
+
+       A Tuya (Positivo, Avant Neo, Smart Life) tambem nao entra aqui: la o
+       projeto de nuvem e de cada pessoa, nao do site. */
+    'philips_hue' => [
+        'client_id'     => '',
+        'client_secret' => '',   // SECRETO. Se vazar, gere outro no portal deles.
+        'app_id'        => '',   // o "App Id" que aparece junto do client id
+    ],
+
     // Para onde mandar o streamer depois do login.
     'hub' => 'https://mods.zocahop.com/meu.html',
 

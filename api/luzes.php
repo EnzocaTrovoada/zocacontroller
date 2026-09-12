@@ -3,6 +3,8 @@
  * As luzes: conectar, escolher aparelho, criar cena e obedecer o chat.
  *
  * GET               — catálogo de marcas, contas conectadas e cenas
+ * GET ?code=        — a volta da marca que conecta por autorização
+ * POST acao=entrar  — pra onde mandar quem vai autorizar
  * POST acao=salvar  — guarda a credencial de uma marca (testando antes)
  * POST acao=...     — aparelhos, remover, testar, cena_salvar, cena_apagar
  * POST acao=chat    — a ponte manda o que o chat digitou
@@ -12,7 +14,84 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/seguranca.php';
 require_once __DIR__ . '/lib/luzes.php';
+
+/* ---------- a volta de quem foi autorizar ----------
+
+   Esta porta é aberta ANTES da chave do painel, e tem que ser: quem chega
+   aqui é o navegador voltando do site da marca, e ele não carrega chave
+   nenhuma. Quem prova de quem é a volta é o 'state', que saiu assinado
+   daqui e vale quinze minutos.
+
+   Uma porta só serve todas as marcas: o driver está escrito dentro do
+   state, e é o arquivo dele que sabe o que fazer com o código. */
+if (isset($_GET['code']) || isset($_GET['error'])) {
+    $pagina = function (string $titulo, string $corpo): void {
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!doctype html><meta charset="utf-8"><title>' . htmlspecialchars($titulo) . '</title>'
+           . '<body style="font:15px system-ui;background:#0E1411;color:#E4EDE7;padding:40px">'
+           . $corpo . '</body>';
+        exit;
+    };
+
+    if (isset($_GET['error'])) {
+        $pagina('Não deu certo', '<h1>Você não autorizou</h1>'
+            . '<p>Sem a permissão da marca não dá pra mexer nas suas luzes. '
+            . 'Pode tentar de novo pelo painel.</p>');
+    }
+
+    $carga = link_verificar((string) ($_GET['state'] ?? ''));
+    $p = $carga === null ? [] : explode(':', $carga);
+    if (count($p) !== 3 || $p[0] !== 'luz' || !ctype_digit($p[1])) {
+        $pagina('Não confere', '<h1>Esse link não vale mais</h1>'
+            . '<p>Ele expira depois de alguns minutos. Volte ao painel e clique em conectar de novo.</p>');
+    }
+
+    $dono   = (int) $p[1];
+    $marca  = (string) $p[2];
+    $driver = luz_drivers()[$marca] ?? null;
+    if (!$driver || empty($driver['oauth']['voltar'])) {
+        $pagina('Não confere', '<h1>Marca desconhecida</h1><p>Volte ao painel e tente de novo.</p>');
+    }
+
+    try {
+        $r = ($driver['oauth']['voltar'])($_GET);
+    } catch (Throwable $e) {
+        $r = ['ok' => false, 'erro' => 'A marca não respondeu agora.'];
+    }
+
+    if (empty($r['ok'])) {
+        $pagina('Não deu certo', '<h1>Não deu certo</h1><p>'
+            . htmlspecialchars((string) ($r['erro'] ?? 'A marca recusou.')) . '</p>');
+    }
+
+    luz_config_grava($dono, $marca, (array) $r['config']);
+
+    /* Já nasce com todas as lâmpadas obedecendo: quem acabou de autorizar
+       quer que funcione, não abrir outra tela pra marcar caixinha.
+
+       Só quando ainda não havia escolha nenhuma: reconectar não pode
+       desfazer as caixinhas que a pessoa desmarcou antes. */
+    try {
+        $ja = db()->prepare('SELECT aparelhos FROM luzes_contas WHERE usuario_id = ? AND driver = ?');
+        $ja->execute([$dono, $marca]);
+        $tinha = json_decode((string) ($ja->fetchColumn() ?: '[]'), true) ?: [];
+
+        if (!$tinha) {
+            $lista = ($driver['testar'])((array) $r['config']);
+            if (!empty($lista['ok'])) {
+                db()->prepare('UPDATE luzes_contas SET aparelhos = ? WHERE usuario_id = ? AND driver = ?')
+                    ->execute([json_encode(array_map(fn($a) => (string) $a['id'], $lista['aparelhos'])), $dono, $marca]);
+            }
+        }
+    } catch (Throwable $e) { /* dá pra escolher na mão depois */ }
+
+    $hub = rtrim((string) (cfg()['hub'] ?? 'https://mods.zocahop.com/'), '/');
+    $pagina('Pronto', '<h1>' . htmlspecialchars((string) $driver['nome']) . ' conectada</h1>'
+        . '<p>Pode fechar esta aba e voltar pro painel.</p>'
+        . '<p><a style="color:#3DD47F" href="' . htmlspecialchars($hub) . '/#/luzes">Voltar</a></p>');
+}
 
 cors();
 $quem = exige_painel();
@@ -60,6 +139,20 @@ if ($acao === 'chat') {
     }
 
     json_saida(luz_aplicar($uid, $ordem));
+}
+
+/* ---------- ir autorizar na marca ---------- */
+if ($acao === 'entrar') {
+    $id = (string) ($d['driver'] ?? '');
+    $drivers = luz_drivers();
+    if (empty($drivers[$id]['oauth']['entrar'])) json_saida(['erro' => 'Marca desconhecida.'], 400);
+
+    try {
+        $url = ($drivers[$id]['oauth']['entrar'])(link_assinar('luz:' . $uid . ':' . $id));
+    } catch (Throwable $e) {
+        json_saida(['erro' => $e->getMessage()], 400);
+    }
+    json_saida(['ok' => true, 'url' => $url]);
 }
 
 /* ---------- conectar uma marca ---------- */
@@ -111,6 +204,8 @@ if ($acao === 'reler') {
     $st = db()->prepare('SELECT config FROM luzes_contas WHERE usuario_id = ? AND driver = ?');
     $st->execute([$uid, $id]);
     $cfg = json_decode((string) ($st->fetchColumn() ?: '{}'), true) ?: [];
+
+    $cfg = luz_renova($uid, $id, $drivers[$id], $cfg);
 
     $r = ($drivers[$id]['testar'])($cfg);
     if (empty($r['ok'])) json_saida(['erro' => (string) ($r['erro'] ?? 'Não consegui falar com a marca.')], 400);
