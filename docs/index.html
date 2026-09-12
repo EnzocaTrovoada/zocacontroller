@@ -1189,6 +1189,11 @@ try {
     min-width: 60px; text-align: right; color: var(--fraco);
     font: 500 12px var(--mono); font-variant-numeric: tabular-nums;
   }
+  /* O nome do comando, na tela de Comandos e na página da overlay dele. */
+  .cmd {
+    flex: 0 0 96px; background: var(--fundo); border: 1px solid var(--linha);
+    border-radius: 4px; padding: 5px 8px; font-size: 12px; color: var(--verde-forte);
+  }
   .prontos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
   .prontos button { text-align: left; line-height: 1.15; }
   .prontos small { display: block; font: 400 10.5px var(--mono); color: var(--apagado); margin-top: 2px; }
@@ -5473,6 +5478,49 @@ function telaEditor(perfil, tipoNovo) {
     }).catch(() => {});
   }
 
+  /* OS COMANDOS DA OVERLAY, NA PÁGINA DELA.
+
+     Eles só existiam na tela de Comandos, longe de onde a pessoa decide o
+     que a overlay faz — e quem monta a de música não tem por que adivinhar
+     que o chat pode pedir faixa e o mod pode escondê-la. */
+  const cmds = (COMANDOS_DA_OVERLAY[tipo] || [])
+    .map((n) => DE_FABRICA.filter((c) => c[0] === n)[0])
+    .filter(Boolean);
+
+  if (cmds.length) {
+    const cxCmd = h('div', { cls: 'fatia' }, [
+      h('h3', { txt: 'O que o chat pode mandar nesta overlay' }),
+      h('p', { cls: 'd', txt: 'Já funcionam, pela fonte do OBS — não precisa criar nada. '
+        + 'A etiqueta do lado diz quem pode usar cada um.' }),
+    ]);
+
+    cmds.forEach((c) => {
+      cxCmd.appendChild(h('div', { cls: 'campo' }, [
+        h('code', { cls: 'cmd', txt: '!' + c[0] }),
+        h('span', { cls: 'selo', txt: c[1] }),
+        h('label', { style: 'flex:1 1 200px', txt: c[2] }),
+      ]));
+    });
+
+    const irCmd = h('button', { cls: 'bt mini', type: 'button', txt: 'Dar um apelido a estes' });
+    irCmd.onclick = () => vaiPara('#/comandos');
+    cxCmd.appendChild(irCmd);
+    tela.appendChild(cxCmd);
+
+    /* Os apelidos que a pessoa criou apontando pra estas ações são comandos
+       desta overlay tanto quanto os de fábrica — e só ela sabe que existem. */
+    api('/comandos.php').then((d) => {
+      const nomes = cmds.map((c) => c[0]);
+      const apelidos = (d.comandos || []).filter((c) =>
+        (c.passos || []).filter((p) => nomes.indexOf(p.acao) !== -1).length > 0);
+      if (!apelidos.length) return;
+
+      cxCmd.insertBefore(h('p', { cls: 'd', style: 'margin:12px 0 2px',
+        txt: 'E os seus, que caem aqui também: '
+           + apelidos.map((c) => '!' + c.nome).join(', ') }), irCmd);
+    }).catch(() => {});
+  }
+
   /* Fica em cima da prévia, e não numa gaveta: é a primeira decisão que
      faz sentido tomar, e escondida ninguém acharia. */
   const fileira = h('div', { cls: 'prontos' });
@@ -5849,6 +5897,15 @@ const DE_FABRICA = [
   ['luz',       'mod',   'Muda a cor das suas luzes — !luz vermelho, !luz festa'],
 ];
 
+/* De que overlay é cada comando. Serve pra mostrar os comandos na página
+   da overlay que eles mexem — quem está montando a de música precisa saber
+   ali, e não numa tela distante, que o chat pode pedir faixa.
+
+   O texto de cada um continua vindo do DE_FABRICA: aqui só mora o dono. */
+const COMANDOS_DA_OVERLAY = {
+  musica: ['musica', 'pular', 'like', 'adicionar', 'fila', 'playlist', 'vod'],
+};
+
 function telaComandos() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -5862,7 +5919,7 @@ function telaComandos() {
   ]);
   DE_FABRICA.forEach((c) => {
     fab.appendChild(h('div', { cls: 'campo' }, [
-      h('code', { txt: '!' + c[0], style: 'flex:0 0 96px;background:var(--fundo);border:1px solid var(--linha);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--verde-forte)' }),
+      h('code', { cls: 'cmd', txt: '!' + c[0] }),
       h('span', { cls: 'selo', txt: c[1] }),
       h('label', { style: 'flex:1 1 200px', txt: c[2] }),
     ]));

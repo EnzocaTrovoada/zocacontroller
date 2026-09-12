@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-12",
+      "titulo": "Os comandos aparecem na página da overlay",
+      "texto": "Quem monta a overlay de música agora vê ali mesmo o !musica, o !pular, o !like, o !adicionar, o !fila, o !playlist e o !vod — com quem pode usar cada um, e os apelidos que você já criou pra eles."
+    },
+    {
+      "data": "2026-09-12",
       "titulo": "Speedrun: ícone por trecho, modelos prontos e o seu .lss",
       "texto": "Cada trecho pode ter o ícone dele, igual ao LiveSplit. Dá pra abrir o seu arquivo .lss e a lista se monta sozinha, com ícones e tempos. E quem monta uma boa lista pode publicar como modelo: os outros aplicam num clique, sem digitar trecho por trecho."
     },
