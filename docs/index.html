@@ -370,7 +370,7 @@ try {
      O resto do site cabe em 1080px porque é formulário e lista, que ficam
      ruins largos demais. A vitrine é o contrário: três painéis lado a lado
      em 1080px espremem tudo — foi o que deixou a primeira versão feia. */
-  body.na-vitrine .w { max-width: none; padding: 16px 16px 60px; }
+  body.na-vitrine .w { max-width: none; padding: 0 0 40px; }
 
   /* O meio leva 5 de 11 porque agora paga por três coisas, e não uma: os
      dois vizinhos ficaram grandes o bastante pra se entender que são lives,
@@ -393,14 +393,31 @@ try {
      vazio — a "folha em branco" com coisas coladas em cima. */
   @media (min-width: 1181px) {
     .hub__lateral {
-      position: sticky; top: calc(var(--barra) + 16px);
-      height: calc(100vh - var(--barra) - 32px);
+      position: sticky; top: var(--barra);
+      height: calc(100vh - var(--barra));
       display: flex; flex-direction: column; gap: 16px;
       overflow-y: auto; scrollbar-width: thin;
     }
     .hub__lateral .hub__painel + .hub__painel { margin-top: 0; }
     .hub__estica { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 180px; }
     .hub__estica .hub__rolo { flex: 1 1 0; max-height: none; min-height: 0; }
+
+    /* A COLUNA DO FEED É COLUNA, NÃO CARTÃO.
+
+       Encostada na borda e na barra, sem canto arredondado, sem sombra e
+       sem fundo aparecendo em volta — é o que separa "a parte esquerda da
+       tela" de "uma caixa em cima de uma folha". O resto do miolo ganha a
+       folga que o .w perdeu. */
+    .hub__col--feed { gap: 0; }
+    .hub__col--feed .feed { margin-top: 0; }
+    .hub__col--feed .hub__painel {
+      border-radius: 0; border-left: 0; border-top: 0; box-shadow: none;
+    }
+    .hub__col--meio { padding: 16px 0 0; }
+    .hub__col--lado { padding: 16px 16px 0 0; }
+  }
+  @media (max-width: 1180px) {
+    .hub { padding: 14px; }
   }
 
   /* Cada coisa no seu painel, com borda própria — foi o que faltava antes:
@@ -4022,8 +4039,8 @@ function chipSelo(s) {
 }
 
 function blocoFeed() {
-  const cx = h('div', { cls: 'hub__painel feed acento-verde' }, [h('h2', { txt: 'Feed' })]);
-  const lista = h('div');
+  const cx = h('div', { cls: 'hub__painel feed acento-verde hub__estica' }, [h('h2', { txt: 'Feed' })]);
+  const lista = h('div', { cls: 'hub__rolo' });
 
   /* A foto vem pronta do servidor: da Twitch, ou a que a pessoa subiu. Só o
      caminho relativo precisa de ajuda, caso o api_base esteja vazio. */
@@ -4345,8 +4362,9 @@ function telaInicio() {
   tela.appendChild(hub);
 
   /* ================= esquerda ================= */
-  const colEsq = h('div', { cls: 'hub__col hub__lateral' });
-  hub.appendChild(colEsq);
+  /* Estas três descem pro miolo, embaixo do Descobrir: a esquerda inteira
+     agora é o feed. */
+  const colEsq = h('div', { cls: 'hub__col' });
 
   /* ----- onde você parou -----
 
@@ -4411,12 +4429,14 @@ function telaInicio() {
 
   const trilho = h('div', { cls: 'hub__trilho' }, [espiaEsq, palco, espiaDir]);
 
-  const colMei = h('div', { cls: 'hub__col' }, [
+  hub.appendChild(h('div', { cls: 'hub__col hub__lateral hub__col--feed' }, [blocoFeed()]));
+
+  const colMei = h('div', { cls: 'hub__col hub__col--meio' }, [
     h('h2', { txt: 'Quem sabe você gosta desse streamer' }),
     trilho,
     infoBox,
     pontos,
-    blocoFeed(),
+    colEsq,
   ]);
   hub.appendChild(colMei);
 
@@ -4429,7 +4449,7 @@ function telaInicio() {
   const listaTop = h('div');
   const listaCanais = h('div', { cls: 'hub__rolo' });
 
-  hub.appendChild(h('div', { cls: 'hub__col hub__lateral' }, [
+  hub.appendChild(h('div', { cls: 'hub__col hub__lateral hub__col--lado' }, [
     h('div', { cls: 'hub__painel acento-violeta' }, [
       h('h2', { txt: 'Em alta na Twitch' }),
       h('div', { cls: 'hub__busca' }, [selIdioma, campoCat]),

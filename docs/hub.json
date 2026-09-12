@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-12",
+      "titulo": "O feed virou a coluna da esquerda",
+      "texto": "Ele ocupa a lateral inteira da tela, colado na borda, e rola por dentro enquanto o resto da página fica parado. O Descobrir e as novidades foram pro meio."
+    },
+    {
+      "data": "2026-09-12",
       "titulo": "Suporte",
       "texto": "Deu problema? Conte na tela de Suporte, com um print se ajudar. A resposta chega no sininho, aqui mesmo, sem e-mail no meio."
     },
