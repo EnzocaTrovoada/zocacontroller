@@ -432,6 +432,7 @@ async function descobrir(lerGaveta = true) {
   if (lerGaveta) {
     await lerOcultos();
     await lerPanico();
+    await lerCamera();
     await lerVod();
     await reaplicaVod();
     await acharOverlays();
@@ -603,6 +604,7 @@ ACOES.camera = {
     const querLigar = /^(on|ligar?|liga|1|sim)$/i.test(arg);
     olho.ligado = arg ? querLigar : !olho.ligado;
     if (!olho.ligado) olho.euQueSai = false;
+    await guardaCamera();
     recado('Troca automática por câmera: ' + (olho.ligado ? 'ligada' : 'desligada') + ' — ' + quem);
     pintar();
   },
@@ -629,6 +631,31 @@ ACOES.som = {
     recado(alvo.nome + ': ' + (r.inputMuted ? 'mudo' : 'no ar') + ' — ' + quem);
   },
 };
+
+/* A TROCA POR CÂMERA TEM QUE LEMBRAR.
+
+   Ela nascia do endereço da fonte, então fechar o OBS religava o que um mod
+   tinha desligado — e ninguém percebia até a cena trocar sozinha no meio da
+   live. Agora a escolha mora numa gaveta do próprio OBS, como o pânico. */
+
+const GAVETA_CAMERA = 'zocacontroller_camera';
+
+async function lerCamera() {
+  if (!cfg.ausencia) return;
+  try {
+    const r = await pedir('GetPersistentData', { realm: CAIXA, slotName: GAVETA_CAMERA });
+    const v = r && r.slotValue;
+    if (v && typeof v.ligado === 'boolean') olho.ligado = v.ligado;
+  } catch (e) {}
+}
+
+async function guardaCamera() {
+  try {
+    await pedir('SetPersistentData', {
+      realm: CAIXA, slotName: GAVETA_CAMERA, slotValue: { ligado: olho.ligado },
+    });
+  } catch (e) {}
+}
 
 /* Fontes da cena e o que fica escondido do controller. */
 
@@ -1369,6 +1396,7 @@ async function doPainel(d) {
   if (d.acao === 'camera') {
     olho.ligado = (d.ligar === undefined) ? !olho.ligado : !!d.ligar;
     if (!olho.ligado) olho.euQueSai = false;
+    await guardaCamera();
     recado('Troca por câmera: ' + (olho.ligado ? 'ligada' : 'desligada') + ' — painel');
     pintar();
     return;

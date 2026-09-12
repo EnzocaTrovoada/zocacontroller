@@ -35,6 +35,9 @@ try {
     --tinta:#101A14; --fraco:#5C6C62; --apagado:#8A9990;
     --verde:#12A150; --verde-fraco:#E4F5EA; --verde-forte:#0B7A3B;
     --perigo:#C4432B;
+    /* O vermelho de estar no ar. Ele NÃO é o --perigo: erro e live são
+       coisas diferentes, e o neon aqui existe pra puxar o olho. */
+    --neon:#F5003C;
     /* O dourado e so do vitalicio. Escuro no tema claro por medida, nao por
        gosto: em #B07D14 o contraste sobre o cartao dava 3.2:1, abaixo do
        4.5:1 que texto pequeno precisa — era o "texto apagado" do vitalicio.
@@ -58,6 +61,7 @@ try {
     --tinta:#E8F0EB; --fraco:#9DB0A5; --apagado:#7A8E83;
     --verde:#3DD47F; --verde-fraco:#10261A; --verde-forte:#69E39C;
     --perigo:#E4735A;
+    --neon:#FF2D55;
     --dourado:#E0A82E;
     --violeta:#A78BFA; --ambar:#F5B942; --ciano:#38BDF8; --coral:#FB7185;
     --vidro:rgba(255,255,255,.028);
@@ -645,6 +649,30 @@ try {
   .feed__quem { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 3px; }
   .feed__quem b { font: 600 14px var(--disp); }
   .feed__quem .arroba, .feed__quem .quando { color: var(--apagado); font: 500 11.5px var(--mono); }
+
+  /* NO AR AGORA.
+     Vermelho neon de propósito: no meio de uma coluna inteira de cinza e
+     verde, é a única coisa que tem pressa. O brilho é sombra de texto e de
+     caixa, não imagem: assim ele acompanha o tema e não pesa nada. */
+  .vivo {
+    flex: none; display: inline-flex; align-items: center; gap: 4px;
+    border: 1px solid var(--neon); border-radius: 999px; padding: 1px 7px 1px 6px;
+    font: 700 9.5px var(--mono); letter-spacing: .12em; text-transform: uppercase;
+    color: var(--neon); background: none; cursor: pointer;
+    text-shadow: 0 0 7px var(--neon);
+    box-shadow: 0 0 0 1px rgba(245, 0, 60, .12), 0 0 9px -1px var(--neon);
+  }
+  .vivo::before {
+    content: ''; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--neon); box-shadow: 0 0 6px var(--neon);
+    animation: pulso 1.6s ease-in-out infinite;
+  }
+  .vivo:hover { background: var(--neon); color: #fff; text-shadow: none; }
+  .vivo:hover::before { background: #fff; box-shadow: none; }
+  @keyframes pulso { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+  /* Quem pediu menos movimento não precisa de bolinha piscando pra
+     entender que está escrito AO VIVO. */
+  @media (prefers-reduced-motion: reduce) { .vivo::before { animation: none; } }
   .feed__texto { font-size: 14px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
   .feed__img {
     display: block; margin-top: 9px; max-width: 100%; max-height: 420px;
@@ -4523,6 +4551,14 @@ function faz(s) {
   return Math.floor(s / 604800) + ' sem';
 }
 
+/** O "ao vivo" que leva pro canal. Botão, e não enfeite: ele é clicável. */
+function seloAoVivo(u) {
+  const b = h('button', { cls: 'vivo', type: 'button', txt: 'ao vivo',
+    title: 'Assistir ' + (u.nome || u.login) + ' agora na Twitch' });
+  b.onclick = (e) => { e.stopPropagation(); naTwitch(u.login); };
+  return b;
+}
+
 const naTwitch = (login) => window.open('https://twitch.tv/' + encodeURIComponent(login),
   '_blank', 'noopener,noreferrer');
 
@@ -4579,6 +4615,7 @@ function blocoFeed() {
     nome.onclick = () => naTwitch(u.login);
 
     const q = h('div', { cls: 'feed__quem' }, [nome]);
+    if (u.aovivo) q.appendChild(seloAoVivo(u));
     (u.selos || []).forEach((s) => q.appendChild(chipSelo(s)));
     q.appendChild(h('span', { cls: 'arroba', txt: '@' + u.login }));
     if (quando !== null && quando !== undefined) {

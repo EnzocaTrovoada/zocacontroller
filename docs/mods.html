@@ -82,6 +82,19 @@
   #recado.bom { border-color: var(--sinal); color: var(--sinal); }
   #recado.ruim { border-color: var(--perigo); color: var(--perigo); }
 
+  /* O aviso de OBS fechado, e o cinza de tudo que virou retrato. */
+  #dormindo {
+    border: 1px solid var(--ambar); background: var(--caixa);
+    padding: 11px 13px; margin-bottom: 12px;
+    font-size: 13px; line-height: 1.45; color: var(--ambar);
+  }
+  #dormindo b { display: block; font: 600 13px var(--disp); margin-bottom: 2px; }
+  .congelado { opacity: .55; }
+  .congelado h2::after {
+    content: ' · como estava'; letter-spacing: 0; text-transform: none;
+    font-weight: 400; color: var(--ambar);
+  }
+
   #porta { text-align: center; padding: 12vh 0; }
   #porta h1 { font: 700 22px var(--disp); margin: 0 0 12px; }
   #porta p { color: var(--fraco); font-size: 14px; margin: 0 auto; max-width: 34ch; }
@@ -101,6 +114,11 @@
       <h1>PAINEL DO MOD</h1>
       <span id="euSou">—</span>
     </header>
+
+    <div id="dormindo" class="escondido">
+      <b>O OBS está fechado</b>
+      <span id="dormindoQuando">Nada daqui muda nada até ele voltar.</span>
+    </div>
 
     <div class="mic" id="cxMic">
       <b id="txMic">carregando…</b>
@@ -208,6 +226,15 @@ async function puxar() {
   }
 }
 
+/** "há 40 s", "há 12 min", "há 3 h" — o mod não quer contar segundo. */
+function faz(segundos) {
+  const s = Math.max(0, parseInt(segundos, 10) || 0);
+  if (s < 90)   return 'há ' + s + ' s';
+  if (s < 5400) return 'há ' + Math.round(s / 60) + ' min';
+  if (s < 86400) return 'há ' + Math.round(s / 3600) + ' h';
+  return 'há ' + Math.round(s / 86400) + ' dias';
+}
+
 function aplicar(d) {
   const viva = !!d.ligada;
   const e = d.estado || {};
@@ -271,12 +298,33 @@ function aplicar(d) {
                                  : 'Troca por câmera: DESLIGADA';
   }
 
+  /* O QUE SE SABIA CONTINUA NA TELA.
+
+     Antes, fechar o OBS levava junto a lista de fontes e deixava os outros
+     botões clicáveis à toa: o mod apertava, nada acontecia, e nada dizia
+     por quê. Agora fica tudo visível, apagadinho e travado, com uma linha
+     em cima explicando que aquilo é retrato e não o agora. */
   el('secaoAudio').classList.toggle('escondido', !pode.audio || !sons.length);
   el('secaoCena').classList.toggle('escondido', !pode.cena || !cenas.length);
-  el('secaoFontes').classList.toggle('escondido', !pode.cena || !viva || !fontes.length);
+  el('secaoFontes').classList.toggle('escondido', !pode.cena || !fontes.length);
   desenharSons();
   desenharCenas();
   desenharFontes();
+
+  el('dormindo').classList.toggle('escondido', viva);
+  if (!viva) {
+    el('dormindoQuando').textContent = (d.idade
+      ? 'Isto é o que estava valendo ' + faz(d.idade) + '. '
+      : 'Ainda não recebi nada dele. ') + 'Nada daqui muda nada até ele voltar.';
+  }
+
+  ['secaoAudio', 'secaoCena', 'secaoFontes'].forEach((id) => {
+    el(id).classList.toggle('congelado', !viva);
+  });
+  ['sons', 'cenas', 'fontesCena'].forEach((id) => {
+    const bs = el(id).getElementsByTagName('button');
+    for (let i = 0; i < bs.length; i++) bs[i].disabled = !viva;
+  });
 
   if (recadoAte && Date.now() > recadoAte) { el('recado').textContent = 'Tudo certo.'; el('recado').className = ''; recadoAte = 0; }
 }

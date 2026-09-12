@@ -22,6 +22,7 @@ require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
 require_once __DIR__ . '/lib/selos.php';
 require_once __DIR__ . '/lib/notificacoes.php';
+require_once __DIR__ . '/lib/aovivo.php';
 
 /* QUEM CONTA O TEMPO É O BANCO.
 
@@ -118,6 +119,9 @@ function feed_autor(array $u, array $selos = []): array
         'nome'  => (string) ($u['nome_exibicao'] ?: $u['login']),
         'foto'  => $foto,
         'selos' => $selos[(int) ($u['usuario_id'] ?? $u['id'] ?? 0)] ?? [],
+        /* Quem está no ar agora. A pergunta à Twitch é uma por minuto pro
+           site inteiro, não uma por post — ver api/lib/aovivo.php. */
+        'aovivo' => ao_vivo_esta((string) $u['login']),
     ];
 }
 

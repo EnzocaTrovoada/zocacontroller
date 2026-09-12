@@ -15,6 +15,16 @@
   "novidades": [
     {
       "data": "2026-09-12",
+      "titulo": "AO VIVO no feed",
+      "texto": "Quem está transmitindo agora ganha um selo vermelho neon ao lado do nome, e o selo leva direto pro canal na Twitch."
+    },
+    {
+      "data": "2026-09-12",
+      "titulo": "O painel do mod não esvazia mais quando o OBS fecha",
+      "texto": "Cenas, áudio e fontes continuam na tela, apagadinhos e travados, com uma linha dizendo de quando é aquele retrato. E a troca por câmera que um mod desligou não volta sozinha quando o OBS reabre."
+    },
+    {
+      "data": "2026-09-12",
       "titulo": "Um botão 'Como usar' em cada tela",
       "texto": "Na ponta direita da linha de cima. Ele abre quatro ou cinco passos da tela em que você está, e só dela — em vez de um manual gigante onde você teria que achar o parágrafo certo."
     },
