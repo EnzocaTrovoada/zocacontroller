@@ -997,15 +997,26 @@ try {
   .selo-img { width: 16px; height: 16px; object-fit: contain; display: block; }
 
   .selo-dica { position: relative; display: inline-flex; align-items: center; outline: 0; cursor: default; }
-  .selo-dica::after {
-    content: attr(data-dica); position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 20;
+
+  /* A DICA MORA NO BODY, E NÃO DENTRO DO SELO.
+
+     Ela era um ::after do próprio selo. Só que o feed rola dentro de uma
+     caixa com overflow, e caixa com overflow corta o que sai dela: a dica
+     subia acima da linha do post e era cortada fora — some inteira nos
+     posts de cima, que são justamente os que a pessoa está olhando.
+
+     Uma dica só, presa ao body e posicionada na hora, não tem caixa
+     nenhuma pra cortá-la. Serve o feed, o Descobrir e a galeria. */
+  .dica-balao {
+    position: fixed; left: 0; top: -999px; z-index: 90;
     width: max-content; max-width: 240px; padding: 6px 9px; border-radius: 5px;
     background: #101412; color: #F2F5F3; box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
     font: 500 12px/1.4 var(--disp); letter-spacing: normal; text-transform: none; text-align: center;
-    opacity: 0; transform: translate(-50%, 4px); pointer-events: none;
-    transition: opacity .12s ease, transform .12s ease;
+    opacity: 0; pointer-events: none; transition: opacity .12s ease;
   }
-  .selo-dica:hover::after, .selo-dica:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+  .dica-balao.on { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .dica-balao { transition: none; } }
+
   .selo-dica img, .selo-dica .selo-chip { transition: transform .16s ease; }
   .selo-dica:hover img, .selo-dica:focus-visible img { transform: scale(1.35); }
   .selo-dica:hover .selo-chip, .selo-dica:focus-visible .selo-chip { transform: scale(1.12); }
@@ -4575,6 +4586,57 @@ const daApi = (u) => !u ? '' : /^https?:/i.test(u) ? u : API + (u.charAt(0) === 
 /* A dica é desenhada pelo CSS, e não pelo title: o do navegador demora um
    segundo pra aparecer, e no celular não aparece nunca. O tabindex é o que
    deixa um toque mostrar a dica também. */
+/* A dica que aparece embaixo do mouse. Uma só na página inteira: os selos
+   nascem e somem a cada redesenho do feed, e um balão por selo seria um
+   balão a mais no DOM por post, pra sempre. */
+let dicaBalao = null;
+
+function mostraDica(alvo) {
+  const txt = alvo.getAttribute('data-dica');
+  if (!txt) return escondeDica();
+
+  if (!dicaBalao) {
+    dicaBalao = h('div', { cls: 'dica-balao' });
+    document.body.appendChild(dicaBalao);
+  }
+  dicaBalao.textContent = txt;
+
+  /* Mede antes de acender: posicionar depois de aparecer daria um pulo
+     visível do lugar antigo pro novo. */
+  const r = alvo.getBoundingClientRect();
+  const b = dicaBalao.getBoundingClientRect();
+
+  const x = Math.min(Math.max(8, r.left + r.width / 2 - b.width / 2), innerWidth - b.width - 8);
+  /* Em cima, que é onde não tapa o nome — a não ser que não caiba. */
+  const cabeEmCima = r.top > b.height + 12;
+
+  dicaBalao.style.left = Math.round(Math.max(8, x)) + 'px';
+  dicaBalao.style.top = Math.round(cabeEmCima ? r.top - b.height - 8 : r.bottom + 8) + 'px';
+  dicaBalao.classList.add('on');
+}
+
+function escondeDica() {
+  if (dicaBalao) dicaBalao.classList.remove('on');
+}
+
+/* Um ouvinte pra página toda, e não um por selo: assim selo criado depois
+   — post novo, canal novo, arte nova — já nasce funcionando. */
+const seloDe = (alvo) => (alvo && alvo.closest) ? alvo.closest('.selo-dica') : null;
+
+document.addEventListener('mouseover', (e) => {
+  const s = seloDe(e.target);
+  if (s) mostraDica(s); else escondeDica();
+});
+document.addEventListener('focusin', (e) => {
+  const s = seloDe(e.target);
+  if (s) mostraDica(s); else escondeDica();
+});
+document.addEventListener('mouseleave', escondeDica);
+/* Rolar com a dica aberta deixaria ela parada no ar, longe do selo. O
+   true pega a rolagem de qualquer caixa, não só a da janela. */
+window.addEventListener('scroll', escondeDica, true);
+window.addEventListener('resize', escondeDica);
+
 function chipSelo(s) {
   const dica = s.dica ? s.nome + ' · ' + s.dica : s.nome;
   const cx = h('span', { cls: 'selo-dica', tabindex: '0', 'data-dica': dica, 'aria-label': dica });
