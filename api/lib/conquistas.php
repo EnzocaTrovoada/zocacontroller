@@ -288,11 +288,17 @@ function conq_confere(int $uid, int $intervalo = CONQ_INTERVALO): array
 
     /* A soma vai pra coluna que o plano lê. Refeita a cada conferência:
        mudar o prêmio de uma conquista chega em quem já tem na próxima
-       visita. */
-    try {
-        db()->prepare('UPDATE usuarios SET vagas_conquista = ? WHERE id = ?')
-            ->execute([conq_bonus_overlays($uid), $uid]);
-    } catch (Throwable $e) { /* coluna nova */ }
+       visita.
+
+       SEM CONQUISTAS LEGÍVEIS, NÃO MEXE. Entre subir este arquivo e rodar o
+       SQL 051, a lista vem vazia — e somar "nada" zeraria as vagas de quem
+       já tinha ganhado. */
+    if (conq_lista(true)) {
+        try {
+            db()->prepare('UPDATE usuarios SET vagas_conquista = ? WHERE id = ?')
+                ->execute([conq_bonus_overlays($uid), $uid]);
+        } catch (Throwable $e) { /* coluna nova */ }
+    }
 
     return $novas;
 }
