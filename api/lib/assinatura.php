@@ -126,12 +126,27 @@ function recursos_do_usuario(int $usuario_id, string $plano): array
     $comoPro = !cobranca_aberta() || usuario_beta($usuario_id) || usuario_cortesia($usuario_id);
     $r = recursos_do_plano($comoPro ? 'pro' : $plano);
 
-    $st = db()->prepare('SELECT perfis_max, recursos FROM usuarios WHERE id = ?');
+    /* SELECT *: a coluna das vagas de conquista chegou depois, e este é o
+       caminho que todo overlay no OBS percorre. Pedir ela pelo nome
+       derrubaria todos os overlays de quem ainda não rodou o SQL 049. */
+    $st = db()->prepare('SELECT * FROM usuarios WHERE id = ?');
     $st->execute([$usuario_id]);
     $u = $st->fetch();
     if (!$u) return $r;
 
     if ($u['perfis_max'] !== null) $r['perfis_max'] = (int) $u['perfis_max'];
+
+    /* As vagas que as conquistas deram somam por cima de tudo — do plano e
+       de um teto dado à mão. Conquista só dá: nunca desce o número.
+
+       Vem de uma coluna, e não da soma das conquistas: este caminho roda a
+       cada consulta de cada overlay no OBS, e somar ali carregaria todos os
+       arquivos de conquista toda vez. Quem mantém a coluna em dia é a
+       conferência das conquistas. */
+    $extra = max(0, (int) ($u['vagas_conquista'] ?? 0));
+    if ($extra && $r['perfis_max'] < PERFIS_ILIMITADO) {
+        $r['perfis_max'] = min(PERFIS_ILIMITADO, $r['perfis_max'] + $extra);
+    }
 
     if (!empty($u['recursos'])) {
         $extra = json_decode((string) $u['recursos'], true);

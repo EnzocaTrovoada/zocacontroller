@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-12",
+      "titulo": "Conquistas",
+      "texto": "Metas que liberam coisa a mais: vagas de overlay no plano grátis, selos pro perfil e dias de Pro de presente. Nenhuma tira nada do que você já usa — e o que você já tinha feito antes delas existirem já conta."
+    },
+    {
+      "data": "2026-09-12",
       "titulo": "Carrossel prefere quem está ao vivo",
       "texto": "A página inicial mostra primeiro quem está transmitindo agora — do site e, se ninguém do site estiver no ar, uma live aberta da Twitch. Canal desligado só aparece quando não tem live nenhuma pra mostrar."
     },

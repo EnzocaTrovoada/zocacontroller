@@ -119,6 +119,8 @@ if ($acao === 'publicar') {
 }
 
 if ($acao === 'aplicar') {
+    trava('aplicar-modelo', 30, 3600);
+
     $st = db()->prepare('SELECT * FROM corridas_modelo WHERE id = ? AND oculto = 0');
     $st->execute([$id]);
     $m = $st->fetch(PDO::FETCH_ASSOC);
@@ -138,7 +140,10 @@ if ($acao === 'aplicar') {
         $saida[] = $item;
     }
 
-    db()->prepare('UPDATE corridas_modelo SET usos = usos + 1 WHERE id = ?')->execute([$id]);
+    /* Uso do próprio autor não conta: o número de usos vale conquista, e
+       aplicar o próprio modelo três vezes não é ninguém usando. */
+    db()->prepare('UPDATE corridas_modelo SET usos = usos + 1 WHERE id = ? AND usuario_id <> ?')
+        ->execute([$id, $uid]);
 
     json_saida(['ok' => true, 'jogo' => (string) $m['jogo'],
                 'categoria' => (string) ($m['categoria'] ?? ''), 'trechos' => $saida]);

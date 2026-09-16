@@ -1308,6 +1308,35 @@ try {
   }
   .trecho-ic:hover { border-color: var(--verde); border-style: solid; color: var(--verde); }
   .trecho-ic img { width: 20px; height: 20px; object-fit: contain; display: block; }
+  /* ---------- conquistas ---------- */
+  .cq-topo { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 4px 0 18px; }
+  .cq-topo b { font: 700 30px var(--disp); }
+  .cq-topo span { color: var(--apagado); font-size: 13px; }
+  .cq-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-bottom: 22px; }
+  .cq {
+    position: relative; display: flex; gap: 12px; padding: 14px;
+    border: 1px solid var(--linha); border-radius: 10px; background: var(--caixa);
+  }
+  .cq__ic {
+    flex: none; width: 46px; height: 46px; border-radius: 12px;
+    display: grid; place-items: center; font-size: 24px; background: var(--caixa2);
+    filter: grayscale(1); opacity: .55;
+  }
+  .cq.ganhou { border-color: var(--verde); background: linear-gradient(135deg, var(--verde-fraco), var(--caixa) 70%); }
+  .cq.ganhou .cq__ic { filter: none; opacity: 1; }
+  .cq.nova { animation: brilha 1.6s ease-out 2; }
+  @keyframes brilha { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 40% { box-shadow: 0 0 0 4px var(--verde); } }
+  @media (prefers-reduced-motion: reduce) { .cq.nova { animation: none; } }
+  .cq b { display: block; font: 600 14.5px var(--disp); }
+  .cq p { margin: 2px 0 8px; font-size: 12.5px; color: var(--fraco); line-height: 1.45; }
+  .cq__barra { height: 6px; border-radius: 3px; background: var(--caixa2); overflow: hidden; }
+  .cq__barra i { display: block; height: 100%; background: var(--verde); border-radius: 3px; }
+  .cq__rodape { display: flex; justify-content: space-between; gap: 8px; margin-top: 7px;
+    font: 500 11.5px var(--mono); color: var(--apagado); }
+  .cq__rodape > span:first-child { flex: none; white-space: nowrap; }
+  .cq__premio { color: var(--dourado); text-align: right; }
+  .cq.ganhou .cq__premio { color: var(--verde-forte); }
+
   .bk-linha { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--linha); }
   .bk-linha:last-child { border-bottom: 0; }
   .bk-tipo {
@@ -3570,6 +3599,13 @@ const COMO_USAR = {
     ['Serve pra contratar', 'O perfil leva pro portfólio da pessoa. O combinado é entre vocês dois — o site não fica no meio.'],
   ]],
 
+  conquistas: ['Conquistas', [
+    ['Só dão, nunca tiram', 'Nada do que você já usa depende de conquista. Elas liberam coisa a mais.'],
+    ['Os prêmios', 'Vagas de overlay a mais no plano grátis, selos pro seu perfil e dias de Pro de presente.'],
+    ['Chegam sozinhas', 'Fez a coisa, ganhou: o aviso aparece no sino na próxima vez que você abrir o painel.'],
+    ['Conta o que já passou', 'Quem já usava o site antes das conquistas existirem já ganha o que tinha feito.'],
+  ]],
+
   backup: ['Backup do OBS', [
     ['O automático é sozinho', 'Com a fonte da ponte no OBS, uma vez a cada 12 horas ela guarda tudo: cenas, fontes, filtros, posições e volumes. Só vira versão nova quando algo mudou.'],
     ['O manual é o que volta num clique', 'No OBS: Coleção de cenas → Exportar. Suba esse arquivo aqui. Pra voltar, é Coleção de cenas → Importar.'],
@@ -3634,6 +3670,7 @@ const TELAS = [
   ['#/luzes',     'Luzes',         'o chat muda a cor das suas lâmpadas'],
   ['#/suporte',   'Suporte',       'fale comigo quando algo não funcionar'],
   ['#/backup',    'Backup do OBS', 'suas cenas guardadas, caso o computador morra'],
+  ['#/conquistas', 'Conquistas',   'metas que liberam overlays, selos e dias de Pro'],
 ];
 
 function nomeDaTela(hash) {
@@ -8350,6 +8387,102 @@ function telaArtistas() {
 
 /* ---------------- suporte ---------------- */
 
+/* ---------------- conquistas ----------------
+
+   A tela só mostra: quem decide o que foi ganho é o servidor, que confere
+   na hora em que a tela pede. */
+const CQ_GRUPOS = [
+  ['comeco', 'Começando'],
+  ['live', 'Na live'],
+  ['feed', 'No feed'],
+  ['comunidade', 'Com a comunidade'],
+];
+
+function telaConquistas() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Conquistas' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Metas que liberam coisa a mais: vagas de overlay, selos pro perfil e dias de Pro. '
+    + 'Nenhuma tira nada do que você já usa.' }));
+
+  if (!chave) {
+    tela.appendChild(h('div', { cls: 'vazio', txt: 'Entre com a Twitch pra ver as suas conquistas.' }));
+    return;
+  }
+
+  const corpo = h('div', {}, [h('p', { cls: 'd', txt: 'conferindo…' })]);
+  tela.appendChild(corpo);
+
+  api('/conquistas.php').then((d) => {
+    corpo.innerHTML = '';
+    const lista = d.conquistas || [];
+    const novas = d.novas || [];
+
+    const topo = h('div', { cls: 'cq-topo' }, [
+      h('b', { txt: d.ganhas + ' de ' + d.total }),
+      h('span', { txt: d.vagas
+        ? '+' + d.vagas + (d.vagas === 1 ? ' vaga de overlay ganha' : ' vagas de overlay ganhas')
+        : 'nenhuma vaga extra ainda' }),
+    ]);
+    corpo.appendChild(topo);
+
+    if (novas.length) {
+      recado('🏆 ' + (novas.length === 1 ? 'Conquista nova!' : novas.length + ' conquistas novas!')
+        + ' O prêmio já está valendo.', 'bom');
+    }
+
+    CQ_GRUPOS.forEach(([g, titulo]) => {
+      const doGrupo = lista.filter((c) => c.grupo === g);
+      if (!doGrupo.length) return;
+
+      const grade = h('div', { cls: 'cq-grade' });
+      doGrupo.forEach((c) => {
+        const pct = Math.round(100 * Math.min(c.tem, c.meta) / c.meta);
+        const barra = h('div', { cls: 'cq__barra' }, [h('i')]);
+        barra.firstChild.style.width = pct + '%';
+
+        const estado = c.ganhou
+          ? (c.pendente ? 'ganha — o selo chega quando for criado' : '✓ ganha ' + (faz(c.ha) === 'agora' ? 'agora' : 'há ' + faz(c.ha)))
+          : c.tem + ' de ' + c.meta;
+
+        grade.appendChild(h('div', {
+          cls: 'cq' + (c.ganhou ? ' ganhou' : '') + (novas.indexOf(c.id) >= 0 ? ' nova' : ''),
+        }, [
+          h('div', { cls: 'cq__ic', txt: c.icone }),
+          h('div', { style: 'flex:1;min-width:0' }, [
+            h('b', { txt: c.nome }),
+            h('p', { txt: c.descricao }),
+            barra,
+            h('div', { cls: 'cq__rodape' }, [
+              h('span', { txt: estado }),
+              h('span', { cls: 'cq__premio', txt: c.premio }),
+            ]),
+          ]),
+        ]));
+      });
+
+      corpo.appendChild(h('h3', { txt: titulo, style: 'margin:0 0 10px' }));
+      corpo.appendChild(grade);
+    });
+  }).catch((e) => {
+    corpo.innerHTML = '';
+    corpo.appendChild(h('p', { cls: 'd', txt: 'Não consegui carregar: ' + e.message }));
+  });
+}
+
+/* Uma conferência por abertura do painel. Quem ganhou alguma coisa desde a
+   última visita recebe o aviso no sino — por isso, quando ela termina, o
+   sino pergunta de novo. */
+function confereConquistas() {
+  return api('/conquistas.php?a=conferir')
+    .then((d) => {
+      const n = (d && d.novas && d.novas.length) || 0;
+      if (n) recado('🏆 ' + (n === 1 ? 'Você ganhou uma conquista!' : 'Você ganhou ' + n + ' conquistas!')
+        + ' Veja em Conquistas.', 'bom');
+    })
+    .catch(() => {});
+}
+
 /* ---------------- backup do OBS ----------------
 
    Duas portas, e a tela diz qual é qual, porque na hora de voltar elas são
@@ -8999,6 +9132,7 @@ function rota() {
   if (p[0] === 'luzes') return telaLuzes();
   if (p[0] === 'suporte') return telaSuporte();
   if (p[0] === 'backup') return telaBackup();
+  if (p[0] === 'conquistas') return telaConquistas();
   if (p[0] === 'subathon') return telaSubathon();
   if (p[0] === 'mods') return telaMods();
   if (p[0] === 'novo' && TIPOS[p[1]]) return telaEditor(null, p[1]);
@@ -9122,6 +9256,9 @@ async function carrega() {
 
   if (!await carrega()) return;
   if (souAdmin) el('abaTextos').classList.remove('escondido');
+  /* Sem await: o painel não espera as contagens. Quando elas voltam, o
+     sino pergunta de novo e já mostra o aviso da conquista. */
+  confereConquistas().then(buscaAvisos);
   ligaAvisos();
   ligaBusca();
   ligaUpgrade();
