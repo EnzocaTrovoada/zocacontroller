@@ -19,6 +19,10 @@ try {
   var zcTema = localStorage.getItem('zc:tema');
   if (!zcTema) zcTema = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'claro' : 'escuro';
   document.documentElement.setAttribute('data-tema', zcTema);
+  /* A intensidade também entra aqui, pelo mesmo motivo do tema: aplicada
+     depois, a página abriria num cinza e pularia pro outro. */
+  var zcInt = localStorage.getItem('zc:intensidade-' + zcTema);
+  if (zcInt) document.documentElement.setAttribute('data-intensidade', zcInt);
 } catch (e) { document.documentElement.setAttribute('data-tema', 'escuro'); }
 </script>
 <link rel="icon" href="icone.png?v=2" type="image/png">
@@ -74,6 +78,41 @@ try {
              radial-gradient(800px 520px at 100% -8%, rgba(167,139,250,.11), transparent 60%),
              radial-gradient(1000px 640px at 50% 112%, rgba(56,189,248,.07), transparent 60%);
     --sombra:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  /* INTENSIDADE: só as superfícies mudam. Texto, verde e o resto da paleta
+     ficam: foram medidos pra contraste, e escurecer o fundo não estraga
+     nenhum deles.
+     Escuro: suave é um cinza-esverdeado, como o "Dim" do X; profundo é preto
+     de verdade, que em tela OLED quase apaga os pixels.
+     Claro: o branco puro é o "brilhante"; os outros dois tiram o ofuscamento
+     de quem usa o site à noite com o tema claro. */
+  :root[data-tema="escuro"][data-intensidade="suave"] {
+    --fundo:#141C18; --caixa:#1B2520; --caixa2:#222E28; --linha:#2B3832; --linha2:#3A4A42;
+    --barra-fundo:rgba(20,28,24,.84); --vidro:rgba(255,255,255,.04);
+  }
+  :root[data-tema="escuro"][data-intensidade="profundo"] {
+    --fundo:#000000; --caixa:#080B0A; --caixa2:#0E1311; --linha:#17201B; --linha2:#24302A;
+    --barra-fundo:rgba(0,0,0,.84); --vidro:rgba(255,255,255,.02);
+  }
+  :root[data-tema="claro"][data-intensidade="suave"] {
+    --fundo:#E3E8E4; --caixa:#DAE0DC; --caixa2:#D0D8D2; --linha:#C2CCC5; --linha2:#AEBAB2;
+    --barra-fundo:rgba(227,232,228,.86); --vidro:rgba(255,255,255,.35);
+  }
+  :root[data-tema="claro"][data-intensidade="medio"] {
+    --fundo:#F1F4F1; --caixa:#E9EDEA; --caixa2:#E0E6E1; --linha:#D0D9D2; --linha2:#BFCBC2;
+    --barra-fundo:rgba(241,244,241,.86); --vidro:rgba(255,255,255,.5);
+  }
+
+  /* A TROCA DE TEMA ESMAECE EM VEZ DE PISCAR.
+
+     Onde o navegador sabe fazer, a página inteira faz um fade de uma cor pra
+     outra. Onde não sabe, as cores deslizam — só durante a troca, pra não
+     deixar hover e botão lentos no resto do tempo. */
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .45s; }
+  html.trocando-tema, html.trocando-tema * {
+    transition: background-color .4s ease, color .4s ease, border-color .4s ease,
+                fill .4s ease, stroke .4s ease, box-shadow .4s ease !important;
   }
 
   * { box-sizing: border-box; }
@@ -184,11 +223,29 @@ try {
    conferencia, nao de navegacao. */
 .quem { color: var(--fraco); font-size: 13px; letter-spacing: .01em; }
 @media (max-width: 640px) { .quem { display: none; } }
-  .lua {
-    padding: 0 20px; border: 0; border-left: 1px solid var(--linha);
-    background: none; color: var(--tinta); cursor: pointer; font-size: 17px;
+  /* O botão do tema tem o mesmo desenho do sino: só o contorno. */
+  .tema { border-left: 1px solid var(--linha); border-right: 0; cursor: default; }
+  .tema__bt { display: flex; align-items: center; padding: 0; border: 0; background: none;
+    color: inherit; cursor: pointer; border-radius: 50%; }
+  .tema__bt:focus-visible { outline: 2px solid var(--verde); outline-offset: 2px; }
+  .tema .bandeja { left: auto; right: -1px; width: 250px; padding: 12px; cursor: default;
+    text-transform: none; letter-spacing: normal; }
+  .tema .bandeja b { display: block; font: 600 11px var(--mono); letter-spacing: .12em;
+    text-transform: uppercase; color: var(--apagado); margin: 2px 2px 8px; }
+  .tema-modos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+  .bandeja .tema-modos button {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 10px 6px; border: 1px solid var(--linha); border-radius: 8px;
+    font: 600 12.5px var(--disp); text-align: center; color: var(--tinta);
   }
-  .lua:hover { background: var(--verde-fraco); color: var(--verde-forte); }
+  .bandeja .tema-modos button svg { width: 22px; height: 22px; }
+  .bandeja .tema-modos button.on { border-color: var(--verde); color: var(--verde-forte); background: var(--verde-fraco); }
+  .tema-faixa { width: 100%; accent-color: var(--verde); margin: 2px 0 0; }
+  .tema-marcas { display: flex; justify-content: space-between; margin: 2px 2px 10px;
+    font: 500 11px var(--mono); color: var(--apagado); }
+  .tema-marcas span.on { color: var(--tinta); }
+  .tema-sistema { display: flex; align-items: center; gap: 8px; cursor: pointer;
+    font: 500 12.5px var(--mono); color: var(--fraco); padding: 4px 2px; }
 
   /* a bandeja nasce colada embaixo da aba que a abriu */
   .bandeja {
@@ -1582,7 +1639,15 @@ try {
        dentro de <a>: aninhar os dois é HTML inválido, e em alguns
        navegadores o clique morre no botão. -->
   <a class="aba entrar escondido" id="abaEntrar" href="https://api.zocahop.com/entrar.php">Entrar com a Twitch</a>
-  <button class="lua" id="btTema" type="button" title="Trocar tema" aria-label="Trocar tema">🌙</button>
+  <!-- Um bloco, e não um botão com a bandeja dentro: esta bandeja tem
+       controle deslizante e caixa de marcar, e controle dentro de <button>
+       é HTML inválido — o Firefox nem deixa clicar. -->
+  <div class="aba sino tema" id="btTema" aria-expanded="false">
+    <button class="tema__bt" type="button" title="Aparência" aria-label="Aparência" aria-haspopup="true">
+      <span class="sino__ic" id="temaIc"></span>
+    </button>
+    <div class="bandeja" id="bandejaTema"></div>
+  </div>
 </nav>
 
 <div class="w">
@@ -1634,15 +1699,121 @@ function temaDoSistema() {
 function temaGuardado() {
   try { return localStorage.getItem('zc:tema') || ''; } catch (e) { return ''; }
 }
-function poeTema(t, guardar) {
-  document.documentElement.setAttribute('data-tema', t);
-  el('btTema').textContent = t === 'escuro' ? '☀️' : '🌙';
-  if (guardar) try { localStorage.setItem('zc:tema', t); } catch (e) {}
-}
-poeTema(temaGuardado() || temaDoSistema(), false);
-el('btTema').onclick = () => {
-  poeTema(document.documentElement.getAttribute('data-tema') === 'escuro' ? 'claro' : 'escuro', true);
+const ICONE_LUA = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" '
+  + 'stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5 8.5 8.5 0 1 0 20.5 14.3z"/></svg>';
+const ICONE_SOL = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" '
+  + 'stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/>'
+  + '<path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>';
+
+/* Os três pontos da intensidade, por tema. O do meio de cada lista é só a
+   posição; o PADRÃO de cada tema é o que não muda nada no CSS. */
+const INTENSIDADES = {
+  escuro: [['suave', 'Suave'], ['', 'Padrão'], ['profundo', 'Profundo']],
+  claro:  [['suave', 'Suave'], ['medio', 'Médio'], ['', 'Brilhante']],
 };
+
+function intensidadeGuardada(t) {
+  try { return localStorage.getItem('zc:intensidade-' + t) || ''; } catch (e) { return ''; }
+}
+
+/* A troca em si, com o esmaecimento. Sem suporte a view transition, as
+   cores deslizam; com movimento reduzido pedido no sistema, troca seco. */
+function aplicaTema(t, intensidade) {
+  const raiz = document.documentElement;
+  const muda = () => {
+    raiz.setAttribute('data-tema', t);
+    if (intensidade) raiz.setAttribute('data-intensidade', intensidade);
+    else raiz.removeAttribute('data-intensidade');
+  };
+
+  let calmo = false;
+  try { calmo = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+  if (calmo) return muda();
+  if (document.startViewTransition) { document.startViewTransition(muda); return; }
+
+  raiz.classList.add('trocando-tema');
+  muda();
+  clearTimeout(aplicaTema.relogio);
+  aplicaTema.relogio = setTimeout(() => raiz.classList.remove('trocando-tema'), 450);
+}
+
+/* Recebem o tema de destino: com o esmaecimento, o atributo só muda depois
+   que o navegador fotografa a tela, e ler dele aqui daria o tema velho. */
+function pintaBotaoTema(tema) {
+  const t = tema || document.documentElement.getAttribute('data-tema');
+  el('temaIc').innerHTML = t === 'escuro' ? ICONE_LUA : ICONE_SOL;
+}
+
+function poeTema(t, guardar) {
+  aplicaTema(t, intensidadeGuardada(t));
+  pintaBotaoTema(t);
+  if (guardar) try { localStorage.setItem('zc:tema', t); } catch (e) {}
+  montaBandejaTema(t);
+}
+
+function montaBandejaTema(tema) {
+  const cx = el('bandejaTema');
+  cx.innerHTML = '';
+  /* Trocar de modo remonta a bandeja, e o botão clicado some da página no
+     meio do clique: sem isto o clique "caía fora" e fechava a bandeja. */
+  cx.onclick = (e) => e.stopPropagation();
+  const t = tema || document.documentElement.getAttribute('data-tema');
+  const segueSistema = !temaGuardado();
+
+  cx.appendChild(h('b', { txt: 'Aparência' }));
+
+  const claro = h('button', { type: 'button', cls: t === 'claro' ? 'on' : '' });
+  claro.innerHTML = ICONE_SOL + '<span>Claro</span>';
+  const escuro = h('button', { type: 'button', cls: t === 'escuro' ? 'on' : '' });
+  escuro.innerHTML = ICONE_LUA + '<span>Escuro</span>';
+  claro.onclick = () => poeTema('claro', true);
+  escuro.onclick = () => poeTema('escuro', true);
+  cx.appendChild(h('div', { cls: 'tema-modos' }, [claro, escuro]));
+
+  /* A faixa mexe na intensidade do tema que está na tela: cada tema lembra
+     a sua, então clarear o escuro não bagunça o claro. */
+  const pontos = INTENSIDADES[t] || INTENSIDADES.escuro;
+  const atual = intensidadeGuardada(t);
+  const pos = Math.max(0, pontos.findIndex((p) => p[0] === atual));
+  cx.appendChild(h('b', { txt: 'Intensidade' }));
+  const faixa = h('input', { type: 'range', min: '0', max: '2', step: '1', cls: 'tema-faixa',
+    'aria-label': 'Intensidade do tema ' + t });
+  faixa.value = String(pos);
+  const marcas = h('div', { cls: 'tema-marcas' },
+    pontos.map((p, i) => h('span', { cls: i === pos ? 'on' : '', txt: p[1] })));
+  faixa.oninput = () => {
+    const escolha = pontos[+faixa.value][0];
+    try {
+      if (escolha) localStorage.setItem('zc:intensidade-' + t, escolha);
+      else localStorage.removeItem('zc:intensidade-' + t);
+    } catch (e) {}
+    aplicaTema(t, escolha);
+    [...marcas.children].forEach((m, i) => m.classList.toggle('on', i === +faixa.value));
+  };
+  cx.append(faixa, marcas);
+
+  const cb = h('input', { type: 'checkbox' });
+  cb.checked = segueSistema;
+  cb.onchange = () => {
+    if (cb.checked) {
+      try { localStorage.removeItem('zc:tema'); } catch (e) {}
+      poeTema(temaDoSistema(), false);
+    } else {
+      poeTema(t, true);
+    }
+  };
+  cx.appendChild(h('label', { cls: 'tema-sistema' }, [cb, document.createTextNode('Seguir o do computador')]));
+}
+
+pintaBotaoTema();
+/* O botão já nasce certo pelo script do head; aqui só a bandeja e o ícone.
+   Não reaplicar o tema no carregamento: isso faria o esmaecimento rodar à
+   toa toda vez que a página abre. */
+function ligaTema() {
+  montaBandejaTema();
+  ligaAba(el('btTema'));
+}
 try {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (!temaGuardado()) poeTema(temaDoSistema(), false);
@@ -2529,6 +2700,7 @@ function ligaAba(aba) {
 ligaAba(el('abaOverlays'));
 ligaAba(el('abaFerramentas'));
 ligaAba(el('abaAvisos'));
+ligaTema();
 document.addEventListener('click', (e) => { if (!e.target.closest('.aba')) fechaBandejas(null); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fechaBandejas(null); });
 
