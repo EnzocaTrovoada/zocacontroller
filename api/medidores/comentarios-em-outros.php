@@ -1,6 +1,6 @@
 <?php
 /**
- * Conquista: Bom de papo.
+ * Medidor: Comentários nos posts dos outros.
  *
  * Contrato em _MODELO.php.
  *
@@ -8,19 +8,14 @@
  */
 
 return [
-    'id'        => 'conversador',
-    'nome'      => 'Bom de papo',
-    'descricao' => 'Comente 20 vezes nos posts de outras pessoas.',
-    'icone'     => '💬',
-    'grupo'     => 'comunidade',
-    'meta'      => 20,
+    'id'      => 'comentarios-em-outros',
+    'nome'    => 'Comentários nos posts dos outros',
+    'unidade' => ['comentário', 'comentários'],
 
-    'progresso' => function (int $uid): int {
+    'contar' => function (int $uid): int {
         $st = db()->prepare('SELECT COUNT(*) FROM post_comentarios c JOIN posts p ON p.id = c.post_id
               WHERE c.usuario_id = ? AND c.escondido = 0 AND p.usuario_id <> c.usuario_id');
         $st->execute([$uid]);
         return (int) $st->fetchColumn();
     },
-
-    'premio' => ['tipo' => 'overlays', 'quantos' => 1],
 ];

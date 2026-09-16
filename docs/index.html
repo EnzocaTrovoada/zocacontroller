@@ -1406,6 +1406,25 @@ try {
   .cq__premio { color: var(--dourado); text-align: right; }
   .cq.ganhou .cq__premio { color: var(--verde-forte); }
 
+  /* ---------- editor de conquistas ---------- */
+  .cqa-linha { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 0; border-top: 1px solid var(--linha); }
+  .cqa-linha.desligada { opacity: .55; }
+  .cqa-ic { flex: none; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+    font-size: 19px; background: var(--caixa2); }
+  .cqa-meio { flex: 1 1 260px; min-width: 0; }
+  .cqa-meio b { font: 600 14px var(--disp); }
+  .cqa-meio small { display: block; color: var(--apagado); font: 500 11.5px var(--mono); }
+  .cqa-estado { font: 600 10.5px var(--mono); padding: 1px 7px; border-radius: 999px;
+    background: var(--caixa2); color: var(--fraco); }
+  .cqa-estado.on { background: var(--verde-fraco); color: var(--verde-forte); }
+  .cqa-form { display: grid; gap: 10px; }
+  .cqa-form .par { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .cqa-form label { display: grid; gap: 4px; font: 500 12px var(--mono); color: var(--fraco); }
+  .cqa-form input[type=text], .cqa-form input[type=number], .cqa-form select { width: 100%; }
+  .cqa-form .marca { display: flex; align-items: center; gap: 8px; }
+  .cqa-aviso { font-size: 12.5px; color: var(--dourado); min-height: 1em; }
+
   .bk-linha { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--linha); }
   .bk-linha:last-child { border-bottom: 0; }
   .bk-tipo {
@@ -8138,6 +8157,7 @@ function telaAdmin() {
   tela.appendChild(blocoSuporte());
   tela.appendChild(blocoAvisos());
   tela.appendChild(blocoSelos());
+  tela.appendChild(blocoConquistasAdmin());
   tela.appendChild(blocoArtistas());
   tela.appendChild(blocoEstilo());
 
@@ -8669,7 +8689,7 @@ function telaConquistas() {
 
         const estado = c.ganhou
           ? (c.pendente ? 'ganha — o selo chega quando for criado' : '✓ ganha ' + (faz(c.ha) === 'agora' ? 'agora' : 'há ' + faz(c.ha)))
-          : c.tem + ' de ' + c.meta;
+          : c.tem + ' de ' + c.meta + (c.unidade ? ' ' + c.unidade : '');
 
         grade.appendChild(h('div', {
           cls: 'cq' + (c.ganhou ? ' ganhou' : '')
@@ -9387,6 +9407,210 @@ function blocoSelos() {
   lista.appendChild(h('p', { cls: 'd', txt: 'vendo…' }));
   fetch(API + '/selos.php').then((r) => r.json()).then((d) => pinta(d.selos || []))
     .catch((e) => { lista.innerHTML = ''; lista.appendChild(h('p', { cls: 'd', txt: 'Não deu: ' + e.message })); });
+
+  return cx;
+}
+
+/* ---------------- editor de conquistas ----------------
+
+   A conquista é editada aqui; o que ela mede é escolhido de uma lista que
+   vem do código. Mudar o que se mede depois que alguém ganhou é recusado
+   pelo servidor, e o formulário já avisa antes. */
+function blocoConquistasAdmin() {
+  const cx = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Conquistas' }),
+    h('p', { cls: 'd', txt: 'Conquista só dá: desativar esconde de quem não tem, e quem tem continua com ela e com o prêmio. '
+      + 'Selo novo chega na hora em quem já ganhou; dias de Pro valem só pra quem ganhar dali pra frente.' }),
+  ]);
+
+  const corpo = h('div', {}, [h('p', { cls: 'd', txt: 'vendo…' })]);
+  const nova = h('button', { cls: 'bt mini', type: 'button', txt: '+ Nova conquista', id: 'cqa-nova' });
+  cx.append(corpo, h('div', { cls: 'campo', style: 'margin-top:10px' }, [nova]));
+
+  let dados = null;
+  const manda = (c) => api('/conquistas.php', { method: 'POST', body: JSON.stringify(c) });
+  const nomeGrupo = (g) => (CQ_GRUPOS.find((x) => x[0] === g) || [g, g])[1];
+  const nomeMedidor = (m) => ((dados.medidores || []).find((x) => x.id === m) || { nome: m }).nome;
+
+  const textoPremio = (c) => {
+    const p = [];
+    if (c.vagas) p.push(c.vagas + (c.vagas === 1 ? ' vaga' : ' vagas'));
+    if (c.selo) p.push('selo ' + (((dados.selos || []).find((s) => s.slug === c.selo) || {}).nome || c.selo));
+    if (c.pro) p.push(c.pro + (c.pro === 1 ? ' dia de Pro' : ' dias de Pro'));
+    return p.join(' + ') || 'sem prêmio';
+  };
+
+  function pinta(d) {
+    dados = d;
+    corpo.innerHTML = '';
+    const cs = d.conquistas || [];
+    if (!cs.length) {
+      corpo.appendChild(h('p', { cls: 'd', txt: 'Nenhuma conquista. Rode o SQL 051 — ele já traz as 14 primeiras.' }));
+      return;
+    }
+
+    CQ_GRUPOS.forEach(([g, titulo]) => {
+      const doGrupo = cs.filter((c) => c.grupo === g);
+      if (!doGrupo.length) return;
+      corpo.appendChild(h('b', { txt: titulo, style: 'display:block;margin:14px 0 2px;font:600 12px var(--mono);'
+        + 'letter-spacing:.1em;text-transform:uppercase;color:var(--apagado)' }));
+
+      doGrupo.forEach((c) => {
+        const editar = h('button', { cls: 'bt mini', type: 'button', txt: 'Editar' });
+        editar.onclick = () => abre(c);
+
+        const liga = h('button', { cls: 'bt mini', type: 'button', txt: c.ativa ? 'Desativar' : 'Ativar' });
+        liga.onclick = async () => {
+          if (c.ativa && !confirm('Desativar "' + c.nome + '"? Some pra quem não tem; quem tem continua com ela.')) return;
+          try { pinta(await manda({ acao: 'ativa', id: c.id, ativa: c.ativa ? 0 : 1 })); }
+          catch (e) { recado(e.message, 'ruim'); }
+        };
+
+        const acoes = [editar, liga];
+        if (!c.quantos) {
+          const fora = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×', title: 'Apagar de vez' });
+          fora.onclick = async () => {
+            if (!confirm('Apagar "' + c.nome + '" de vez? Ninguém ganhou ela ainda.')) return;
+            try { pinta(await manda({ acao: 'apagar', id: c.id })); }
+            catch (e) { recado(e.message, 'ruim'); }
+          };
+          acoes.push(fora);
+        }
+
+        corpo.appendChild(h('div', { cls: 'cqa-linha' + (c.ativa ? '' : ' desligada') }, [
+          h('span', { cls: 'cqa-ic', txt: c.icone }),
+          h('div', { cls: 'cqa-meio' }, [
+            h('b', { txt: c.nome }),
+            h('small', { txt: nomeMedidor(c.medidor) + ' ≥ ' + c.meta + '  ·  ' + textoPremio(c)
+              + '  ·  ' + (c.quantos === 1 ? '1 pessoa tem' : c.quantos + ' pessoas têm') }),
+          ]),
+          h('span', { cls: 'cqa-estado' + (c.ativa ? ' on' : ''),
+            txt: !c.ativa ? 'desativada' : c.oculta ? 'escondida até ganhar' : 'ativa' }),
+        ].concat(acoes)));
+      });
+    });
+  }
+
+  /* O formulário, no mesmo popup do resto do site. */
+  function abre(c) {
+    const editando = !!c;
+    const v = c || { id: '', nome: '', descricao: '', icone: '🏆', grupo: 'comeco', ordem: 50,
+      medidor: (dados.medidores[0] || {}).id || '', meta: 1, vagas: 0, selo: '', pro: 0, ativa: 1, oculta: 0, quantos: 0 };
+
+    fechaPop();
+    const caixa = h('div', { cls: 'pop__caixa' });
+    const fundo = h('div', { cls: 'pop', id: 'pop' }, [caixa]);
+    fundo.onclick = (e) => { if (e.target === fundo) fechaPop(); };
+    document.addEventListener('keydown', popTecla);
+    const x = h('button', { cls: 'pop__x', type: 'button', txt: '×', title: 'Fechar' });
+    x.onclick = fechaPop;
+
+    const campo = (rotulo, el2) => h('label', {}, [document.createTextNode(rotulo), el2]);
+    const texto = (id, valor, max, ph) => {
+      const i = h('input', { type: 'text', id, maxlength: String(max), placeholder: ph || '' });
+      i.value = valor;
+      return i;
+    };
+    const numero = (id, valor, min, max) => {
+      const i = h('input', { type: 'number', id, min: String(min), max: String(max) });
+      i.value = String(valor);
+      return i;
+    };
+    const escolha = (id, opcoes, valor) => {
+      const s = h('select', { id });
+      opcoes.forEach(([val, rot]) => {
+        const o = h('option', { value: val, txt: rot });
+        if (String(val) === String(valor)) o.selected = true;
+        s.appendChild(o);
+      });
+      return s;
+    };
+
+    const fId = texto('cqa-id', v.id, 40, 'ex: primeira-live');
+    if (editando) fId.disabled = true;
+    const fNome = texto('cqa-nome', v.nome, 60, 'Nome que aparece na tela');
+    const fDesc = texto('cqa-desc', v.descricao, 200, 'O que fazer pra ganhar');
+    const fIcone = texto('cqa-icone', v.icone, 16, '🏆');
+    const fGrupo = escolha('cqa-grupo', CQ_GRUPOS, v.grupo);
+    const fOrdem = numero('cqa-ordem', v.ordem, -999, 999);
+    const fMedidor = escolha('cqa-medidor', (dados.medidores || []).map((m) => [m.id, m.nome]), v.medidor);
+    const fMeta = numero('cqa-meta', v.meta, 1, 1000000);
+    const fVagas = numero('cqa-vagas', v.vagas, 0, 50);
+    const fSelo = escolha('cqa-selo', [['', 'nenhum']].concat((dados.selos || []).map((s) => [s.slug, s.nome])), v.selo);
+    const fPro = numero('cqa-pro', v.pro, 0, 365);
+    const fAtiva = h('input', { type: 'checkbox', id: 'cqa-ativa' });
+    fAtiva.checked = !!v.ativa;
+    const fOculta = h('input', { type: 'checkbox', id: 'cqa-oculta' });
+    fOculta.checked = !!v.oculta;
+
+    /* Trocar o medidor de quem já ganhou é recusado no servidor; aqui o
+       campo já nasce travado, com o motivo do lado. */
+    if (editando && v.quantos > 0) fMedidor.disabled = true;
+
+    const aviso = h('p', { cls: 'cqa-aviso' });
+    const confere = () => {
+      const avisos = [];
+      if (editando && v.quantos > 0) {
+        if (+fVagas.value < v.vagas) avisos.push('Menos vagas: quem já tem perde a diferença na próxima visita.');
+        if (+fPro.value !== v.pro) avisos.push('Os dias de Pro novos valem só pra quem ganhar daqui pra frente.');
+        if (+fMeta.value > v.meta) avisos.push('Meta maior: quem já ganhou continua com ela.');
+      }
+      aviso.textContent = avisos.join(' ');
+    };
+    [fVagas, fPro, fMeta].forEach((i) => { i.oninput = confere; });
+
+    const salvar = h('button', { cls: 'bt principal', type: 'button', txt: editando ? 'Salvar' : 'Criar conquista' });
+    salvar.onclick = async () => {
+      if (editando && v.quantos > 0 && +fVagas.value < v.vagas
+          && !confirm('Diminuir as vagas tira espaço de ' + v.quantos + ' pessoas. Continuar?')) return;
+      salvar.disabled = true;
+      try {
+        const r = await manda({
+          acao: 'salvar', editando: editando ? 1 : 0,
+          id: fId.value.trim().toLowerCase(), nome: fNome.value, descricao: fDesc.value, icone: fIcone.value,
+          grupo: fGrupo.value, ordem: +fOrdem.value, medidor: fMedidor.value, meta: +fMeta.value,
+          vagas: +fVagas.value, selo: fSelo.value, pro: +fPro.value,
+          ativa: fAtiva.checked ? 1 : 0, oculta: fOculta.checked ? 1 : 0,
+        });
+        fechaPop();
+        pinta(r);
+        recado(editando ? 'Conquista salva.' : 'Conquista criada. Quem já cumpre ganha na próxima visita.', 'bom');
+      } catch (e) {
+        recado(e.message, 'ruim');
+        salvar.disabled = false;
+      }
+    };
+
+    caixa.append(
+      h('div', { cls: 'pop__topo' }, [x, h('h2', { txt: editando ? 'Editar conquista' : 'Nova conquista' })]),
+      h('div', { cls: 'pop__corpo' }, [
+        h('div', { cls: 'cqa-form' }, [
+          h('div', { cls: 'par' }, [campo('Id (não muda depois)', fId), campo('Ícone', fIcone)]),
+          campo('Nome', fNome),
+          campo('Como ganhar', fDesc),
+          h('div', { cls: 'par' }, [campo('Grupo', fGrupo), campo('Ordem no grupo', fOrdem)]),
+          h('div', { cls: 'par' }, [
+            campo(editando && v.quantos > 0 ? 'O que mede (travado: já tem quem ganhou)' : 'O que mede', fMedidor),
+            campo('Meta', fMeta),
+          ]),
+          h('div', { cls: 'par' }, [campo('Vagas de overlay', fVagas), campo('Selo', fSelo), campo('Dias de Pro', fPro)]),
+          h('label', { cls: 'marca' }, [fAtiva, document.createTextNode('Ativa')]),
+          h('label', { cls: 'marca' }, [fOculta, document.createTextNode('Escondida até alguém ganhar')]),
+          aviso,
+          h('div', { cls: 'campo' }, [salvar]),
+        ]),
+      ]),
+    );
+    document.body.appendChild(fundo);
+    (editando ? fNome : fId).focus();
+  }
+
+  nova.onclick = () => { if (dados) abre(null); };
+
+  manda({ acao: 'admin' }).then(pinta).catch((e) => {
+    corpo.innerHTML = '';
+    corpo.appendChild(h('p', { cls: 'd', txt: 'Não deu: ' + e.message }));
+  });
 
   return cx;
 }

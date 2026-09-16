@@ -1,6 +1,6 @@
 <?php
 /**
- * Conquista: Querido.
+ * Medidor: Curtidas recebidas.
  *
  * Contrato em _MODELO.php.
  *
@@ -8,22 +8,14 @@
  */
 
 return [
-    'id'        => 'querido',
-    'nome'      => 'Querido',
-    'descricao' => 'Receba 50 curtidas nos seus posts.',
-    'icone'     => '💚',
-    'grupo'     => 'feed',
-    'meta'      => 50,
+    'id'      => 'curtidas-recebidas',
+    'nome'    => 'Curtidas recebidas',
+    'unidade' => ['curtida', 'curtidas'],
 
-    'progresso' => function (int $uid): int {
+    'contar' => function (int $uid): int {
         $st = db()->prepare('SELECT COUNT(*) FROM post_curtidas k JOIN posts p ON p.id = k.post_id
               WHERE p.usuario_id = ? AND p.escondido = 0 AND k.usuario_id <> p.usuario_id');
         $st->execute([$uid]);
         return (int) $st->fetchColumn();
     },
-
-    'premio' => [
-        ['tipo' => 'selo', 'slug' => 'querido'],
-        ['tipo' => 'pro', 'dias' => 7],
-    ],
 ];
