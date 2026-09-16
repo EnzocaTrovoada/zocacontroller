@@ -20,7 +20,10 @@ $uid  = (int) $quem['usuario_id'];
 header('Cache-Control: private, no-store');
 
 if (($_GET['a'] ?? '') === 'conferir') {
-    json_saida(['ok' => true, 'novas' => conq_confere($uid)]);
+    $novas = conq_confere($uid);
+    /* O total vai junto pra medalha da barra: a tela compara com quantas a
+       pessoa já tinha visto e mostra a diferença. */
+    json_saida(['ok' => true, 'novas' => $novas, 'ganhas' => count(conq_ganhas($uid))]);
 }
 
 /* Na tela, a conferência pode ser mais frequente: quem abriu a tela quer ver

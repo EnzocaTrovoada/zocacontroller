@@ -150,6 +150,16 @@ try {
     pointer-events: none;
   }
   .sino .n.tem { display: inline-flex; }
+
+  /* A medalha usa o mesmo desenho do sino (ícone branco, número em cima),
+     com o número dourado: vermelho é de aviso, e conquista não é aviso. */
+  .medalha .n { background: var(--dourado); color: #1B1300; }
+  /* Na tela das conquistas a medalha fica dourada. Cheia, como o sino, ela
+     virava uma bola branca e a estrela de dentro sumia. */
+  .medalha.ativa, .medalha.ativa:hover { color: var(--dourado); }
+  /* A estrela é o único desenho cheio: a regra do sino tira o preenchimento
+     de todo caminho, e sem esta ela sumia. */
+  .medalha svg .medalha__estrela { fill: currentColor; stroke: none; }
   #bandejaAvisos { width: 340px; max-height: 60vh; overflow-y: auto; }
   .aviso-item { display: block; width: 100%; text-align: left; }
   .aviso-item.novo { background: var(--verde-fraco); }
@@ -1537,6 +1547,20 @@ try {
        certa: uma chave de outra conta mostra uma lista vazia legitima. -->
   <!-- Reaproveita a bandeja das abas: abrir, fechar clicando fora e o Esc
        já funcionam do mesmo jeito que em Overlays e Ferramentas. -->
+  <!-- A medalha não abre bandeja: ela leva direto pra tela das conquistas. -->
+  <button class="aba sino medalha escondido" id="abaConquistas" type="button"
+          title="Conquistas" aria-label="Conquistas">
+    <span class="sino__ic">
+      <svg viewBox="0 0 24 24" aria-hidden="true" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8.4 10.2 5.8 2.5h4.1l2.1 4.3 2.1-4.3h4.1l-2.6 7.7" fill="none"/>
+        <circle cx="12" cy="15.4" r="6" fill="none"/>
+        <path class="medalha__estrela" d="M12 12l.85 2.23 2.38.12-1.85 1.5.62 2.3L12 16.85l-2 1.3.62-2.3-1.85-1.5 2.38-.12z"/>
+      </svg>
+      <span class="n" id="conquistasN"></span>
+    </span>
+  </button>
+
   <button class="aba sino escondido" id="abaAvisos" type="button" aria-expanded="false" aria-haspopup="true"
           title="Avisos" aria-label="Avisos">
     <span class="sino__ic">
@@ -3602,7 +3626,7 @@ const COMO_USAR = {
   conquistas: ['Conquistas', [
     ['Só dão, nunca tiram', 'Nada do que você já usa depende de conquista. Elas liberam coisa a mais.'],
     ['Os prêmios', 'Vagas de overlay a mais no plano grátis, selos pro seu perfil e dias de Pro de presente.'],
-    ['Chegam sozinhas', 'Fez a coisa, ganhou: o aviso aparece no sino na próxima vez que você abrir o painel.'],
+    ['Chegam sozinhas', 'Fez a coisa, ganhou: na próxima vez que você abrir o painel, a medalha ao lado do sino mostra quantas são novas.'],
     ['Conta o que já passou', 'Quem já usava o site antes das conquistas existirem já ganha o que tinha feito.'],
   ]],
 
@@ -8418,6 +8442,13 @@ function telaConquistas() {
     const lista = d.conquistas || [];
     const novas = d.novas || [];
 
+    /* O destaque de "nova" vale pro que a pessoa ainda não tinha visto,
+       não só pro que foi ganho nesta mesma requisição. */
+    let vistasAntes = 0;
+    try { vistasAntes = parseInt(localStorage.getItem(CQ_VISTAS), 10) || 0; } catch (e) {}
+    const naoVistas = Math.max(0, (d.ganhas || 0) - vistasAntes);
+    marcaConquistasVistas(d.ganhas || 0);
+
     const topo = h('div', { cls: 'cq-topo' }, [
       h('b', { txt: d.ganhas + ' de ' + d.total }),
       h('span', { txt: d.vagas
@@ -8430,6 +8461,11 @@ function telaConquistas() {
       recado('🏆 ' + (novas.length === 1 ? 'Conquista nova!' : novas.length + ' conquistas novas!')
         + ' O prêmio já está valendo.', 'bom');
     }
+
+    /* As "não vistas" são as ganhas mais recentes: ordena por quanto tempo
+       faz e pega as primeiras. */
+    const recentes = lista.filter((c) => c.ganhou && c.ha != null)
+      .sort((a, b) => a.ha - b.ha).slice(0, naoVistas).map((c) => c.id);
 
     CQ_GRUPOS.forEach(([g, titulo]) => {
       const doGrupo = lista.filter((c) => c.grupo === g);
@@ -8446,7 +8482,9 @@ function telaConquistas() {
           : c.tem + ' de ' + c.meta;
 
         grade.appendChild(h('div', {
-          cls: 'cq' + (c.ganhou ? ' ganhou' : '') + (novas.indexOf(c.id) >= 0 ? ' nova' : ''),
+          cls: 'cq' + (c.ganhou ? ' ganhou' : '')
+             + (novas.indexOf(c.id) >= 0 || (c.ganhou && c.ha != null && naoVistas > 0
+                 && recentes.indexOf(c.id) >= 0) ? ' nova' : ''),
         }, [
           h('div', { cls: 'cq__ic', txt: c.icone }),
           h('div', { style: 'flex:1;min-width:0' }, [
@@ -8470,15 +8508,49 @@ function telaConquistas() {
   });
 }
 
+/* QUANTAS A PESSOA AINDA NÃO VIU.
+
+   O servidor diz quantas ela ganhou; o navegador lembra quantas ela já
+   tinha visto na última vez que abriu a tela. A medalha mostra a
+   diferença. Guardado no navegador porque é só um lembrete de tela: perder
+   isso (aba anônima, outro computador) só faz o número aparecer de novo. */
+const CQ_VISTAS = 'zc:conquistas-vistas';
+
+function pintaMedalha(ganhas) {
+  const b = el('abaConquistas');
+  if (!b || ganhas == null) return;
+  let vistas = 0;
+  try { vistas = parseInt(localStorage.getItem(CQ_VISTAS), 10) || 0; } catch (e) {}
+
+  const novas = Math.max(0, ganhas - vistas);
+  const n = el('conquistasN');
+  n.textContent = novas > 99 ? '99+' : String(novas || '');
+  n.classList.toggle('tem', novas > 0);
+  b.classList.toggle('tem-nova', novas > 0);
+  b.setAttribute('aria-label', novas
+    ? 'Conquistas: ' + novas + (novas === 1 ? ' nova' : ' novas') : 'Conquistas');
+}
+
+function marcaConquistasVistas(ganhas) {
+  try { localStorage.setItem(CQ_VISTAS, String(ganhas)); } catch (e) {}
+  pintaMedalha(ganhas);
+}
+
 /* Uma conferência por abertura do painel. Quem ganhou alguma coisa desde a
    última visita recebe o aviso no sino — por isso, quando ela termina, o
    sino pergunta de novo. */
 function confereConquistas() {
+  const b = el('abaConquistas');
+  if (b) {
+    b.classList.remove('escondido');
+    b.onclick = () => vaiPara('#/conquistas');
+  }
   return api('/conquistas.php?a=conferir')
     .then((d) => {
+      pintaMedalha(d && d.ganhas);
       const n = (d && d.novas && d.novas.length) || 0;
       if (n) recado('🏆 ' + (n === 1 ? 'Você ganhou uma conquista!' : 'Você ganhou ' + n + ' conquistas!')
-        + ' Veja em Conquistas.', 'bom');
+        + ' Veja na medalha, ao lado do sino.', 'bom');
     })
     .catch(() => {});
 }
@@ -9113,6 +9185,7 @@ function rota() {
   const btVolta = el('abaMeusOverlays');
   if (btVolta) btVolta.style.display = 'none';
   const p = (location.hash || '#/overlays').replace(/^#\//, '').split('/');
+  if (el('abaConquistas')) el('abaConquistas').classList.toggle('ativa', p[0] === 'conquistas');
 
   /* Sem conta, tudo leva pra entrada — menos a galeria, que um artista
      abre por um link de divulgação e não precisa de conta pra ver. O botão
