@@ -112,8 +112,9 @@ if (JSON.stringify(cargosPonte) === JSON.stringify(cargosCmds)
    A edição feita no modo de edição é guardada pelo texto ORIGINAL do
    código. Reescrever esse texto aqui sem avisar o motor deixava a edição
    sem par: ela continuava no banco e sumia do site. Isto lê as edições que
-   estão no ar e confere se cada original ainda existe no código — direto,
-   ou como texto antigo em TEXTOS_ANTIGOS, no docs/index.html. */
+   estão no ar e confere se cada original ainda existe no código (o
+   index.html e as telas de admin) — direto, ou como texto antigo em
+   TEXTOS_ANTIGOS, no docs/index.html. */
 const TEXTOS_DINAMICOS = [
   'Novo Meta',   // título montado na hora: 'Novo ' + o nome do tipo
 ];
@@ -130,7 +131,7 @@ async function confereTextos() {
 
   /* Texto comprido fica quebrado em 'pedaço' + 'pedaço' no código; juntar
      os pedaços é o que deixa achar a frase inteira. */
-  const juntos = hub.replace(/'\s*\+\s*'/g, '');
+  const juntos = (hub + ler('api/admin/tela.js')).replace(/'\s*\+\s*'/g, '');
   const todas = Object.keys((d && d.textos) || {});
   const sem = todas.filter((k) => !juntos.includes(k) && !TEXTOS_DINAMICOS.includes(k));
 
