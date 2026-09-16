@@ -147,27 +147,31 @@ if (!chave) {
   el('txChave').textContent = chave;
 }
 
-const comChave = (arquivo, marca) => AQUI + arquivo + marca + 'chave=' + encodeURIComponent(chave);
+/* Pras páginas deste site a chave nem precisa ir no link: elas leem a que
+   ficou guardada no login. Só o que abre dentro do OBS leva ela — depois do
+   #, que não chega no servidor. */
+const comChave = (arquivo) => AQUI + arquivo + '#chave=' + encodeURIComponent(chave);
+const semChave = (arquivo) => AQUI + arquivo;
 
 /* Cada coisa diz PARA QUE serve antes de dizer o que é. Ninguém decide entre
    "painel" e "doca" pelo nome; decide pelo que quer fazer. */
 const NO_OBS = [
   { nome: 'Fonte de navegador', onde: 'Fontes → + → Navegador',
     txt: 'É por ela que o chat fala com o OBS. Sem isso nada funciona. Monte o endereço no gerador, que ele lê suas cenas sozinho.',
-    url: () => comChave('criar.html', '?'), botao: 'Abrir o gerador', link: true },
+    url: () => semChave('criar.html'), botao: 'Abrir o gerador', link: true },
 
   { nome: 'Painel do OBS', onde: 'Painéis → Painéis personalizáveis com URL',
     txt: 'Fica dentro da janela do OBS, na sua tela, e nunca aparece na transmissão. Mostra se o microfone está mudo e tem os botões de pânico, cena e palpite.',
-    url: () => comChave('painel.html', '?') },
+    url: () => comChave('painel.html') },
 ];
 
 const PAINEIS = [
   { nome: 'Moderadores', txt: 'Criar e revogar o link de cada mod, e ver quem anda usando.',
-    url: () => comChave('convites.html', '?') },
+    url: () => semChave('convites.html') },
   { nome: 'Subathon', txt: 'Escolher quanto cada sub, bit ou doação soma no cronômetro.',
-    url: () => comChave('subathon.html', '?') },
+    url: () => semChave('subathon.html') },
   { nome: 'Overlays', txt: 'Meta, subathon, relógio, contador e placar — criar, editar e pegar o link, tudo numa tela só.',
-    url: () => comChave('index.html', '?') },
+    url: () => semChave('index.html') },
 ];
 
 function cartao(it) {

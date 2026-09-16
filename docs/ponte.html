@@ -118,7 +118,14 @@
 
 /* Configuração — modo A: tudo dentro do link. */
 
+/* O QUE É SEGREDO VAI DEPOIS DO #.
+
+   O que vem depois do # nunca sai do computador: não vai pro servidor que
+   entrega esta página, nem pro registro dele. A chave do painel e a senha
+   do OBS moram ali nos links novos. Os links antigos, com tudo na parte do
+   ?, continuam valendo — os dois lados são lidos juntos, e o # ganha. */
 const q = new URLSearchParams(location.search);
+new URLSearchParams(location.hash.replace(/^#/, '')).forEach((v, k) => q.set(k, v));
 const guardado = (c) => { try { return localStorage.getItem(c); } catch (e) { return null; } };
 const guardar  = (c, v) => { try { localStorage.setItem(c, v); } catch (e) {} };
 
@@ -163,7 +170,7 @@ const el = (id) => document.getElementById(id);
 
 if (!cfg.canal) {
   el('exemplo').textContent =
-    location.origin + location.pathname + '?canal=SEUCANAL&senha=SUASENHA';
+    location.origin + location.pathname + '?canal=SEUCANAL#senha=SUASENHA';
   el('ajuda').classList.add('on');
   throw new Error('sem canal');
 }

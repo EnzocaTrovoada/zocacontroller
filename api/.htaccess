@@ -1,5 +1,7 @@
-# config.php guarda credenciais: ninguém abre pelo navegador.
-<FilesMatch "^config\.php$">
+# config.php guarda credenciais: ninguém abre pelo navegador. O exemplo e
+# os textos .md também não são endereço de nada — são documentação, e o
+# LEIA-ME estava sendo servido pra qualquer um que digitasse o nome.
+<FilesMatch "^(config\.php|config\.example\.php|.*\.md)$">
     Require all denied
 </FilesMatch>
 

@@ -1,12 +1,13 @@
 # ZocaController — núcleo
 
-Esqueleto do backend compartilhado: contas, assinatura e perfis de overlay.
-Nada aqui está pronto para produção — os pontos de integração estão marcados
-com `TODO`.
+O servidor do ZocaController: contas, assinatura, overlays, feed e o relé
+entre a ponte do OBS e o painel. Roda em hospedagem compartilhada (PHP 8.3,
+MySQL). A visão geral do projeto está em `ARQUITETURA.md`, na raiz.
 
 ## Instalar
 
-1. Rodar `sql/schema.sql` no phpMyAdmin da Hostinger.
+1. Rodar `sql/schema.sql` e depois cada arquivo numerado de `sql/`, em
+   ordem, no phpMyAdmin da Hostinger.
 2. `cp api/config.example.php api/config.php` e preencher.
 3. Gerar os segredos: `php -r "echo bin2hex(random_bytes(32));"`
 4. Cadastrar a URL do webhook no painel do Mercado Pago e copiar a

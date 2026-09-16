@@ -12,3 +12,9 @@ desktop.ini
 .vscode/
 .idea/
 *.swp
+
+# Coisa de fora do projeto que mora nesta pasta: o script de mineração do
+# Minecraft entrou aqui por engano, e o roteiro de ideias é ferramenta de
+# trabalho, não parte do site.
+/minerar.lua
+/PROMPT-IDEIAS.md

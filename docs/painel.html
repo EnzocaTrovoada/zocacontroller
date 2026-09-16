@@ -1106,7 +1106,10 @@ el('cenas').addEventListener('change', async (e) => {
 /* ---------- entra sozinho se já tem senha guardada ---------- */
 /* A doca guarda a senha e reconecta sozinha, então a tela de conexão some
    depois da primeira vez — e com ela sumia o campo da chave. */
+/* Chave e senha podem vir depois do # (links novos) ou do ? (antigos).
+   O # não chega no servidor, e é por isso que os links novos usam ele. */
 const naUrl = new URLSearchParams(location.search);
+new URLSearchParams(location.hash.replace(/^#/, '')).forEach((v, k) => naUrl.set(k, v));
 if (naUrl.get('chave')) { chavePainel = naUrl.get('chave').trim(); guardar('zc:chave', chavePainel); }
 if (naUrl.get('senha') !== null) guardar('zc:senha', naUrl.get('senha'));
 if (naUrl.get('porta')) guardar('zc:porta', naUrl.get('porta'));

@@ -438,16 +438,34 @@ function montar() {
     p.set('segundosAusente', el('segundos').value || '12');
   }
 
+  /* Senha do OBS e chave do painel vão depois do #, num pedaço à parte: o
+     OBS abre este endereço toda vez que liga, e o que está antes do #
+     chega no servidor que entrega a página — e fica no registro dele. */
+  const segredo = new URLSearchParams();
   const senha = el('senha').value;
-  if (senha) p.set('senha', senha);
+  if (senha) segredo.set('senha', senha);
 
-  /* A chave veio do hub, entao ela ja entra no link pronto: quem esta criando
-     a fonte nao precisa saber que ela existe. */
-  const chave = new URLSearchParams(location.search).get('chave');
-  if (chave) p.set('chave', chave.trim());
+  /* A chave já entra no link pronto: quem está criando a fonte não precisa
+     saber que ela existe. */
+  if (chaveDoPainel) segredo.set('chave', chaveDoPainel);
 
-  el('saida').textContent = new URL('ponte.html', location.href).href + '?' + p.toString();
+  el('saida').textContent = new URL('ponte.html', location.href).href + '?' + p.toString()
+    + (segredo.toString() ? '#' + segredo.toString() : '');
 }
+
+/* A chave chega pelo # (links novos), pelo ? (links antigos) ou já está
+   guardada, desde o login no site. O # e o ? saem da barra na hora. */
+const chaveDoPainel = (function () {
+  const daUrl = new URLSearchParams(location.hash.replace(/^#/, '')).get('chave')
+             || new URLSearchParams(location.search).get('chave');
+  if (daUrl) {
+    try { localStorage.setItem('zc:chave', daUrl.trim()); } catch (e) {}
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    return daUrl.trim();
+  }
+  try { return localStorage.getItem('zc:chave') || sessionStorage.getItem('zc:chave') || ''; }
+  catch (e) { return ''; }
+})();
 
 for (const id of ['canal','mic','cenaPanico','camera','cenaAusente','segundos','senha']) {
   el(id).addEventListener('input', montar);

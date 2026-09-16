@@ -207,7 +207,7 @@ try {
   /* Tudo que mora na barra precisa se centrar sozinho: ela estica cada item
      até a altura toda, e quem não é caixa flexível fica com o texto colado
      no topo — era isso que deixava o @ torto. */
-  .barra .quem, .barra .busca, .barra .lua { display: flex; align-items: center; }
+  .barra .quem, .barra .busca { display: flex; align-items: center; }
   .barra .quem { padding: 0 14px; }
 
   /* O único botão cheio da barra: pra quem chegou sem conta, é a próxima
@@ -339,14 +339,6 @@ try {
      iguais some da vista, e a lista de benefícios é a parte que precisa
      ser lida. */
   .pop__ok { font-weight: 700; }
-  .pop__estrela { color: var(--dourado); font-weight: 700; }
-  .pop__lista li.so-vital b { color: var(--dourado); }
-  .pop__tag {
-    display: inline-block; margin-left: 8px; font-style: normal;
-    font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase;
-    color: var(--dourado); border: 1px solid currentColor;
-    padding: 1px 5px; vertical-align: 2px;
-  }
   /* O roteiro do teste. Numerado porque é sequência de verdade: pular a
      janela anônima faz os outros passos falharem. */
   .pop .passos { margin: 0 0 12px; padding-left: 20px; }
@@ -431,9 +423,6 @@ try {
   }
   .so-adm p, .so-adm li, .so-adm .d { color: var(--perigo); }
   .so-adm .bt { border-color: currentColor; }
-
-  /* Quando é um trecho curto no meio de outra coisa. */
-  .adm-tag { color: var(--perigo); font-weight: 600; }
 
   /* ---------- calculadora de comissão ---------- */
   .calc { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 4px 0 12px; }
@@ -801,16 +790,6 @@ try {
 
   .feed__eu { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
   .feed__ok { color: var(--verde-forte); font: 600 12px var(--mono); }
-
-  /* Um selo, um significado. Verde é quem transmite com a gente; roxo é
-     quem desenha à mão. Os dois são conferidos por uma pessoa. */
-  .feed__selo {
-    font: 600 9.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
-    padding: 2px 6px; border-radius: 3px; white-space: nowrap;
-  }
-  .feed__selo.streamer { color: var(--verde-forte); background: var(--verde-fraco); }
-  .feed__selo.artista  { color: #6B3FA0; background: rgba(107,63,160,.13); }
-  [data-tema="escuro"] .feed__selo.artista { color: #C6A6F0; background: rgba(198,166,240,.16); }
 
   /* ---- direita: em alta ---- */
 
@@ -6659,8 +6638,10 @@ function telaControlador() {
     h('p', { cls: 'd', txt: 'Estes carregam a chave dentro do endereço, então nascem tapados. Copie e cole direto no OBS sem mostrar na tela.' }),
   ]);
   [
-    ['Fonte do OBS', base + 'ponte.html?chave=' + encodeURIComponent(chave)],
-    ['Painel do OBS', base + 'painel.html?chave=' + encodeURIComponent(chave)],
+    /* Chave depois do #: o OBS abre esses endereços toda vez que liga, e o
+       que vem antes do # fica no registro do servidor que entrega a página. */
+    ['Fonte do OBS', base + 'ponte.html#chave=' + encodeURIComponent(chave)],
+    ['Painel do OBS', base + 'painel.html#chave=' + encodeURIComponent(chave)],
   ].forEach(function (par) {
     fatiaLinks.appendChild(h('p', { style: 'margin:12px 0 5px;font-size:12.5px;color:var(--fraco)', txt: par[0] }));
     fatiaLinks.appendChild(segredo(par[1], null));
