@@ -1230,6 +1230,16 @@ try {
   }
   .trecho-ic:hover { border-color: var(--verde); border-style: solid; color: var(--verde); }
   .trecho-ic img { width: 20px; height: 20px; object-fit: contain; display: block; }
+  .bk-linha { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--linha); }
+  .bk-linha:last-child { border-bottom: 0; }
+  .bk-tipo {
+    flex: none; font: 600 10px var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    padding: 2px 7px; border: 1px solid currentColor; border-radius: 3px;
+  }
+  .bk-tipo.obs { color: var(--verde-forte); }
+  .bk-tipo.arquivo { color: var(--dourado); }
+  .bk-linha small { display: block; color: var(--apagado); font-size: 12px; margin-top: 2px; }
+
   .modelo-linha {
     display: flex; align-items: center; gap: 10px;
     padding: 9px 0; border-bottom: 1px solid var(--linha);
@@ -3472,6 +3482,13 @@ const COMO_USAR = {
     ['Serve pra contratar', 'O perfil leva pro portfólio da pessoa. O combinado é entre vocês dois — o site não fica no meio.'],
   ]],
 
+  backup: ['Backup do OBS', [
+    ['O automático é sozinho', 'Com a fonte da ponte no OBS, uma vez a cada 12 horas ela guarda tudo: cenas, fontes, filtros, posições e volumes. Só vira versão nova quando algo mudou.'],
+    ['O manual é o que volta num clique', 'No OBS: Coleção de cenas → Exportar. Suba esse arquivo aqui. Pra voltar, é Coleção de cenas → Importar.'],
+    ['A chave de transmissão nunca vem', 'Ela mora em outro lugar do OBS e a ponte não pergunta por ela. Nem a chave deste painel sai do seu computador.'],
+    ['Guardamos as últimas 8', 'A mais velha sai quando entra uma nova. Baixe e guarde a que você mais gosta.'],
+  ]],
+
   suporte: ['Suporte', [
     ['Conte o que aconteceu', 'Sem formulário gigante: o que você fez, o que esperava e o que apareceu.'],
     ['O print ajuda muito', 'Uma imagem da tela costuma resolver em um recado o que três mensagens não resolvem.'],
@@ -3528,6 +3545,7 @@ const TELAS = [
   ['#/artistas',  'Artistas',      'arte humana, feita à mão'],
   ['#/luzes',     'Luzes',         'o chat muda a cor das suas lâmpadas'],
   ['#/suporte',   'Suporte',       'fale comigo quando algo não funcionar'],
+  ['#/backup',    'Backup do OBS', 'suas cenas guardadas, caso o computador morra'],
 ];
 
 function nomeDaTela(hash) {
@@ -8029,6 +8047,139 @@ function telaArtistas() {
 
 /* ---------------- suporte ---------------- */
 
+/* ---------------- backup do OBS ----------------
+
+   Duas portas, e a tela diz qual é qual, porque na hora de voltar elas são
+   coisas diferentes: o automático é um retrato fiel pra remontar, o manual
+   é o arquivo do próprio OBS e volta num clique. */
+function telaBackup() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Backup do OBS' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Se o computador morrer amanhã, as suas cenas não morrem junto.' }));
+
+  if (!chave) {
+    tela.appendChild(h('div', { cls: 'vazio', txt: 'Entre com a Twitch pra guardar o backup.' }));
+    return;
+  }
+
+  const aviso = h('p', { cls: 'aviso escondido' });
+  tela.appendChild(aviso);
+
+  /* ----- as duas portas ----- */
+  const auto = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Automático' }),
+    h('p', { cls: 'd', txt: 'Acontece sozinho enquanto a fonte da ponte estiver no OBS: a cada 12 horas ela '
+      + 'guarda cenas, fontes, filtros, posições, volumes e trilhas de áudio. Só vira versão nova quando '
+      + 'alguma coisa mudou. Serve pra saber exatamente o que você tinha e remontar.' }),
+  ]);
+
+  const arq = h('input', { type: 'file', accept: '.json,application/json', style: 'display:none' });
+  const btSobe = h('button', { cls: 'bt principal', type: 'button', txt: 'Subir o arquivo exportado' });
+  btSobe.onclick = () => arq.click();
+
+  const manual = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Manual — o que volta num clique' }),
+    h('p', { cls: 'd', txt: 'No OBS, no menu de cima: Coleção de cenas → Exportar. Salve o arquivo e suba aqui. '
+      + 'Pra voltar, é o caminho contrário: Coleção de cenas → Importar. Vale fazer isto sempre que '
+      + 'você terminar de mexer nas cenas.' }),
+    h('div', { cls: 'campo' }, [btSobe, arq]),
+  ]);
+
+  const grade = h('div', { cls: 'hub__dupla', style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px' },
+    [auto, manual]);
+  tela.appendChild(grade);
+
+  /* ----- as versões ----- */
+  const lista = h('div');
+  tela.appendChild(h('div', { cls: 'fatia' }, [h('h3', { txt: 'Versões guardadas' }), lista]));
+
+  const tamanho = (b) => b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' KB'
+                                     : (b / 1048576).toFixed(1).replace('.', ',') + ' MB';
+
+  function pinta(d) {
+    lista.innerHTML = '';
+    const bs = d.backups || [];
+
+    aviso.classList.toggle('escondido', d.cifrado !== false);
+    aviso.textContent = 'Atenção: o servidor ainda está guardando os backups sem cadeado. Eles continuam '
+      + 'funcionando, mas avise o Enzo — falta uma configuração do lado dele.';
+
+    if (!bs.length) {
+      lista.appendChild(h('p', { cls: 'd', txt: 'Nenhuma versão ainda. Com a ponte aberta no OBS, a primeira '
+        + 'chega sozinha em uns minutos — ou suba um arquivo exportado agora.' }));
+      return;
+    }
+
+    bs.forEach((b) => {
+      const baixar = h('button', { cls: 'bt mini', type: 'button', txt: 'Baixar' });
+      baixar.onclick = async () => {
+        baixar.disabled = true;
+        try {
+          const r = await api('/backup.php', { method: 'POST', body: JSON.stringify({ acao: 'link', id: b.id }) });
+          location.href = r.url;
+        } catch (e) { recado(e.message, 'ruim'); }
+        setTimeout(() => { baixar.disabled = false; }, 1500);
+      };
+
+      const fora = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×', title: 'Apagar esta versão' });
+      fora.onclick = async () => {
+        if (!confirm('Apagar esta versão do backup? Não tem como desfazer.')) return;
+        try {
+          pinta(await api('/backup.php', { method: 'POST', body: JSON.stringify({ acao: 'apagar', id: b.id }) }));
+        } catch (e) { recado(e.message, 'ruim'); }
+      };
+
+      const titulo = (b.nome || 'Coleção sem nome');
+      const partes = [];
+      if (b.cenas) partes.push(b.cenas + (b.cenas === 1 ? ' cena' : ' cenas'));
+      if (b.fontes) partes.push(b.fontes + (b.fontes === 1 ? ' fonte' : ' fontes'));
+      partes.push(tamanho(b.bytes));
+      partes.push(faz(b.idade) === 'agora' ? 'agora' : 'há ' + faz(b.idade));
+
+      lista.appendChild(h('div', { cls: 'bk-linha' }, [
+        h('span', { cls: 'bk-tipo ' + (b.origem === 'arquivo' ? 'arquivo' : 'obs'),
+          txt: b.origem === 'arquivo' ? 'manual' : 'automático',
+          title: b.origem === 'arquivo' ? 'O arquivo do próprio OBS: volta com Importar'
+                                        : 'O retrato que a ponte tirou: serve pra remontar' }),
+        h('div', { style: 'flex:1 1 auto;min-width:0' }, [
+          h('b', { txt: titulo }),
+          h('small', { txt: partes.join('  ·  ') }),
+        ]),
+        baixar, fora,
+      ]));
+    });
+  }
+
+  arq.onchange = async () => {
+    const f = arq.files && arq.files[0];
+    arq.value = '';
+    if (!f) return;
+    if (f.size > 8388608) return recado('Esse arquivo passa de 8 MB — não parece uma coleção de cenas.', 'ruim');
+
+    btSobe.disabled = true;
+    btSobe.textContent = 'subindo…';
+    try {
+      const fd = new FormData();
+      fd.append('arq', f);
+      const r = await fetch(API + '/backup.php', { method: 'POST', headers: { 'X-Chave': chave }, body: fd });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.erro || 'não consegui guardar');
+      pinta(d);
+      recado(d.repetido ? 'Esse arquivo é igual à última versão guardada — nada mudou.'
+                        : 'Backup guardado.', 'bom');
+    } catch (e) { recado(e.message, 'ruim'); }
+    btSobe.disabled = false;
+    btSobe.textContent = 'Subir o arquivo exportado';
+  };
+
+  lista.appendChild(h('p', { cls: 'd', txt: 'vendo…' }));
+  api('/backup.php').then(pinta).catch((e) => {
+    lista.innerHTML = '';
+    lista.appendChild(h('p', { cls: 'd', txt: 'Não deu: ' + e.message }));
+  });
+}
+
 function telaSuporte() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -8544,6 +8695,7 @@ function rota() {
   if (p[0] === 'artistas') return telaArtistas();
   if (p[0] === 'luzes') return telaLuzes();
   if (p[0] === 'suporte') return telaSuporte();
+  if (p[0] === 'backup') return telaBackup();
   if (p[0] === 'subathon') return telaSubathon();
   if (p[0] === 'mods') return telaMods();
   if (p[0] === 'novo' && TIPOS[p[1]]) return telaEditor(null, p[1]);

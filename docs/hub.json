@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-12",
+      "titulo": "Backup do OBS",
+      "texto": "Com a ponte aberta no OBS, suas cenas, fontes, filtros e posições são guardadas sozinhas a cada 12 horas. E dá pra subir o arquivo que o próprio OBS exporta, que é o que volta num clique. A chave de transmissão nunca sai do seu computador."
+    },
+    {
+      "data": "2026-09-12",
       "titulo": "AO VIVO no feed",
       "texto": "Quem está transmitindo agora ganha um selo vermelho neon ao lado do nome, e o selo leva direto pro canal na Twitch."
     },

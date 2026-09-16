@@ -1460,6 +1460,172 @@ async function buscarComando() {
 }
 setInterval(buscarComando, 600);
 
+/* ------------------------------------------------------------------ *
+ *  O retrato do OBS
+ * ------------------------------------------------------------------ */
+
+/* O QUE ISTO É, E O QUE NÃO É.
+
+   O obs-websocket não sabe exportar coleção de cenas — não existe pedido
+   pra isso, só pra ler pedaço por pedaço. Então aqui a gente lê tudo:
+   cena, fonte, ajuste, filtro, posição, volume, trilha de áudio. O que sai
+   é um retrato fiel do que a pessoa tinha, e não o arquivo que o OBS
+   importa de volta. Pra voltar num clique existe o export feito na mão, que
+   a tela pede e guarda do lado deste.
+
+   A CHAVE DE TRANSMISSÃO NÃO ENTRA AQUI. Ela mora no perfil, não na coleção
+   de cenas, e o GetStreamServiceSettings — que a devolveria — não é
+   chamado em lugar nenhum desta ponte. De propósito.
+
+   A chave do painel some antes de sair desta máquina: ela aparece dentro do
+   endereço desta própria fonte de navegador, e backup nenhum precisa dela. */
+
+const GAVETA_BACKUP = 'zocacontroller_backup';
+const BACKUP_A_CADA = 12 * 60 * 60 * 1000;
+const BACKUP_ESPERA = 90 * 1000;      // deixa o OBS assentar antes de varrer
+
+/** Tira a chave do painel e a senha do OBS de qualquer texto do retrato. */
+function semSegredo(valor) {
+  if (typeof valor === 'string') {
+    let v = valor;
+    if (cfg.chave) v = v.split(cfg.chave).join('«a-sua-chave»');
+    if (cfg.senha) v = v.split(cfg.senha).join('«a-sua-senha»');
+    return v;
+  }
+  if (Array.isArray(valor)) return valor.map(semSegredo);
+  if (valor && typeof valor === 'object') {
+    const saida = {};
+    for (const k in valor) if (Object.prototype.hasOwnProperty.call(valor, k)) {
+      saida[k] = semSegredo(valor[k]);
+    }
+    return saida;
+  }
+  return valor;
+}
+
+/** Pergunta e devolve null em vez de estourar: fonte sem áudio recusa
+    metade destas perguntas, e isso é normal, não é erro. */
+async function talvez(tipo, dados) {
+  try { return await pedir(tipo, dados); } catch (e) { return null; }
+}
+
+async function filtrosDe(nome) {
+  const r = await talvez('GetSourceFilterList', { sourceName: nome });
+  return (r && r.filters) ? r.filters : [];
+}
+
+async function retratoDoObs() {
+  const retrato = { versao: 1, quando: new Date().toISOString(), colecao: '', cenas: [], fontes: [] };
+
+  const col = await talvez('GetSceneCollectionList');
+  retrato.colecao = (col && col.currentSceneCollectionName) || '';
+
+  const video = await talvez('GetVideoSettings');
+  if (video) retrato.video = video;
+
+  const tr = await talvez('GetSceneTransitionList');
+  if (tr) retrato.transicoes = tr;
+
+  const cenas = await talvez('GetSceneList');
+  if (!cenas || !Array.isArray(cenas.scenes)) return null;
+  retrato.cenaAtual = cenas.currentProgramSceneName || '';
+
+  for (const c of cenas.scenes) {
+    const itens = await talvez('GetSceneItemList', { sceneName: c.sceneName });
+    retrato.cenas.push({
+      nome: c.sceneName,
+      ordem: c.sceneIndex,
+      itens: (itens && itens.sceneItems) ? itens.sceneItems : [],
+      filtros: await filtrosDe(c.sceneName),
+    });
+  }
+
+  /* Os grupos são cenas por dentro, e os itens deles não aparecem na cena
+     que os contém: sem isto, um grupo viraria uma caixa vazia no retrato. */
+  const grupos = await talvez('GetGroupList');
+  if (grupos && Array.isArray(grupos.groups)) {
+    retrato.grupos = [];
+    for (const g of grupos.groups) {
+      const itens = await talvez('GetGroupSceneItemList', { sceneName: g });
+      retrato.grupos.push({ nome: g, itens: (itens && itens.sceneItems) ? itens.sceneItems : [] });
+    }
+  }
+
+  const inputs = await talvez('GetInputList');
+  for (const i of ((inputs && inputs.inputs) || [])) {
+    const nome = i.inputName;
+    const f = { nome, tipo: i.inputKind, tipoBase: i.unversionedInputKind };
+
+    const aj = await talvez('GetInputSettings', { inputName: nome });
+    if (aj) f.ajustes = aj.inputSettings;
+
+    /* Áudio: cada uma destas recusa em fonte que não tem som. Guardar só o
+       que veio deixa o retrato honesto sobre o que a fonte é. */
+    const vol = await talvez('GetInputVolume', { inputName: nome });
+    if (vol) { f.volume = vol.inputVolumeMul; f.volumeDb = vol.inputVolumeDb; }
+
+    const mudo = await talvez('GetInputMute', { inputName: nome });
+    if (mudo) f.mudo = !!mudo.inputMuted;
+
+    const bal = await talvez('GetInputAudioBalance', { inputName: nome });
+    if (bal) f.balanco = bal.inputAudioBalance;
+
+    const atraso = await talvez('GetInputAudioSyncOffset', { inputName: nome });
+    if (atraso) f.atraso = atraso.inputAudioSyncOffset;
+
+    const monitor = await talvez('GetInputAudioMonitorType', { inputName: nome });
+    if (monitor) f.monitor = monitor.monitorType;
+
+    const trilhas = await talvez('GetInputAudioTracks', { inputName: nome });
+    if (trilhas) f.trilhas = trilhas.inputAudioTracks;
+
+    f.filtros = await filtrosDe(nome);
+    retrato.fontes.push(f);
+  }
+
+  return semSegredo(retrato);
+}
+
+async function backupDevido() {
+  try {
+    const r = await pedir('GetPersistentData', { realm: CAIXA, slotName: GAVETA_BACKUP });
+    const v = r && r.slotValue;
+    return !v || !v.quando || (Date.now() - v.quando) > BACKUP_A_CADA;
+  } catch (e) { return true; }
+}
+
+async function mandaBackup() {
+  if (!cfg.chave || !estado.obs) return;
+  if (!(await backupDevido())) return;
+
+  /* A hora é marcada ANTES de mandar. Se o envio falhar, a gente tenta na
+     próxima janela e não fica batendo no servidor de minuto em minuto por
+     causa de uma internet que caiu. */
+  try {
+    await pedir('SetPersistentData', {
+      realm: CAIXA, slotName: GAVETA_BACKUP, slotValue: { quando: Date.now() },
+    });
+  } catch (e) {}
+
+  let retrato = null;
+  try { retrato = await retratoDoObs(); } catch (e) { return; }
+  if (!retrato || !retrato.cenas.length) return;
+
+  try {
+    await fetch(cfg.api + '/backup.php', {
+      method: 'POST',
+      headers: { 'X-Chave': cfg.chave, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acao: 'obs', retrato }),
+    });
+  } catch (e) { /* servidor fora do ar não é problema de quem está transmitindo */ }
+}
+
+/* Uma vez depois que o OBS assenta, e depois de hora em hora conferindo se
+   já passou a janela. Varrer a coleção toda é barato aqui dentro, mas não é
+   de graça: fazer isso a cada pulso seria desperdício. */
+setTimeout(mandaBackup, BACKUP_ESPERA);
+setInterval(mandaBackup, 60 * 60 * 1000);
+
 /* Relé — o caminho até os moderadores. */
 
 const dorme = (ms) => new Promise(r => setTimeout(r, ms));
