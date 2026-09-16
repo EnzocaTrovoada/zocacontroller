@@ -11,9 +11,20 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
-require_once __DIR__ . '/lib/conquistas.php';
 
 cors();
+
+/* SUBIDA PELA METADE NÃO PODE VIRAR "FAILED TO FETCH".
+
+   Sem a biblioteca, o require quebra antes de qualquer resposta — e sem os
+   cabeçalhos de acesso, o navegador só diz "Failed to fetch", que não
+   aponta pra lugar nenhum. Aqui a resposta sai com os cabeçalhos e diz o
+   arquivo que falta. */
+if (!is_file(__DIR__ . '/lib/conquistas.php')) {
+    json_saida(['erro' => 'O servidor ainda não tem as conquistas: falta subir api/lib/conquistas.php.'], 503);
+}
+require_once __DIR__ . '/lib/conquistas.php';
+
 $quem = exige_painel();
 $uid  = (int) $quem['usuario_id'];
 
@@ -24,6 +35,10 @@ if (($_GET['a'] ?? '') === 'conferir') {
     /* O total vai junto pra medalha da barra: a tela compara com quantas a
        pessoa já tinha visto e mostra a diferença. */
     json_saida(['ok' => true, 'novas' => $novas, 'ganhas' => count(conq_ganhas($uid))]);
+}
+
+if (!conq_lista()) {
+    json_saida(['erro' => 'O servidor ainda não tem as conquistas: falta subir a pasta api/conquistas/.'], 503);
 }
 
 /* Na tela, a conferência pode ser mais frequente: quem abriu a tela quer ver
