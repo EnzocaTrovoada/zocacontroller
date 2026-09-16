@@ -27,7 +27,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     if ($nome !== '') {
         /* Sem cache: quem abriu esta tela quer saber se funciona AGORA. */
         try { $tocando = lf_tocando($uid, 0); }
-        catch (Throwable $e) { $erro = $e->getMessage(); }
+        catch (Throwable $e) { $erro = erro_publico($e); }
     }
 
     json_saida([
@@ -50,7 +50,7 @@ if (!empty($d['desligar'])) {
 try {
     $r = lf_conferir((string) ($d['usuario'] ?? ''));
 } catch (Throwable $e) {
-    json_saida(['erro' => $e->getMessage()], 400);
+    json_saida(['erro' => erro_publico($e)], 400);
 }
 if (empty($r['ok'])) json_saida(['erro' => $r['erro']], 400);
 

@@ -79,7 +79,7 @@ if (isset($_GET['code']) || isset($_GET['error'])) {
 
         $r = kick_assinar($usuario_id);
     } catch (Throwable $e) {
-        $pagina('Não deu certo', '<h1>Não deu certo</h1><p>' . htmlspecialchars($e->getMessage()) . '</p>');
+        $pagina('Não deu certo', '<h1>Não deu certo</h1><p>' . htmlspecialchars(erro_publico($e)) . '</p>');
     }
 
     $hub = rtrim(cfg()['hub'] ?? 'https://mods.zocahop.com/', '/');

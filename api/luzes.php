@@ -150,7 +150,7 @@ if ($acao === 'entrar') {
     try {
         $url = ($drivers[$id]['oauth']['entrar'])(link_assinar('luz:' . $uid . ':' . $id));
     } catch (Throwable $e) {
-        json_saida(['erro' => $e->getMessage()], 400);
+        json_saida(['erro' => erro_publico($e)], 400);
     }
     json_saida(['ok' => true, 'url' => $url]);
 }

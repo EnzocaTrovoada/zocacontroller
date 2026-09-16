@@ -132,7 +132,7 @@ try {
     tw_guardar($usuario_id, $tokens);
 
 } catch (Throwable $e) {
-    pagina('Erro', '<h1>Não deu certo</h1><p>' . htmlspecialchars($e->getMessage()) . '</p>'
+    pagina('Erro', '<h1>Não deu certo</h1><p>' . htmlspecialchars(erro_publico($e)) . '</p>'
         . '<p><a href="entrar.php">Tentar de novo</a></p>');
 }
 

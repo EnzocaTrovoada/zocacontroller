@@ -420,7 +420,7 @@ function sp_diagnostico(int $usuario_id): array
     try {
         $token = sp_token($usuario_id);
     } catch (Throwable $e) {
-        return ['etapa' => 'token', 'erro' => $e->getMessage()];
+        return ['etapa' => 'token', 'erro' => erro_publico($e)];
     }
     if (!$token) return ['etapa' => 'token', 'erro' => 'Não consegui renovar o acesso.'];
 

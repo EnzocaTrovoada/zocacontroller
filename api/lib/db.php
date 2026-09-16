@@ -50,6 +50,26 @@ function db(): PDO
     return $pdo;
 }
 
+/**
+ * A mensagem de um erro que pode ir pra tela.
+ *
+ * Erro nosso — lançado de propósito, com texto escrito pra quem usa — passa.
+ * Erro do banco ou do PHP não: ele carrega nome de tabela, caminho de
+ * arquivo no servidor e o número da conta da hospedagem. Esse vai pro
+ * registro do servidor, e a tela recebe o texto genérico.
+ *
+ * O PDOException é filho do RuntimeException no PHP, e por isso é barrado
+ * pelo nome antes: pegar RuntimeException sozinho deixava passar SQL.
+ */
+function erro_publico(Throwable $e, string $generico = 'Algo deu errado aqui do nosso lado. Tente de novo em instantes.'): string
+{
+    if ($e instanceof RuntimeException && !($e instanceof PDOException)) {
+        return $e->getMessage();
+    }
+    error_log('[zc] ' . get_class($e) . ': ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
+    return $generico;
+}
+
 function json_saida($dados, int $codigo = 200): void
 {
     http_response_code($codigo);

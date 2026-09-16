@@ -172,8 +172,12 @@ function mp_criar_cobranca(int $usuario_id, array $plano, string $codigo = ''): 
 
     [$http, $r] = mp_http('POST', '/checkout/preferences', $corpo);
     if ($http !== 201 && $http !== 200) {
-        $msg = is_array($r) ? ($r['message'] ?? json_encode($r)) : 'resposta vazia';
-        throw new RuntimeException('O Mercado Pago recusou a cobrança (' . $http . '): ' . $msg);
+        /* O corpo da recusa fica no registro do servidor: ele vai pra tela de
+           quem está pagando, e lá só serve a frase. O porquê, o admin vê no
+           checkout.php?diagnostico. */
+        error_log('[zc] Mercado Pago recusou a cobrança (' . $http . '): '
+            . (is_array($r) ? json_encode($r, JSON_UNESCAPED_UNICODE) : 'resposta vazia'));
+        throw new RuntimeException('O Mercado Pago recusou a cobrança agora. Tente de novo em alguns minutos.');
     }
 
     db()->prepare(

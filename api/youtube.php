@@ -27,7 +27,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $erro = '';
     if (!empty($u['yt_canal'])) {
         try { $inscritos = yt_inscritos($uid); }
-        catch (Throwable $e) { $erro = $e->getMessage(); }
+        catch (Throwable $e) { $erro = erro_publico($e); }
     }
 
     json_saida([
@@ -50,6 +50,6 @@ if (!empty($d['desligar'])) {
 try {
     $r = yt_resolve($uid, (string) ($d['handle'] ?? ''));
 } catch (Throwable $e) {
-    json_saida(['erro' => $e->getMessage()], 400);
+    json_saida(['erro' => erro_publico($e)], 400);
 }
 json_saida(empty($r['ok']) ? ['erro' => $r['erro']] : $r, empty($r['ok']) ? 400 : 200);

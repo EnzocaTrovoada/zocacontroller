@@ -177,7 +177,7 @@ function contagem(int $usuario_id, string $fonte, int $maxIdade = 60, string $pl
            consertar nada. */
         $ok = false;
         $http = 0;
-        $excecao = $e->getMessage();
+        $excecao = erro_publico($e);
     }
 
     if (!$ok) {

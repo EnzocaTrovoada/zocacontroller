@@ -85,5 +85,5 @@ try {
     json_saida(['ok' => true, 'por' => $quem['nome']]);
 
 } catch (RuntimeException $e) {
-    json_saida(['erro' => $e->getMessage()], 400);
+    json_saida(['erro' => erro_publico($e)], 400);
 }

@@ -58,7 +58,7 @@ if (isset($_GET['cupons'])) {
             ];
         }
     } catch (Throwable $e) {
-        $falhou = $e->getMessage();
+        $falhou = erro_publico($e);
     }
 
     /* LISTA VAZIA PRO ADMIN VEM COM O MOTIVO.
@@ -121,7 +121,7 @@ if (isset($_GET['conferir'])) {
     try {
         $r = mp_reconciliar((int) $quem['usuario_id']);
     } catch (Throwable $e) {
-        json_saida(['erro' => $e->getMessage()], 502);
+        json_saida(['erro' => erro_publico($e)], 502);
     }
 
     json_saida([
@@ -216,7 +216,7 @@ $codigo = (string) ($_GET['cupom'] ?? '');
 try {
     $r = mp_criar_cobranca((int) $quem['usuario_id'], $plano, $codigo);
 } catch (Throwable $e) {
-    json_saida(['erro' => $e->getMessage()], 502);
+    json_saida(['erro' => erro_publico($e)], 502);
 }
 
 if (($r['url'] ?? '') === '') {

@@ -55,7 +55,7 @@ if (isset($_GET['code']) || isset($_GET['error'])) {
         sp_guardar($usuario_id, $t);
         sp_anota_email($usuario_id, (string) $t['access_token']);
     } catch (Throwable $e) {
-        $pagina('Não deu certo', '<h1>Não deu certo</h1><p>' . htmlspecialchars($e->getMessage()) . '</p>');
+        $pagina('Não deu certo', '<h1>Não deu certo</h1><p>' . htmlspecialchars(erro_publico($e)) . '</p>');
     }
 
     $hub = rtrim(cfg()['hub'] ?? 'https://mods.zocahop.com/', '/');

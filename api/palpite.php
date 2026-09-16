@@ -159,5 +159,5 @@ try {
     json_saida(['erro' => 'Ação desconhecida.'], 400);
 
 } catch (RuntimeException $e) {
-    json_saida(['erro' => $e->getMessage()], 400);
+    json_saida(['erro' => erro_publico($e)], 400);
 }
