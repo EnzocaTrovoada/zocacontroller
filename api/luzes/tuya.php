@@ -105,6 +105,40 @@ function tuya_hsv(string $hex, int $teto): array
     ];
 }
 
+/* As categorias de luz da Tuya: lâmpada, fita, cordão, luz ambiente e
+   plafon. O endereço novo aceita no máximo cinco por pedido — são estas. */
+const TUYA_CATEGORIAS = 'dj,dd,dc,fwd,xdd';
+
+/**
+ * As luzes pelo endereço atual (v2.0). Vinte por página, no máximo três
+ * páginas: sessenta lâmpadas é mais do que alguém liga numa live.
+ */
+function tuya_luzes_v2(array $cfg, string $token): array
+{
+    $aps = [];
+    $depois = '';
+    for ($pagina = 0; $pagina < 3; $pagina++) {
+        /* A Tuya assina a query em ordem alfabética: categories, last_id,
+           page_size — e a ordem aqui precisa ser a mesma. */
+        $q = 'categories=' . TUYA_CATEGORIAS
+           . ($depois !== '' ? '&last_id=' . rawurlencode($depois) : '')
+           . '&page_size=20';
+        [$http, $r] = tuya_chama($cfg, 'GET', '/v2.0/cloud/thing/device?' . $q, null, $token);
+        if ($http !== 200 || empty($r['success']) || !is_array($r['result'] ?? null)) break;
+
+        $lista = $r['result'];
+        foreach ($lista as $dev) {
+            if (empty($dev['id'])) continue;
+            $nome = (string) ($dev['customName'] ?? '') ?: (string) ($dev['name'] ?? $dev['id']);
+            $aps[] = ['id' => (string) $dev['id'], 'nome' => $nome];
+        }
+        if (count($lista) < 20) break;
+        $depois = (string) (end($lista)['id'] ?? '');
+        if ($depois === '') break;
+    }
+    return $aps;
+}
+
 return [
     'id'    => 'tuya',
     'nome'  => 'Tuya (Positivo, Avant Neo, Smart Life)',
@@ -132,26 +166,26 @@ return [
                                            . 'e se o centro de dados é o mesmo onde o projeto foi criado.'];
         }
 
-        [$http, $r] = tuya_chama($cfg, 'GET', '/v1.0/iot-01/associated-users/devices?size=50', null, $token);
-        if ($http !== 200 || empty($r['success'])) {
-            return ['ok' => false, 'erro' => 'As chaves valem, mas a Tuya não devolveu a lista de aparelhos. '
-                                           . 'Confira se você ligou a conta do aplicativo no projeto.'];
-        }
+        $aps = tuya_luzes_v2($cfg, $token);
 
-        $aps = [];
-        foreach (($r['result']['devices'] ?? []) as $dev) {
-            if (empty($dev['id'])) continue;
-
-            /* Só o que sabe mudar de cor: tomada e interruptor Tuya
-               aparecem na mesma lista e não servem pra nada aqui. */
-            $temCor = false;
-            foreach (($dev['status'] ?? []) as $s) {
-                $c = (string) ($s['code'] ?? '');
-                if ($c === 'colour_data' || $c === 'colour_data_v2') $temCor = true;
+        /* O endereço antigo ficou na parte "arquivada" da documentação deles.
+           Continua respondendo em muita conta, então fica de reserva pra
+           quando o novo não devolver nada. */
+        if (!$aps) {
+            [$http, $r] = tuya_chama($cfg, 'GET', '/v1.0/iot-01/associated-users/devices?size=50', null, $token);
+            if ($http === 200 && !empty($r['success'])) {
+                foreach (($r['result']['devices'] ?? []) as $dev) {
+                    if (empty($dev['id'])) continue;
+                    /* Só o que sabe mudar de cor: tomada e interruptor Tuya
+                       aparecem na mesma lista e não servem pra nada aqui. */
+                    $temCor = false;
+                    foreach (($dev['status'] ?? []) as $s) {
+                        $c = (string) ($s['code'] ?? '');
+                        if ($c === 'colour_data' || $c === 'colour_data_v2') $temCor = true;
+                    }
+                    if ($temCor) $aps[] = ['id' => (string) $dev['id'], 'nome' => (string) ($dev['name'] ?? $dev['id'])];
+                }
             }
-            if (!$temCor) continue;
-
-            $aps[] = ['id' => (string) $dev['id'], 'nome' => (string) ($dev['name'] ?? $dev['id'])];
         }
         if (!$aps) {
             return ['ok' => false, 'erro' => 'Conectou, mas não achei nenhuma luz colorida nessa conta. '

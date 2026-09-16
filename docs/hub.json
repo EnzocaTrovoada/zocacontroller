@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-16",
+      "titulo": "Links do OBS mais seguros",
+      "texto": "A chave e a senha do OBS agora vão numa parte do endereço que nunca sai do seu computador. Os links antigos continuam funcionando, mas vale gerar de novo o da ponte e o do painel em Meu Controller. E as senhas das suas luzes passaram a ser guardadas com cadeado."
+    },
+    {
+      "data": "2026-09-16",
       "titulo": "Tema com intensidade",
       "texto": "O botão do tema virou um ícone como o do sino e abre as opções de aparência: claro ou escuro, seguir o do computador e a intensidade de cada um — do escuro suave ao preto total, do claro suave ao branco. E a troca agora esmaece, sem clarão."
     },

@@ -8,8 +8,45 @@
  * conhecer o resto do site.
  */
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/cifra.php';
 
 const LUZ_TIMEOUT = 6;
+
+/* A CREDENCIAL DA LUZ É GUARDADA CIFRADA.
+
+   Um token da LIFX, da Govee ou da Philips controla a casa de alguém. Se o
+   banco vazar, o que sai daqui tem que ser lixo sem a chave, que mora no
+   config.php e não no banco.
+
+   O que foi guardado antes disto continua abrindo, e é regravado cifrado
+   na primeira vez que for lido. */
+function luz_cfg_fecha(array $cfg): string
+{
+    $json = (string) json_encode($cfg);
+    return cifra_pronta() ? cifra($json) : $json;
+}
+
+function luz_cfg_abre(?string $guardado): array
+{
+    $g = (string) $guardado;
+    if ($g === '') return [];
+    if (strncmp($g, 's1.', 3) === 0 || strncmp($g, 'g1.', 3) === 0) {
+        $g = (string) decifra($g);
+    }
+    $d = json_decode($g, true);
+    return is_array($d) ? $d : [];
+}
+
+/** Credencial ainda em texto puro vira cifrada assim que é lida. */
+function luz_cfg_migra(int $uid, string $driver, string $guardado, array $cfg): void
+{
+    if (!$cfg || !cifra_pronta()) return;
+    if (strncmp($guardado, 's1.', 3) === 0 || strncmp($guardado, 'g1.', 3) === 0) return;
+    try {
+        db()->prepare('UPDATE luzes_contas SET config = ? WHERE usuario_id = ? AND driver = ?')
+            ->execute([luz_cfg_fecha($cfg), $uid, $driver]);
+    } catch (Throwable $e) { /* fica pra próxima leitura */ }
+}
 
 /** Chamada HTTP pros drivers. Com tempo limite: marca fora do ar não pode
     segurar a requisição de quem está transmitindo. */
@@ -143,7 +180,10 @@ function luz_config(int $uid, string $driver): array
 {
     $st = db()->prepare('SELECT config FROM luzes_contas WHERE usuario_id = ? AND driver = ?');
     $st->execute([$uid, $driver]);
-    return json_decode((string) ($st->fetchColumn() ?: '{}'), true) ?: [];
+    $guardado = (string) ($st->fetchColumn() ?: '');
+    $cfg = luz_cfg_abre($guardado);
+    luz_cfg_migra($uid, $driver, $guardado, $cfg);
+    return $cfg;
 }
 
 /** Guarda a config sem encostar nos aparelhos que a pessoa escolheu. */
@@ -153,7 +193,7 @@ function luz_config_grava(int $uid, string $driver, array $cfg): void
         'INSERT INTO luzes_contas (usuario_id, driver, config, aparelhos, ligado)
               VALUES (?, ?, ?, ?, 1)
          ON DUPLICATE KEY UPDATE config = VALUES(config), ligado = 1'
-    )->execute([$uid, $driver, json_encode($cfg), '[]']);
+    )->execute([$uid, $driver, luz_cfg_fecha($cfg), '[]']);
 }
 
 /**
@@ -202,9 +242,10 @@ function luz_aplicar(int $uid, array $ordem): array
         $d = $drivers[$c['driver']] ?? null;
         if (!$d) continue;
         try {
+            $cfgAberta = luz_cfg_abre($c['config']);
+            luz_cfg_migra($uid, (string) $c['driver'], (string) $c['config'], $cfgAberta);
             $r = ($d['aplicar'])(
-                luz_renova($uid, (string) $c['driver'], $d,
-                    json_decode((string) ($c['config'] ?: '{}'), true) ?: []),
+                luz_renova($uid, (string) $c['driver'], $d, $cfgAberta),
                 $ordem,
                 json_decode((string) ($c['aparelhos'] ?: '[]'), true) ?: []
             );

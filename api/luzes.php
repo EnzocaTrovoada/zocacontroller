@@ -177,7 +177,7 @@ if ($acao === 'salvar') {
         'INSERT INTO luzes_contas (usuario_id, driver, config, aparelhos, ligado)
               VALUES (?, ?, ?, ?, 1)
          ON DUPLICATE KEY UPDATE config = VALUES(config), aparelhos = VALUES(aparelhos), ligado = 1'
-    )->execute([$uid, $id, json_encode($cfg), json_encode($todos)]);
+    )->execute([$uid, $id, luz_cfg_fecha($cfg), json_encode($todos)]);
 
     json_saida(['ok' => true, 'aparelhos' => $r['aparelhos'], 'contas' => luz_contas($uid)]);
 }
@@ -201,11 +201,7 @@ if ($acao === 'reler') {
     $drivers = luz_drivers();
     if (!isset($drivers[$id])) json_saida(['erro' => 'Marca desconhecida.'], 400);
 
-    $st = db()->prepare('SELECT config FROM luzes_contas WHERE usuario_id = ? AND driver = ?');
-    $st->execute([$uid, $id]);
-    $cfg = json_decode((string) ($st->fetchColumn() ?: '{}'), true) ?: [];
-
-    $cfg = luz_renova($uid, $id, $drivers[$id], $cfg);
+    $cfg = luz_renova($uid, $id, $drivers[$id], luz_config($uid, $id));
 
     $r = ($drivers[$id]['testar'])($cfg);
     if (empty($r['ok'])) json_saida(['erro' => (string) ($r['erro'] ?? 'Não consegui falar com a marca.')], 400);
