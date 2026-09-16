@@ -49,6 +49,9 @@ try {
     --violeta:#6D4AE0; --ambar:#B7791F; --ciano:#0E7490; --coral:#C2410C;
     --vidro:rgba(255,255,255,.7);
     --barra-fundo:rgba(255,255,255,.86);
+    /* O sino segue o texto, como no X: branco no escuro, quase preto no
+       claro. Branco puro numa barra branca simplesmente sumiria. */
+    --sino:#0F1419;
     --brilho:radial-gradient(900px 520px at 6% -12%, rgba(18,161,80,.07), transparent 60%),
              radial-gradient(800px 520px at 100% -8%, rgba(109,74,224,.06), transparent 60%);
     --barra:56px;
@@ -66,6 +69,7 @@ try {
     --violeta:#A78BFA; --ambar:#F5B942; --ciano:#38BDF8; --coral:#FB7185;
     --vidro:rgba(255,255,255,.028);
     --barra-fundo:rgba(7,11,9,.82);
+    --sino:#FFFFFF;
     --brilho:radial-gradient(900px 520px at 6% -12%, rgba(61,212,127,.11), transparent 60%),
              radial-gradient(800px 520px at 100% -8%, rgba(167,139,250,.11), transparent 60%),
              radial-gradient(1000px 640px at 50% 112%, rgba(56,189,248,.07), transparent 60%);
@@ -118,11 +122,32 @@ try {
   }
   .espaco { flex: 1; }
 
-  .sino { position: relative; }
+  /* O SINO, NO JEITO DO X.
+
+     Só o desenho, sem a palavra: é o ícone que todo mundo já reconhece, e
+     a palavra ocupava a largura de duas abas. O número fica montado em cima
+     do sino, com um anel da cor da barra em volta — é esse anel que faz
+     ele parecer "recortado" do ícone, e não colado do lado. */
+  .sino { position: relative; padding: 0 16px; color: var(--sino); }
+  .sino:hover, .sino[aria-expanded="true"] { background: none; color: var(--sino); }
+  .sino__ic {
+    position: relative; display: grid; place-items: center;
+    width: 38px; height: 38px; border-radius: 50%;
+    transition: background .15s ease;
+  }
+  .sino:hover .sino__ic, .sino:focus-visible .sino__ic { background: rgba(127, 127, 127, .16); }
+  .sino svg { width: 24px; height: 24px; display: block; }
+  .sino svg path { fill: none; }
+  /* Com a caixa aberta o sino fica cheio, como no X quando você está na
+     página de notificações. */
+  .sino[aria-expanded="true"] svg .sino__corpo { fill: currentColor; }
   .sino .n {
-    min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px; border-radius: 9px;
-    background: var(--perigo); color: #fff; font: 700 10px var(--mono);
+    position: absolute; top: 1px; right: -1px;
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+    background: var(--neon); color: #fff; font: 700 10.5px/1 var(--disp);
+    box-shadow: 0 0 0 2px var(--fundo);
     display: none; align-items: center; justify-content: center;
+    pointer-events: none;
   }
   .sino .n.tem { display: inline-flex; }
   #bandejaAvisos { width: 340px; max-height: 60vh; overflow-y: auto; }
@@ -1015,6 +1040,59 @@ try {
     opacity: 0; pointer-events: none; transition: opacity .12s ease;
   }
   .dica-balao.on { opacity: 1; }
+
+  /* A lista do @. Presa ao body pelo mesmo motivo da dica do selo: dentro
+     do painel do feed ela seria cortada pela borda dele. */
+  .marcar-lista {
+    position: fixed; z-index: 95; width: 270px; max-height: 300px; overflow-y: auto;
+    background: var(--caixa); border: 1px solid var(--linha2); border-radius: 10px;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, .35); padding: 5px;
+  }
+  .marcar-item {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 7px 9px; border: 0; border-radius: 7px; background: none;
+    color: var(--tinta); text-align: left; cursor: pointer;
+  }
+  .marcar-item.on, .marcar-item:hover { background: var(--verde-fraco); }
+  .marcar-item img, .marcar-item .letra {
+    width: 30px; height: 30px; border-radius: 50%; flex: none; object-fit: cover;
+    display: grid; place-items: center; background: var(--caixa2);
+    font: 600 13px var(--disp); color: var(--fraco);
+  }
+  .marcar-item b { display: block; font: 600 13.5px var(--disp); }
+  .marcar-item small { display: block; color: var(--apagado); font: 500 11.5px var(--mono); }
+  .marcar-vazio { padding: 10px; color: var(--apagado); font-size: 12.5px; }
+
+  /* "Tem post novo": o mesmo lugar e o mesmo jeito do X — um botão no topo
+     da lista, e o feed só muda quando a pessoa pede. Trocar os posts
+     embaixo do dedo de quem está lendo faz perder a linha. */
+  /* Todos | Quem eu sigo, no jeito das abas do X: o texto é o botão, e a
+     barrinha embaixo diz qual está valendo. */
+  .feed__abas { display: flex; border-bottom: 1px solid var(--linha); margin: 4px -4px 0; }
+  .feed__abas button {
+    flex: 1; position: relative; padding: 11px 6px; border: 0; background: none; cursor: pointer;
+    color: var(--apagado); font: 600 13px var(--disp);
+  }
+  .feed__abas button:hover { background: rgba(127, 127, 127, .08); color: var(--tinta); }
+  .feed__abas button.on { color: var(--tinta); }
+  .feed__abas button.on::after {
+    content: ''; position: absolute; left: 50%; bottom: -1px; transform: translateX(-50%);
+    width: 44px; height: 3px; border-radius: 3px; background: var(--verde);
+  }
+
+  .feed__chegou {
+    position: sticky; top: 6px; z-index: 5; display: flex; justify-content: center;
+    margin: 6px 0 4px; pointer-events: none;
+  }
+  .feed__chegou button {
+    pointer-events: auto; border: 0; border-radius: 999px; padding: 7px 16px;
+    background: var(--verde); color: #04130A; cursor: pointer;
+    font: 700 12.5px var(--disp); box-shadow: 0 6px 18px rgba(0, 0, 0, .3);
+    animation: chega .25s ease-out;
+  }
+  .feed__chegou button:hover { filter: brightness(1.08); }
+  @keyframes chega { from { transform: translateY(-8px); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .feed__chegou button { animation: none; } }
   @media (prefers-reduced-motion: reduce) { .dica-balao { transition: none; } }
 
   .selo-dica img, .selo-dica .selo-chip { transition: transform .16s ease; }
@@ -1431,8 +1509,15 @@ try {
   <!-- Reaproveita a bandeja das abas: abrir, fechar clicando fora e o Esc
        já funcionam do mesmo jeito que em Overlays e Ferramentas. -->
   <button class="aba sino escondido" id="abaAvisos" type="button" aria-expanded="false" aria-haspopup="true"
-          title="Avisos">
-    Avisos<span class="n" id="avisosN"></span>
+          title="Avisos" aria-label="Avisos">
+    <span class="sino__ic">
+      <svg viewBox="0 0 24 24" aria-hidden="true" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path class="sino__corpo" d="M6 10a6 6 0 0 1 12 0c0 4.2 1.3 6.3 2.2 7.2a.6.6 0 0 1-.43 1H4.23a.6.6 0 0 1-.43-1C4.7 16.3 6 14.2 6 10z"/>
+        <path d="M9.6 21a2.5 2.5 0 0 0 4.8 0"/>
+      </svg>
+      <span class="n" id="avisosN"></span>
+    </span>
     <span class="bandeja" id="bandejaAvisos"></span>
   </button>
 
@@ -2327,6 +2412,9 @@ function pintaAvisos(d) {
     const quantos = (d && d.nao_lidas) || 0;
     n.textContent = quantos > 99 ? '99+' : String(quantos || '');
     n.classList.toggle('tem', quantos > 0);
+    /* Sem a palavra na tela, o número precisa chegar a quem usa leitor. */
+    el('abaAvisos').setAttribute('aria-label', quantos
+      ? 'Avisos: ' + quantos + (quantos === 1 ? ' novo' : ' novos') : 'Avisos');
 
     const cx = el('bandejaAvisos');
     cx.innerHTML = '';
@@ -4580,6 +4668,128 @@ function faz(s) {
   return Math.floor(s / 604800) + ' sem';
 }
 
+/* ---------------- marcar com @ ----------------
+
+   Serve o campo do post e o dos comentários. Uma lista só na página: abrir
+   outra em cada campo deixaria duas abertas ao mesmo tempo. */
+let marcarLista = null;
+let marcarFecha = null;
+
+function fechaMarcacao() {
+  if (marcarLista) marcarLista.remove();
+  marcarLista = null;
+  marcarFecha = null;
+}
+
+/** O @palavra logo antes do cursor, ou null. */
+function marcandoAgora(campo) {
+  const ate = campo.selectionStart == null ? campo.value.length : campo.selectionStart;
+  const m = /(^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{0,25})$/.exec(campo.value.slice(0, ate));
+  return m ? { inicio: ate - m[2].length - 1, ate, parte: m[2] } : null;
+}
+
+function ligaMarcacao(campo) {
+  let atual = null;       // o @palavra sendo digitado
+  let itens = [];
+  let escolhido = 0;
+  let pedido = 0;
+  let espera = null;
+
+  const escolhe = (u) => {
+    if (!atual) return;
+    const antes = campo.value.slice(0, atual.inicio);
+    const depois = campo.value.slice(atual.ate);
+    const meio = '@' + u.login + ' ';
+    campo.value = antes + meio + depois.replace(/^ /, '');
+    const pos = antes.length + meio.length;
+    campo.focus();
+    campo.setSelectionRange(pos, pos);
+    fechaMarcacao();
+    /* O contador de caracteres escuta o input: sem isto ele ficaria
+       mostrando o número de antes da marcação. */
+    campo.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  const desenha = () => {
+    if (!marcarLista) {
+      marcarLista = h('div', { cls: 'marcar-lista', role: 'listbox' });
+      document.body.appendChild(marcarLista);
+    }
+    marcarLista.innerHTML = '';
+
+    if (!itens.length) {
+      marcarLista.appendChild(h('div', { cls: 'marcar-vazio', txt: atual && atual.parte
+        ? 'Ninguém do site com esse nome.' : 'Digite o nome de quem você quer marcar.' }));
+    }
+
+    itens.forEach((u, i) => {
+      const foto = u.foto
+        ? h('img', { src: daApi(u.foto), alt: '', loading: 'lazy' })
+        : h('span', { cls: 'letra', txt: (u.nome || u.login).slice(0, 1).toUpperCase() });
+      const b = h('button', { cls: 'marcar-item' + (i === escolhido ? ' on' : ''), type: 'button',
+        role: 'option' }, [foto, h('span', {}, [h('b', { txt: u.nome }), h('small', { txt: '@' + u.login })])]);
+      /* mousedown, e não click: o click chega depois do campo perder o
+         foco, e aí a lista já teria fechado. */
+      b.onmousedown = (e) => { e.preventDefault(); escolhe(u); };
+      marcarLista.appendChild(b);
+    });
+
+    const r = campo.getBoundingClientRect();
+    const alto = Math.min(300, marcarLista.scrollHeight);
+    const cabeEmbaixo = r.bottom + alto + 8 < innerHeight;
+    marcarLista.style.left = Math.round(Math.min(Math.max(8, r.left), innerWidth - 278)) + 'px';
+    marcarLista.style.top = Math.round(cabeEmbaixo ? r.bottom + 6 : Math.max(8, r.top - alto - 6)) + 'px';
+    marcarFecha = campo;
+  };
+
+  const busca = () => {
+    atual = marcandoAgora(campo);
+    if (!atual) {
+      if (marcarFecha === campo) fechaMarcacao();
+      return;
+    }
+    clearTimeout(espera);
+    /* Um respiro entre teclas: digitar "@enzoca" não pode virar seis
+       perguntas ao servidor. O número do pedido descarta a resposta que
+       chegar atrasada, depois de uma mais nova. */
+    espera = setTimeout(async () => {
+      const meu = ++pedido;
+      try {
+        const d = await api('/feed.php?a=quem&q=' + encodeURIComponent(atual.parte));
+        if (meu !== pedido || !marcandoAgora(campo)) return;
+        itens = d.quem || [];
+        escolhido = 0;
+        desenha();
+      } catch (e) { /* sem lista, a pessoa digita o nome inteiro, como antes */ }
+    }, 160);
+  };
+
+  campo.addEventListener('input', busca);
+  campo.addEventListener('click', busca);
+  campo.addEventListener('blur', () => { if (marcarFecha === campo) setTimeout(fechaMarcacao, 120); });
+
+  campo.addEventListener('keydown', (e) => {
+    if (!marcarLista || marcarFecha !== campo || !itens.length) {
+      if (e.key === 'Escape' && marcarLista) fechaMarcacao();
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      escolhido = (escolhido + (e.key === 'ArrowDown' ? 1 : itens.length - 1)) % itens.length;
+      desenha();
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      e.stopPropagation();
+      escolhe(itens[escolhido]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      fechaMarcacao();
+    }
+  });
+}
+
+window.addEventListener('resize', fechaMarcacao);
+
 /** O "ao vivo" que leva pro canal. Botão, e não enfeite: ele é clicável. */
 function seloAoVivo(u) {
   const b = h('button', { cls: 'vivo', type: 'button', txt: 'ao vivo',
@@ -4741,8 +4951,9 @@ function blocoFeed() {
     };
 
     if (chave) {
-      const campo = h('input', { type: 'text', maxlength: '300', placeholder: 'Comentar…' });
+      const campo = h('input', { type: 'text', maxlength: '300', placeholder: 'Comentar… (@ marca alguém)' });
       const env = h('button', { cls: 'bt mini', type: 'button', txt: 'Enviar' });
+      ligaMarcacao(campo);
 
       const enviar = async () => {
         if (!campo.value.trim()) return;
@@ -4827,7 +5038,10 @@ function blocoFeed() {
     /* Seguir é daqui de dentro: a Twitch não deixa site nenhum seguir um
        canal por você desde 2021. Quem quiser seguir lá clica no nome. */
     if (chave && quemSou && p.autor.login !== quemSou) {
-      const seg = h('button', { cls: 'feed__acao', type: 'button' });
+      const seg = h('button', { cls: 'feed__acao', type: 'button',
+        title: 'Seguir aqui no site: os posts dessa pessoa aparecem em "Quem eu sigo", ela vem '
+             + 'primeiro quando você digita @ e recebe um aviso. Na Twitch não muda nada — '
+             + 'pra seguir lá, clique no nome.' });
       let sigo = !!p.sigo;
       const pinta = () => { seg.textContent = sigo ? 'seguindo' : 'seguir'; };
       pinta();
@@ -4868,10 +5082,26 @@ function blocoFeed() {
     return h('div', { cls: 'feed__post' }, [avatar(p.autor), corpo]);
   }
 
+  /* O post mais novo que está na tela: é a partir dele que se pergunta se
+     chegou alguma coisa. */
+  let ultimoId = 0;
+  const chegou = h('div', { cls: 'feed__chegou' });
+
+  /* Qual aba está aberta. Guardado no navegador: quem prefere ver só quem
+     segue não quer escolher de novo a cada visita. */
+  let soSigo = false;
+  try { soSigo = !!chave && localStorage.getItem('zc:feed-sigo') === '1'; } catch (e) {}
+  const cabecalho = () => (chave ? { 'X-Chave': chave } : {});
+
   const desenha = (posts) => {
     lista.innerHTML = '';
+    chegou.innerHTML = '';
+    lista.appendChild(chegou);
+    ultimoId = posts.length ? Math.max.apply(null, posts.map((p) => p.id)) : 0;
     if (!posts.length) {
-      lista.appendChild(h('p', { cls: 'd', txt: 'Ninguém zocou nada ainda. Comece você.' }));
+      lista.appendChild(h('p', { cls: 'd', txt: soSigo
+        ? 'Ninguém que você segue postou ainda. Siga alguém pelo botão "seguir" embaixo de um post.'
+        : 'Ninguém zocou nada ainda. Comece você.' }));
       return;
     }
     posts.forEach((p) => lista.appendChild(desenhaPost(p)));
@@ -4881,14 +5111,54 @@ function blocoFeed() {
     /* no-store: o feed é guardado por quinze segundos pra quem não entrou, e
        era isso que fazia o post recém-escrito demorar a aparecer pra quem
        escreveu. */
-    fetch(API + '/feed.php', { cache: 'no-store', headers: chave ? { 'X-Chave': chave } : {} })
+    fetch(API + '/feed.php' + (soSigo ? '?seguindo=1' : ''), { cache: 'no-store', headers: cabecalho() })
       .then((r) => r.json())
       .then((d) => desenha(d.posts || []))
       .catch(() => { lista.innerHTML = ''; lista.appendChild(h('p', { cls: 'd', txt: 'Não consegui carregar o feed.' })); });
   };
 
+  /* SEM F5 PRA VER POST NOVO.
+
+     A hospedagem não empurra nada, então a tela pergunta — só com a aba à
+     vista, e só "quantos chegaram", que é uma contagem e não o feed
+     inteiro. Quando chega, aparece o botão; o feed só troca quando a pessoa
+     clica, pra não mexer no que ela está lendo. */
+  const confere = () => {
+    if (!document.body.contains(lista)) {
+      clearInterval(feedRelogio);
+      feedRelogio = null;
+      feedConfere = null;
+      return;
+    }
+    if (document.hidden || !ultimoId) return;
+
+    fetch(API + '/feed.php?a=novos&depois=' + ultimoId + (soSigo ? '&seguindo=1' : ''),
+          soSigo ? { cache: 'no-store', headers: cabecalho() } : {})
+      .then((r) => r.json())
+      .then((d) => {
+        const n = (d && d.novos) || 0;
+        chegou.innerHTML = '';
+        if (!n) return;
+        const b = h('button', { type: 'button',
+          txt: '↑ ' + (n === 1 ? '1 post novo' : n + (n >= 99 ? '+' : '') + ' posts novos') + ' — atualizar feed' });
+        b.onclick = () => {
+          b.disabled = true;
+          lista.scrollTop = 0;
+          carregaFeed();
+        };
+        chegou.appendChild(b);
+      })
+      .catch(() => {});
+  };
+
+  if (feedRelogio) clearInterval(feedRelogio);
+  feedRelogio = setInterval(confere, 20000);
+  feedConfere = confere;
+
   if (chave) {
-    const campo = h('textarea', { maxlength: '500', placeholder: 'O que você está fazendo na live?' });
+    const campo = h('textarea', { maxlength: '500',
+      placeholder: 'O que você está fazendo na live? Use @ pra marcar alguém.' });
+    ligaMarcacao(campo);
     const foto  = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,image/gif',
       style: 'display:none' });
     const anexo = h('button', { cls: 'bt mini', type: 'button', txt: 'Imagem' });
@@ -4971,11 +5241,44 @@ function blocoFeed() {
     ]));
   }
 
+  if (chave) {
+    const todos = h('button', { type: 'button', txt: 'Todos' });
+    const sigo = h('button', { type: 'button', txt: 'Quem eu sigo' });
+    const marca = () => {
+      todos.classList.toggle('on', !soSigo);
+      sigo.classList.toggle('on', soSigo);
+    };
+    const muda = (v) => {
+      if (soSigo === v) return;
+      soSigo = v;
+      try { localStorage.setItem('zc:feed-sigo', v ? '1' : '0'); } catch (e) {}
+      marca();
+      lista.innerHTML = '';
+      lista.appendChild(h('p', { cls: 'd', txt: 'vendo…' }));
+      carregaFeed();
+    };
+    todos.onclick = () => muda(false);
+    sigo.onclick = () => muda(true);
+    marca();
+    cx.appendChild(h('div', { cls: 'feed__abas', role: 'tablist' }, [todos, sigo]));
+  }
+
   cx.appendChild(lista);
   lista.appendChild(h('p', { cls: 'd', txt: 'vendo…' }));
   carregaFeed();
   return cx;
 }
+
+/* Um relógio só, do feed que está na tela: montar a página inicial de novo
+   troca este, em vez de empilhar um relógio por visita. */
+let feedRelogio = null;
+let feedConfere = null;
+
+/* Voltar pra aba depois de um tempo fora confere na hora, em vez de esperar
+   o próximo pulso. */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && feedConfere) feedConfere();
+});
 
 let hubTeclado = null;
 

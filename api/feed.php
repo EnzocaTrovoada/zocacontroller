@@ -184,6 +184,82 @@ if (($_GET['a'] ?? '') === 'comentarios') {
     json_saida(['comentarios' => feed_comentarios((int) ($_GET['id'] ?? 0))]);
 }
 
+/* ---------- quem dá pra marcar ----------
+
+   A lista que abre quando se digita @. Só pra quem entrou: de fora, isto
+   seria um jeito de listar todo mundo que usa o site, uma letra por vez.
+
+   Sem @ digitado ainda, vem quem a pessoa segue — é quem ela mais marca. */
+if (($_GET['a'] ?? '') === 'quem') {
+    $eu = (int) exige_painel()['usuario_id'];
+    trava('marcar', 240, 60);
+
+    $q = substr(preg_replace('/[^A-Za-z0-9_]/', '', (string) ($_GET['q'] ?? '')), 0, 25);
+    $linhas = [];
+    try {
+        if ($q === '') {
+            $st = db()->prepare(
+                'SELECT u.login, u.nome_exibicao, u.foto, u.foto_propria
+                   FROM feed_seguidores s JOIN usuarios u ON u.id = s.seguido_id
+                  WHERE s.seguidor_id = ? AND u.login IS NOT NULL AND u.login <> \'\'
+                  ORDER BY s.criado_em DESC LIMIT 8'
+            );
+            $st->execute([$eu]);
+        } else {
+            /* Começo do login primeiro, depois começo do nome de exibição:
+               quem digita "@enz" quer o "enzoca" antes do "lorenzo". */
+            $st = db()->prepare(
+                'SELECT login, nome_exibicao, foto, foto_propria
+                   FROM usuarios
+                  WHERE id <> ? AND login IS NOT NULL AND login <> \'\'
+                    AND (login LIKE ? OR nome_exibicao LIKE ?)
+                  ORDER BY (login LIKE ?) DESC, CHAR_LENGTH(login), login
+                  LIMIT 8'
+            );
+            $st->execute([$eu, $q . '%', $q . '%', $q . '%']);
+        }
+        $linhas = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { /* sem a tabela de seguir, a lista vazia serve */ }
+
+    header('Cache-Control: private, no-store');
+    json_saida(['quem' => array_map(fn($u) => [
+        'login' => (string) $u['login'],
+        'nome'  => (string) ($u['nome_exibicao'] ?: $u['login']),
+        'foto'  => !empty($u['foto_propria'])
+            ? api_base() . '/feed.php?a=foto&login=' . rawurlencode((string) $u['login'])
+            : (string) ($u['foto'] ?: ''),
+    ], $linhas)]);
+}
+
+/* ---------- chegou post novo? ----------
+
+   A tela pergunta isto de tempos em tempos pra mostrar o "atualizar feed".
+   É uma contagem só, e a mesma resposta serve todo mundo por uns segundos:
+   por isso o cache é público. Buscar o feed inteiro a cada vez pra comparar
+   seria gastar trinta posts pra responder um número. */
+if (($_GET['a'] ?? '') === 'novos') {
+    $depois = max(0, (int) ($_GET['depois'] ?? 0));
+    /* Na aba "Quem eu sigo" só conta quem a pessoa segue — senão o botão
+       prometeria post novo e o clique não mostraria nada. Essa resposta é
+       dela, então não pode ser guardada pra todo mundo. */
+    $eu = !empty($_GET['seguindo']) ? quem_talvez() : 0;
+    $n = 0;
+    try {
+        if ($eu) {
+            $st = db()->prepare('SELECT COUNT(*) FROM posts WHERE escondido = 0 AND id > ?
+                                   AND usuario_id IN (SELECT seguido_id FROM feed_seguidores WHERE seguidor_id = ?)');
+            $st->execute([$depois, $eu]);
+        } else {
+            $st = db()->prepare('SELECT COUNT(*) FROM posts WHERE escondido = 0 AND id > ?');
+            $st->execute([$depois]);
+        }
+        $n = (int) $st->fetchColumn();
+    } catch (Throwable $e) { /* sem tabela, sem novidade */ }
+
+    header($eu ? 'Cache-Control: private, no-store' : 'Cache-Control: public, max-age=10');
+    json_saida(['novos' => min($n, 99)]);
+}
+
 /* ---------- ler o feed ---------- */
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $eu = quem_talvez();
@@ -202,10 +278,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
                   FROM posts p JOIN usuarios u ON u.id = p.usuario_id
                  WHERE p.escondido = 0';
         if ($antes > 0) $sql .= ' AND p.id < ' . $antes;
+
+        /* "Quem eu sigo" filtra NO BANCO. Filtrar depois de pegar os trinta
+           mais novos deixava a aba quase sempre vazia: bastava o resto do
+           site postar mais que as pessoas que você segue. */
+        $soSigo = !empty($_GET['seguindo']) && $eu;
+        if ($soSigo) {
+            $sql .= ' AND p.usuario_id IN (SELECT seguido_id FROM feed_seguidores WHERE seguidor_id = ?)';
+        }
         $sql .= ' ORDER BY p.id DESC LIMIT ' . FEED_PAGINA;
 
         $st = db()->prepare($sql);
-        $st->execute([$eu]);
+        $st->execute($soSigo ? [$eu, $eu] : [$eu]);
         $linhas = $st->fetchAll(PDO::FETCH_ASSOC);
         $selos = selos_de(array_column($linhas, 'usuario_id'));
 
@@ -219,9 +303,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
                 $sg->execute([$eu]);
                 $sigo = array_flip(array_map('intval', $sg->fetchAll(PDO::FETCH_COLUMN)));
             } catch (Throwable $e) { /* sem a tabela, ninguém segue ninguém */ }
-        }
-        if (!empty($_GET['seguindo']) && $eu) {
-            $linhas = array_values(array_filter($linhas, fn($p) => isset($sigo[(int) $p['usuario_id']])));
         }
 
         foreach ($linhas as $p) {

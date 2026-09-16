@@ -211,16 +211,24 @@ function vitrine_logins_do_site(bool $soPagantes): array
     return $pagantes;
 }
 
-function vitrine_do_site(bool $soPagantes, array $bloqueados): ?array
+/**
+ * Alguém do site pro carrossel.
+ *
+ * $modo: 'vivo' só aceita quem está no ar; 'desligado' pula a conferência e
+ * pega qualquer um; 'tanto' é os dois, nessa ordem.
+ */
+function vitrine_do_site(bool $soPagantes, array $bloqueados, string $modo = 'tanto'): ?array
 {
     $logins = vitrine_logins_do_site($soPagantes);
     $logins = array_values(array_filter($logins, fn($l) => !in_array(strtolower($l), $bloqueados, true)));
     if (!$logins) return null;
 
-    $vivos = vitrine_ao_vivo($logins, $bloqueados);
-    if ($vivos) return vitrine_cartao($vivos[random_int(0, count($vivos) - 1)]);
+    if ($modo !== 'desligado') {
+        $vivos = vitrine_ao_vivo($logins, $bloqueados);
+        if ($vivos) return vitrine_cartao($vivos[random_int(0, count($vivos) - 1)]);
+        if ($modo === 'vivo') return null;
+    }
 
-    /* Ninguém no ar: mostra alguém desligado mesmo. */
     return vitrine_cartao_offline($logins[random_int(0, count($logins) - 1)], $bloqueados);
 }
 
@@ -303,8 +311,14 @@ function vitrine_sortear(string $fatia, array $cfg, string $idioma, array $bloqu
        todo sorteio aqui já filtra por ela, então não repetir sai de graça. */
     $fora = array_values(array_unique(array_merge($bloqueados, $evitar)));
 
-    if ($fatia === 'usuario')   $c = vitrine_do_site(false, $fora);
-    elseif ($fatia === 'pro')   $c = vitrine_do_site(true, $fora);
+    /* QUEM ESTÁ AO VIVO PRIMEIRO, SEMPRE.
+
+       Antes, sem ninguém do site no ar, o carrossel mostrava alguém do site
+       DESLIGADO — um painel parado no meio da página, enquanto havia live
+       aberta pra mostrar. Agora a ordem é: do site e ao vivo; da Twitch e
+       ao vivo; e só então do site e desligado, como último recurso. */
+    if ($fatia === 'usuario')   $c = vitrine_do_site(false, $fora, 'vivo');
+    elseif ($fatia === 'pro')   $c = vitrine_do_site(true, $fora, 'vivo');
     else                        $c = vitrine_twitch($cfg, $idioma, $fora);
 
     /* TRÊS PAINÉIS, SEMPRE TRÊS.
@@ -317,6 +331,12 @@ function vitrine_sortear(string $fatia, array $cfg, string $idioma, array $bloqu
     if (!$c && $fatia !== 'twitch') {
         $c = vitrine_twitch($cfg, $idioma, $fora);
         if ($c) $c['origem'] = 'twitch';
+    }
+
+    /* Nem a Twitch tinha ninguém que servisse: aí sim, alguém do site mesmo
+       desligado — painel com rosto conhecido é melhor que buraco. */
+    if (!$c && $fatia !== 'twitch') {
+        $c = vitrine_do_site($fatia === 'pro', $fora, 'desligado');
     }
 
     return $c;
