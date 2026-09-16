@@ -134,6 +134,19 @@ if ($acao === 'apagar') {
     json_saida(['ok' => true, 'selos' => selo_lista()]);
 }
 
+/* ---------- o acerto fino do tamanho ---------- */
+if ($acao === 'ajuste') {
+    $id = (int) ($d['id'] ?? 0);
+    $escala = max(0.5, min(2.0, round((float) ($d['escala'] ?? 1), 2)));
+    $y = max(-8, min(8, (int) ($d['ajuste'] ?? 0)));
+    try {
+        db()->prepare('UPDATE selos SET escala = ?, ajuste_y = ? WHERE id = ?')->execute([$escala, $y, $id]);
+    } catch (Throwable $e) {
+        json_saida(['erro' => 'Falta rodar o SQL 050 pra guardar o tamanho.'], 503);
+    }
+    json_saida(['ok' => true, 'selos' => selo_lista()]);
+}
+
 if ($acao === 'tirar_desenho') {
     $st = db()->prepare('SELECT arquivo FROM selos WHERE id = ?');
     $st->execute([(int) ($d['id'] ?? 0)]);

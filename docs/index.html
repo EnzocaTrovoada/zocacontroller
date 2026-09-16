@@ -1065,7 +1065,14 @@ try {
   }
   .selo-chip img { width: 14px; height: 14px; object-fit: contain; display: block; }
   /* Só desenho, sem etiqueta: quando o selo tem imagem, ela fala sozinha. */
-  .selo-img { width: 16px; height: 16px; object-fit: contain; display: block; }
+  /* O acerto fino do painel entra por variável, e não por transform escrito
+     no elemento: assim o zoom de passar o mouse multiplica o acerto em vez
+     de apagar ele. */
+  .selo-img {
+    width: 16px; height: 16px; object-fit: contain; display: block;
+    transform: translateY(calc(var(--selo-y, 0) * 1px))
+               scale(calc(var(--selo-escala, 1) * var(--selo-zoom, 1)));
+  }
 
   .selo-dica { position: relative; display: inline-flex; align-items: center; outline: 0; cursor: default; }
 
@@ -1142,18 +1149,34 @@ try {
   @media (prefers-reduced-motion: reduce) { .dica-balao { transition: none; } }
 
   .selo-dica img, .selo-dica .selo-chip { transition: transform .16s ease; }
-  .selo-dica:hover img, .selo-dica:focus-visible img { transform: scale(1.35); }
+  .selo-dica:hover img, .selo-dica:focus-visible img { --selo-zoom: 1.35; }
   .selo-dica:hover .selo-chip, .selo-dica:focus-visible .selo-chip { transform: scale(1.12); }
   /* Passar pelo post já acorda os selos dele; em cima do selo, ele cresce mais. */
-  .feed__post:hover .selo-dica img { transform: scale(1.18); }
+  .feed__post:hover .selo-dica img { --selo-zoom: 1.18; }
   .feed__post:hover .selo-dica .selo-chip { transform: scale(1.05); }
-  .feed__post .selo-dica:hover img { transform: scale(1.35); }
+  .feed__post .selo-dica:hover img { --selo-zoom: 1.35; }
   .feed__post .selo-dica:hover .selo-chip { transform: scale(1.12); }
   @media (prefers-reduced-motion: reduce) { .selo-dica img, .selo-dica .selo-chip { transition: none; } }
   .hub__nome { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 
   .selo-lista { display: flex; flex-direction: column; gap: 10px; }
   .selo-linha { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  /* A régua dos selos: todos lado a lado, no tamanho do feed, nos dois
+     fundos. É olhando aqui que se iguala um com o outro. */
+  .selo-regua { display: grid; gap: 8px; margin: 4px 0 16px; }
+  .selo-regua__faixa {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px;
+    padding: 12px 14px; border-radius: 8px; border: 1px solid var(--linha);
+    font: 600 14px var(--disp);
+  }
+  .selo-regua__faixa.clara { background: #FFFFFF; color: #101A14; }
+  .selo-regua__faixa.escura { background: #070B09; color: #E8F0EB; }
+  .selo-regua__um { display: inline-flex; align-items: center; gap: 5px; }
+  .selo-acerto { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font: 500 12px var(--mono); color: var(--fraco); }
+  .selo-acerto input[type=range] { width: 120px; accent-color: var(--verde); }
+  .selo-acerto output { min-width: 42px; font-variant-numeric: tabular-nums; color: var(--tinta); }
   .selo-linha .previa {
     width: 30px; height: 30px; display: grid; place-items: center;
     border: 1px solid var(--linha); border-radius: 4px; flex: none;
@@ -5077,12 +5100,26 @@ document.addEventListener('mouseleave', escondeDica);
 window.addEventListener('scroll', escondeDica, true);
 window.addEventListener('resize', escondeDica);
 
+/** O desenho do selo, já com o acerto fino que o admin fez. */
+function imgSelo(s) {
+  const img = h('img', { cls: 'selo-img', src: daApi(s.img), alt: '', loading: 'lazy' });
+  acertaSelo(img, s.escala, s.ajuste);
+  return img;
+}
+
+function acertaSelo(img, escala, ajuste) {
+  const e = Number(escala) || 1;
+  const y = Number(ajuste) || 0;
+  if (e !== 1) img.style.setProperty('--selo-escala', String(e)); else img.style.removeProperty('--selo-escala');
+  if (y) img.style.setProperty('--selo-y', String(y)); else img.style.removeProperty('--selo-y');
+}
+
 function chipSelo(s) {
   const dica = s.dica ? s.nome + ' · ' + s.dica : s.nome;
   const cx = h('span', { cls: 'selo-dica', tabindex: '0', 'data-dica': dica, 'aria-label': dica });
 
   if (s.img) {
-    cx.appendChild(h('img', { cls: 'selo-img', src: daApi(s.img), alt: '', loading: 'lazy' }));
+    cx.appendChild(imgSelo(s));
   } else {
     const c = h('span', { cls: 'selo-chip', txt: s.nome });
     c.style.color = s.cor;
@@ -9045,16 +9082,119 @@ function blocoAvisos() {
    dado por regra automática não vale nada, porque a regra é o que a pessoa
    contorna. */
 
+/* O AJUSTE AUTOMÁTICO DO DESENHO.
+
+   O selo é desenhado numa caixa pequena com "caber inteiro", então quem
+   manda no tamanho aparente é a margem transparente: desenho com muita
+   sobra fica miúdo, desenho que enche o quadro fica grande. Aqui a sobra é
+   cortada e o desenho é centralizado num quadrado.
+
+   PIXEL ART NÃO PODE SER SUAVIZADA. Desenho pequeno (até 64 px de
+   conteúdo) cresce em múltiplo inteiro, pixel por pixel — um aumento
+   quebrado deixa cada pixel de uma largura, e suavizar deixa tudo borrado.
+   Desenho grande é reduzido normalmente, com suavização.
+
+   GIF e SVG ficam como estão: o canvas mataria a animação de um e a nitidez
+   do outro. Pra esses existe o acerto fino. */
+const SELO_LADO = 128;
+
+async function aparaSelo(blob) {
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = await new Promise((ok, falha) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = () => falha(new Error('Não consegui abrir esse desenho.'));
+      i.src = url;
+    });
+    const W = img.naturalWidth, H = img.naturalHeight;
+    if (!W || !H) throw new Error('O desenho está vazio.');
+    if (W > 2048 || H > 2048) throw new Error('Desenho grande demais: até 2048 px de lado.');
+
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(img, 0, 0);
+    const px = g.getImageData(0, 0, W, H).data;
+
+    let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (px[(y * W + x) * 4 + 3] > 8) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+    }
+    if (x1 < 0) throw new Error('O desenho é todo transparente.');
+
+    const w = x1 - x0 + 1, hh = y1 - y0 + 1;
+    const L = Math.max(w, hh);
+    const pixel = L <= 64;
+    const k = pixel ? Math.max(1, Math.round(SELO_LADO / L)) : SELO_LADO / L;
+    const lado = pixel ? L * k : SELO_LADO;
+
+    const out = document.createElement('canvas');
+    out.width = lado; out.height = lado;
+    const o = out.getContext('2d');
+    o.imageSmoothingEnabled = !pixel;
+    if (!pixel) o.imageSmoothingQuality = 'high';
+
+    /* No pixel art a sobra do centro também é múltiplo de k: assim a grade
+       de pixels não sai meio pixel pro lado. */
+    const dx = pixel ? Math.floor((L - w) / 2) * k : Math.round((lado - w * k) / 2);
+    const dy = pixel ? Math.floor((L - hh) / 2) * k : Math.round((lado - hh * k) / 2);
+    o.drawImage(c, x0, y0, w, hh, dx, dy, w * k, hh * k);
+
+    const png = await new Promise((ok) => out.toBlob(ok, 'image/png'));
+    if (!png) throw new Error('Não consegui gerar o desenho ajustado.');
+    return {
+      arquivo: new File([png], 'selo.png', { type: 'image/png' }),
+      tirou: [W - w, H - hh],
+      pixel,
+      lado,
+    };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+const seloAparavel = (tipo) => tipo === 'image/png' || tipo === 'image/webp';
+
 function blocoSelos() {
   const cx = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Selos' }),
     h('p', { cls: 'd', txt: 'Cada selo pode ter um desenho seu. Sem desenho, ele aparece como etiqueta escrita na cor escolhida. Quem tem qual você marca na ficha de cada conta, ali embaixo.' }),
   ]);
 
+  /* A régua fica em cima: é nela que se compara um selo com o outro. */
+  const clara = h('div', { cls: 'selo-regua__faixa clara' });
+  const escura = h('div', { cls: 'selo-regua__faixa escura' });
+  const todos = h('button', { cls: 'bt mini', type: 'button', txt: 'Ajustar todos automaticamente' });
+  cx.appendChild(h('div', { cls: 'selo-regua' }, [
+    h('p', { cls: 'd', style: 'margin:0', txt: 'Como os selos aparecem no feed. Ao subir um PNG ou WEBP, a margem '
+      + 'transparente é cortada sozinha; o tamanho e a altura de cada um você acerta embaixo, olhando aqui.' }),
+    clara, escura,
+    h('div', { cls: 'campo', style: 'margin:0' }, [todos]),
+  ]));
+
   const lista = h('div', { cls: 'selo-lista' });
   cx.appendChild(lista);
 
   const manda = (corpo) => api('/selos.php', { method: 'POST', body: JSON.stringify(corpo) });
+
+  /* O desenho que está no ar, cortado e subido de novo no lugar. */
+  const ajustaGuardado = async (s, nome, cor, dica) => {
+    if (!s.img) return null;
+    const r = await fetch(daApi(s.img), { cache: 'no-store' });
+    if (!r.ok) throw new Error('Não consegui baixar o desenho de "' + s.nome + '".');
+    const b = await r.blob();
+    if (!seloAparavel(b.type)) return null;
+    const a = await aparaSelo(b);
+    return subir(s.slug, nome, cor, a.arquivo, dica);
+  };
 
   const subir = (slug, nome, cor, arquivo, dica) => {
     const fd = new FormData();
@@ -9073,6 +9213,40 @@ function blocoSelos() {
 
   function pinta(selos) {
     lista.innerHTML = '';
+    clara.innerHTML = '';
+    escura.innerHTML = '';
+
+    /* Cada selo aparece nas duas faixas; o acerto mexe nos dois ao vivo. */
+    const naRegua = {};
+    selos.forEach((s) => {
+      naRegua[s.id] = [clara, escura].map((faixa) => {
+        const chip = chipSelo(s);
+        faixa.appendChild(h('span', { cls: 'selo-regua__um' }, [document.createTextNode('Enzoca'), chip]));
+        return chip.querySelector('img');
+      }).filter(Boolean);
+    });
+    if (!selos.length) {
+      clara.textContent = 'Nenhum selo ainda.';
+      escura.textContent = 'Nenhum selo ainda.';
+    }
+
+    todos.onclick = async () => {
+      const com = selos.filter((s) => s.img);
+      if (!com.length) return recado('Nenhum selo tem desenho ainda.', 'ruim');
+      if (!confirm('Cortar a margem transparente de ' + com.length + ' selos e subir de novo?\n\n'
+        + 'GIF e SVG ficam como estão. Os desenhos originais são trocados pelos ajustados.')) return;
+      todos.disabled = true;
+      let feitos = 0, pulados = 0, ultimo = null;
+      for (const s of com) {
+        try {
+          const r = await ajustaGuardado(s, s.nome, s.cor, s.dica);
+          if (r) { feitos++; ultimo = r; } else pulados++;
+        } catch (e) { pulados++; }
+      }
+      todos.disabled = false;
+      if (ultimo) pinta(ultimo.selos || []);
+      recado(feitos + ' selos ajustados' + (pulados ? ', ' + pulados + ' ficaram como estavam (GIF, SVG ou erro)' : '') + '.', 'bom');
+    };
 
     selos.forEach((s) => {
       const previa = h('div', { cls: 'previa' });
@@ -9095,10 +9269,73 @@ function blocoSelos() {
         const f = arq.files && arq.files[0];
         arq.value = '';
         if (!f) return;
-        if (f.size > 262144) return recado('O desenho pode ter no máximo 256 KB.', 'ruim');
-        try { const r = await subir(s.slug, nome.value, cor.value, f, dica.value); pinta(r.selos || []); }
-        catch (e) { recado(e.message, 'ruim'); }
+        try {
+          /* PNG e WEBP passam pelo corte antes de subir. O limite de 256 KB
+             vale pro que sobe, e o ajustado é bem menor que o original. */
+          let enviar = f;
+          let aviso = '';
+          if (seloAparavel(f.type)) {
+            const a = await aparaSelo(f);
+            enviar = a.arquivo;
+            aviso = ' Margem cortada' + (a.pixel ? ', pixels preservados' : '') + '.';
+          }
+          if (enviar.size > 262144) return recado('O desenho pode ter no máximo 256 KB.', 'ruim');
+          const r = await subir(s.slug, nome.value, cor.value, enviar, dica.value);
+          pinta(r.selos || []);
+          recado('Desenho de "' + s.nome + '" trocado.' + aviso, 'bom');
+        } catch (e) { recado(e.message, 'ruim'); }
       };
+
+      /* ACERTO FINO: tamanho e altura, a olho, na régua lá em cima. */
+      const escala = h('input', { type: 'range', min: '0.5', max: '2', step: '0.05',
+        id: 'selo-escala-' + s.id, 'aria-label': 'Tamanho de ' + s.nome });
+      escala.value = String(s.escala || 1);
+      const altura = h('input', { type: 'range', min: '-8', max: '8', step: '1',
+        id: 'selo-altura-' + s.id, 'aria-label': 'Altura de ' + s.nome });
+      altura.value = String(s.ajuste || 0);
+      const vEscala = h('output', { txt: Math.round((s.escala || 1) * 100) + '%' });
+      const vAltura = h('output', { txt: (s.ajuste > 0 ? '+' : '') + (s.ajuste || 0) + ' px' });
+      const guardar = h('button', { cls: 'bt mini', type: 'button', txt: 'Guardar tamanho' });
+      guardar.disabled = true;
+
+      const aoMexer = () => {
+        vEscala.textContent = Math.round(+escala.value * 100) + '%';
+        vAltura.textContent = (+altura.value > 0 ? '+' : '') + altura.value + ' px';
+        (naRegua[s.id] || []).forEach((img) => acertaSelo(img, +escala.value, +altura.value));
+        guardar.disabled = false;
+      };
+      escala.oninput = aoMexer;
+      altura.oninput = aoMexer;
+      guardar.onclick = async () => {
+        guardar.disabled = true;
+        try {
+          const r = await manda({ acao: 'ajuste', id: s.id, escala: +escala.value, ajuste: +altura.value });
+          pinta(r.selos || []);
+          recado('Tamanho de "' + s.nome + '" guardado.', 'bom');
+        } catch (e) { recado(e.message, 'ruim'); guardar.disabled = false; }
+      };
+
+      const auto = h('button', { cls: 'bt mini', type: 'button', txt: 'Ajustar automático' });
+      auto.style.display = s.img ? '' : 'none';
+      auto.onclick = async () => {
+        auto.disabled = true;
+        try {
+          const r = await ajustaGuardado(s, nome.value, cor.value, dica.value);
+          if (!r) {
+            recado('"' + s.nome + '" é GIF ou SVG: esse fica como está. Use o tamanho e a altura.', 'ruim');
+          } else {
+            pinta(r.selos || []);
+            recado('Margem de "' + s.nome + '" cortada.', 'bom');
+          }
+        } catch (e) { recado(e.message, 'ruim'); }
+        auto.disabled = false;
+      };
+
+      const acerto = h('div', { cls: 'selo-acerto', style: 'flex:1 1 100%' }, [
+        document.createTextNode('Tamanho'), escala, vEscala,
+        document.createTextNode('Altura'), altura, vAltura,
+        guardar, auto,
+      ]);
 
       const salvar = h('button', { cls: 'bt mini', type: 'button', txt: 'Salvar' });
       salvar.onclick = async () => {
@@ -9120,10 +9357,11 @@ function blocoSelos() {
         catch (e) { recado(e.message, 'ruim'); }
       };
 
-      lista.appendChild(h('div', { cls: 'selo-linha' }, [
+      lista.appendChild(h('div', { cls: 'selo-linha', style: 'padding:10px 0;border-top:1px solid var(--linha)' }, [
         previa,
         h('code', { style: 'flex:0 0 90px;font-size:12px', txt: s.slug }),
         nome, cor, dica, desenho, arq, semDesenho, salvar, apagar,
+        s.img ? acerto : document.createTextNode(''),
       ]));
     });
 
@@ -9132,7 +9370,7 @@ function blocoSelos() {
     const nSlug = h('input', { type: 'text', maxlength: '24', placeholder: 'apelido (sem espaço)', style: 'flex:0 0 160px' });
     const nNome = h('input', { type: 'text', maxlength: '32', placeholder: 'Nome na tela', style: 'flex:0 0 150px' });
     const nCor = h('input', { type: 'color', value: '#12A150', style: 'flex:0 0 46px;padding:2px' });
-    const nAdd = h('button', { cls: 'bt mini', type: 'button', txt: '+ Selo' });
+    const nAdd = h('button', { cls: 'bt mini', type: 'button', txt: '+ Selo', id: 'selo-novo' });
     nAdd.onclick = async () => {
       if (!nSlug.value.trim()) return recado('O selo precisa de um apelido.', 'ruim');
       try {
