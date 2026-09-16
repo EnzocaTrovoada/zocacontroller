@@ -354,13 +354,17 @@ function vitrine_sortear(string $fatia, array $cfg, string $idioma, array $bloqu
  * momento, não a lista global da Twitch (que é dominada por inglês e não diz
  * nada sobre o público brasileiro).
  */
-function vitrine_altas(string $idioma, string $categoria, array $bloqueados): array
+function vitrine_altas(string $idioma, string $categoria, array $bloqueados): ?array
 {
     $q = ['language' => ($idioma ?: 'pt'), 'first' => '100', 'type' => 'live'];
 
+    /* Categoria que a Twitch não conhece devolve null: a lista geral no
+       lugar dela seria resposta errada, e guardar isso deixaria uma linha
+       no banco por nome digitado pela metade. */
     if ($categoria !== '') {
         [$h, $g] = tw_helix_app('GET', '/games', ['name' => $categoria]);
-        if ($h === 200 && !empty($g['data'][0]['id'])) $q['game_id'] = (string) $g['data'][0]['id'];
+        if ($h !== 200 || empty($g['data'][0]['id'])) return null;
+        $q['game_id'] = (string) $g['data'][0]['id'];
     }
 
     [$http, $r] = tw_helix_app('GET', '/streams', $q);
@@ -536,7 +540,7 @@ function vitrine_atualiza(array $cfg, array $bloqueados, string $idioma): array
     }
 
     try {
-        $altas = vitrine_altas($idioma, '', $bloqueados);
+        $altas = vitrine_altas($idioma, '', $bloqueados) ?? ['topicos' => [], 'canais' => []];
         vitrine_grava('altas_' . substr(md5($idioma . '|'), 0, 20), $altas);
         $feito['altas'] = count($altas['topicos'] ?? []);
     } catch (Throwable $e) {
@@ -584,8 +588,11 @@ $cfg = vitrine_config();
 $bloqueados = vitrine_bloqueados();
 $idioma = (string) $cfg['idioma'];
 
-/* O visitante pode filtrar os tópicos sem mexer na configuração de ninguém. */
-$idiomaPedido = preg_replace('/[^a-z-]/', '', strtolower((string) ($_GET['idioma'] ?? ''))) ?: $idioma;
+/* O visitante pode filtrar os tópicos sem mexer na configuração de ninguém.
+   Idioma na Twitch é código de duas letras: qualquer outra coisa vira o
+   idioma da vitrine, e não uma linha nova de cache. */
+$idiomaPedido = strtolower((string) ($_GET['idioma'] ?? ''));
+if (!preg_match('/^[a-z]{2}$/', $idiomaPedido)) $idiomaPedido = $idioma;
 $catPedida    = mb_substr(trim((string) ($_GET['categoria'] ?? '')), 0, 80);
 
 /* ----- as três fatias: sempre o que está guardado ----- */
@@ -645,11 +652,32 @@ $altas = $ga['valor'] ?? null;
    escapar: uma leitura só da Twitch, que é barata (um pedido). O caro é o
    sorteio das fatias, e esse nunca acontece durante a visita. */
 if ($altas === null) {
-    try {
-        $altas = vitrine_altas($idiomaPedido, $catPedida, $bloqueados);
-        vitrine_grava($chaveAltas, $altas);
-    } catch (Throwable $e) {
-        $altas = ['topicos' => [], 'canais' => []];
+    /* FILTRO NOVO CUSTA PEDIDO À TWITCH, E O NOME É LIVRE.
+
+       Sem freio, inventar categorias em sequência gastaria a cota da Twitch
+       que os overlays de todo mundo usam. Passando do limite — por IP ou no
+       total —, a resposta sai vazia e nada é guardado. */
+    require_once __DIR__ . '/lib/seguranca.php';
+    $pode = limite_ok('vitrine-altas:' . ip_de_quem_chama(), 20, 600)
+         && limite_ok('vitrine-altas', 200, 600);
+
+    $altas = ['topicos' => [], 'canais' => []];
+    if (!$pode) {
+        $altas['limite'] = true;
+    } else {
+        try {
+            $achou = vitrine_altas($idiomaPedido, $catPedida, $bloqueados);
+            if ($achou !== null) {
+                $altas = $achou;
+                vitrine_grava($chaveAltas, $altas);
+            }
+            /* Cada categoria buscada deixa uma linha. As de mais de dois dias
+               já estariam vencidas de qualquer jeito. */
+            if (random_int(1, 20) === 1) {
+                db()->prepare("DELETE FROM vitrine WHERE chave LIKE 'altas\\_%'
+                                AND atualizado_em < DATE_SUB(NOW(), INTERVAL 2 DAY)")->execute();
+            }
+        } catch (Throwable $e) { /* fica a resposta vazia */ }
     }
 } elseif ($ga['idade'] >= VITRINE_FRESCOR) {
     $velho = true;
@@ -669,6 +697,7 @@ echo json_encode([
         'categoria' => $catPedida,
         'topicos'   => $altas['topicos'] ?? [],
         'canais'    => $altas['canais'] ?? [],
+        'limite'    => !empty($altas['limite']),
     ],
 ], JSON_UNESCAPED_UNICODE);
 

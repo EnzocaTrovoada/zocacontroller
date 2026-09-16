@@ -5630,7 +5630,9 @@ function telaInicio() {
         ]));
       });
       if (!(a.topicos || []).length) {
-        listaTop.appendChild(h('p', { cls: 'd', txt: 'Nada encontrado nesse filtro.' }));
+        listaTop.appendChild(h('p', { cls: 'd', txt: a.limite
+          ? 'Muitas buscas seguidas. Espere uns minutos e tente de novo.'
+          : 'Nada encontrado nesse filtro.' }));
       }
 
       listaCanais.innerHTML = '';
