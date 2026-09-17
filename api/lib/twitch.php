@@ -20,7 +20,14 @@ const TW_ESCOPOS = [
     'moderator:read:followers',     // saber quem seguiu (channel.follow v2)
     'channel:read:subscriptions',   // subs, para as metas
     'bits:read',                    // bits, para as metas
+    'user:write:chat',              // comando que responde no chat, pela própria conta
+    'channel:bot',                  // deixar o bot do ZocaController falar no canal
 ];
+
+/* O que a conta do BOT autoriza, uma vez só, em entrar.php?bot=1. Com isso
+   o token do aplicativo manda mensagem como ela nos canais que deram
+   channel:bot — e nenhum token do bot precisa ficar guardado aqui. */
+const TW_ESCOPOS_BOT = ['user:bot', 'user:write:chat', 'user:read:chat'];
 
 /**
  * Token do APLICATIVO, não do usuário.
@@ -73,14 +80,14 @@ function tw_helix_app(string $metodo, string $caminho, array $query = [], $corpo
         $cabecalhos, $corpo);
 }
 
-function tw_url_login(string $estado): string
+function tw_url_login(string $estado, array $escopos = TW_ESCOPOS): string
 {
     $c = cfg()['twitch'];
     return TW_AUTORIZAR . '?' . http_build_query([
         'client_id'     => $c['client_id'],
         'redirect_uri'  => $c['redirect_uri'],
         'response_type' => 'code',
-        'scope'         => implode(' ', TW_ESCOPOS),
+        'scope'         => implode(' ', $escopos),
         'state'         => $estado,
         'force_verify'  => 'true',
     ]);

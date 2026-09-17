@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-17",
+      "titulo": "Comandos que respondem no chat",
+      "texto": "Agora um comando seu pode falar no chat, com as mesmas variáveis do StreamElements: $(sender), $(1:), $(count) e companhia. E quem vem de lá traz tudo de uma vez: em Comandos, o botão \"Trazer do StreamElements\" lê os seus comandos e mostra o que entra antes de trazer."
+    },
+    {
+      "data": "2026-09-17",
       "titulo": "Entrar pelo celular não derruba mais o PC",
       "texto": "Cada aparelho em que você entra com a Twitch agora ganha a própria chave: entrar pelo celular não desliga mais o computador nem a ponte do OBS. Em Meu Controller aparece a lista de aparelhos conectados, com um botão pra desconectar o que não for seu."
     },

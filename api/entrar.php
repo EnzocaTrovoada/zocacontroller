@@ -61,7 +61,8 @@ if (!isset($_GET['code'])) {
             . '<p><a href="entrar.php">Entrar com a Twitch</a></p>');
     }
     $_SESSION['estado_oauth'] = chave_nova(16);
-    header('Location: ' . tw_url_login($_SESSION['estado_oauth']));
+    $_SESSION['entrar_bot'] = isset($_GET['bot']);
+    header('Location: ' . tw_url_login($_SESSION['estado_oauth'], isset($_GET['bot']) ? TW_ESCOPOS_BOT : TW_ESCOPOS));
     exit;
 }
 
@@ -72,6 +73,40 @@ if (empty($_GET['state']) || empty($_SESSION['estado_oauth'])
     pagina('Erro', '<h1>Login não confere</h1><p>Comece de novo por <a href="entrar.php">aqui</a>.</p>');
 }
 unset($_SESSION['estado_oauth']);
+$ehBot = !empty($_SESSION['entrar_bot']);
+unset($_SESSION['entrar_bot']);
+
+/* ---------- a conta do bot ----------
+
+   Ela não vira conta do site: só autoriza o aplicativo a falar como ela.
+   Nada é guardado — a Twitch lembra da autorização, e o token do aplicativo
+   basta daqui pra frente. */
+if ($ehBot) {
+    try {
+        $tokens = tw_trocar_codigo($_GET['code']);
+        [$http, $eu] = tw_http('GET', TW_HELIX . '/users', [
+            'Authorization: Bearer ' . $tokens['access_token'],
+            'Client-Id: ' . cfg()['twitch']['client_id'],
+        ]);
+        $conta = $eu['data'][0] ?? null;
+        if ($http !== 200 || !$conta) throw new RuntimeException('Não consegui ler a conta na Twitch.');
+    } catch (Throwable $e) {
+        pagina('Erro', '<h1>Não deu certo</h1><p>' . htmlspecialchars(erro_publico($e)) . '</p>');
+    }
+
+    $nome = htmlspecialchars((string) $conta['login']);
+    $esperado = (string) (cfg()['twitch_bot']['user_id'] ?? '');
+    if ($esperado === '') {
+        pagina('Bot', '<h1>Conta autorizada</h1><p>A conta <b>' . $nome . '</b> autorizou o ZocaController a falar no chat.</p>'
+            . '<p>Pra ela virar o bot, ponha esta linha no config.php e envie o arquivo de novo:</p>'
+            . '<code>' . htmlspecialchars("'twitch_bot' => ['user_id' => '" . $conta['id'] . "'],") . '</code>');
+    }
+    if ((string) $conta['id'] !== $esperado) {
+        pagina('Bot', '<h1>Conta errada</h1><p>Você entrou como <b>' . $nome . '</b>, que não é a conta do bot. '
+            . 'Saia da Twitch e entre de novo com a conta do bot.</p>');
+    }
+    pagina('Bot', '<h1>Bot pronto</h1><p>A conta <b>' . $nome . '</b> já fala nos canais que liberaram o bot.</p>');
+}
 
 try {
     $tokens = tw_trocar_codigo($_GET['code']);

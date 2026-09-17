@@ -1427,6 +1427,30 @@ try {
   .chave input:checked + span::after { transform: translateX(18px); }
   .tempoBotoes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
 
+  /* ---------- respostas no chat e a importação ---------- */
+  .pop__caixa--largo { max-width: 760px; }
+  .resposta-campo {
+    flex: 1 1 260px; min-width: 0; min-height: 46px; resize: vertical;
+    font-family: inherit; font-size: 13px; line-height: 1.45; color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); border-radius: 4px; padding: 7px 9px;
+  }
+  .resposta-campo:focus { outline: 0; border-color: var(--verde); }
+  .variaveis { margin: 2px 0 14px; font-size: 12.5px; color: var(--fraco); }
+  .variaveis summary { cursor: pointer; color: var(--verde-forte); }
+  .variaveis ul { margin: 6px 0 0; padding-left: 18px; }
+  .variaveis li { margin: 3px 0; }
+  .variaveis code { font: 12px var(--mono); color: var(--tinta); }
+  .cmd-desligado { opacity: .5; }
+  .imp-linha { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--linha); cursor: pointer; }
+  .imp-linha:last-child { border-bottom: 0; }
+  .imp-linha input[type=checkbox] { margin-top: 3px; flex: none; }
+  .imp-meio { flex: 1; min-width: 0; }
+  .imp-meio b { font: 600 13px var(--mono); }
+  .imp-texto { display: block; color: var(--fraco); font-size: 12.5px; overflow-wrap: anywhere; margin-top: 2px; }
+  .imp-aviso { display: block; color: var(--dourado); font-size: 12px; margin-top: 3px; }
+  .imp-erro { display: block; color: var(--perigo); font-size: 12px; margin-top: 3px; }
+  .imp-linha.pulado { opacity: .6; cursor: default; }
+
   /* ---------- segredos ---------- */
   .segredo {
     display: flex; align-items: center; gap: 6px;
@@ -3694,6 +3718,8 @@ const COMO_USAR = {
     ['Os seus são apelidos', 'Um comando seu não é código novo: é um nome curto pra uma ação que já existe, com o argumento pronto. "!brb" vira "cena Cenário BRB".'],
     ['Um comando pode ter vários passos', 'Trocar de cena, mutar o microfone e mudar a luz, tudo com uma palavra só.'],
     ['Gatilhos são sem comando', 'Em vez do chat digitar, quem dispara é o que acontece: sub, bits, follow, raid.'],
+    ['Responder no chat', 'Escolha a ação "responder" e escreva o texto. $(sender) vira o nome de quem mandou — a lista completa fica logo abaixo do campo.'],
+    ['Vem do StreamElements?', 'O botão "Trazer do StreamElements" lê os seus comandos de lá e traz prontos, com quem pode usar e a espera de cada um.'],
   ]],
 
   subathon: ['Subathon', [
@@ -6544,7 +6570,278 @@ const DE_FABRICA = [
   ['playlist',  'chat',  'Diz de qual playlist a música está saindo'],
   ['vod',       'dono',  'Tira o som do Spotify do VOD, pra não tomar strike'],
   ['luz',       'mod',   'Muda a cor das suas luzes — !luz vermelho, !luz festa'],
+  ['responder', 'dono',  'Responde no chat — só como passo de um comando seu'],
 ];
+
+/* ---------------- trazer do StreamElements ----------------
+
+   A leitura acontece AQUI, no navegador: o StreamElements responde direto
+   pra esta página. A chave de lá, quando a pessoa cola, vai só pra eles —
+   não passa pelo nosso servidor e não é guardada. Pro servidor vão só os
+   comandos já convertidos. */
+const SE_API = 'https://api.streamelements.com/kappa/v2';
+
+/* O que a resposta daqui entende. O resto sai vazio, e a lista avisa antes. */
+const SE_VARIAVEIS = new Set(['sender', 'source', 'user', 'touser', 'channel', 'game', 'title', 'uptime',
+  'provider', 'msgid', 'random', 'count', 'getcount', 'time', 'math', 'repeat', 'queryescape',
+  'queryencode', 'pathescape', 'customapi', 'urlfetch', 'if']);
+
+/* O "regular" do StreamElements não existe aqui: vai pro VIP, o mais
+   próximo por cima. Liberar demais é pior que liberar de menos. */
+const SE_CARGO = { 100: 'chat', 250: 'sub', 300: 'vip', 400: 'vip', 500: 'mod', 1000: 'supermod', 1500: 'dono' };
+
+async function seLer(canal, jwt) {
+  const opcoes = jwt ? { headers: { Authorization: 'Bearer ' + jwt } } : {};
+  const pede = async (caminho) => {
+    let r;
+    try { r = await fetch(SE_API + caminho, opcoes); }
+    catch (e) { throw new Error('Não consegui falar com o StreamElements.'); }
+    if (r.status === 401 || r.status === 403) throw new Error('O StreamElements recusou essa chave. Confira se copiou a JWT inteira.');
+    if (r.status === 404) throw new Error('Não achei esse canal no StreamElements.');
+    if (!r.ok) throw new Error('O StreamElements respondeu ' + r.status + '. Tente de novo daqui a pouco.');
+    return r.json();
+  };
+  const conta = await pede(jwt ? '/channels/me' : '/channels/' + encodeURIComponent(canal));
+  const id = conta && (conta._id || conta.id);
+  if (!id) throw new Error('O StreamElements não disse qual é o canal.');
+  const lista = await pede('/bot/commands/' + encodeURIComponent(id));
+  return {
+    canal: (conta && (conta.displayName || conta.username)) || canal,
+    comandos: Array.isArray(lista) ? lista : ((lista && (lista.commands || lista.docs)) || []),
+  };
+}
+
+const seNome = (s) => String(s || '').trim().replace(/^!+/, '').toLowerCase().replace(/[^\p{L}\p{N}_-]/gu, '');
+
+/* O que impede um nome. Esses a pessoa conserta ali mesmo, renomeando. */
+function seProblemaNome(nome) {
+  if (!nome) return 'o comando precisa de um nome';
+  if (nome.length > 30) return 'o nome passa de 30 letras';
+  if (DE_FABRICA.some((d) => d[0] === nome)) return 'aqui já existe um !' + nome + ' de fábrica';
+  return '';
+}
+
+/* O StreamElements guarda "sem data" como o ano 1. */
+const seData = (v) => {
+  const ms = Date.parse(v || '');
+  return ms > Date.UTC(2000, 0, 1) ? ms : 0;
+};
+
+function seConverte(c, comChave) {
+  const nome = seNome(c.command);
+  const texto = String(c.reply || '');
+  const avisos = [];
+  let problema = seProblemaNome(nome);
+  const problemaNome = !!problema;
+  /* "/clear" e "/commercial 30" são comandos da Twitch: lá o bot executa,
+     aqui eles sairiam como texto no chat. */
+  const barra = texto.trim().match(/^[/.](\w+)/);
+  if (!problema && barra && barra[1].toLowerCase() !== 'me') {
+    problema = 'a resposta é um comando da Twitch (/' + barra[1] + '), que não roda por aqui';
+  }
+  if (!problema && !texto.trim()) problema = 'a resposta está vazia';
+
+  const faltam = new Set();
+  for (const m of texto.matchAll(/\$[({]\s*([a-z0-9_]+)(?:\.([a-z0-9_]+))?/gi)) {
+    const base = m[1].toLowerCase();
+    const sub = (m[2] || '').toLowerCase();
+    if (/^\d/.test(base)) continue;
+    if (!SE_VARIAVEIS.has(base)) faltam.add(base);
+    else if (['sender', 'source', 'user'].includes(base) && sub && !['name', 'level', 'twitchid'].includes(sub)) faltam.add(base + '.' + sub);
+    else if (base === 'random' && sub === 'emote') faltam.add('random.emote');
+    else if (base === 'channel' && ['chatters', 'subpoints', 'id'].includes(sub)) faltam.add('channel.' + sub);
+  }
+  if (faltam.size) avisos.push([...faltam].map((v) => '$(' + v + ')').join(', ') + ' não existe aqui e sai vazio');
+  if (!comChave && /\$[({]\s*(customapi|urlfetch)\s*[)}]/i.test(texto)) {
+    avisos.push('o endereço do $(customapi) não veio: a lista pública do StreamElements esconde. Cole a chave pra trazer completo');
+  }
+  if (texto.length > 500) avisos.push('a resposta passa de 500 letras e vai cortada');
+  if (Number(c.cost) > 0) avisos.push('custava ' + c.cost + ' pontos; aqui é de graça');
+  if (c.type === 'whisper') avisos.push('era sussurro; aqui responde no chat, com @ na frente');
+  if ((c.keywords || []).length || c.regex || (c.titleKeywords || []).length) avisos.push('também disparava por palavra solta; aqui só pelo !' + nome);
+  if (c.enabledOnline === false && c.enabledOffline !== false) avisos.push('só funcionava fora do ar; aqui funciona sempre');
+  if (c.enabledOffline === false && c.enabledOnline !== false) avisos.push('só funcionava ao vivo; aqui funciona sempre');
+  const vence = seData(c.expiresAt);
+  if (vence && vence < Date.now()) avisos.push('já tinha vencido no StreamElements; vem desligado');
+  else if (vence || seData(c.startsAt)) avisos.push('tinha data pra começar ou acabar; aqui não tem');
+  if (Number(c.accessLevel) === 300) avisos.push('era pros regulares do StreamElements; aqui ficou pra VIPs pra cima');
+
+  const espera = c.cooldown || {};
+  const desligado = c.enabled === false || (c.enabledOnline === false && c.enabledOffline === false)
+    || (vence && vence < Date.now());
+  return {
+    problema: problema,
+    problemaNome: problemaNome,
+    avisos: avisos,
+    item: {
+      nome: nome,
+      apelidos: (c.aliases || []).map((a) => String(a).replace(/^!+/, '')).join(' '),
+      passos: [{
+        acao: 'responder',
+        argumento: texto.slice(0, 500),
+        modo: c.type === 'reply' ? 'reply' : (c.type === 'mention' || c.type === 'whisper' ? 'mention' : 'say'),
+      }],
+      quem: SE_CARGO[Number(c.accessLevel)] || 'chat',
+      espera: Math.max(1, Math.round(Number(espera.global) || 0)),
+      espera_pessoa: Math.max(0, Math.round(Number(espera.user) || 0)),
+      ligado: desligado ? 0 : 1,
+      contador: typeof c.count === 'number' ? c.count : undefined,
+    },
+  };
+}
+
+function abreImportarSE(aoTerminar) {
+  fechaPop();
+
+  const caixa = h('div', { cls: 'pop__caixa pop__caixa--largo' });
+  const fundo = h('div', { cls: 'pop', id: 'pop' }, [caixa]);
+  fundo.onclick = (e) => { if (e.target === fundo) fechaPop(); };
+  document.addEventListener('keydown', popTecla);
+
+  const x = h('button', { cls: 'pop__x', type: 'button', txt: '×', title: 'Fechar' });
+  x.onclick = fechaPop;
+
+  const canal = h('input', { type: 'text', placeholder: 'o seu canal', autocomplete: 'off', value: quemSou || '' });
+  const jwt = h('input', { type: 'password', placeholder: 'opcional', autocomplete: 'off', spellcheck: 'false' });
+  const ler = h('button', { cls: 'bt principal', type: 'button', txt: 'Ler os comandos' });
+  const diz = h('p', { cls: 'd', style: 'min-height:1em;margin:10px 0 0' });
+  const lista = h('div', { style: 'margin-top:6px' });
+  const substituir = h('input', { type: 'checkbox' });
+  const importar = h('button', { cls: 'bt principal', type: 'button', txt: 'Nada marcado', disabled: '' });
+  const rodape = h('div', { cls: 'escondido', style: 'flex:0 0 auto;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--linha);padding-top:12px' }, [
+    h('label', { style: 'display:flex;gap:6px;align-items:center;font-size:13px' }, [
+      substituir, document.createTextNode('trocar os que já existem com o mesmo nome'),
+    ]),
+    h('span', { style: 'flex:1' }),
+    importar,
+  ]);
+
+  let lidos = [];
+
+  function conta() {
+    const n = lidos.filter((l) => l.marcado && !l.problema).length;
+    importar.textContent = n ? 'Trazer ' + n + (n === 1 ? ' comando' : ' comandos') : 'Nada marcado';
+    importar.disabled = !n;
+  }
+
+  function pinta() {
+    lista.innerHTML = '';
+    lidos.forEach((l) => {
+      const marca = h('input', { type: 'checkbox' });
+      marca.checked = l.marcado;
+      marca.disabled = !!l.problema;
+      marca.onchange = () => { l.marcado = marca.checked; conta(); };
+      const it = l.item;
+      const resposta = it.passos[0].argumento;
+      const meio = h('div', { cls: 'imp-meio' }, [
+        h('b', { txt: '!' + (it.nome || '?') + (it.apelidos ? '   (também ' + it.apelidos.split(' ').map((a) => '!' + a).join(' ') + ')' : '') }),
+        h('span', { cls: 'imp-texto', txt: resposta.length > 180 ? resposta.slice(0, 180) + '…' : resposta }),
+        h('span', { cls: 'imp-texto', txt: [it.quem, it.espera + 's',
+          it.espera_pessoa ? it.espera_pessoa + 's cada um' : '', it.ligado ? '' : 'desligado'].filter(Boolean).join(' · ') }),
+      ]);
+      const erro = h('span', { cls: 'imp-erro' + (l.problema ? '' : ' escondido'), txt: 'Não dá pra trazer: ' + l.problema });
+      meio.appendChild(erro);
+      l.avisos.forEach((a) => meio.appendChild(h('span', { cls: 'imp-aviso', txt: '⚠ ' + a })));
+      const linha = h('label', { cls: 'imp-linha' + (l.problema ? ' pulado' : '') }, [marca, meio]);
+
+      /* Nome que bate com um de fábrica se conserta aqui mesmo. */
+      if (l.problemaNome) {
+        const titulo = meio.querySelector('b');
+        const novo = h('input', { type: 'text', placeholder: 'outro nome', style: 'width:170px;margin-top:5px' });
+        novo.oninput = () => {
+          const n = seNome(novo.value);
+          l.problema = seProblemaNome(n);
+          l.item.nome = n;
+          l.marcado = !l.problema;
+          marca.checked = l.marcado;
+          marca.disabled = !!l.problema;
+          erro.textContent = 'Não dá pra trazer: ' + l.problema;
+          erro.classList.toggle('escondido', !l.problema);
+          linha.classList.toggle('pulado', !!l.problema);
+          titulo.textContent = '!' + (n || '?');
+          conta();
+        };
+        meio.appendChild(h('span', { cls: 'imp-texto' }, [document.createTextNode('Trazer com outro nome: '), novo]));
+      }
+      lista.appendChild(linha);
+    });
+    rodape.classList.toggle('escondido', !lidos.length);
+    conta();
+  }
+
+  ler.onclick = async () => {
+    const chave = jwt.value.trim();
+    const nomeCanal = canal.value.trim().replace(/^@/, '').toLowerCase();
+    if (!chave && !nomeCanal) { diz.textContent = 'Escreva o nome do seu canal.'; return; }
+    ler.disabled = true;
+    diz.textContent = 'lendo no StreamElements…';
+    lista.innerHTML = '';
+    lidos = [];
+    rodape.classList.add('escondido');
+    try {
+      const d = await seLer(nomeCanal, chave);
+      /* Usou, apagou: a chave não fica nem no campo. */
+      jwt.value = '';
+      lidos = d.comandos.map((c) => Object.assign(seConverte(c, !!chave), { marcado: true }));
+      lidos.forEach((l) => { if (l.problema) l.marcado = false; });
+      diz.textContent = lidos.length
+        ? d.canal + ': ' + lidos.length + (lidos.length === 1 ? ' comando.' : ' comandos.') + ' Desmarque o que não quiser trazer.'
+        : 'Esse canal não tem comandos próprios no StreamElements.';
+      pinta();
+    } catch (e) {
+      diz.textContent = e.message;
+    }
+    ler.disabled = false;
+  };
+
+  importar.onclick = async () => {
+    const itens = lidos.filter((l) => l.marcado && !l.problema).map((l) => l.item);
+    if (!itens.length) return;
+    importar.disabled = true;
+    importar.textContent = 'trazendo…';
+    try {
+      const r = await api('/comandos.php', { method: 'POST', body: JSON.stringify({
+        acao: 'importar', comandos: itens, substituir: substituir.checked,
+      }) });
+      const partes = [];
+      if ((r.criados || []).length) partes.push(r.criados.length + (r.criados.length === 1 ? ' novo' : ' novos'));
+      if ((r.trocados || []).length) partes.push(r.trocados.length + (r.trocados.length === 1 ? ' trocado' : ' trocados'));
+      if ((r.pulados || []).length) partes.push(r.pulados.length + (r.pulados.length === 1 ? ' ficou de fora' : ' ficaram de fora'));
+      diz.textContent = 'Pronto: ' + (partes.join(', ') || 'nada mudou')
+        + '. A fonte do OBS pega em até 5 minutos, ou na hora se você recarregar ela.';
+      lidos = [];
+      lista.innerHTML = '';
+      (r.pulados || []).forEach((p) => lista.appendChild(h('div', { cls: 'imp-linha pulado' }, [
+        h('div', { cls: 'imp-meio' }, [h('b', { txt: '!' + p.nome }), h('span', { cls: 'imp-erro', txt: p.motivo })]),
+      ])));
+      rodape.classList.add('escondido');
+      if (aoTerminar) aoTerminar();
+    } catch (e) {
+      diz.textContent = e.message;
+      conta();
+    }
+  };
+
+  const onde = h('a', { href: 'https://streamelements.com/dashboard/account/channels', target: '_blank',
+    rel: 'noopener noreferrer', txt: 'Account → Channels → Show secrets' });
+  const corpo = h('div', { cls: 'pop__corpo' }, [
+    h('p', { cls: 'sub', txt: 'Os comandos que respondem no chat chegam prontos: a resposta, quem pode usar, as esperas e os outros nomes.' }),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Canal no StreamElements' }), canal]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Chave JWT (opcional)' }), jwt]),
+    h('p', { cls: 'd', style: 'font-size:12px;margin:-2px 0 12px' }, [
+      document.createTextNode('Só faz falta nos comandos que buscam um endereço ($(customapi)): a lista pública do StreamElements esconde o endereço deles. Fica em '),
+      onde,
+      document.createTextNode(', no campo JWT Token. Ela vai direto pro StreamElements, não passa pelo nosso servidor e não fica guardada — mas não mostre na live.'),
+    ]),
+    h('p', { style: 'margin:0' }, [ler]),
+    diz,
+    lista,
+  ]);
+
+  caixa.append(h('div', { cls: 'pop__topo' }, [x, h('h2', { txt: 'Trazer do StreamElements' })]), corpo, rodape);
+  document.body.appendChild(fundo);
+  canal.focus();
+}
 
 /* De que overlay é cada comando. Serve pra mostrar os comandos na página
    da overlay que eles mexem — quem está montando a de música precisa saber
@@ -6555,18 +6852,70 @@ const COMANDOS_DA_OVERLAY = {
   musica: ['musica', 'pular', 'like', 'adicionar', 'fila', 'playlist', 'vod'],
 };
 
+/* O campo de um passo: o argumento de sempre, ou o texto da resposta. */
+function campoDoPasso(p, comModo) {
+  if (p.acao !== 'responder') {
+    const arg = h('input', { type: 'text', placeholder: 'sem argumento', style: 'flex:1 1 130px' });
+    arg.value = p.argumento || '';
+    arg.oninput = () => { p.argumento = arg.value; };
+    return [arg];
+  }
+  const area = h('textarea', { cls: 'resposta-campo', rows: '2', maxlength: '500',
+    placeholder: comModo ? 'Oi $(sender)! As minhas redes: ...' : 'Valeu pelo sub, {quem}!' });
+  area.value = p.argumento || '';
+  area.oninput = () => { p.argumento = area.value; };
+  if (!comModo) return [area];
+
+  const modo = h('select', { style: 'flex:0 0 150px', title: 'Como a resposta aparece no chat' });
+  [['say', 'mensagem normal'], ['reply', 'responde a pessoa'], ['mention', 'começa com @pessoa']]
+    .forEach((m) => modo.appendChild(h('option', { value: m[0], txt: m[1] })));
+  modo.value = p.modo || 'say';
+  modo.onchange = () => { p.modo = modo.value; };
+  return [area, modo];
+}
+
+/* O que a resposta entende, do jeito do StreamElements. */
+function ajudaVariaveis() {
+  const itens = [
+    ['$(sender)', 'quem mandou o comando'],
+    ['$(touser)', 'a primeira palavra depois do comando (ou quem mandou)'],
+    ['$(1)  $(2)  $(1:)', 'as palavras depois do comando; $(1:) é tudo'],
+    ['$(1|todo mundo)', 'com um padrão pra quando ninguém digitou nada'],
+    ['$(channel)  $(game)  $(title)  $(uptime)', 'o seu canal: nome, jogo, título e há quanto tempo está ao vivo'],
+    ['$(game fulano)', 'o jogo de outro canal, bom pro !so'],
+    ['$(random.1-6)', 'um número sorteado'],
+    ["$(random.pick 'a' 'b')", 'um item sorteado da lista'],
+    ['$(random.chatter)', 'alguém que falou no chat há pouco'],
+    ['$(count)  $(getcount nome)', 'um contador que sobe a cada uso, e a leitura de um contador'],
+    ["$(if $(random.pick 1,0) 'sim' 'não')", 'escolhe um dos lados'],
+    ['$(math 2*3)', 'uma conta'],
+    ['$(time America/Sao_Paulo)', 'a hora agora'],
+    ['$(customapi https://...)', 'o começo do que um endereço responde'],
+  ];
+  return h('details', { cls: 'variaveis' }, [
+    h('summary', { txt: 'O que dá pra usar na resposta' }),
+    h('ul', {}, itens.map((i) => h('li', {}, [h('code', { txt: i[0] }), document.createTextNode(' — ' + i[1])]))),
+    h('p', { style: 'margin:6px 0 0', txt: 'Nos gatilhos, {quem} vira o nome da pessoa e {quanto} vira o número.' }),
+  ]);
+}
+
+const resumoTexto = (s) => {
+  const t = String(s || '').replace(/\s+/g, ' ').trim();
+  return t.length > 60 ? t.slice(0, 60) + '…' : t;
+};
+
 function telaComandos() {
   const tela = el('tela');
   tela.innerHTML = '';
   tela.appendChild(h('h1', { txt: 'Comandos' }));
-  tela.appendChild(h('p', { cls: 'sub', txt: 'O que o seu chat pode mandar pro OBS. Os de fábrica já funcionam; os seus são apelidos com o argumento pronto — "!brb" vira "cena Cenário BRB".' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'O que o seu chat pode mandar pro OBS, e o que o chat ouve de volta. Os de fábrica já funcionam; os seus são apelidos com o argumento pronto — "!brb" vira "cena Cenário BRB" — ou respostas, como "!discord".' }));
 
   /* ----- os de fábrica ----- */
   const fab = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Já funcionam' }),
     h('p', { cls: 'd', txt: 'Quem pode usar é decidido pela etiqueta que a Twitch manda junto da mensagem — não dá pra fingir ser mod. A ordem é: chat, sub, VIP, mod, moderador-chefe, você.' }),
   ]);
-  DE_FABRICA.forEach((c) => {
+  DE_FABRICA.filter((c) => c[0] !== 'responder').forEach((c) => {
     fab.appendChild(h('div', { cls: 'campo' }, [
       h('code', { cls: 'cmd', txt: '!' + c[0] }),
       h('span', { cls: 'selo', txt: c[1] }),
@@ -6578,8 +6927,12 @@ function telaComandos() {
   /* ----- os seus ----- */
   const meus = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Os seus' }),
-    h('p', { cls: 'd', txt: 'Um comando seu não é código novo: é um nome novo pra uma ação que já existe, com o argumento já preenchido. Assim o mod digita "!brb" em vez de lembrar o nome exato da cena.' }),
+    h('p', { cls: 'd', txt: 'Um comando seu não é código novo: é um nome novo pra ações que já existem, com o argumento já preenchido. Assim o mod digita "!brb" em vez de lembrar o nome exato da cena. Com a ação "responder", o comando fala no chat.' }),
   ]);
+  const avisoResposta = h('div');
+  const btImportar = h('button', { cls: 'bt', type: 'button', txt: 'Trazer do StreamElements' });
+  btImportar.onclick = () => abreImportarSE(pintaMeus);
+  meus.append(avisoResposta, h('p', { style: 'margin:4px 0 14px' }, [btImportar]));
   const listaMeus = h('div');
   meus.appendChild(listaMeus);
 
@@ -6599,18 +6952,16 @@ function telaComandos() {
         if (c[0] === p.acao) o.selected = true;
         sel.appendChild(o);
       });
-      sel.onchange = () => { p.acao = sel.value; };
-
-      const arg = h('input', { type: 'text', placeholder: 'sem argumento', style: 'flex:1 1 130px' });
-      arg.value = p.argumento || '';
-      arg.oninput = () => { p.argumento = arg.value; };
+      /* Trocar pra "responder" troca o campo: resposta é texto longo. */
+      sel.onchange = () => { p.acao = sel.value; pintaPassos(); };
+      const campos = campoDoPasso(p, true);
 
       const tirar = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×', title: 'Tirar este passo' });
       tirar.onclick = () => { passos.splice(i, 1); if (!passos.length) passos = [{ acao: 'cena', argumento: '' }]; pintaPassos(); };
 
       listaPassos.appendChild(h('div', { cls: 'campo' }, [
         h('span', { style: 'flex:0 0 20px;font-size:12px;color:var(--apagado)', txt: (i + 1) + '.' }),
-        sel, arg, tirar,
+        sel, ...campos, tirar,
       ]));
     });
 
@@ -6632,7 +6983,11 @@ function telaComandos() {
     ['dono', 'Só eu'],
   ].forEach((q) => cQuem.appendChild(h('option', { value: q[0], txt: q[1] })));
   cQuem.value = 'mod';
-  const cEspera = h('input', { type: 'number', min: '1', max: '600', value: '5' });
+  const cEspera = h('input', { type: 'number', min: '1', max: '3600', value: '5' });
+  const cEsperaPessoa = h('input', { type: 'number', min: '0', max: '3600', value: '0' });
+  const cApelidos = h('input', { type: 'text', placeholder: 'links redes (opcional)' });
+  const cLigado = h('input', { type: 'checkbox' });
+  cLigado.checked = true;
   let editandoCmd = null;
 
   const salvar = h('button', { cls: 'bt principal', type: 'button', txt: 'Criar comando' });
@@ -6642,8 +6997,11 @@ function telaComandos() {
       await api('/comandos.php', { method: 'POST', body: JSON.stringify({
         acao: 'salvar', id: editandoCmd, nome: cNome.value, passos: passos,
         quem: cQuem.value, espera: parseInt(cEspera.value, 10) || 5,
+        espera_pessoa: parseInt(cEsperaPessoa.value, 10) || 0,
+        apelidos: cApelidos.value, ligado: cLigado.checked ? 1 : 0,
       }) });
-      cNome.value = ''; passos = [{ acao: 'cena', argumento: '' }]; pintaPassos();
+      cNome.value = ''; cApelidos.value = ''; cEsperaPessoa.value = '0'; cLigado.checked = true;
+      passos = [{ acao: 'cena', argumento: '' }]; pintaPassos();
       editandoCmd = null;
       salvar.textContent = 'Criar comando';
       recado('Pronto. A fonte do OBS pega em até 5 minutos, ou na hora se você recarregar ela.', 'bom');
@@ -6654,12 +7012,16 @@ function telaComandos() {
 
   meus.append(
     h('div', { cls: 'campo' }, [h('label', { txt: 'Nome (sem o !)' }), cNome]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Outros nomes' }), cApelidos]),
     h('p', { style: 'margin:14px 0 4px;font-size:13px;color:var(--fraco)', txt: 'Faz o quê, nesta ordem' }),
     listaPassos,
-    h('p', { style: 'margin:6px 0 12px;font-size:11.5px;color:var(--apagado)',
-             txt: 'o argumento é o nome de uma cena, de uma fonte, ou o texto de uma enquete — deixe vazio no que não precisa' }),
+    h('p', { style: 'margin:6px 0 8px;font-size:11.5px;color:var(--apagado)',
+             txt: 'o argumento é o nome de uma cena, de uma fonte, ou o texto de uma enquete — deixe vazio no que não precisa. Pra falar no chat, escolha "responder".' }),
+    ajudaVariaveis(),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Quem pode usar' }), cQuem]),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Espera entre usos (s)' }), cEspera]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Espera de cada pessoa (s)' }), cEsperaPessoa]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Ligado' }), h('label', { cls: 'chave' }, [cLigado, h('span')])]),
     h('p', { style: 'margin:6px 0 12px' }, [salvar]),
   );
   tela.appendChild(meus);
@@ -6668,11 +7030,31 @@ function telaComandos() {
     listaMeus.innerHTML = '';
     let d;
     try { d = await api('/comandos.php'); } catch (e) { recado(e.message, 'ruim'); return; }
+
+    /* Sem a permissão, o comando existe mas a resposta não sai: melhor
+       avisar aqui do que a pessoa descobrir no meio da live. */
+    avisoResposta.innerHTML = '';
+    if (d.pode_responder === false) {
+      const bt = h('button', { cls: 'bt mini', type: 'button', txt: 'Entrar com a Twitch de novo' });
+      bt.onclick = () => { location.href = API + '/entrar.php'; };
+      avisoResposta.appendChild(h('div', { cls: 'aviso', style: 'margin:0 0 12px' }, [
+        h('p', { style: 'margin:0 0 8px', txt: 'Pra responder no chat, a Twitch pede uma permissão nova. Entre de novo uma vez pra liberar — a ponte e o painel do OBS continuam funcionando.' }),
+        bt,
+      ]));
+    }
+    if (d.completo === false && souAdmin) {
+      avisoResposta.appendChild(h('div', { cls: 'so-adm' }, [
+        h('p', { style: 'margin:0', txt: 'Falta rodar o SQL 053: sem ele, outros nomes, espera de cada pessoa e ligado não são guardados, e o $(count) não conta.' }),
+      ]));
+    }
+
     const lista = d.comandos || [];
     if (!lista.length) {
       listaMeus.appendChild(h('div', { cls: 'vazio', txt: 'Nenhum comando seu ainda.' }));
       return;
     }
+    listaMeus.appendChild(h('p', { cls: 'd', style: 'margin:0 0 6px;font-size:12px',
+      txt: lista.length + ' de ' + (d.max || lista.length) + ' comandos' }));
     lista.forEach((c) => {
       const ed = h('button', { cls: 'bt mini', type: 'button', txt: 'Editar' });
       ed.onclick = () => {
@@ -6680,9 +7062,12 @@ function telaComandos() {
         cNome.value = c.nome;
         /* O servidor entrega sempre uma lista, mesmo pros de um passo só. */
         passos = (c.passos && c.passos.length ? c.passos : [{ acao: c.acao, argumento: c.argumento }])
-          .map((p) => ({ acao: p.acao, argumento: p.argumento || '' }));
+          .map((p) => ({ acao: p.acao, argumento: p.argumento || '', modo: p.modo || 'say' }));
         pintaPassos();
         cQuem.value = c.quem; cEspera.value = c.espera;
+        cEsperaPessoa.value = c.espera_pessoa || 0;
+        cApelidos.value = c.apelidos || '';
+        cLigado.checked = c.ligado !== 0;
         salvar.textContent = 'Salvar alterações';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       };
@@ -6692,11 +7077,18 @@ function telaComandos() {
         try { await api('/comandos.php', { method: 'POST', body: JSON.stringify({ acao: 'apagar', id: c.id }) }); pintaMeus(); }
         catch (e) { recado(e.message, 'ruim'); }
       };
-      listaMeus.appendChild(h('div', { cls: 'campo' }, [
-        h('code', { txt: '!' + c.nome, style: 'flex:0 0 96px;background:var(--fundo);border:1px solid var(--linha);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--verde-forte)' }),
-        h('label', { txt: (c.passos || [{ acao: c.acao, argumento: c.argumento }])
-            .map((p) => p.acao + (p.argumento ? ' ' + p.argumento : '')).join('  →  ')
-            + '  ·  ' + c.quem + '  ·  ' + c.espera + 's' }),
+      const faz = (c.passos || [{ acao: c.acao, argumento: c.argumento }])
+        .map((p) => (p.acao === 'responder'
+          ? 'responde "' + resumoTexto(p.argumento) + '"'
+          : p.acao + (p.argumento ? ' ' + p.argumento : '')))
+        .join('  →  ');
+      const extras = [c.quem, c.espera + 's'];
+      if (c.espera_pessoa) extras.push(c.espera_pessoa + 's cada um');
+      if (c.apelidos) extras.push('também ' + c.apelidos.split(' ').map((a) => '!' + a).join(' '));
+      if (c.ligado === 0) extras.push('desligado');
+      listaMeus.appendChild(h('div', { cls: 'campo' + (c.ligado === 0 ? ' cmd-desligado' : '') }, [
+        h('code', { txt: '!' + c.nome, style: 'flex:0 0 96px;overflow:hidden;text-overflow:ellipsis;background:var(--fundo);border:1px solid var(--linha);border-radius:4px;padding:5px 8px;font-size:12px;color:var(--verde-forte)' }),
+        h('label', { style: 'overflow-wrap:anywhere', txt: faz + '  ·  ' + extras.join('  ·  ') }),
         ed, ap,
       ]));
     });
@@ -6754,11 +7146,8 @@ function telaComandos() {
         if (c[0] === pp.acao) o.selected = true;
         sel.appendChild(o);
       });
-      sel.onchange = () => { pp.acao = sel.value; };
-
-      const arg = h('input', { type: 'text', placeholder: 'sem argumento', style: 'flex:1 1 130px' });
-      arg.value = pp.argumento || '';
-      arg.oninput = () => { pp.argumento = arg.value; };
+      sel.onchange = () => { pp.acao = sel.value; pintaGPassos(); };
+      const campos = campoDoPasso(pp, false);
 
       const tirar = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'x', title: 'Tirar este passo' });
       tirar.onclick = () => {
@@ -6769,7 +7158,7 @@ function telaComandos() {
 
       listaGPassos.appendChild(h('div', { cls: 'campo' }, [
         h('span', { style: 'flex:0 0 20px;font-size:12px;color:var(--apagado)', txt: (i + 1) + '.' }),
-        sel, arg, tirar,
+        sel, ...campos, tirar,
       ]));
     });
     const mais = h('button', { cls: 'bt mini', type: 'button', txt: '+ mais uma acao' });

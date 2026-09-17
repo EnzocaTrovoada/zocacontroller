@@ -142,6 +142,13 @@ return [
         'app_id'        => '',   // o "App Id" que aparece junto do client id
     ],
 
+    /* A conta do bot que responde no chat. Vazio: a resposta sai pela conta
+       de quem transmite. Pra preencher, entre em api/entrar.php?bot=1 com a
+       conta do bot: a pagina mostra a linha pronta. */
+    'twitch_bot' => [
+        'user_id' => '',
+    ],
+
     // Para onde mandar o streamer depois do login.
     'hub' => 'https://mods.zocahop.com/',
 

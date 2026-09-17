@@ -904,6 +904,30 @@ ACOES.marcar = {
 
 ACOES.marca = ACOES.marcar;
 
+/* RESPONDER NO CHAT: só existe como passo de um comando seu.
+
+   Quem manda a mensagem é o servidor. Aqui não existe token de chat, e nem
+   deveria: qualquer um que abrisse esta fonte leria. A ponte diz só QUAL
+   comando e QUAL passo; o texto o servidor lê do banco. */
+ACOES.responder = {
+  minimo: 'dono', espera: 0, soPasso: true,
+  async fazer(quem, arg, cargo, extra, qual) {
+    if (!qual) return;
+    const tags = (extra && extra.tags) || {};
+    try {
+      await apiRele('/responder.php', Object.assign({
+        quem: quem,
+        login: tags.login || '',
+        id_twitch: tags['user-id'] || '',
+        cargo: cargo,
+        mensagem: (extra && extra.texto) || '',
+        msg_id: tags.id || '',
+        chatters: quemFalou(),
+      }, qual));
+    } catch (e) { recado('Resposta no chat: ' + e.message, 12000); }
+  },
+};
+
 ACOES.titulo = {
   minimo: 'mod', espera: 10000,
   async fazer(quem, arg) {
@@ -1062,21 +1086,35 @@ ACOES.categoria = {
 
 const ultimoUso = new Map();
 
-async function executar(nome, arg, tags) {
+async function executar(nome, arg, tags, texto) {
   const acao = ACOES[nome];
-  if (!acao) return;                                    // negar por padrão
+  if (!acao || acao.soPasso) return;                    // negar por padrão
 
   const cargo = cargoDe(tags);
   if (CARGOS[cargo] < CARGOS[acao.minimo]) return;      // sem permissão: silêncio
 
+  /* A espera é do comando, não do nome digitado: !links e !redes são o
+     mesmo comando e esperam juntos. */
+  const chave = acao.chave || nome;
   const agora = performance.now();
-  if (agora - (ultimoUso.get(nome) || -1e9) < acao.espera) return;
-  ultimoUso.set(nome, agora);
+  if (agora - (ultimoUso.get(chave) || -1e9) < acao.espera) return;
+
+  /* A espera de cada pessoa vem por cima da geral: um só não pode ocupar o
+     comando pra todo mundo. */
+  if (acao.esperaPessoa) {
+    const minha = chave + '|' + String(tags.login || '').toLowerCase();
+    if (agora - (ultimoUso.get(minha) || -1e9) < acao.esperaPessoa) return;
+    if (ultimoUso.size > 3000) ultimoUso.clear();
+    ultimoUso.set(minha, agora);
+  }
+  ultimoUso.set(chave, agora);
 
   const quem = tags['display-name'] || tags.login || 'alguém';
   /* O cargo segue junto: os comandos de música precisam dele pra pedir ao
-     servidor, e é o servidor quem decide de verdade o que é permitido. */
-  try { await acao.fazer(quem, arg, cargo); }
+     servidor, e é o servidor quem decide de verdade o que é permitido. A
+     mensagem inteira vai no último: é dela que as respostas tiram $(1),
+     $(2:) e companhia. */
+  try { await acao.fazer(quem, arg, cargo, { tags: tags, texto: texto || '' }); }
   catch (err) { recado('Falhou: ' + err.message); }
 }
 
@@ -1190,7 +1228,7 @@ function olhaUsernotice(m) {
 
   if (id === 'sub' || id === 'resub') {
     contaNoSubathon({ tipo: planoDoSub(t), chave: t.id, quem: quem, quantidade: 1, detalhe: id });
-    dispararGatilhos('sub', { quem: quem, quantidade: 1 });
+    dispararGatilhos('sub', { quem: quem, quantidade: 1, id: t.id });
     return;
   }
 
@@ -1211,8 +1249,29 @@ function olhaUsernotice(m) {
   }
 }
 
+/* Quem falou nos últimos trinta minutos: é daqui que sai o
+   $(random.chatter) das respostas. Só o login, e só na memória. */
+const falaram = new Map();
+
+function quemFalou() {
+  const limite = Date.now() - 30 * 60000;
+  const lista = [];
+  for (const [login, quando] of falaram) {
+    if (quando < limite) falaram.delete(login);
+    else lista.push(login);
+  }
+  return lista.slice(-100);
+}
+
 function tratar(m) {
   if (m.cmd === 'USERNOTICE') { olhaUsernotice(m); return; }
+
+  if (m.tags.login) {
+    const login = String(m.tags.login).toLowerCase();
+    falaram.delete(login);
+    falaram.set(login, Date.now());
+    if (falaram.size > 500) falaram.delete(falaram.keys().next().value);
+  }
 
   /* Bits vêm como mensagem comum, só que com a etiqueta bits. */
   const bits = parseInt(m.tags.bits, 10);
@@ -1231,7 +1290,7 @@ function tratar(m) {
   const esp = corpo.indexOf(' ');
   const nome = (esp === -1 ? corpo : corpo.slice(0, esp)).toLowerCase();
   const arg  = esp === -1 ? '' : corpo.slice(esp + 1).trim();
-  executar(nome, arg, m.tags);
+  executar(nome, arg, m.tags, m.texto);
 }
 
 /* Você sumiu da câmera? */
@@ -1746,12 +1805,18 @@ async function dispararGatilhos(evento, dados) {
     gatilhoQuieto[g.id] = agora + (g.espera || 0) * 1000;
 
     const quem = dados.quem || 'alguém';
-    for (const p of (g.passos || [])) {
+    for (const [i, p] of (g.passos || []).entries()) {
       const acao = ACOES[p.acao];
       if (!acao) continue;
       /* Um passo que falha não derruba os outros: meio gatilho feito é
          melhor que nenhum quando o sub já aconteceu. */
       try {
+        if (p.acao === 'responder') {
+          /* O {quem} e o {quanto} da resposta o servidor preenche. */
+          await acao.fazer(quem, '', 'dono', { tags: { id: dados.id || '' }, texto: '' },
+                           { gatilho: g.id, passo: i, quanto: quanto });
+          continue;
+        }
         await acao.fazer(quem, (p.argumento || '')
           .replace(/\{quem\}/g, quem)
           .replace(/\{quanto\}/g, String(quanto)), 'dono');
@@ -1769,7 +1834,7 @@ async function carregarComandos() {
   if (!cfg.chave) return;
   comandosEm = Date.now();
   try {
-    const r = await fetch(cfg.api + '/comandos.php', { headers: { 'X-Chave': cfg.chave } });
+    const r = await fetch(cfg.api + '/comandos.php?ponte=1', { headers: { 'X-Chave': cfg.chave } });
     if (!r.ok) return;
     const d = await r.json();
 
@@ -1787,27 +1852,49 @@ async function carregarComandos() {
     /* Vêm na mesma resposta dos comandos: uma requisição só. */
     GATILHOS = (d.gatilhos || []).filter((g) => (g.passos || []).length);
 
+    const apelidos = [];
     for (const c of (d.comandos || [])) {
       if (ACOES[c.nome]) continue;               // nome de fábrica não se troca
+      if (c.ligado === 0) continue;              // desligado no painel
 
-      /* O servidor entrega sempre uma lista, mesmo pros de um passo só. */
-      const passos = (c.passos || []).filter((p) => ACOES[p.acao]);
+      /* O servidor entrega sempre uma lista, mesmo pros de um passo só. O
+         número de cada passo vai junto porque a resposta é pedida por ele,
+         e filtrar antes mudaria a conta. */
+      const passos = (c.passos || [])
+        .map((p, i) => Object.assign({ i: i }, p))
+        .filter((p) => ACOES[p.acao]);
       if (!passos.length) continue;
 
-      ACOES[c.nome] = {
+      const cmd = {
         apelido: true,
+        chave: c.nome,
         minimo: c.quem || 'mod',
         espera: Math.max(1, c.espera || 5) * 1000,
-        fazer: async (quem, arg, cargo) => {
+        esperaPessoa: Math.max(0, c.espera_pessoa || 0) * 1000,
+        fazer: async (quem, arg, cargo, extra) => {
           /* Em sequência, e não todas de uma vez: "!sumir" precisa mutar
              ANTES de trocar de cena, senão o microfone fica aberto no
              meio do corte. */
           for (const p of passos) {
-            try { await ACOES[p.acao].fazer(quem, p.argumento || arg, cargo); }
-            catch (e) { recado('!' + c.nome + ' — ' + p.acao + ': ' + e.message); }
+            try {
+              if (p.acao === 'responder') {
+                await ACOES.responder.fazer(quem, arg, cargo, extra, { comando: c.id, passo: p.i });
+              } else {
+                await ACOES[p.acao].fazer(quem, p.argumento || arg, cargo, extra);
+              }
+            } catch (e) { recado('!' + c.nome + ' — ' + p.acao + ': ' + e.message); }
           }
         },
       };
+      ACOES[c.nome] = cmd;
+      String(c.apelidos || '').split(/[\s,]+/).filter(Boolean)
+        .forEach((a) => apelidos.push([a.toLowerCase(), cmd]));
+    }
+
+    /* Os outros nomes depois de todos os nomes de verdade: um apelido não
+       pode tomar o lugar de um comando que só vinha mais adiante na lista. */
+    for (const [a, cmd] of apelidos) {
+      if (!ACOES[a]) ACOES[a] = cmd;
     }
   } catch (e) { /* sem internet: fica com os de fábrica */ }
 }
