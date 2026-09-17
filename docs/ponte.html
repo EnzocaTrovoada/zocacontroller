@@ -181,6 +181,14 @@ if (cfg.hud) el('hud').classList.remove('oculto');
  *  Estado
  * ------------------------------------------------------------------ */
 
+/* A VERSÃO DO CÓDIGO DESTA FONTE.
+
+   O OBS guarda a página em cache, então a fonte pode ficar semanas com um
+   código velho enquanto o site já mudou — e de fora ninguém vê. A ponte
+   conta a versão dela junto do estado, e o painel avisa quando está
+   atrasada. Sobe junto com qualquer mudança nesta página. */
+const PONTE_VERSAO = '2026-09-17';
+
 const estado = {
   obs: false, chat: false,
   mic: '', desktop: '', cena: '', cenaAntes: '',
@@ -203,6 +211,17 @@ let recadoAte = 0;
 function recado(txt, ms = 6000) {
   el('recado').textContent = txt;
   recadoAte = performance.now() + ms;
+}
+
+/* O QUE FALHOU TEM QUE SAIR DAQUI DE DENTRO.
+
+   Esta fonte vive escondida no OBS: um recado de erro aqui não é lido por
+   ninguém. Então a falha também vai pro servidor, e o painel mostra. */
+function avisaFalha(txt) {
+  recado(txt, 12000);
+  estado.erro = String(txt).slice(0, 200);
+  estado.erroEm = Date.now();
+  subirEstado(true);
 }
 
 function pintar() {
@@ -916,7 +935,7 @@ ACOES.responder = {
     if (!qual) return;
     const tags = (extra && extra.tags) || {};
     try {
-      await apiRele('/responder.php', Object.assign({
+      const r = await apiRele('/responder.php', Object.assign({
         quem: quem,
         login: tags.login || '',
         id_twitch: tags['user-id'] || '',
@@ -925,7 +944,9 @@ ACOES.responder = {
         msg_id: tags.id || '',
         chatters: quemFalou(),
       }, qual));
-    } catch (e) { recado('Resposta no chat: ' + e.message, 12000); }
+      /* Deu certo: some com a queixa antiga do painel. */
+      if (r && r.ok && estado.erro) { estado.erro = ''; subirEstado(true); }
+    } catch (e) { avisaFalha('Resposta no chat: ' + e.message); }
   },
 };
 
@@ -1729,6 +1750,9 @@ async function subirEstado(forcar) {
     cenas: cfg.cenas.length ? cfg.cenas : estado.cenasConhecidas,
     sons: estado.sons,
     fontes: estado.fontes,
+    versao: PONTE_VERSAO,
+    /* Queixa velha não ajuda ninguém: meia hora e ela some sozinha. */
+    erro: (estado.erro && Date.now() - estado.erroEm < 1800000) ? estado.erro : '',
     /* -1 na primeira vez: pede a marca sem receber o histórico. Se um dia a
        ponte reiniciar no meio da live, ela recomeça do agora e não dispara
        os follows da manhã inteira. */
@@ -1737,7 +1761,7 @@ async function subirEstado(forcar) {
 
   const assinatura = JSON.stringify([corpo.cena, corpo.mudo, corpo.mic, corpo.panico,
                                      corpo.chat, corpo.olho, corpo.cenas, corpo.sons,
-                                     corpo.fontes, corpo.falando]);
+                                     corpo.fontes, corpo.falando, corpo.erro, corpo.versao]);
   const agora = Date.now();
   if (!forcar && assinatura === ultimaAssinatura && agora - ultimoEnvio < 5000) return;
 

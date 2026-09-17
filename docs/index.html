@@ -6907,6 +6907,11 @@ function ajudaVariaveis() {
   ]);
 }
 
+/* A versão que a fonte do OBS deveria estar rodando. Quando ela publica
+   outra, é cache do OBS — e a tela diz isso em vez de deixar a pessoa
+   adivinhando. Sobe junto com o PONTE_VERSAO do ponte.html. */
+const PONTE_VERSAO = '2026-09-17';
+
 const resumoTexto = (s) => {
   const t = String(s || '').replace(/\s+/g, ' ').trim();
   return t.length > 60 ? t.slice(0, 60) + '…' : t;
@@ -6940,7 +6945,66 @@ function telaComandos() {
   const avisoResposta = h('div');
   const btImportar = h('button', { cls: 'bt', type: 'button', txt: 'Trazer do StreamElements' });
   btImportar.onclick = () => abreImportarSE(pintaMeus);
-  meus.append(avisoResposta, h('p', { style: 'margin:4px 0 14px' }, [btImportar]));
+
+  /* ----- a ponte, que vive escondida no OBS -----
+
+     Quando a resposta não sai, o motivo está quase sempre em um destes
+     dois: a fonte do OBS ficou com o código antigo, ou a Twitch recusou. O
+     primeiro a tela lê do estado que a ponte publica; o segundo o botão de
+     teste descobre na hora, falando com a Twitch sem passar pela ponte. */
+  const estadoPonte = h('div', { cls: 'd', style: 'margin:2px 0 10px;font-size:12.5px' });
+  const btTeste = h('button', { cls: 'bt', type: 'button', txt: 'Mandar teste no chat' });
+  const dizTeste = h('span', { cls: 'd', style: 'font-size:12.5px' });
+
+  btTeste.onclick = async () => {
+    btTeste.disabled = true;
+    dizTeste.textContent = 'mandando…';
+    dizTeste.style.color = '';
+    try {
+      const r = await api('/responder.php', { method: 'POST', body: JSON.stringify({ teste: 1 }) });
+      if (r.ok) {
+        dizTeste.textContent = 'Mandei — olha o seu chat.'
+          + (r.por === 'bot' ? ' (falou pelo bot)' : ' (falou pela sua conta)');
+        dizTeste.style.color = 'var(--verde-forte)';
+      } else {
+        dizTeste.textContent = r.erro || 'Não consegui mandar.';
+        dizTeste.style.color = 'var(--perigo)';
+      }
+    } catch (e) {
+      dizTeste.textContent = e.message;
+      dizTeste.style.color = 'var(--perigo)';
+    }
+    btTeste.disabled = false;
+    pintaPonte();
+  };
+
+  async function pintaPonte() {
+    estadoPonte.innerHTML = '';
+    let d;
+    try { d = await api('/estado.php'); } catch (e) { return; }
+    const e = (d && d.estado) || {};
+    const linha = (txt, cor) => estadoPonte.appendChild(
+      h('div', { style: cor ? 'color:' + cor : '', txt: txt }));
+
+    if (!d.ligada) {
+      linha('A fonte do OBS não está publicando nada. Abra o OBS e confira se a fonte da ponte está lá.',
+            'var(--perigo)');
+    } else if ((e.versao || '') !== PONTE_VERSAO) {
+      linha('A fonte do OBS está com o código antigo (o OBS guarda em cache). '
+            + 'No OBS: botão direito na fonte da ponte → Atualizar.', 'var(--dourado)');
+    } else {
+      linha('Fonte do OBS: ' + (faz(d.idade) === 'agora' ? 'vista agora' : 'vista há ' + faz(d.idade))
+            + ', com o código de hoje.' + (e.chat ? '' : ' Mas ela não está lendo o chat.'));
+    }
+    if (e.erro) linha('A ponte avisou: ' + e.erro, 'var(--perigo)');
+  }
+  pintaPonte();
+
+  meus.append(
+    avisoResposta,
+    estadoPonte,
+    h('p', { cls: 'campo', style: 'margin:4px 0 14px' }, [btImportar, btTeste, dizTeste]),
+  );
   const listaMeus = h('div');
   meus.appendChild(listaMeus);
 
@@ -7029,7 +7093,7 @@ function telaComandos() {
     h('div', { cls: 'campo' }, [h('label', { txt: 'Quem pode usar' }), cQuem]),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Espera entre usos (s)' }), cEspera]),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Espera de cada pessoa (s)' }), cEsperaPessoa]),
-    h('div', { cls: 'campo' }, [h('label', { txt: 'Ligado' }), h('label', { cls: 'chave' }, [cLigado, h('span')])]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Ligado' }), h('span', { cls: 'chave' }, [cLigado, h('span')])]),
     h('p', { style: 'margin:6px 0 12px' }, [salvar]),
   );
   tela.appendChild(meus);
@@ -7418,7 +7482,7 @@ function telaComandos() {
       h('label', { style: 'display:flex;gap:6px;align-items:center;font-size:13px' },
         [rFora, document.createTextNode('está fora do ar')]),
     ]),
-    h('div', { cls: 'campo' }, [h('label', { txt: 'Ligado' }), h('label', { cls: 'chave' }, [rLigado, h('span')])]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Ligado' }), h('span', { cls: 'chave' }, [rLigado, h('span')])]),
     h('p', { cls: 'd', style: 'margin:-2px 0 10px;font-size:11.5px',
              txt: 'Vale o mesmo das respostas: $(game), $(uptime), $(count)... Quem manda é a fonte do OBS, então com o OBS fechado o recado não sai.' }),
     h('div', { cls: 'acoes', style: 'display:flex;gap:8px' }, [rSalvar, rLimpar]),

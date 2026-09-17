@@ -25,8 +25,30 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
    bem abaixo disso: resposta de comando não é conversa. */
 trava('responder', 40, 30);
 
-$uid   = (int) $quem['usuario_id'];
-$d     = corpo_json();
+$uid = (int) $quem['usuario_id'];
+$d   = corpo_json();
+
+/* ---------- o teste do painel ----------
+
+   Manda uma mensagem de verdade no chat, sem passar pela ponte. É o que
+   separa "o servidor não consegue falar com a Twitch" de "a fonte do OBS
+   não está chamando o servidor". O texto é fixo de propósito: este
+   endereço não é um megafone. */
+if (!empty($d['teste'])) {
+    trava('responder-teste', 6, 600);
+    $escopos = chat_escopos($uid);
+    try {
+        $r = chat_enviar($uid, 'Teste do ZocaController: o bot está falando aqui.');
+    } catch (Throwable $e) {
+        $r = ['ok' => false, 'erro' => erro_publico($e)];
+    }
+    json_saida($r + [
+        'bot'          => chat_bot_id() !== '',
+        'escopo_conta' => in_array('user:write:chat', $escopos, true),
+        'escopo_bot'   => in_array('channel:bot', $escopos, true),
+    ]);
+}
+
 $passo = max(0, (int) ($d['passo'] ?? 0));
 $msgId = preg_match('/^[0-9a-f-]{36}$/i', (string) ($d['msg_id'] ?? '')) ? (string) $d['msg_id'] : '';
 

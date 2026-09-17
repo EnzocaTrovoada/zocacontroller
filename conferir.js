@@ -86,6 +86,19 @@ compara('ações do chat', {
   tela:     [...(bloco(hub, 'const DE_FABRICA = [', '\n];') || '').matchAll(/\['(\w+)'/g)].map((m) => m[1]),
 });
 
+/* ---- a versão da ponte ----
+
+   O painel usa ela pra dizer "a sua fonte do OBS está com o código antigo".
+   Se as duas divergirem, o painel acusa cache em todo mundo, pra sempre. */
+const versaoPonte = ponte.match(/const PONTE_VERSAO = '([^']+)'/)?.[1];
+const versaoHub   = hub.match(/const PONTE_VERSAO = '([^']+)'/)?.[1];
+if (versaoPonte && versaoPonte === versaoHub) {
+  console.log(`✓ versão da ponte: ${versaoPonte} nos dois lugares`);
+} else {
+  console.log(`✗ versão da ponte: ponte.html=${versaoPonte} e index.html=${versaoHub}`);
+  falhas++;
+}
+
 /* ---- cargos, e na MESMA ordem: aqui a ordem é a regra ---- */
 const cargosPonte = Object.keys(JSON.parse(
   '{' + (ponte.match(/const CARGOS = \{([^}]*)\}/)?.[1] || '').replace(/(\w+):/g, '"$1":') + '}'

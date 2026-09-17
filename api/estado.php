@@ -56,6 +56,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             fn($s) => ['nome' => (string) ($s['nome'] ?? ''), 'mudo' => (bool) ($s['mudo'] ?? false)],
             (array) ($estado['sons'] ?? [])
         )), 0, 30),
+        /* A versão do código da fonte do OBS. Sem isto, uma fonte com o
+           código velho em cache fica igual a uma fonte em dia, e a pessoa
+           procura o problema no lugar errado. */
+        'versao' => mb_substr((string) ($estado['versao'] ?? ''), 0, 20),
+        /* A última falha da ponte. Ela vive escondida dentro do OBS: sem
+           este caminho, um erro de resposta no chat não chega em ninguém. */
+        'erro'   => mb_substr((string) ($estado['erro'] ?? ''), 0, 200),
     ];
 
     db()->prepare(
