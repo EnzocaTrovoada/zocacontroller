@@ -15,6 +15,7 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/seguranca.php';
+require_once __DIR__ . '/lib/cifra.php';
 
 const LP_OAUTH = 'https://oauth.livepix.gg/oauth2/token';
 const LP_API   = 'https://api.livepix.gg/v2';
@@ -45,7 +46,7 @@ function lp_token(array $conta): ?string
         http_build_query([
             'grant_type'    => 'client_credentials',
             'client_id'     => $conta['client_id'],
-            'client_secret' => $conta['client_secret'],
+            'client_secret' => (string) segredo_le($conta['client_secret']),
             'scope'         => 'payments:read webhooks',
         ])
     );
@@ -169,12 +170,17 @@ if (!lp_token(['client_id' => $cid, 'client_secret' => $sec])) {
 
 $url_segredo = $conta['segredo_url'] ?? chave_nova(24);
 
+/* A coluna tem 200 caracteres. Um secret comprido a ponto de não caber
+   cifrado fica como veio, em vez de ser cortado sem aviso pelo banco. */
+$secGuardado = segredo_guarda($sec);
+if (strlen((string) $secGuardado) > 200) $secGuardado = $sec;
+
 db()->prepare(
     'INSERT INTO livepix (usuario_id, client_id, client_secret, segredo_url, ligado)
           VALUES (?, ?, ?, ?, 1)
      ON DUPLICATE KEY UPDATE client_id = VALUES(client_id),
           client_secret = VALUES(client_secret), ligado = 1'
-)->execute([$quem['usuario_id'], $cid, $sec, $url_segredo]);
+)->execute([$quem['usuario_id'], $cid, $secGuardado, $url_segredo]);
 
 json_saida([
     'ok'  => true,

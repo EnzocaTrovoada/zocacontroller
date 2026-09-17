@@ -12,6 +12,7 @@
  * bem, sem processo longo e sem ficar perguntando de tempos em tempos.
  */
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/cifra.php';
 
 /* Preenchidos a partir da documentação oficial — ver api/kick.php. */
 const KICK_AUTORIZA = 'https://id.kick.com/oauth/authorize';
@@ -136,14 +137,15 @@ function kick_guardar(int $usuario_id, array $t): void
              ON DUPLICATE KEY UPDATE token = VALUES(token),
                                      refresh_token = VALUES(refresh_token),
                                      expira_em = VALUES(expira_em)'
-        )->execute([$usuario_id, (string) $t['access_token'], (string) $t['refresh_token'], $expira]);
+        )->execute([$usuario_id, segredo_guarda((string) $t['access_token']),
+                    segredo_guarda((string) $t['refresh_token']), $expira]);
         return;
     }
 
     db()->prepare(
         'INSERT INTO kick (usuario_id, token, expira_em) VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE token = VALUES(token), expira_em = VALUES(expira_em)'
-    )->execute([$usuario_id, (string) $t['access_token'], $expira]);
+    )->execute([$usuario_id, segredo_guarda((string) $t['access_token']), $expira]);
 }
 
 /** O token de agora, renovado se estiver perto de vencer. Null = desconectado. */
@@ -152,7 +154,10 @@ function kick_token(int $usuario_id): ?string
     $st = db()->prepare('SELECT token, refresh_token, expira_em FROM kick WHERE usuario_id = ?');
     $st->execute([$usuario_id]);
     $l = $st->fetch();
-    if (!$l || empty($l['token'])) return null;
+    if (!$l) return null;
+    $l['token']         = segredo_le($l['token']);
+    $l['refresh_token'] = segredo_le($l['refresh_token']);
+    if (empty($l['token'])) return null;
 
     if (time() < (int) $l['expira_em']) return (string) $l['token'];
     if (empty($l['refresh_token'])) return null;

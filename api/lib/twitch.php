@@ -7,6 +7,7 @@
  * que é onde tudo vaza.
  */
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/cifra.php';
 
 const TW_AUTORIZAR = 'https://id.twitch.tv/oauth2/authorize';
 const TW_TOKEN     = 'https://id.twitch.tv/oauth2/token';
@@ -141,8 +142,8 @@ function tw_guardar(int $usuario_id, array $t): void
           WHERE id = ?'
     );
     $st->execute([
-        $t['access_token'],
-        $t['refresh_token'] ?? null,
+        segredo_guarda($t['access_token']),
+        segredo_guarda($t['refresh_token'] ?? null),
         date('Y-m-d H:i:s', time() + (int) ($t['expires_in'] ?? 3600)),
         implode(' ', $t['scope'] ?? []),
         $usuario_id,
@@ -158,6 +159,10 @@ function tw_token(int $usuario_id): string
     $st = db()->prepare('SELECT tw_acesso, tw_refresh, tw_expira_em FROM usuarios WHERE id = ?');
     $st->execute([$usuario_id]);
     $u = $st->fetch();
+    if ($u) {
+        $u['tw_acesso']  = segredo_le($u['tw_acesso']);
+        $u['tw_refresh'] = segredo_le($u['tw_refresh']);
+    }
 
     if (!$u || !$u['tw_refresh']) {
         throw new RuntimeException('Este canal ainda não entrou com a Twitch.');

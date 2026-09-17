@@ -8,6 +8,7 @@
  * todo print, em todo VOD e no inspecionar elemento de qualquer um.
  */
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/cifra.php';
 
 const SP_AUTORIZA = 'https://accounts.spotify.com/authorize';
 const SP_TOKEN    = 'https://accounts.spotify.com/api/token';
@@ -85,8 +86,8 @@ function sp_guardar(int $usuario_id, array $t): void
 
     db()->prepare($sql)->execute([
         $usuario_id,
-        (string) $t['access_token'],
-        (string) ($t['refresh_token'] ?? ''),
+        (string) segredo_guarda((string) $t['access_token']),
+        (string) segredo_guarda((string) ($t['refresh_token'] ?? '')),
         (int) ($t['expires_in'] ?? 3600),
     ]);
 }
@@ -128,10 +129,12 @@ function sp_token(int $usuario_id): ?string
     $st->execute([$usuario_id]);
     $c = $st->fetch();
     if (!$c) return null;
+    $c['access_token']  = segredo_le($c['access_token']);
+    $c['refresh_token'] = segredo_le($c['refresh_token']);
 
     /* 60 segundos de folga: renovar em cima da hora deixa a consulta seguinte
        falhar por um token que venceu no meio do caminho. */
-    if ((int) $c['falta'] > 60) return $c['access_token'];
+    if ((int) $c['falta'] > 60 && $c['access_token']) return $c['access_token'];
     if (!$c['refresh_token']) return null;
 
     $a = sp_cfg();

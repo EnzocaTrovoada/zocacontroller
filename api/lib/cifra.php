@@ -43,6 +43,28 @@ function cifra(#[\SensitiveParameter] string $texto): string
     return 'g1.' . base64_encode($iv . $tag . $cru);
 }
 
+/**
+ * Token ou secret de outro serviço, do jeito de guardar no banco.
+ *
+ * Um banco vazado não pode virar acesso ao canal de cada pessoa. Sem a chave
+ * no config, guarda como veio: o segredo_le() entende os dois jeitos, e o
+ * que já estava gravado em claro vai sendo cifrado na próxima renovação.
+ */
+function segredo_guarda(#[\SensitiveParameter] ?string $texto): ?string
+{
+    if ($texto === null || $texto === '' || !cifra_pronta()) return $texto;
+    return cifra($texto);
+}
+
+/** O segredo em claro. Null se a chave do config mudou e ele não abre mais. */
+function segredo_le(?string $guardado): ?string
+{
+    if ($guardado === null || $guardado === '') return $guardado;
+    $prefixo = substr($guardado, 0, 3);
+    if ($prefixo !== 's1.' && $prefixo !== 'g1.') return $guardado;
+    return decifra($guardado);
+}
+
 /** O texto de volta; null se a chave não bate, se mexeram no dado ou se falta a extensão. */
 function decifra(string $cifrado): ?string
 {
