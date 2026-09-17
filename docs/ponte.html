@@ -1254,6 +1254,17 @@ function olhaUsernotice(m) {
    $(random.chatter) das respostas. Só o login, e só na memória. */
 const falaram = new Map();
 
+/* Quantas mensagens o chat mandou nos últimos cinco minutos. É o que segura
+   o recado automático quando não tem ninguém: bot falando sozinho em sala
+   vazia é o que faz a pessoa desligar o recado. */
+const linhasDoChat = [];
+
+function linhasRecentes() {
+  const corte = Date.now() - 5 * 60000;
+  while (linhasDoChat.length && linhasDoChat[0] < corte) linhasDoChat.shift();
+  return linhasDoChat.length;
+}
+
 function quemFalou() {
   const limite = Date.now() - 30 * 60000;
   const lista = [];
@@ -1272,6 +1283,8 @@ function tratar(m) {
     falaram.delete(login);
     falaram.set(login, Date.now());
     if (falaram.size > 500) falaram.delete(falaram.keys().next().value);
+    linhasDoChat.push(Date.now());
+    if (linhasDoChat.length > 2000) linhasDoChat.splice(0, 1000);
   }
 
   /* Bits vêm como mensagem comum, só que com a etiqueta bits. */
@@ -1828,6 +1841,36 @@ async function dispararGatilhos(evento, dados) {
   }
 }
 
+/* ---------------- recados de tempo em tempo ----------------
+
+   O RELÓGIO É DO SERVIDOR. Aqui só se pergunta "está na hora?", contando
+   quem falou e se a live está no ar; o servidor responde, e é ele que grava
+   a hora. Duas pontes abertas (a fonte posta em duas cenas) perguntam as
+   duas, e só a primeira leva. */
+let RECADOS = [];
+
+async function mandaRecados(aoVivo) {
+  const linhas = linhasRecentes();
+  for (const r of RECADOS) {
+    if (!r.ligado) continue;
+    if (!(aoVivo ? r.no_ar : r.fora_do_ar)) continue;
+    if (linhas < (r.linhas || 0)) continue;
+    try {
+      await apiRele('/responder.php', { recado: r.id, ao_vivo: aoVivo, linhas: linhas });
+    } catch (e) { /* daqui a pouco pergunta de novo */ }
+  }
+}
+
+async function lacoDosRecados() {
+  while (cfg.chave) {
+    await dorme(30000);
+    if (!RECADOS.length || !estado.obs || Date.now() < releQuieto) continue;
+    try {
+      await mandaRecados((await tempoDaLive()).aoVivo);
+    } catch (e) { /* sem OBS agora: na próxima volta */ }
+  }
+}
+
 let eventosDesde = -1;    /* -1 = ainda não sei onde a live está */
 let comandosEm = 0;
 
@@ -1852,6 +1895,7 @@ async function carregarComandos() {
 
     /* Vêm na mesma resposta dos comandos: uma requisição só. */
     GATILHOS = (d.gatilhos || []).filter((g) => (g.passos || []).length);
+    RECADOS = (d.recados || []).filter((r) => r.quantas > 0);
 
     const apelidos = [];
     for (const c of (d.comandos || [])) {
@@ -1904,6 +1948,7 @@ if (cfg.chave) {
   setInterval(() => subirEstado(), 700);   // olha rápido, envia só quando muda
   carregarComandos();
   lacoDoRele();
+  lacoDosRecados();
 }
 
 ligarObs();

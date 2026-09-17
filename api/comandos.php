@@ -39,6 +39,10 @@ const QUEM_VALIDO = ['chat', 'sub', 'vip', 'mod', 'supermod', 'dono'];
    comandos de resposta, e deixar metade pra trás não é importar. */
 const COMANDOS_MAX = 100;
 
+/* Recados de tempo em tempo. Dez já é mais do que qualquer chat aguenta. */
+const RECADOS_MAX = 10;
+const RECADO_MENSAGENS = 8;
+
 /** O SQL 053 já rodou? Ele traz apelidos, espera por pessoa e ligado. */
 function comandos_053(): bool
 {
@@ -125,9 +129,31 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         return $x;
     }, $g->fetchAll());
 
+    /* Os recados vêm na mesma resposta: a ponte já faz esta requisição. */
+    $recados = [];
+    try {
+        $rc = db()->prepare('SELECT * FROM recados WHERE usuario_id = ? ORDER BY id');
+        $rc->execute([$quem['usuario_id']]);
+        foreach ($rc->fetchAll() as $r) {
+            $msgs = json_decode((string) $r['mensagens'], true);
+            $recados[] = [
+                'id'         => (int) $r['id'],
+                'nome'       => (string) $r['nome'],
+                'mensagens'  => $daPonte ? [] : (is_array($msgs) ? $msgs : []),
+                'quantas'    => is_array($msgs) ? count($msgs) : 0,
+                'minutos'    => (int) $r['minutos'],
+                'linhas'     => (int) $r['linhas'],
+                'no_ar'      => (int) $r['no_ar'],
+                'fora_do_ar' => (int) $r['fora_do_ar'],
+                'ligado'     => (int) $r['ligado'],
+            ];
+        }
+    } catch (Throwable $e) { /* sem o SQL 054, ninguém tem recado */ }
+
     $saida = [
         'comandos'  => $lista,
         'gatilhos'  => $gatilhos,
+        'recados'   => $recados,
         'acoes'     => ACOES_VALIDAS,
         'eventos'   => EVENTOS_VALIDOS,
         'supermods' => (string) ($sm->fetchColumn() ?: ''),
@@ -229,6 +255,67 @@ if ($acao === 'gatilho' || $acao === 'gatilho-apagar') {
               VALUES (?, ?, ?, ?, ?, ?)'
     )->execute([$quem['usuario_id'], $evento, $minimo, $espera, $ligado, $json]);
     json_saida(['ok' => true, 'id' => (int) db()->lastInsertId()]);
+}
+
+/* ---------- recados de tempo em tempo ---------- */
+if ($acao === 'recado' || $acao === 'recado-apagar') {
+    $uid = (int) $quem['usuario_id'];
+
+    if ($acao === 'recado-apagar') {
+        $st = db()->prepare('DELETE FROM recados WHERE id = ? AND usuario_id = ?');
+        $st->execute([(int) ($d['id'] ?? 0), $uid]);
+        json_saida(['ok' => (bool) $st->rowCount()]);
+    }
+
+    $mensagens = [];
+    foreach ((array) ($d['mensagens'] ?? []) as $msg) {
+        $msg = mb_substr(trim((string) $msg), 0, 500);
+        if ($msg !== '') $mensagens[] = $msg;
+        if (count($mensagens) >= RECADO_MENSAGENS) break;
+    }
+    if (!$mensagens) json_saida(['erro' => 'Escreva pelo menos uma mensagem pro recado.'], 400);
+
+    $noAr    = empty($d['no_ar']) ? 0 : 1;
+    $foraDoAr = empty($d['fora_do_ar']) ? 0 : 1;
+    if (!$noAr && !$foraDoAr) {
+        json_saida(['erro' => 'Escolha quando o recado vale: com a live no ar, fora do ar, ou nos dois.'], 400);
+    }
+
+    $campos = [
+        'nome'       => mb_substr(trim((string) ($d['nome'] ?? '')), 0, 40),
+        'mensagens'  => json_encode($mensagens, JSON_UNESCAPED_UNICODE),
+        'minutos'    => max(1, min(1440, (int) ($d['minutos'] ?? 15))),
+        'linhas'     => max(0, min(500, (int) ($d['linhas'] ?? 3))),
+        'no_ar'      => $noAr,
+        'fora_do_ar' => $foraDoAr,
+        'ligado'     => array_key_exists('ligado', $d) && empty($d['ligado']) ? 0 : 1,
+    ];
+
+    try {
+        $id = (int) ($d['id'] ?? 0);
+        if ($id > 0) {
+            db()->prepare(
+                'UPDATE recados SET nome = ?, mensagens = ?, minutos = ?, linhas = ?,
+                        no_ar = ?, fora_do_ar = ?, ligado = ?
+                  WHERE id = ? AND usuario_id = ?'
+            )->execute([...array_values($campos), $id, $uid]);
+            json_saida(['ok' => true, 'id' => $id]);
+        }
+
+        $st = db()->prepare('SELECT COUNT(*) FROM recados WHERE usuario_id = ?');
+        $st->execute([$uid]);
+        if ((int) $st->fetchColumn() >= RECADOS_MAX) {
+            json_saida(['erro' => 'Você já tem ' . RECADOS_MAX . ' recados.'], 400);
+        }
+
+        db()->prepare(
+            'INSERT INTO recados (usuario_id, nome, mensagens, minutos, linhas, no_ar, fora_do_ar, ligado)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$uid, ...array_values($campos)]);
+        json_saida(['ok' => true, 'id' => (int) db()->lastInsertId()]);
+    } catch (PDOException $e) {
+        json_saida(['erro' => erro_publico($e, 'Falta rodar o SQL 054 no banco.')], 500);
+    }
 }
 
 if ($acao === 'apagar') {

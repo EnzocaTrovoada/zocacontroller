@@ -44,6 +44,9 @@ $modo = 'say';
 $nome = '';
 $contador = '';
 $quanto = '';
+$ehRecado = false;
+$cedo = false;
+$sumiu = false;
 
 try {
     if (!empty($d['comando'])) {
@@ -56,6 +59,37 @@ try {
             $texto = (string) ($p['argumento'] ?? '');
             $modo = (string) ($p['modo'] ?? 'say');
             $nome = $contador = (string) $c['nome'];
+        }
+    } elseif (!empty($d['recado'])) {
+        /* O RELÓGIO É DAQUI. A ponte só pergunta se está na hora; quem
+           responde é o ultimo_em, num UPDATE que só passa uma vez. Duas
+           pontes abertas não viram dois recados. */
+        $st = db()->prepare('SELECT * FROM recados WHERE id = ? AND usuario_id = ?');
+        $st->execute([(int) $d['recado'], $uid]);
+        $r = $st->fetch();
+        $msgs = $r ? json_decode((string) $r['mensagens'], true) : null;
+        $sumiu = !$r || !is_array($msgs) || !$msgs;
+
+        if (!$sumiu) {
+            $aoVivo = !empty($d['ao_vivo']);
+            $vale = $aoVivo ? (int) $r['no_ar'] : (int) $r['fora_do_ar'];
+            $cedo = !(int) $r['ligado'] || !$vale || (int) ($d['linhas'] ?? 0) < (int) $r['linhas'];
+
+            if (!$cedo) {
+                $marca = db()->prepare(
+                    'UPDATE recados SET ultimo_em = NOW(), proxima = proxima + 1
+                      WHERE id = ? AND usuario_id = ?
+                        AND (ultimo_em IS NULL OR ultimo_em < DATE_SUB(NOW(), INTERVAL minutos MINUTE))'
+                );
+                $marca->execute([(int) $r['id'], $uid]);
+                $cedo = !$marca->rowCount();
+            }
+
+            if (!$cedo) {
+                $texto = (string) $msgs[((int) $r['proxima']) % count($msgs)];
+                $contador = 'recado-' . (int) $r['id'];
+                $ehRecado = true;
+            }
         }
     } elseif (!empty($d['gatilho'])) {
         $st = db()->prepare('SELECT passos FROM gatilhos WHERE id = ? AND usuario_id = ?');
@@ -73,6 +107,10 @@ try {
 } catch (Throwable $e) {
     json_saida(['erro' => erro_publico($e)], 500);
 }
+
+/* O recado ainda não deu a hora, ou o chat está parado: não é erro. */
+if ($cedo)  json_saida(['ok' => true, 'cedo' => true]);
+if ($sumiu) json_saida(['erro' => 'Esse recado não existe mais.'], 404);
 
 if ($texto === null) {
     json_saida(['erro' => 'Esse comando não tem resposta pra mandar.'], 404);
@@ -95,6 +133,13 @@ $ctx = [
     'quanto'    => $quanto,
     'chatters'  => array_slice($chatters, 0, 100),
 ];
+
+/* Num recado não existe "quem mandou": quem fala é o canal. */
+if ($ehRecado) {
+    $ctx['quem']  = chat_canal_campo($uid, 'display_name', '');
+    $ctx['login'] = chat_canal_campo($uid, '', '');
+    $ctx['cargo'] = 'dono';
+}
 
 $modo = in_array($modo, ['say', 'reply', 'mention'], true) ? $modo : 'say';
 try {

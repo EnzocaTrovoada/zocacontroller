@@ -3727,6 +3727,7 @@ const COMO_USAR = {
     ['Gatilhos são sem comando', 'Em vez do chat digitar, quem dispara é o que acontece: sub, bits, follow, raid.'],
     ['Responder no chat', 'Escolha a ação "responder" e escreva o texto. $(sender) vira o nome de quem mandou — a lista completa fica logo abaixo do campo.'],
     ['Vem do StreamElements?', 'O botão "Trazer do StreamElements" lê os seus comandos de lá e traz prontos, com quem pode usar e a espera de cada um.'],
+    ['De tempo em tempo', 'O recado que sai sozinho, de X em X minutos. Só sai se o chat estiver andando, e você escolhe se vale com a live no ar, fora do ar, ou nos dois.'],
   ]],
 
   subathon: ['Subathon', [
@@ -7263,6 +7264,166 @@ function telaComandos() {
   gat.appendChild(h('p', { cls: 'd', style: 'margin:-4px 0 10px', txt: 'Dez subs seguidos nao podem virar dez trocas de cena.' }));
   gat.appendChild(h('div', { cls: 'acoes', style: 'display:flex;gap:8px' }, [gSalvar, gLimpar]));
   tela.appendChild(gat);
+
+  /* ================= DE TEMPO EM TEMPO =================
+
+     O recado que sai sozinho. Quem conta os minutos é o SERVIDOR: aqui é só
+     a régua, e a fonte do OBS pergunta se já deu a hora. */
+
+  const rec = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'De tempo em tempo' }),
+    h('p', { cls: 'd', txt: 'Um recado que o bot manda sozinho. Com mais de uma mensagem, elas se revezam — e ele só fala se o chat estiver andando, pra não ficar falando sozinho numa sala vazia.' }),
+  ]);
+  const listaRec = h('div');
+  rec.appendChild(listaRec);
+
+  const rNome = h('input', { type: 'text', placeholder: 'regras, redes, discord…' });
+  const listaMsgs = h('div');
+  let msgs = [''];
+  let editandoRec = 0;
+
+  function pintaMsgs() {
+    listaMsgs.innerHTML = '';
+    msgs.forEach((m, i) => {
+      const area = h('textarea', { cls: 'resposta-campo', rows: '2', maxlength: '500',
+        placeholder: 'Siga o canal pra não perder a próxima live!' });
+      area.value = m;
+      area.oninput = () => { msgs[i] = area.value; };
+      const tirar = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×', title: 'Tirar esta mensagem' });
+      tirar.onclick = () => { msgs.splice(i, 1); if (!msgs.length) msgs = ['']; pintaMsgs(); };
+      listaMsgs.appendChild(h('div', { cls: 'campo' }, [
+        h('span', { style: 'flex:0 0 20px;font-size:12px;color:var(--apagado)', txt: (i + 1) + '.' }),
+        area, tirar,
+      ]));
+    });
+    const mais = h('button', { cls: 'bt mini', type: 'button', txt: '+ outra mensagem' });
+    mais.disabled = msgs.length >= 8;
+    mais.onclick = () => { msgs.push(''); pintaMsgs(); };
+    listaMsgs.appendChild(h('p', { style: 'margin:4px 0 0' }, [mais]));
+  }
+  pintaMsgs();
+
+  const rMin = h('input', { type: 'number', min: '1', max: '1440', value: '15', style: 'flex:0 0 90px' });
+  const rLinhas = h('input', { type: 'number', min: '0', max: '500', value: '3', style: 'flex:0 0 90px' });
+  const rNoAr = h('input', { type: 'checkbox' });
+  rNoAr.checked = true;
+  const rFora = h('input', { type: 'checkbox' });
+  const rLigado = h('input', { type: 'checkbox' });
+  rLigado.checked = true;
+
+  const rSalvar = h('button', { cls: 'bt', type: 'button', txt: 'Criar recado' });
+  const rLimpar = h('button', { cls: 'bt fraco escondido', type: 'button', txt: 'Cancelar' });
+
+  const rLimpaForm = () => {
+    editandoRec = 0;
+    rNome.value = '';
+    msgs = [''];
+    pintaMsgs();
+    rMin.value = '15';
+    rLinhas.value = '3';
+    rNoAr.checked = true;
+    rFora.checked = false;
+    rLigado.checked = true;
+    rSalvar.textContent = 'Criar recado';
+    rLimpar.classList.add('escondido');
+  };
+  rLimpar.onclick = rLimpaForm;
+
+  rSalvar.onclick = async () => {
+    rSalvar.disabled = true;
+    try {
+      await api('/comandos.php', { method: 'POST', body: JSON.stringify({
+        acao: 'recado', id: editandoRec, nome: rNome.value, mensagens: msgs,
+        minutos: parseInt(rMin.value, 10) || 15,
+        linhas: parseInt(rLinhas.value, 10) || 0,
+        no_ar: rNoAr.checked ? 1 : 0,
+        fora_do_ar: rFora.checked ? 1 : 0,
+        ligado: rLigado.checked ? 1 : 0,
+      }) });
+      recado('Recado salvo. A fonte do OBS pega em até 5 minutos.', 'bom');
+      rLimpaForm();
+      pintaRecados();
+    } catch (e) { recado(e.message, 'ruim'); }
+    rSalvar.disabled = false;
+  };
+
+  async function pintaRecados() {
+    listaRec.innerHTML = '';
+    let d;
+    try { d = await api('/comandos.php'); } catch (e) { return; }
+    const lista = d.recados || [];
+    if (!lista.length) {
+      listaRec.appendChild(h('div', { cls: 'vazio', txt: 'Nenhum recado ainda.' }));
+      return;
+    }
+    lista.forEach((r) => {
+      const quando = [r.no_ar ? 'no ar' : '', r.fora_do_ar ? 'fora do ar' : ''].filter(Boolean).join(' e ');
+      const detalhe = [
+        'a cada ' + r.minutos + ' min',
+        quando,
+        r.linhas ? 'com ' + r.linhas + '+ mensagens no chat' : 'mesmo com o chat parado',
+        r.quantas > 1 ? r.quantas + ' mensagens revezando' : '',
+        r.ligado ? '' : 'desligado',
+      ].filter(Boolean).join('  ·  ');
+
+      const ed = h('button', { cls: 'bt mini', type: 'button', txt: 'Editar' });
+      ed.onclick = () => {
+        editandoRec = r.id;
+        rNome.value = r.nome || '';
+        msgs = (r.mensagens && r.mensagens.length) ? r.mensagens.slice() : [''];
+        pintaMsgs();
+        rMin.value = r.minutos;
+        rLinhas.value = r.linhas;
+        rNoAr.checked = !!r.no_ar;
+        rFora.checked = !!r.fora_do_ar;
+        rLigado.checked = !!r.ligado;
+        rSalvar.textContent = 'Salvar alterações';
+        rLimpar.classList.remove('escondido');
+        rNome.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      };
+
+      const ap = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'Apagar' });
+      ap.onclick = async () => {
+        if (!confirm('Apagar este recado?')) return;
+        try {
+          await api('/comandos.php', { method: 'POST', body: JSON.stringify({ acao: 'recado-apagar', id: r.id }) });
+          pintaRecados();
+        } catch (e) { recado(e.message, 'ruim'); }
+      };
+
+      listaRec.appendChild(h('div', { cls: 'campo' + (r.ligado ? '' : ' cmd-desligado') }, [
+        h('label', { style: 'flex:1 1 200px;overflow-wrap:anywhere',
+          txt: (r.nome || resumoTexto((r.mensagens || [''])[0])) + '  ·  ' + detalhe }),
+        ed, ap,
+      ]));
+    });
+  }
+  pintaRecados();
+
+  rec.append(
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Nome (só pra você)' }), rNome]),
+    h('p', { style: 'margin:14px 0 4px;font-size:13px;color:var(--fraco)', txt: 'O que ele fala' }),
+    listaMsgs,
+    h('div', { cls: 'campo', style: 'margin-top:12px' }, [
+      h('label', { txt: 'A cada' }), rMin, h('span', { cls: 'd', txt: 'minutos' }),
+    ]),
+    h('div', { cls: 'campo' }, [
+      h('label', { txt: 'Só se o chat mandou' }), rLinhas,
+      h('span', { cls: 'd', txt: 'mensagens nos últimos 5 minutos' }),
+    ]),
+    h('div', { cls: 'campo' }, [
+      h('label', { txt: 'Vale quando' }),
+      h('label', { style: 'display:flex;gap:6px;align-items:center;font-size:13px' },
+        [rNoAr, document.createTextNode('a live está no ar')]),
+      h('label', { style: 'display:flex;gap:6px;align-items:center;font-size:13px' },
+        [rFora, document.createTextNode('está fora do ar')]),
+    ]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Ligado' }), h('label', { cls: 'chave' }, [rLigado, h('span')])]),
+    h('p', { cls: 'd', style: 'margin:-2px 0 10px;font-size:11.5px',
+             txt: 'Vale o mesmo das respostas: $(game), $(uptime), $(count)... Quem manda é a fonte do OBS, então com o OBS fechado o recado não sai.' }),
+    h('div', { cls: 'acoes', style: 'display:flex;gap:8px' }, [rSalvar, rLimpar]),
+  );
+  tela.appendChild(rec);
 }
 
 /* A prévia devolve o arrasto por mensagem. Só aceito da mesma origem, e só
