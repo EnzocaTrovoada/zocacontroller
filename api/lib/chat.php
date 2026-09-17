@@ -742,7 +742,9 @@ function chat_busca(string $url): string
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_HEADER         => false,
-            CURLOPT_TIMEOUT        => 6,
+            /* Dez segundos: comando de RPG mexe no banco antes de responder,
+               e o StreamElements esperava quinze. */
+            CURLOPT_TIMEOUT        => 10,
             CURLOPT_CONNECTTIMEOUT => 4,
             CURLOPT_USERAGENT      => 'ZocaController/1.0 (+resposta de comando)',
             CURLOPT_HTTPHEADER     => ['Accept: text/plain, application/json;q=0.9, */*;q=0.5'],
