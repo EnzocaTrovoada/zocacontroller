@@ -3,12 +3,14 @@
  * Login da Twitch.
  *
  * Sem ?code: manda o streamer para a Twitch.
- * Com ?code: troca pelos tokens, cria o usuário e mostra a chave do painel
- *            UMA vez. Guardamos só o hash dela — se perder, gera outra.
+ * Com ?code: troca pelos tokens, cria o usuário e manda a chave do painel
+ *            pro site. Guardamos só o hash dela — se perder, é só entrar de
+ *            novo, que o aparelho ganha outra sem derrubar os demais.
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/twitch.php';
 require_once __DIR__ . '/lib/seguranca.php';
+require_once __DIR__ . '/lib/acesso.php';
 
 /* O COOKIE DA SESSÃO COM AS TRÊS TRANCAS.
 
@@ -50,8 +52,13 @@ function pagina(string $titulo, string $miolo): void
 
 // ---------- ida ----------
 if (!isset($_GET['code'])) {
-    if (isset($_GET['erro'])) {
-        pagina('Erro', '<h1>Não deu certo</h1><p>' . htmlspecialchars($_GET['erro']) . '</p>');
+    /* A Twitch volta com ?error quando a pessoa clica em Cancelar. Sem isto o
+       login recomeçava, e a pessoa caía de novo na tela que acabou de
+       recusar. O texto que veio no endereço não é mostrado: qualquer um
+       escreveria o que quisesse numa página com o nome do site. */
+    if (isset($_GET['error']) || isset($_GET['erro'])) {
+        pagina('Login cancelado', '<h1>Login cancelado</h1><p>Nada foi mudado na sua conta.</p>'
+            . '<p><a href="entrar.php">Entrar com a Twitch</a></p>');
     }
     $_SESSION['estado_oauth'] = chave_nova(16);
     header('Location: ' . tw_url_login($_SESSION['estado_oauth']));
@@ -80,6 +87,7 @@ try {
     $perfil = $eu['data'][0];
 
     $chave = chave_nova(24);
+    $hash  = hash_chave($chave);
 
     /* Antes de gravar: depois do INSERT, conta nova e conta que voltou ficam
        iguais, e a boas-vindas cairia em todo login. */
@@ -94,13 +102,13 @@ try {
         db()->prepare(
             'INSERT INTO usuarios (twitch_user_id, login, email, chave_painel, nome_exibicao, foto)
                   VALUES (?, ?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE login = VALUES(login), chave_painel = VALUES(chave_painel),
+             ON DUPLICATE KEY UPDATE login = VALUES(login),
                   nome_exibicao = VALUES(nome_exibicao), foto = VALUES(foto)'
         )->execute([
             $perfil['id'],
             $perfil['login'],
             $perfil['email'] ?? null,
-            hash('sha256', $chave),
+            $hash,
             $perfil['display_name'] ?? null,
             $perfil['profile_image_url'] ?? null,
         ]);
@@ -109,18 +117,32 @@ try {
         db()->prepare(
             'INSERT INTO usuarios (twitch_user_id, login, email, chave_painel)
                   VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE login = VALUES(login), chave_painel = VALUES(chave_painel)'
+             ON DUPLICATE KEY UPDATE login = VALUES(login)'
         )->execute([
             $perfil['id'],
             $perfil['login'],
             $perfil['email'] ?? null,
-            hash('sha256', $chave),
+            $hash,
         ]);
     }
 
     $st = db()->prepare('SELECT id FROM usuarios WHERE twitch_user_id = ?');
     $st->execute([$perfil['id']]);
     $usuario_id = (int) $st->fetchColumn();
+
+    /* UMA CHAVE POR APARELHO.
+
+       Conta nova usa a chave como principal. Quem volta ganha uma chave só
+       deste aparelho, e as outras continuam valendo: entrar pelo celular não
+       pode derrubar o computador nem a ponte no OBS. Sem o SQL 052, vale o
+       jeito antigo, que troca a principal. */
+    if (!$primeiraVez) {
+        try {
+            chave_de_aparelho_nova($usuario_id, $hash, aparelho_nome((string) ($_SERVER['HTTP_USER_AGENT'] ?? '')));
+        } catch (PDOException $e) {
+            db()->prepare('UPDATE usuarios SET chave_painel = ? WHERE id = ?')->execute([$hash, $usuario_id]);
+        }
+    }
 
     if ($primeiraVez) {
         require_once __DIR__ . '/lib/notificacoes.php';

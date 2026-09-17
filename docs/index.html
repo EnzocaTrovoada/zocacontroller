@@ -6381,7 +6381,7 @@ function telaControlador() {
   ]);
 
   async function redefinir() {
-    const aviso = 'Trocar a chave agora?\n\nA fonte do OBS PARA de funcionar até você colar o endereço novo nela, e links salvos nos favoritos deixam de valer.';
+    const aviso = 'Trocar a chave agora?\n\nA fonte do OBS PARA de funcionar até você colar o endereço novo nela, links salvos nos favoritos deixam de valer e os outros aparelhos precisam entrar com a Twitch de novo.';
     if (!confirm(aviso)) return;
     try {
       const d = await api('/chave.php', { method: 'POST', body: JSON.stringify({ acao: 'redefinir' }) });
@@ -6396,16 +6396,69 @@ function telaControlador() {
   fatiaChave.appendChild(h('p', { cls: 'aviso', txt: 'Só troque se a chave tiver aparecido em print ou na live. A fonte do OBS para até você colar o endereço novo.' }));
   tela.appendChild(fatiaChave);
 
+  /* ----- aparelhos -----
+
+     Cada entrada com a Twitch dá ao aparelho a própria chave. Os links do
+     OBS carregam a chave do aparelho onde foram copiados, então desconectar
+     um aparelho derruba também o que foi copiado dele — o aviso diz isso. */
+  const listaAparelhos = h('div', {}, [h('p', { cls: 'd', txt: 'vendo…' })]);
+  tela.appendChild(h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Aparelhos conectados' }),
+    h('p', { cls: 'd', txt: 'Cada computador ou celular em que você entrou com a Twitch. Desconecte o que não for seu ou que você não usa mais.' }),
+    listaAparelhos,
+  ]));
+
+  async function pintaAparelhos() {
+    let d;
+    try {
+      d = await api('/chave.php');
+    } catch (e) {
+      listaAparelhos.innerHTML = '';
+      listaAparelhos.appendChild(h('p', { cls: 'd', txt: 'Não consegui ler os aparelhos: ' + e.message }));
+      return;
+    }
+    listaAparelhos.innerHTML = '';
+    (d.aparelhos || []).forEach((a) => {
+      const principal = a.id === 0;
+      const detalhe = principal
+        ? 'A primeira chave da conta. Só sai com Redefinir.'
+        : (faz(a.ha) === 'agora' ? 'usado agora' : 'usado há ' + faz(a.ha)) + (a.desde ? ' · desde ' + a.desde : '');
+      const linha = h('div', { cls: 'bk-linha' }, [
+        h('div', { style: 'flex:1;min-width:0' }, [
+          h('b', { txt: a.aparelho + (a.atual ? '  ·  este aparelho' : '') }),
+          h('small', { txt: detalhe }),
+        ]),
+      ]);
+      if (!principal) {
+        const bt = h('button', { cls: 'bt fraco mini', type: 'button', txt: 'Desconectar' });
+        bt.onclick = async () => {
+          const pergunta = a.atual
+            ? 'Desconectar ESTE aparelho?\n\nVocê sai daqui, e os links do OBS copiados daqui (a ponte e o painel) param de funcionar.'
+            : 'Desconectar "' + a.aparelho + '"?\n\nOs links do OBS que foram copiados de lá (a ponte e o painel) também param de funcionar.';
+          if (!confirm(pergunta)) return;
+          bt.disabled = true;
+          try {
+            const r = await api('/chave.php', { method: 'POST', body: JSON.stringify({ acao: 'desconectar', id: a.id }) });
+            if (r.era_este) { esqueceChave(); location.href = 'index.html'; return; }
+            recado('Aparelho desconectado.', 'bom');
+            pintaAparelhos();
+          } catch (e) {
+            bt.disabled = false;
+            recado(e.message, 'ruim');
+          }
+        };
+        linha.appendChild(bt);
+      }
+      listaAparelhos.appendChild(linha);
+    });
+  }
+  pintaAparelhos();
+
   /* ----- conta da Twitch ----- */
   const btEntrarDeNovo = h('button', { cls: 'bt', type: 'button', txt: 'Entrar de novo na Twitch' });
-  btEntrarDeNovo.onclick = () => {
-    /* Avisar ANTES, e não depois: a chave é guardada com hash, então entrar
-       de novo obriga a gerar outra — e todo link que carrega a chave (a fonte
-       da ponte e o painel do OBS) para de valer na hora. Os overlays não:
-       eles usam a chave pública de cada um, que não muda. */
-    if (!confirm('Entrar de novo troca a sua chave. Seus overlays NAO sao afetados e continuam funcionando no OBS. O que precisa ser colado de novo la sao a fonte da ponte e o painel, e os dois novos aparecem aqui em Meu Controller depois que voce entrar. Continuar?')) return;
-    location.href = API + '/entrar.php';
-  };
+  /* Entrar de novo dá a este navegador uma chave nova e deixa as outras
+     valendo: a ponte e o painel do OBS continuam funcionando. */
+  btEntrarDeNovo.onclick = () => { location.href = API + '/entrar.php'; };
 
   const btSair = h('button', { cls: 'bt fraco', type: 'button', txt: 'Sair deste computador' });
   btSair.onclick = () => {
@@ -6417,7 +6470,7 @@ function telaControlador() {
 
   tela.appendChild(h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Conta da Twitch' }),
-    h('p', { cls: 'd', txt: 'Renova a permissão com a Twitch. Não desfaz nada: overlays, comandos e subathon continuam.' }),
+    h('p', { cls: 'd', txt: 'Renova a permissão com a Twitch. Não desfaz nada: overlays, comandos, subathon e a ponte do OBS continuam.' }),
     h('div', { cls: 'acoes', style: 'display:flex;gap:8px;flex-wrap:wrap' }, [btEntrarDeNovo, btSair]),
     h('p', { cls: 'd', style: 'margin-top:8px', txt: 'Sair só apaga a chave guardada neste navegador. Os overlays que já estão no OBS continuam funcionando.' }),
   ]));
@@ -8304,10 +8357,11 @@ async function carrega() {
     const e = ultimoErro;
     /* CHAVE VELHA NÃO É LISTA VAZIA.
 
-       Entrar de novo na Twitch gera uma chave nova — a antiga é guardada com
-       hash e não dá pra devolver. Quem abrisse o site por um link salvo com a
-       chave antiga levava 401 aqui, e a tela mostrava "nenhum overlay ainda".
-       Ou seja: a pessoa via os overlays dela sumirem sem ter perdido nada.
+       Chave redefinida ou aparelho desconectado não voltam: a chave é
+       guardada com hash e não dá pra devolver. Quem abrisse o site por um
+       link salvo com ela levava 401 aqui, e a tela mostrava "nenhum overlay
+       ainda". Ou seja: a pessoa via os overlays dela sumirem sem ter perdido
+       nada.
 
        Nada foi apagado nesse caso, e a tela precisa dizer isso. */
     if (e.status === 401 || e.status === 403) {
@@ -8315,9 +8369,9 @@ async function carrega() {
       el('abaEntrar').classList.remove('escondido');
       const cx = el('semChave');
       const p2 = cx.querySelector('p');
-      if (p2) p2.textContent = 'Esta chave não vale mais — ela troca quando você entra de novo na Twitch. '
+      if (p2) p2.textContent = 'Esta chave não vale mais: ela foi redefinida, ou este aparelho foi desconectado. '
         + 'Nada foi apagado: seus overlays continuam no lugar e os que já estão no OBS continuam funcionando. '
-        + 'Entre de novo pra pegar a chave nova.';
+        + 'Entre com a Twitch de novo pra continuar.';
       cx.classList.remove('escondido');
       el('tela').innerHTML = '';
       return false;

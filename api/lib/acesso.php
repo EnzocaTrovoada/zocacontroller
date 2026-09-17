@@ -97,6 +97,101 @@ function hash_chave(string $bruta): string
     return hash('sha256', $bruta);
 }
 
+/** Quantos aparelhos uma conta mantém conectados ao mesmo tempo. */
+const CHAVES_MAX = 25;
+
+/**
+ * De quem é esta chave de painel: [usuario_id, id da chave do aparelho].
+ *
+ * Duas gavetas. A chave principal mora em usuarios.chave_painel e tem id 0
+ * aqui; as de cada aparelho moram em chaves_painel. Antes do SQL 052 a
+ * segunda gaveta não existe, e só a principal vale. [0, 0] = não vale.
+ */
+function chave_dono(#[\SensitiveParameter] string $chave): array
+{
+    $h = hash_chave($chave);
+    try {
+        $st = db()->prepare(
+            'SELECT id AS usuario_id, 0 AS chave_id, 0 AS velha
+               FROM usuarios WHERE chave_painel = ?
+             UNION ALL
+             SELECT usuario_id, id,
+                    (visto_em IS NULL OR visto_em < DATE_SUB(NOW(), INTERVAL 1 HOUR))
+               FROM chaves_painel WHERE chave_hash = ?
+             LIMIT 1'
+        );
+        $st->execute([$h, $h]);
+    } catch (PDOException $e) {
+        $st = db()->prepare(
+            'SELECT id AS usuario_id, 0 AS chave_id, 0 AS velha
+               FROM usuarios WHERE chave_painel = ? LIMIT 1'
+        );
+        $st->execute([$h]);
+    }
+    $l = $st->fetch();
+    if (!$l) return [0, 0];
+
+    /* Quando o aparelho apareceu por último, pra lista de aparelhos. Uma vez
+       por hora: a ponte chama dezenas de vezes por minuto. */
+    if ((int) $l['chave_id'] && (int) $l['velha']) {
+        try {
+            db()->prepare('UPDATE chaves_painel SET visto_em = NOW() WHERE id = ?')
+                ->execute([(int) $l['chave_id']]);
+        } catch (Throwable $e) { /* só a lista perde a data */ }
+    }
+    return [(int) $l['usuario_id'], (int) $l['chave_id']];
+}
+
+/**
+ * Grava a chave de um aparelho que acabou de entrar e poda as sobras.
+ * Lança se a tabela ainda não existe: quem chama decide o que fazer.
+ */
+function chave_de_aparelho_nova(int $usuario_id, string $hash, string $aparelho): void
+{
+    db()->prepare(
+        'INSERT INTO chaves_painel (usuario_id, chave_hash, aparelho, visto_em) VALUES (?, ?, ?, NOW())'
+    )->execute([$usuario_id, $hash, mb_substr($aparelho, 0, 80)]);
+
+    /* Aparelho sumido há um ano sai sozinho, e ninguém passa de CHAVES_MAX:
+       o mais esquecido vai embora primeiro. */
+    try {
+        db()->prepare(
+            'DELETE FROM chaves_painel WHERE usuario_id = ?
+                AND COALESCE(visto_em, criado_em) < DATE_SUB(NOW(), INTERVAL 365 DAY)'
+        )->execute([$usuario_id]);
+
+        $st = db()->prepare(
+            'SELECT id FROM chaves_painel WHERE usuario_id = ?
+              ORDER BY COALESCE(visto_em, criado_em) DESC, id DESC'
+        );
+        $st->execute([$usuario_id]);
+        $sobra = array_map('intval', array_slice($st->fetchAll(PDO::FETCH_COLUMN), CHAVES_MAX));
+        if ($sobra) {
+            $vaz = implode(',', array_fill(0, count($sobra), '?'));
+            db()->prepare("DELETE FROM chaves_painel WHERE id IN ($vaz)")->execute($sobra);
+        }
+    } catch (Throwable $e) { /* a poda fica pra próxima entrada */ }
+}
+
+/** "Chrome no Windows": o nome que a lista de aparelhos mostra. */
+function aparelho_nome(string $ua): string
+{
+    $nav = 'Navegador';
+    foreach (['OBS/' => 'OBS', 'Edg' => 'Edge', 'OPR/' => 'Opera', 'SamsungBrowser/' => 'Samsung Internet',
+              'Firefox/' => 'Firefox', 'FxiOS/' => 'Firefox', 'CriOS/' => 'Chrome', 'Chrome/' => 'Chrome',
+              'Safari/' => 'Safari'] as $marca => $nome) {
+        if (strpos($ua, $marca) !== false) { $nav = $nome; break; }
+    }
+    /* iPhone e Android antes: o do iPhone diz "like Mac OS X", e o do
+       Android diz Linux. */
+    $so = '';
+    foreach (['iPhone' => 'iPhone', 'iPad' => 'iPad', 'Android' => 'Android', 'Windows' => 'Windows',
+              'CrOS' => 'Chromebook', 'Mac OS' => 'Mac', 'Linux' => 'Linux'] as $marca => $nome) {
+        if (strpos($ua, $marca) !== false) { $so = $nome; break; }
+    }
+    return $so !== '' ? $nav . ' no ' . $so : $nav;
+}
+
 /**
  * Identifica quem está chamando.
  * Devolve ['usuario_id', 'tipo', 'nome', 'pode' => ['cena','audio','canal']].
@@ -107,14 +202,13 @@ function quem_chama(): array
     $mod   = $_SERVER['HTTP_X_MOD']   ?? '';
 
     if ($chave !== '') {
-        $st = db()->prepare('SELECT id FROM usuarios WHERE chave_painel = ? LIMIT 1');
-        $st->execute([hash_chave($chave)]);
-        $id = $st->fetchColumn();
+        [$id, $chaveId] = chave_dono($chave);
         if ($id) {
             return [
-                'usuario_id' => (int) $id,
+                'usuario_id' => $id,
                 'tipo'       => 'painel',
                 'nome'       => 'painel',
+                'chave_id'   => $chaveId,
                 'pode'       => ['cena' => true, 'audio' => true, 'canal' => true, 'palpite' => true],
             ];
         }
@@ -165,9 +259,7 @@ function quem_talvez(): int
     if ($chave === '') return 0;
 
     try {
-        $st = db()->prepare('SELECT id FROM usuarios WHERE chave_painel = ? LIMIT 1');
-        $st->execute([hash_chave($chave)]);
-        return (int) ($st->fetchColumn() ?: 0);
+        return chave_dono($chave)[0];
     } catch (Throwable $e) {
         return 0;
     }

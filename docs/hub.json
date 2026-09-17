@@ -14,6 +14,11 @@
 
   "novidades": [
     {
+      "data": "2026-09-17",
+      "titulo": "Entrar pelo celular não derruba mais o PC",
+      "texto": "Cada aparelho em que você entra com a Twitch agora ganha a própria chave: entrar pelo celular não desliga mais o computador nem a ponte do OBS. Em Meu Controller aparece a lista de aparelhos conectados, com um botão pra desconectar o que não for seu."
+    },
+    {
       "data": "2026-09-16",
       "titulo": "Selos do mesmo tamanho",
       "texto": "Os selos agora aparecem com o mesmo tamanho ao lado do nome, não importa o quanto de margem cada desenho tinha — e desenho novo que entra continua nítido, pixel por pixel."
