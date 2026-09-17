@@ -1,0 +1,4 @@
+# Só a página inicial interessa pra busca. As outras são ferramentas, e cada
+# uma já diz "noindex" por conta própria.
+User-agent: *
+Allow: /
