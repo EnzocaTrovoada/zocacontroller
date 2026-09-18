@@ -14,6 +14,11 @@
 
   "novidades": [
     {
+      "data": "2026-09-18",
+      "titulo": "Tela de comandos nova, e o comando vale na hora",
+      "texto": "A tela de Comandos virou uma lista: cada comando numa linha, com a chave de ligar ali mesmo, e a edição abre numa janela. Junto vieram a busca, os gatilhos e os recados no mesmo formato. E o mais importante: comando criado ou mudado passa a valer na hora — antes a fonte do OBS só relia a lista a cada cinco minutos, e parecia que não funcionava."
+    },
+    {
       "data": "2026-09-17",
       "titulo": "Recado de tempo em tempo",
       "texto": "O bot pode mandar um recado sozinho de tempos em tempos: as suas redes, o Discord, a regra do chat. Com mais de uma mensagem, elas se revezam, e ele só fala se o chat estiver andando — nada de bot falando sozinho em sala vazia. Você escolhe se vale com a live no ar, fora do ar, ou nos dois."

@@ -257,6 +257,21 @@ if ($acao === 'gatilho' || $acao === 'gatilho-apagar') {
     json_saida(['ok' => true, 'id' => (int) db()->lastInsertId()]);
 }
 
+/* ---------- ligar e desligar na própria lista ---------- */
+if ($acao === 'ligar') {
+    $tabelas = ['comando' => 'comandos', 'recado' => 'recados', 'gatilho' => 'gatilhos'];
+    $tabela = $tabelas[(string) ($d['tipo'] ?? '')] ?? '';
+    if ($tabela === '') json_saida(['erro' => 'Não sei o que ligar.'], 400);
+
+    try {
+        $st = db()->prepare("UPDATE $tabela SET ligado = ? WHERE id = ? AND usuario_id = ?");
+        $st->execute([empty($d['ligado']) ? 0 : 1, (int) ($d['id'] ?? 0), (int) $quem['usuario_id']]);
+        json_saida(['ok' => (bool) $st->rowCount()]);
+    } catch (PDOException $e) {
+        json_saida(['erro' => erro_publico($e, 'Falta rodar o SQL 053 no banco.')], 500);
+    }
+}
+
 /* ---------- recados de tempo em tempo ---------- */
 if ($acao === 'recado' || $acao === 'recado-apagar') {
     $uid = (int) $quem['usuario_id'];

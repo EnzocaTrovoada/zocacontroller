@@ -33,6 +33,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $acao = strtolower(trim((string) ($d['acao'] ?? '')));
     $arg  = trim((string) ($d['argumento'] ?? ''));
 
+    /* NÃO É AÇÃO NO OBS: É RECADO PRA PONTE.
+
+       Quando o painel salva um comando, a ponte precisa saber na hora. Sem
+       isto ela só relia a lista no ciclo de cinco minutos, e quem acabava de
+       criar um comando testava no chat e achava que não funcionava. */
+    if ($acao === 'recarregar') {
+        if ($quem['tipo'] !== 'painel') {
+            json_saida(['erro' => 'Só o painel pede isso.'], 403);
+        }
+        db()->prepare(
+            'INSERT INTO fila_comandos (usuario_id, acao, argumento, quem) VALUES (?, ?, NULL, ?)'
+        )->execute([$quem['usuario_id'], 'recarregar', $quem['nome']]);
+        json_saida(['ok' => true]);
+    }
+
     if (!isset(PERMITIDAS[$acao])) {
         json_saida(['erro' => 'Esse comando não existe.'], 400);
     }

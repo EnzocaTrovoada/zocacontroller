@@ -1806,6 +1806,8 @@ async function lacoDoRele() {
       const d = await r.json();
       const lista = d.comandos || [];
       for (const c of lista) {
+        /* O painel mexeu na lista: relê agora, não daqui a cinco minutos. */
+        if (c.acao === 'recarregar') { await carregarComandos(); continue; }
         await doPainel({ zc: 'comando', acao: c.acao, arg: c.argumento || '', quem: c.quem || 'mod' });
       }
 
