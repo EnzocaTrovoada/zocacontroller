@@ -33,6 +33,29 @@ function bot_linha(int $uid): ?array
     }
 }
 
+/** Os comandos que o bot sabe responder, pra tela dele mostrar o que vale. */
+function bot_comandos(int $uid): array
+{
+    try {
+        $st = db()->prepare('SELECT nome, apelidos, passos FROM comandos WHERE usuario_id = ? AND ligado = 1 ORDER BY nome');
+        $st->execute([$uid]);
+        $fora = [];
+        foreach ($st->fetchAll() as $c) {
+            $passos = json_decode((string) $c['passos'], true);
+            if (!is_array($passos)) continue;
+            foreach ($passos as $p) {
+                if (is_array($p) && ($p['acao'] ?? '') === 'responder') {
+                    $fora[] = ['nome' => (string) $c['nome'], 'apelidos' => (string) $c['apelidos']];
+                    break;
+                }
+            }
+        }
+        return $fora;
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
 /** O que falta pra poder ligar: '' quando está tudo pronto. */
 function bot_falta(int $uid): string
 {
@@ -43,9 +66,13 @@ function bot_falta(int $uid): string
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $linha = bot_linha($uid);
     $saida = [
-        'ligado' => $linha ? (bool) $linha['ligado'] : false,
-        'falta'  => bot_falta($uid),
-        'estado' => '',
+        'ligado'   => $linha ? (bool) $linha['ligado'] : false,
+        'falta'    => bot_falta($uid),
+        'estado'   => '',
+        'nome'     => chat_bot_nome(),
+        'falas'    => chat_falas($uid),
+        'responde' => bot_comandos($uid),
+        'visto_em' => $linha ? (string) ($linha['visto_em'] ?? '') : '',
     ];
 
     /* O QUE A TWITCH ACHA DISSO.

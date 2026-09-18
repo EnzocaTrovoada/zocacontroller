@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-18",
+      "titulo": "O bot ganhou tela própria, e apagar tem volta",
+      "texto": "O bot saiu de dentro da tela de comandos e virou aba: dá pra colocá-lo no chat, ver o que ele sabe responder e ler as últimas coisas que ele falou — inclusive as que não saíram, e por quê. E apagar comando, gatilho ou recado não pergunta mais \"tem certeza?\": apaga e deixa uma barra de Desfazer por vinte segundos."
+    },
+    {
+      "data": "2026-09-18",
       "titulo": "Agora é ZocaHub",
       "texto": "O nome mudou: ZocaController virou ZocaHub. Nada mais mudou — os links, os overlays e a sua conta continuam iguais."
     },

@@ -837,6 +837,31 @@ function chat_bot_id(): string
 }
 
 /**
+ * O nome da conta do bot, pra tela poder dizer quem é que fala.
+ *
+ * Vem do config quando está lá; sem isso, pergunta pra Twitch pelo id. A
+ * pergunta é barata porque esta função só é chamada quando alguém abre a
+ * tela do bot — nunca no caminho de responder uma mensagem.
+ */
+function chat_bot_nome(): string
+{
+    static $nome = null;
+    if ($nome !== null) return $nome;
+
+    $nome = trim((string) (cfg()['twitch_bot']['login'] ?? ''));
+    if ($nome !== '') return $nome;
+
+    $id = chat_bot_id();
+    if ($id === '') return $nome = '';
+
+    try {
+        [$http, $r] = tw_helix_app('GET', '/users', ['id' => $id]);
+        if ($http === 200) $nome = (string) ($r['data'][0]['display_name'] ?? '');
+    } catch (Throwable $e) { /* o nome é enfeite; o bot funciona sem ele */ }
+    return $nome;
+}
+
+/**
  * Manda a mensagem no chat do canal.
  *
  * Com o bot configurado e o canal tendo dado a permissão channel:bot, sai
@@ -897,4 +922,62 @@ function chat_enviar(int $uid, string $texto, string $modo = 'say', string $msgI
             : ($http === 429 ? 'Mensagens demais seguidas. Espere um pouco.' : 'A Twitch respondeu ' . $http . '.');
     }
     return ['ok' => false, 'erro' => $ultimo];
+}
+
+/**
+ * Guarda o que o bot acabou de falar, pra aparecer na tela dele.
+ *
+ * "Está ligado" é promessa; uma lista do que ele acabou de dizer é prova —
+ * e é o que responde, sem adivinhação, se o comando não saiu por causa do
+ * comando, da permissão ou da Twitch. Por isso a falha entra aqui também.
+ *
+ * Nada aqui pode derrubar uma resposta: a tabela pode não existir ainda, e
+ * anotar é o menos importante que acontece nesta requisição.
+ */
+function chat_anota(int $uid, array $f): void
+{
+    try {
+        db()->prepare(
+            'INSERT INTO bot_falas (usuario_id, texto, comando, quem, origem, erro)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $uid,
+            mb_substr((string) ($f['texto'] ?? ''), 0, 500),
+            mb_substr((string) ($f['comando'] ?? ''), 0, 40),
+            mb_substr((string) ($f['quem'] ?? ''), 0, 40),
+            (string) ($f['origem'] ?? ''),
+            mb_substr((string) ($f['erro'] ?? ''), 0, 160),
+        ]);
+    } catch (Throwable $e) { /* sem o SQL 056 o bot fala igual */ }
+}
+
+/** As últimas falas, e a faxina do resto. */
+function chat_falas(int $uid, int $quantas = 20): array
+{
+    try {
+        $st = db()->prepare(
+            'SELECT texto, comando, quem, origem, erro, criado_em
+               FROM bot_falas WHERE usuario_id = ? ORDER BY id DESC LIMIT ' . max(1, min(50, $quantas))
+        );
+        $st->execute([$uid]);
+        $falas = $st->fetchAll();
+    } catch (Throwable $e) {
+        return [];
+    }
+
+    /* A FAXINA É AQUI, E NÃO NA HORA DE FALAR.
+
+       Apagar a cada mensagem seria uma consulta a mais no caminho mais
+       quente do sistema. Aqui é uma vez por visita ao painel, que é raro —
+       e o efeito é o mesmo: a tabela nunca cresce. */
+    try {
+        $st = db()->prepare('SELECT id FROM bot_falas WHERE usuario_id = ? ORDER BY id DESC LIMIT 1 OFFSET 50');
+        $st->execute([$uid]);
+        $corte = $st->fetchColumn();
+        if ($corte) {
+            db()->prepare('DELETE FROM bot_falas WHERE usuario_id = ? AND id <= ?')->execute([$uid, (int) $corte]);
+        }
+    } catch (Throwable $e) { /* a lista já saiu */ }
+
+    return $falas;
 }

@@ -62,6 +62,12 @@ try {
        ganha um tom proprio desta familia, e os tons repetem de proposito
        nos detalhes do painel (data, numero, seta) — e isso que amarra. */
     --violeta:#6D4AE0; --ambar:#B7791F; --ciano:#0E7490; --coral:#C2410C;
+    /* A BARRA DE DESFAZER NAO VIRA COM O TEMA.
+       Estes tres nao sao redefinidos no escuro de proposito: virando junto,
+       a barra ficava clara com o verde claro em cima — 1.4:1, o "Desfazer"
+       sumia. Ela e um aviso do sistema e fica escura sempre, como em todo
+       lugar que faz isso. */
+    --tapa:#101A14; --tapa-txt:#F2F7F4; --tapa-acao:#6FE49B;
     --vidro:rgba(255,255,255,.7);
     --barra-fundo:rgba(255,255,255,.86);
     /* O sino segue o texto, como no X: branco no escuro, quase preto no
@@ -1472,6 +1478,46 @@ try {
   .linha-ponte { font-size: 12.5px; margin: 0 0 10px; }
   .linha-ponte div { margin: 2px 0; }
 
+  /* ---------- desfazer ----------
+     Barra presa embaixo, e não um recado no topo: o apagar acontece numa
+     lista que pode estar rolada, e um aviso lá em cima ninguém vê. */
+  .desfaz {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    display: flex; gap: 14px; align-items: center; z-index: 70;
+    background: var(--tapa); color: var(--tapa-txt);
+    border-radius: 8px; padding: 10px 12px 10px 16px;
+    font-size: 13.5px; box-shadow: 0 10px 30px rgba(0,0,0,.28);
+    max-width: calc(100vw - 32px);
+  }
+  .desfaz__bt {
+    font: 600 12px var(--disp); letter-spacing: .06em; text-transform: uppercase;
+    background: transparent; color: var(--tapa-acao); border: 0; cursor: pointer;
+    padding: 4px 6px; border-radius: 5px;
+  }
+  .desfaz__bt:hover { background: rgba(255,255,255,.12); }
+  @media (prefers-reduced-motion: no-preference) {
+    .desfaz { animation: sobe .18s ease-out; }
+    @keyframes sobe { from { transform: translate(-50%, 14px); opacity: 0 } }
+  }
+
+  /* ---------- a tela do bot ---------- */
+  .bot-lista { display: flex; flex-wrap: wrap; gap: 6px; }
+  .bot-cmd {
+    font: 500 12.5px var(--mono); color: var(--verde-forte);
+    background: var(--verde-fraco); border-radius: 5px; padding: 4px 9px;
+  }
+  /* Uma linha por fala, com a hora à esquerda alinhada: o olho desce pela
+     coluna da hora e acha "foi agora" sem ler o resto. */
+  .bot-fala {
+    display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+    padding: 7px 0; border-top: 1px solid var(--linha); font-size: 13px;
+  }
+  .bot-fala:first-child { border-top: 0; }
+  .bot-fala__hora { font: 500 11.5px var(--mono); color: var(--apagado); flex: 0 0 38px; }
+  .bot-fala__oque { flex: 1 1 220px; }
+  .bot-fala__de { font: 500 11.5px var(--mono); color: var(--apagado); }
+  .bot-fala.ruim .bot-fala__oque { color: var(--perigo); }
+
   @media (max-width: 720px) {
     .tab .esconde-mini { display: none; }
   }
@@ -1589,7 +1635,11 @@ try {
     <span class="bandeja" id="bandejaFerramentas"></span>
   </button>
 
-  <button class="aba" id="abaMeu" type="button">Meu Controller</button>
+  <!-- O BOT TEM ABA, E NÃO UM BOTÃO ESCONDIDO EM COMANDOS.
+       É metade do produto: quem chega precisa ver que existe sem procurar. -->
+  <button class="aba" id="abaBot" type="button">Bot</button>
+
+  <button class="aba" id="abaMeu" type="button">Meu ZocaHub</button>
   <!-- Fica visível pra quem não entrou: um artista que chega por um link de
        divulgação não tem conta e não precisa ter. -->
   <button class="aba" id="abaArtistas" type="button">Artistas</button>
@@ -3867,7 +3917,8 @@ function abreComoUsar(chaveTela) {
    divergir na primeira tela nova. */
 const TELAS = [
   ['#/overlays',  'Meus overlays', 'a lista dos que você já tem'],
-  ['#/meu',       'Meu Controller', 'chave, conta e plano'],
+  ['#/meu',       'Meu ZocaHub',   'chave, conta e plano'],
+  ['#/bot',       'Bot',           'o bot que responde no seu chat'],
   ['#/comandos',  'Comandos',      'o que o chat pode fazer'],
   ['#/subathon',  'Subathon',      'cronômetro e o que soma tempo'],
   ['#/mods',      'Moderadores',   'links de quem te ajuda'],
@@ -7031,6 +7082,256 @@ function resumoDosPassos(passos) {
     : p.acao + (p.argumento ? ' ' + p.argumento : ''))).join('  →  ');
 }
 
+
+/* DESFAZER.
+
+   Substitui o "tem certeza?". Perguntar antes é o jeito de quem programa
+   proteger o arquivo; quem usa clica em "sim" no automático e o aviso não
+   protegeu nada. Deixar apagar e oferecer a volta protege de verdade — e
+   ainda é mais rápido pra quem sabia o que estava fazendo.
+
+   A volta é REFAZER, e não ressuscitar: o servidor apagou de verdade e o
+   que volta é uma cópia com um número novo. Serve pra comando, gatilho,
+   recado e cena de luz, onde o número não aparece pra ninguém. NÃO serve
+   pra overlay, cuja URL está colada dentro do OBS de alguém — lá o aviso
+   antes continua sendo o certo.
+
+   Vinte segundos, e só um de cada vez: apagar outra coisa apaga a chance
+   anterior, igual em todo lugar que faz isso. */
+let desfazBarra = null;
+let desfazRelogio = null;
+
+function fechaDesfaz() {
+  if (desfazRelogio) clearTimeout(desfazRelogio);
+  desfazRelogio = null;
+  if (desfazBarra) desfazBarra.remove();
+  desfazBarra = null;
+}
+
+function podeDesfazer(texto, refaz) {
+  fechaDesfaz();
+  const bt = h('button', { cls: 'desfaz__bt', type: 'button', txt: 'Desfazer' });
+  desfazBarra = h('div', { cls: 'desfaz', role: 'status' }, [h('span', { txt: texto }), bt]);
+
+  bt.onclick = async () => {
+    bt.disabled = true;
+    bt.textContent = 'voltando…';
+    try {
+      await refaz();
+      fechaDesfaz();
+      recado('Pronto, voltou.', 'bom');
+    } catch (e) {
+      fechaDesfaz();
+      recado('Não consegui trazer de volta: ' + e.message, 'ruim');
+    }
+  };
+
+  document.body.appendChild(desfazBarra);
+  desfazRelogio = setTimeout(fechaDesfaz, 20000);
+}
+
+
+/* O QUE VOLTA, EM CADA CASO.
+
+   Uma cópia com número novo, montada com os mesmos campos que a tela de
+   criar manda. Ficam juntas de propósito: quando um campo novo entrar no
+   salvar, é aqui que alguém lembra de pôr também — separadas pelo arquivo,
+   a que ficasse pra trás ressuscitaria o item sem o campo. */
+function refazComando(c) {
+  return api('/comandos.php', { method: 'POST', body: JSON.stringify({
+    acao: 'salvar', id: 0, nome: c.nome, apelidos: c.apelidos || '', passos: c.passos,
+    quem: c.quem, espera: c.espera, espera_pessoa: c.espera_pessoa, ligado: c.ligado,
+  }) }).then(avisaPonte);
+}
+
+function refazGatilho(g) {
+  return api('/comandos.php', { method: 'POST', body: JSON.stringify({
+    acao: 'gatilho', id: 0, evento: g.evento, minimo: g.minimo,
+    espera: g.espera, ligado: g.ligado, passos: g.passos,
+  }) }).then(avisaPonte);
+}
+
+function refazRecado(r) {
+  return api('/comandos.php', { method: 'POST', body: JSON.stringify({
+    acao: 'recado', id: 0, nome: r.nome, mensagens: r.mensagens, minutos: r.minutos,
+    linhas: r.linhas, no_ar: r.no_ar, fora_do_ar: r.fora_do_ar, ligado: r.ligado,
+  }) }).then(avisaPonte);
+}
+
+/* ================== O BOT ==================
+
+   Ele já existia, escondido como um botão no meio da tela de comandos. Um
+   bot que mora numa tela de configuração parece opção; o bot é metade do
+   produto e precisa de porta própria — é assim que o StreamElements faz, e
+   é o primeiro lugar onde a pessoa entende o que comprou.
+
+   O que esta tela responde, nesta ordem: ele está no meu chat? o que ele
+   sabe responder? ele falou alguma coisa? A terceira é a que resolve
+   suporte: "está ligado" é promessa, a lista do que ele disse é prova. */
+
+/* Quem está na tela de comandos também precisa saber se o bot está lá — a
+   frase da fonte do OBS muda por causa disso. Um lugar só guarda. */
+let botLigado = false;
+
+async function leBot() {
+  try {
+    const d = await api('/bot.php');
+    botLigado = !!d.ligado;
+    return d;
+  } catch (e) {
+    /* Servidor mais velho que a página: o painel sai do GitHub Pages na
+       hora, o PHP sobe à mão. Aqui isso não é erro, é "ainda não tem". */
+    return null;
+  }
+}
+
+function telaBot() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Bot' }));
+  tela.appendChild(h('p', { cls: 'sub',
+    txt: 'Um bot que também mexe no seu OBS: responde no chat com o OBS fechado e, com ele aberto, troca de cena, muta e acende a luz.' }));
+
+  const bt = h('button', { cls: 'bt principal', type: 'button', txt: 'Colocar bot no chat' });
+  const diz = h('div', { cls: 'd', style: 'font-size:13px' });
+  const quem = h('p', { cls: 'd', style: 'font-size:12.5px;margin:10px 0 0' });
+  const cxResponde = h('div');
+  const cxFalas = h('div');
+
+  /* ----- o estado, e o botão que diz o que vai acontecer ----- */
+  function pinta(d) {
+    botLigado = !!(d && d.ligado);
+    const falta = (d && d.falta) || '';
+
+    bt.disabled = falta === 'sem-bot';
+    bt.textContent = botLigado ? 'Tirar bot do chat' : 'Colocar bot no chat';
+    bt.className = 'bt' + (botLigado ? ' fraco' : ' principal');
+
+    let texto = 'Com ele no chat, os seus comandos respondem mesmo com o OBS fechado.';
+    let cor = '';
+    if (falta === 'sem-bot') {
+      texto = 'O bot ainda não foi ligado neste servidor.';
+    } else if (falta === 'sem-permissao') {
+      texto = 'Falta a permissão pra ele falar no seu canal. Entre com a Twitch de novo.';
+      cor = 'var(--dourado)';
+    } else if (botLigado) {
+      /* O CASO CHATO É ESTE: "liguei e não acontece nada".
+         Só a Twitch sabe se a assinatura vingou, então é ela que responde.
+         Campo ausente é servidor antigo, não é problema. */
+      const st = d.estado;
+      if (!st || st === 'enabled') {
+        texto = 'Está no seu chat, ouvindo.';
+        cor = 'var(--verde-forte)';
+      } else if (st === 'webhook_callback_verification_pending') {
+        texto = 'A Twitch está confirmando… recarregue daqui a pouco.';
+        cor = 'var(--dourado)';
+      } else {
+        texto = 'A Twitch não confirmou (' + st + '). Tire e coloque de novo.';
+        cor = 'var(--perigo)';
+      }
+    }
+    diz.textContent = texto;
+    diz.style.color = cor;
+
+    quem.textContent = d && d.nome
+      ? 'Quem fala no seu chat é a conta ' + d.nome + '.'
+      : '';
+    quem.classList.toggle('escondido', !(d && d.nome));
+  }
+
+  bt.onclick = async () => {
+    const entrando = !botLigado;
+    bt.disabled = true;
+    diz.style.color = '';
+    diz.textContent = entrando ? 'entrando no chat…' : 'saindo do chat…';
+    try {
+      await api('/bot.php', { method: 'POST', body: JSON.stringify({ acao: entrando ? 'entrar' : 'sair' }) });
+      await carrega();
+    } catch (e) {
+      diz.textContent = e.message;
+      diz.style.color = 'var(--perigo)';
+      bt.disabled = false;
+    }
+  };
+
+  /* ----- o que ele sabe responder ----- */
+  function pintaResponde(lista) {
+    cxResponde.innerHTML = '';
+    if (!lista) {
+      cxResponde.appendChild(h('p', { cls: 'd', style: 'font-size:12.5px;margin:0',
+        txt: 'Este servidor ainda não sabe responder isso. Suba os arquivos novos da pasta api.' }));
+    } else if (!lista.length) {
+      cxResponde.appendChild(h('p', { cls: 'd', style: 'font-size:12.5px;margin:0',
+        txt: 'Nenhum comando com resposta ainda.' }));
+    } else {
+      const fila = h('div', { cls: 'bot-lista' });
+      lista.forEach((c) => {
+        const nomes = ['!' + c.nome].concat(
+          (c.apelidos || '').split(/[\s,]+/).filter(Boolean).map((a) => '!' + a));
+        fila.appendChild(h('span', { cls: 'bot-cmd', txt: nomes.join(' ') }));
+      });
+      cxResponde.appendChild(fila);
+    }
+    const ir = h('a', { href: '#/comandos', txt: 'Mexer nos comandos' });
+    cxResponde.appendChild(h('p', { style: 'font-size:12.5px;margin:12px 0 0' }, [ir]));
+  }
+
+  /* ----- o que ele acabou de falar ----- */
+  function pintaFalas(falas) {
+    cxFalas.innerHTML = '';
+    if (!falas || !falas.length) {
+      cxFalas.appendChild(h('p', { cls: 'd', style: 'font-size:12.5px;margin:0',
+        txt: falas
+          ? 'Ele ainda não falou nada. Mande um comando no seu chat e volte aqui.'
+          : 'Este servidor ainda não guarda o que o bot fala. Suba os arquivos novos da pasta api e rode o SQL 056.' }));
+      return;
+    }
+    falas.forEach((f) => {
+      const hora = (f.criado_em || '').slice(11, 16);
+      const linha = h('div', { cls: 'bot-fala' + (f.erro ? ' ruim' : '') }, [
+        h('span', { cls: 'bot-fala__hora', txt: hora }),
+        h('span', { cls: 'bot-fala__oque', txt: f.erro ? 'não saiu: ' + f.erro : f.texto }),
+      ]);
+      const de = [f.comando ? '!' + f.comando : '', f.quem ? '@' + f.quem : ''].filter(Boolean).join(' · ');
+      if (de) linha.appendChild(h('span', { cls: 'bot-fala__de', txt: de }));
+      cxFalas.appendChild(linha);
+    });
+  }
+
+  async function carrega() {
+    const d = await leBot();
+    if (!d) {
+      diz.textContent = 'Este servidor ainda não tem o bot. Suba os arquivos novos da pasta api.';
+      diz.style.color = 'var(--dourado)';
+      bt.disabled = true;
+      return;
+    }
+    pinta(d);
+    pintaResponde(d.responde);
+    pintaFalas(d.falas);
+  }
+
+  tela.appendChild(h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'No seu chat' }),
+    h('div', { cls: 'barra-cmd', style: 'margin-bottom:8px' }, [bt]),
+    diz,
+    quem,
+  ]));
+
+  tela.appendChild(h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'O que ele responde' }),
+    cxResponde,
+  ]));
+
+  tela.appendChild(h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'O que ele falou' }),
+    h('p', { cls: 'd', txt: 'As últimas vinte. Serve pra saber se o problema foi o comando, a permissão ou a Twitch.' }),
+    cxFalas,
+  ]));
+
+  carrega();
+}
+
 function telaComandos() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -7077,72 +7378,21 @@ function telaComandos() {
     pintaPonte();
   };
 
-  /* ----- o bot dentro do chat -----
+  /* O BOT TEM TELA PRÓPRIA.
 
-     Ligado, a Twitch avisa o nosso servidor a cada mensagem e a resposta
-     sai com o OBS fechado. As ações no OBS continuam sendo da fonte.
+     Ele morava aqui dentro, como um botão no meio da lista de comandos —
+     e um bot escondido numa tela de configuração não parece produto,
+     parece opção. A linha abaixo é só o atalho; quem manda é o #/bot. */
+  const linhaNuvem = h('div', { cls: 'd linha-ponte' });
 
-     Botão, e não chavinha: "colocar" e "tirar" dizem o que vai acontecer,
-     enquanto uma chave ligada só diz onde ela está. */
-  const btNuvem = h('button', { cls: 'bt', type: 'button', txt: 'Colocar bot no chat' });
-  const dizNuvem = h('span', { cls: 'd', style: 'font-size:12.5px' });
-  const linhaNuvem = h('div', { cls: 'escondido',
-    style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px' }, [btNuvem, dizNuvem]);
-  let nuvemLigada = false;
-
-  function pintaBotaoNuvem(d) {
-    nuvemLigada = !!d.ligado;
-    linhaNuvem.classList.remove('escondido');
-    btNuvem.disabled = d.falta === 'sem-bot';
-    btNuvem.textContent = nuvemLigada ? 'Tirar bot do chat' : 'Colocar bot no chat';
-    btNuvem.className = 'bt' + (nuvemLigada ? ' fraco' : ' principal');
-
-    let texto = 'com isso os comandos respondem mesmo com o OBS fechado';
-    let cor = '';
-    if (d.falta === 'sem-bot') {
-      texto = 'o bot ainda não foi ligado neste servidor';
-    } else if (d.falta === 'sem-permissao') {
-      texto = 'entre com a Twitch de novo pra liberar';
-      cor = 'var(--dourado)';
-    } else if (nuvemLigada) {
-      /* O que a Twitch responde sobre a assinatura: é aqui que aparece o
-         caso chato de "liguei e não acontece nada". */
-      if (d.estado === 'enabled' || d.estado === '') {
-        texto = 'o bot está no seu chat e responde com o OBS fechado';
-        cor = 'var(--verde-forte)';
-      } else if (d.estado === 'webhook_callback_verification_pending') {
-        texto = 'a Twitch está confirmando… recarregue daqui a pouco';
-        cor = 'var(--dourado)';
-      } else {
-        texto = 'a Twitch não confirmou (' + d.estado + '). Tire e coloque de novo.';
-        cor = 'var(--perigo)';
-      }
-    }
-    dizNuvem.textContent = texto;
-    dizNuvem.style.color = cor;
+  function pintaAtalhoBot() {
+    linhaNuvem.innerHTML = '';
+    const ir = h('a', { href: '#/bot', txt: 'Abrir a tela do bot' });
+    linhaNuvem.appendChild(h('span', { txt: botLigado
+      ? 'O bot está no seu chat: estes comandos respondem mesmo com o OBS fechado. '
+      : 'O bot não está no seu chat: hoje só respondem com o OBS aberto. ' }));
+    linhaNuvem.appendChild(ir);
   }
-
-  async function pintaNuvem() {
-    try {
-      pintaBotaoNuvem(await api('/bot.php'));
-    } catch (e) { /* servidor antigo: a linha fica escondida */ }
-  }
-
-  btNuvem.onclick = async () => {
-    const entrando = !nuvemLigada;
-    btNuvem.disabled = true;
-    dizNuvem.style.color = '';
-    dizNuvem.textContent = entrando ? 'entrando no chat…' : 'saindo do chat…';
-    try {
-      await api('/bot.php', { method: 'POST', body: JSON.stringify({ acao: entrando ? 'entrar' : 'sair' }) });
-      await pintaNuvem();
-      await pintaPonte();
-    } catch (e) {
-      dizNuvem.textContent = e.message;
-      dizNuvem.style.color = 'var(--perigo)';
-      btNuvem.disabled = false;
-    }
-  };
 
   /* A ponte vive escondida no OBS: é aqui que ela aparece. */
   async function pintaPonte() {
@@ -7153,10 +7403,10 @@ function telaComandos() {
     const linha = (txt, cor) => estadoPonte.appendChild(h('div', { style: cor ? 'color:' + cor : '', txt: txt }));
 
     if (!d.ligada) {
-      linha(nuvemLigada
+      linha(botLigado
         ? 'A fonte do OBS está fechada: as respostas saem pelo bot, mas cena, mute e luz precisam dela aberta.'
         : 'A fonte do OBS não está publicando nada. Abra o OBS e confira se a fonte da ponte está lá.',
-        nuvemLigada ? 'var(--dourado)' : 'var(--perigo)');
+        botLigado ? 'var(--dourado)' : 'var(--perigo)');
     } else if ((e.versao || '') !== PONTE_VERSAO) {
       linha('A fonte do OBS está com o código antigo (o OBS guarda em cache). No OBS: botão direito na fonte da ponte → Atualizar.', 'var(--dourado)');
     } else {
@@ -7219,11 +7469,11 @@ function telaComandos() {
 
       const ap = h('button', { cls: 'bt mini perigo esconde-mini', type: 'button', txt: 'Apagar' });
       ap.onclick = async () => {
-        if (!confirm('Apagar o !' + c.nome + '?')) return;
         try {
           await api('/comandos.php', { method: 'POST', body: JSON.stringify({ acao: 'apagar', id: c.id }) });
           avisaPonte();
           carrega();
+          podeDesfazer('!' + c.nome + ' apagado.', () => refazComando(c).then(carrega));
         } catch (e) { recado(e.message, 'ruim'); }
       };
 
@@ -7328,12 +7578,12 @@ function telaComandos() {
     /* O apagar também mora aqui: no celular ele sai da lista. */
     const apagar = h('button', { cls: 'bt fraco perigo', type: 'button', txt: 'Apagar' });
     apagar.onclick = async () => {
-      if (!confirm('Apagar o !' + atual.nome + '?')) return;
       try {
         await api('/comandos.php', { method: 'POST', body: JSON.stringify({ acao: 'apagar', id: atual.id }) });
         avisaPonte();
         fechaPop();
         carrega();
+        podeDesfazer('!' + atual.nome + ' apagado.', () => refazComando(atual).then(carrega));
       } catch (e) { diz.textContent = e.message; diz.style.color = 'var(--perigo)'; }
     };
 
@@ -7401,11 +7651,12 @@ function telaComandos() {
       ed.onclick = () => abreGatilho(g);
       const ap = h('button', { cls: 'bt mini perigo esconde-mini', type: 'button', txt: 'Apagar' });
       ap.onclick = async () => {
-        if (!confirm('Apagar este gatilho?')) return;
         try {
           await api('/comandos.php', { method: 'POST', body: JSON.stringify({ acao: 'gatilho-apagar', id: g.id }) });
           avisaPonte();
           carrega();
+          podeDesfazer('Gatilho de ' + rotuloEvento(g.evento).toLowerCase() + ' apagado.',
+                       () => refazGatilho(g).then(carrega));
         } catch (e) { recado(e.message, 'ruim'); }
       };
       corpoGat.appendChild(h('tr', { cls: g.ligado === 0 ? 'off' : '' }, [
@@ -7504,12 +7755,13 @@ function telaComandos() {
     /* O apagar também mora aqui: no celular ele sai da lista. */
     const apagar = h('button', { cls: 'bt fraco perigo', type: 'button', txt: 'Apagar' });
     apagar.onclick = async () => {
-      if (!confirm('Apagar este gatilho?')) return;
       try {
         await api('/comandos.php', { method: 'POST', body: JSON.stringify({ acao: 'gatilho-apagar', id: atual.id }) });
         avisaPonte();
         fechaPop();
         carrega();
+        podeDesfazer('Gatilho de ' + rotuloEvento(atual.evento).toLowerCase() + ' apagado.',
+                     () => refazGatilho(atual).then(carrega));
       } catch (e) { diz.textContent = e.message; diz.style.color = 'var(--perigo)'; }
     };
 
@@ -7564,11 +7816,11 @@ function telaComandos() {
       ed.onclick = () => abreRecado(r);
       const ap = h('button', { cls: 'bt mini perigo esconde-mini', type: 'button', txt: 'Apagar' });
       ap.onclick = async () => {
-        if (!confirm('Apagar este recado?')) return;
         try {
           await api('/comandos.php', { method: 'POST', body: JSON.stringify({ acao: 'recado-apagar', id: r.id }) });
           avisaPonte();
           carrega();
+          podeDesfazer('Recado "' + (r.nome || 'sem nome') + '" apagado.', () => refazRecado(r).then(carrega));
         } catch (e) { recado(e.message, 'ruim'); }
       };
 
@@ -7659,12 +7911,13 @@ function telaComandos() {
     /* O apagar também mora aqui: no celular ele sai da lista. */
     const apagar = h('button', { cls: 'bt fraco perigo', type: 'button', txt: 'Apagar' });
     apagar.onclick = async () => {
-      if (!confirm('Apagar este recado?')) return;
       try {
         await api('/comandos.php', { method: 'POST', body: JSON.stringify({ acao: 'recado-apagar', id: atual.id }) });
         avisaPonte();
         fechaPop();
         carrega();
+        podeDesfazer('Recado "' + (atual.nome || 'sem nome') + '" apagado.',
+                     () => refazRecado(atual).then(carrega));
       } catch (e) { diz.textContent = e.message; diz.style.color = 'var(--perigo)'; }
     };
 
@@ -7741,7 +7994,7 @@ function telaComandos() {
   /* Nesta ordem: a linha da ponte muda de texto quando o bot está no chat,
      então ela só se pinta depois de saber disso. */
   carrega();
-  pintaNuvem().then(pintaPonte);
+  leBot().then(() => { pintaAtalhoBot(); pintaPonte(); });
 }
 
 /* A prévia devolve o arrasto por mensagem. Só aceito da mesma origem, e só
@@ -9170,6 +9423,7 @@ function rota() {
 
   if (p[0] === 'inicio') return telaInicio();
   if (p[0] === 'meu') return telaControlador();
+  if (p[0] === 'bot') return telaBot();
   if (p[0] === 'comandos') return telaComandos();
   if (p[0] === 'tutorial') return telaTutorial();
   if (p[0] === 'admin') return abreAdmin();
@@ -9192,6 +9446,7 @@ window.addEventListener('hashchange', rota);
 /* A marca leva pra vitrine, não pra lista. Quem clica no nome do site espera
    a porta de entrada — a lista já tem aba própria. */
 el('irInicio').onclick = () => vaiPara('#/inicio');
+el('abaBot').onclick = () => { fechaBandejas(null); vaiPara('#/bot'); };
 el('abaMeu').onclick = () => { fechaBandejas(null); vaiPara('#/meu'); };
 el('abaArtistas').onclick = () => { fechaBandejas(null); vaiPara('#/artistas'); };
 el('abaMeusOverlays').onclick = () => { fechaBandejas(null); vaiPara('#/overlays'); };
@@ -9211,7 +9466,7 @@ const TELAS_ABERTAS = ['inicio', 'artistas', 'tutorial'];
 function ficaOlhando() {
   olhando = true;
   try { localStorage.setItem(OLHADINHA, '1'); } catch (e) {}
-  ['abaOverlays', 'abaFerramentas', 'abaMeu', 'busca'].forEach((id) => {
+  ['abaOverlays', 'abaFerramentas', 'abaBot', 'abaMeu', 'busca'].forEach((id) => {
     const a = el(id);
     if (a) a.classList.add('escondido');
   });
@@ -9314,7 +9569,7 @@ async function carrega() {
     /* As abas do painel não servem pra quem não entrou: clicar em qualquer
        uma delas só levaria a uma tela que falha. Some com elas e o que resta
        é a vitrine e o botão de entrar. */
-    ['abaOverlays', 'abaFerramentas', 'abaMeu', 'busca'].forEach((id) => {
+    ['abaOverlays', 'abaFerramentas', 'abaBot', 'abaMeu', 'busca'].forEach((id) => {
       const a = el(id);
       if (a) a.classList.add('escondido');
     });

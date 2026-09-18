@@ -197,6 +197,13 @@ try {
 
         $modo = in_array($p['modo'] ?? '', ['say', 'reply', 'mention'], true) ? $p['modo'] : 'say';
         $r = chat_enviar($uid, $saida, $modo, $msgId, $login);
+        chat_anota($uid, [
+            'texto'   => (string) ($r['texto'] ?? $saida),
+            'comando' => (string) $cmd['nome'],
+            'quem'    => $login,
+            'origem'  => 'nuvem',
+            'erro'    => empty($r['ok']) ? (string) ($r['erro'] ?? 'não saiu') : '',
+        ]);
         if (empty($r['ok'])) {
             error_log('[zc] bot no chat de ' . $uid . ': ' . (string) ($r['erro'] ?? '?'));
         }

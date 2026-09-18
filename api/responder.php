@@ -38,7 +38,7 @@ if (!empty($d['teste'])) {
     trava('responder-teste', 6, 600);
     $escopos = chat_escopos($uid);
     try {
-        $r = chat_enviar($uid, 'Teste do ZocaController: o bot está falando aqui.');
+        $r = chat_enviar($uid, 'Teste do ZocaHub: o bot está falando aqui.');
     } catch (Throwable $e) {
         $r = ['ok' => false, 'erro' => erro_publico($e)];
     }
@@ -173,4 +173,13 @@ try {
 
 /* $(if) falso sem "senão": a resposta não sai, e isso não é erro. */
 if ($r === null) json_saida(['ok' => true, 'calado' => true]);
+
+chat_anota($uid, [
+    'texto'   => (string) ($r['texto'] ?? $saida),
+    'comando' => (string) $contador,
+    'quem'    => (string) $ctx['login'],
+    'origem'  => 'ponte',
+    'erro'    => empty($r['ok']) ? (string) ($r['erro'] ?? 'nao saiu') : '',
+]);
+
 json_saida($r, $r['ok'] ? 200 : 502);

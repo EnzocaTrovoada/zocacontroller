@@ -147,6 +147,8 @@ return [
        conta do bot: a pagina mostra a linha pronta. */
     'twitch_bot' => [
         'user_id' => '',
+        // So pra tela mostrar o nome sem perguntar pra Twitch. Vazio funciona.
+        'login'   => '',
     ],
 
     // Para onde mandar o streamer depois do login.
