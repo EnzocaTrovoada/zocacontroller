@@ -269,7 +269,7 @@
     surg:     { t: 'n', d: 5,   min: 0,  max: 180 },
     surgc:    { t: 'c', d: '#ff4d4d' },
     /* subathon: a legenda "o que dá quanto". Os valores vêm prontos do painel
-       do ZocaController — quem usa o relógio sozinho preenche na mão. */
+       do ZocaHub — quem usa o relógio sozinho preenche na mão. */
     leg:      { t: 'b', d: 1 },
     vsub1:    { t: 'n', d: 0, min: 0, max: 86400 },
     vsub2:    { t: 'n', d: 0, min: 0, max: 86400 },

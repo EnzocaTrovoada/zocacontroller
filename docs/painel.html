@@ -11,7 +11,7 @@
      no-referrer não manda nada, e não custa nada. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Painel — ZocaController</title>
+<title>Painel — ZocaHub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -152,9 +152,9 @@
   <p>Cole a senha do WebSocket do OBS. Fica guardada aqui e você não digita de novo.</p>
   <input id="senha" type="password" placeholder="senha (vazio se não tiver)" autocomplete="off">
   <input id="porta" type="text" value="4455" inputmode="numeric">
-  <p style="margin:10px 0 6px">A chave do ZocaController libera palpite, título e categoria.
+  <p style="margin:10px 0 6px">A chave do ZocaHub libera palpite, título e categoria.
      Sem ela o resto funciona igual.</p>
-  <input id="chave" type="password" placeholder="chave do ZocaController (opcional)" autocomplete="off">
+  <input id="chave" type="password" placeholder="chave do ZocaHub (opcional)" autocomplete="off">
   <button id="btEntrar">Conectar</button>
   <div id="aviso"></div>
 </div>
@@ -645,7 +645,7 @@ let chavePainel = guardado('zc:chave') || '';
 let palpiteAtual = null;
 
 async function api(caminho, opcoes) {
-  if (!chavePainel) throw new Error('sem a chave do ZocaController');
+  if (!chavePainel) throw new Error('sem a chave do ZocaHub');
   const o = Object.assign({ headers: {} }, opcoes || {});
   o.headers = Object.assign({ 'X-Chave': chavePainel, 'Content-Type': 'application/json' }, o.headers);
   const r = await fetch(API + caminho, o);

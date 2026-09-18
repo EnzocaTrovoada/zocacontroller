@@ -809,7 +809,7 @@ ACOES.clip = ACOES.replay;
 /* Palpites pelo chat. */
 
 async function apiRele(caminho, corpo) {
-  if (!cfg.chave) throw new Error('esta ponte não tem a chave do ZocaController');
+  if (!cfg.chave) throw new Error('esta ponte não tem a chave do ZocaHub');
   const r = await fetch(cfg.api + caminho, {
     method: corpo ? 'POST' : 'GET',
     headers: { 'X-Chave': cfg.chave, 'Content-Type': 'application/json' },
@@ -907,7 +907,7 @@ ACOES.marcar = {
   minimo: 'mod', espera: 3000,
   async fazer(quem, arg) {
     if (!cfg.chave) {
-      return recado('O marcador precisa da chave do ZocaController no link.', 15000);
+      return recado('O marcador precisa da chave do ZocaHub no link.', 15000);
     }
 
     const t = await tempoDaLive();

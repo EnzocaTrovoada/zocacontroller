@@ -12,11 +12,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- A inicial é a vitrine: essa aparece na busca. As telas de dentro são
      desenhadas por aqui mesmo, sem página própria, então não vazam. -->
-<title>ZocaController — o chat no comando da sua live</title>
+<title>ZocaHub — o chat no comando da sua live</title>
 <meta name="description" content="Overlays que se atualizam sozinhos, o chat mandando no OBS, respostas no chat e metas automáticas. Em português, pra quem transmite na Twitch.">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="ZocaController">
-<meta property="og:title" content="ZocaController — o chat no comando da sua live">
+<meta property="og:site_name" content="ZocaHub">
+<meta property="og:title" content="ZocaHub — o chat no comando da sua live">
 <meta property="og:description" content="Overlays que se atualizam sozinhos, o chat mandando no OBS, respostas no chat e metas automáticas.">
 <meta name="twitter:card" content="summary">
 <!-- O tema entra ANTES do primeiro quadro. Aplicado lá embaixo, no script
@@ -1576,7 +1576,7 @@ try {
       <path d="M22 7.2A9.4 9.4 0 1 0 22 18.8" fill="none" stroke="var(--verde)" stroke-width="3.2" stroke-linecap="round"/>
       <path d="M8.5 9h8l-8 8h8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
-    ZocaController
+    ZocaHub
   </button>
 
   <button class="aba" id="abaOverlays" type="button" aria-expanded="false" aria-haspopup="true">
@@ -4218,7 +4218,7 @@ function abrePro(estado) {
   x.onclick = fechaPop;
   topo.appendChild(x);
 
-  topo.appendChild(h('h2', { txt: 'ZocaController Pro' }));
+  topo.appendChild(h('h2', { txt: 'ZocaHub Pro' }));
 
   const ate = estado.valido_ate ? new Date(estado.valido_ate.replace(' ', 'T')) : null;
   topo.appendChild(h('p', { cls: 'sub', txt: estado.beta
@@ -4560,7 +4560,7 @@ const PRO_CORES = ['#3DD47F', '#45B8BF', '#7C8CF8', '#D98CDE', '#E0A82E',
                    '#4ADE80', '#38BDF8', '#A78BFA', '#F472B6', '#FBBF24'];
 
 const HUB_SELOS = {
-  usuario: ['usuario', 'Usa o ZocaController'],
+  usuario: ['usuario', 'Usa o ZocaHub'],
   pro:     ['pro',     'Assinante'],
   twitch:  ['',        'Descoberta'],
 };
@@ -8346,7 +8346,7 @@ function telaEntrar() {
 
   tela.appendChild(h('div', { cls: 'entrada' }, [
     marca,
-    h('h1', { txt: 'ZocaController' }),
+    h('h1', { txt: 'ZocaHub' }),
     h('p', { cls: 'entrada__sub', txt: 'Overlays que se atualizam sozinhos, o chat mandando no OBS e a sua live no centro de tudo.' }),
     h('a', { cls: 'entrada__bt', href: API + '/entrar.php' }, [
       h('span', { cls: 'ic', txt: '▶' }),
@@ -8420,7 +8420,7 @@ function cartaoArtista(a, seloArtista, eMeu) {
   const topo = h('div', { cls: 'topo' }, [h('span', { cls: 'nm', txt: a.nome })]);
   if (a.sem_ia) {
     topo.appendChild(chipSelo(seloArtista
-      || { nome: 'Artista', cor: '#6B3FA0', dica: 'Artista conferido pelo ZocaController, sem IA' }));
+      || { nome: 'Artista', cor: '#6B3FA0', dica: 'Artista conferido pelo ZocaHub, sem IA' }));
   }
 
   const corpo = h('div', { cls: 'arte-corpo' }, [topo]);

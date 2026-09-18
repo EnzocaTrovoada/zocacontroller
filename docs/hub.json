@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-18",
+      "titulo": "Agora é ZocaHub",
+      "texto": "O nome mudou: ZocaController virou ZocaHub. Nada mais mudou — os links, os overlays e a sua conta continuam iguais."
+    },
+    {
+      "data": "2026-09-18",
       "titulo": "Dá pra olhar o site sem entrar",
       "texto": "Quem chega sem conta agora tem o botão \"Estou só dando uma olhadinha…\": dá pra ver o feed, a vitrine e os artistas antes de decidir entrar. Curtir, comentar e postar continuam pedindo a conta da Twitch. E o bot no chat virou um botão que diz o que vai acontecer: \"Colocar bot no chat\" e, quando ele está lá, \"Tirar bot do chat\"."
     },
