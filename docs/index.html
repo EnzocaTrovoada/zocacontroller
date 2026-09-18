@@ -7080,45 +7080,68 @@ function telaComandos() {
   /* ----- o bot dentro do chat -----
 
      Ligado, a Twitch avisa o nosso servidor a cada mensagem e a resposta
-     sai com o OBS fechado. As ações no OBS continuam sendo da fonte. */
-  const chaveNuvem = h('input', { type: 'checkbox' });
+     sai com o OBS fechado. As ações no OBS continuam sendo da fonte.
+
+     Botão, e não chavinha: "colocar" e "tirar" dizem o que vai acontecer,
+     enquanto uma chave ligada só diz onde ela está. */
+  const btNuvem = h('button', { cls: 'bt', type: 'button', txt: 'Colocar bot no chat' });
   const dizNuvem = h('span', { cls: 'd', style: 'font-size:12.5px' });
   const linhaNuvem = h('div', { cls: 'escondido',
-    style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px' }, [
-    h('span', { cls: 'chave', title: 'O bot no seu chat' }, [chaveNuvem, h('span')]),
-    h('b', { style: 'font-size:13px', txt: 'Deixar o bot no meu chat' }),
-    dizNuvem,
-  ]);
+    style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px' }, [btNuvem, dizNuvem]);
   let nuvemLigada = false;
 
-  async function pintaNuvem() {
-    let d;
-    try { d = await api('/bot.php'); } catch (e) { return; }
-    linhaNuvem.classList.remove('escondido');
+  function pintaBotaoNuvem(d) {
     nuvemLigada = !!d.ligado;
-    chaveNuvem.checked = nuvemLigada;
-    chaveNuvem.disabled = d.falta === 'sem-bot';
-    dizNuvem.textContent = nuvemLigada
-      ? 'responde mesmo com o OBS fechado'
-      : (d.falta === 'sem-bot' ? 'o bot ainda não foi ligado neste servidor'
-        : (d.falta === 'sem-permissao' ? 'entre com a Twitch de novo pra liberar'
-        : 'sem isso, os comandos só respondem com o OBS aberto'));
+    linhaNuvem.classList.remove('escondido');
+    btNuvem.disabled = d.falta === 'sem-bot';
+    btNuvem.textContent = nuvemLigada ? 'Tirar bot do chat' : 'Colocar bot no chat';
+    btNuvem.className = 'bt' + (nuvemLigada ? ' fraco' : ' principal');
+
+    let texto = 'com isso os comandos respondem mesmo com o OBS fechado';
+    let cor = '';
+    if (d.falta === 'sem-bot') {
+      texto = 'o bot ainda não foi ligado neste servidor';
+    } else if (d.falta === 'sem-permissao') {
+      texto = 'entre com a Twitch de novo pra liberar';
+      cor = 'var(--dourado)';
+    } else if (nuvemLigada) {
+      /* O que a Twitch responde sobre a assinatura: é aqui que aparece o
+         caso chato de "liguei e não acontece nada". */
+      if (d.estado === 'enabled' || d.estado === '') {
+        texto = 'o bot está no seu chat e responde com o OBS fechado';
+        cor = 'var(--verde-forte)';
+      } else if (d.estado === 'webhook_callback_verification_pending') {
+        texto = 'a Twitch está confirmando… recarregue daqui a pouco';
+        cor = 'var(--dourado)';
+      } else {
+        texto = 'a Twitch não confirmou (' + d.estado + '). Tire e coloque de novo.';
+        cor = 'var(--perigo)';
+      }
+    }
+    dizNuvem.textContent = texto;
+    dizNuvem.style.color = cor;
   }
 
-  chaveNuvem.onchange = async () => {
-    const entrando = chaveNuvem.checked;
-    chaveNuvem.disabled = true;
+  async function pintaNuvem() {
+    try {
+      pintaBotaoNuvem(await api('/bot.php'));
+    } catch (e) { /* servidor antigo: a linha fica escondida */ }
+  }
+
+  btNuvem.onclick = async () => {
+    const entrando = !nuvemLigada;
+    btNuvem.disabled = true;
+    dizNuvem.style.color = '';
     dizNuvem.textContent = entrando ? 'entrando no chat…' : 'saindo do chat…';
     try {
       await api('/bot.php', { method: 'POST', body: JSON.stringify({ acao: entrando ? 'entrar' : 'sair' }) });
-      recado(entrando ? 'O bot entrou no seu chat.' : 'O bot saiu do seu chat.', 'bom');
+      await pintaNuvem();
+      await pintaPonte();
     } catch (e) {
-      chaveNuvem.checked = !entrando;
-      recado(e.message, 'ruim');
+      dizNuvem.textContent = e.message;
+      dizNuvem.style.color = 'var(--perigo)';
+      btNuvem.disabled = false;
     }
-    chaveNuvem.disabled = false;
-    pintaNuvem();
-    pintaPonte();
   };
 
   /* A ponte vive escondida no OBS: é aqui que ela aparece. */
@@ -7715,9 +7738,10 @@ function telaComandos() {
     pintaRecados();
   }
 
+  /* Nesta ordem: a linha da ponte muda de texto quando o bot está no chat,
+     então ela só se pinta depois de saber disso. */
   carrega();
-  pintaNuvem();
-  pintaPonte();
+  pintaNuvem().then(pintaPonte);
 }
 
 /* A prévia devolve o arrasto por mensagem. Só aceito da mesma origem, e só
@@ -8317,6 +8341,9 @@ function telaEntrar() {
   const galeria = h('button', { cls: 'entrada__outro', type: 'button', txt: 'Conhecer os artistas' });
   galeria.onclick = () => vaiPara('#/artistas');
 
+  const olhada = h('button', { cls: 'entrada__outro', type: 'button', txt: 'Estou só dando uma olhadinha…' });
+  olhada.onclick = ficaOlhando;
+
   tela.appendChild(h('div', { cls: 'entrada' }, [
     marca,
     h('h1', { txt: 'ZocaController' }),
@@ -8326,6 +8353,7 @@ function telaEntrar() {
       document.createTextNode('Entrar com a Twitch'),
     ]),
     h('p', { cls: 'entrada__nota', txt: 'Você entra com a sua conta da Twitch. Sem senha nova pra decorar.' }),
+    olhada,
     galeria,
   ]));
 }
@@ -9133,8 +9161,11 @@ function rota() {
      de entrar da barra só aparece na galeria: na tela de entrada ele seria
      o mesmo botão duas vezes. */
   if (!chave) {
-    el('abaEntrar').classList.toggle('escondido', p[0] !== 'artistas');
-    if (p[0] !== 'artistas') return telaEntrar();
+    const aberta = p[0] === 'artistas' || (olhando && TELAS_ABERTAS.includes(p[0]));
+    /* O botão de entrar acompanha o visitante em tudo que ele pode ver. Na
+       própria tela de entrada ele seria o mesmo botão duas vezes. */
+    el('abaEntrar').classList.toggle('escondido', !aberta);
+    if (!aberta) return telaEntrar();
   }
 
   if (p[0] === 'inicio') return telaInicio();
@@ -9164,6 +9195,28 @@ el('irInicio').onclick = () => vaiPara('#/inicio');
 el('abaMeu').onclick = () => { fechaBandejas(null); vaiPara('#/meu'); };
 el('abaArtistas').onclick = () => { fechaBandejas(null); vaiPara('#/artistas'); };
 el('abaMeusOverlays').onclick = () => { fechaBandejas(null); vaiPara('#/overlays'); };
+
+/* SÓ DANDO UMA OLHADINHA.
+
+   Quem chega sem conta caía direto na tela de entrar, e não via nada do
+   site. Agora dá pra olhar o feed, a vitrine e os artistas antes de
+   decidir — sem poder interagir, que isso continua pedindo conta. */
+const OLHADINHA = 'zc:olhadinha';
+let olhando = false;
+try { olhando = localStorage.getItem(OLHADINHA) === '1'; } catch (e) {}
+
+/* As telas que um visitante alcança. O resto leva pra entrada. */
+const TELAS_ABERTAS = ['inicio', 'artistas', 'tutorial'];
+
+function ficaOlhando() {
+  olhando = true;
+  try { localStorage.setItem(OLHADINHA, '1'); } catch (e) {}
+  ['abaOverlays', 'abaFerramentas', 'abaMeu', 'busca'].forEach((id) => {
+    const a = el(id);
+    if (a) a.classList.add('escondido');
+  });
+  vaiPara('#/inicio');
+}
 
 /* De qual conta é esta tela, e se a lista nela é a de verdade. */
 let quemSou = '';
@@ -9265,6 +9318,9 @@ async function carrega() {
       const a = el(id);
       if (a) a.classList.add('escondido');
     });
+    /* Quem já tinha clicado em "só dando uma olhadinha" volta pro feed, e
+       não pra tela de entrar de novo. */
+    if (olhando && !location.hash) { vaiPara('#/inicio'); return; }
     rota();
     return;
   }

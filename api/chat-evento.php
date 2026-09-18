@@ -31,10 +31,19 @@ if ($tipo === '' || $id === '' || $hora === '' || abs(time() - strtotime($hora))
 
 $dados = json_decode($cru, true) ?: [];
 $subId = (string) ($dados['subscription']['id'] ?? '');
+$doCanal = (string) ($dados['subscription']['condition']['broadcaster_user_id'] ?? '');
 
+/* PELO ID DA ASSINATURA, OU PELO DONO DO CANAL.
+
+   Na confirmação do endereço a Twitch chega antes de a gente ter gravado o
+   id da assinatura: ela cria e confirma no mesmo segundo. Procurar também
+   pelo canal faz a primeira confirmação passar. */
 try {
-    $st = db()->prepare('SELECT * FROM bot_chat WHERE sub_id = ? LIMIT 1');
-    $st->execute([$subId]);
+    $st = db()->prepare(
+        'SELECT b.* FROM bot_chat b JOIN usuarios u ON u.id = b.usuario_id
+          WHERE b.sub_id = ? OR u.twitch_user_id = ? LIMIT 1'
+    );
+    $st->execute([$subId, $doCanal]);
     $canal = $st->fetch();
 } catch (Throwable $e) {
     $canal = null;

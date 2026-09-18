@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-18",
+      "titulo": "Dá pra olhar o site sem entrar",
+      "texto": "Quem chega sem conta agora tem o botão \"Estou só dando uma olhadinha…\": dá pra ver o feed, a vitrine e os artistas antes de decidir entrar. Curtir, comentar e postar continuam pedindo a conta da Twitch. E o bot no chat virou um botão que diz o que vai acontecer: \"Colocar bot no chat\" e, quando ele está lá, \"Tirar bot do chat\"."
+    },
+    {
+      "data": "2026-09-18",
       "titulo": "O bot fica no seu chat, com o OBS fechado",
       "texto": "Em Comandos tem uma chave nova: \"Deixar o bot no meu chat\". Ligada, a Twitch avisa o nosso servidor a cada mensagem e os comandos de resposta funcionam mesmo com o OBS fechado — como no StreamElements. As ações no OBS (cena, mute, luz) continuam precisando da fonte aberta, porque só ela fala com o seu OBS. A tela também ficou mais enxuta e o texto, mais escuro no modo claro."
     },

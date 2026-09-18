@@ -42,10 +42,31 @@ function bot_falta(int $uid): string
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $linha = bot_linha($uid);
-    json_saida([
+    $saida = [
         'ligado' => $linha ? (bool) $linha['ligado'] : false,
         'falta'  => bot_falta($uid),
-    ]);
+        'estado' => '',
+    ];
+
+    /* O QUE A TWITCH ACHA DISSO.
+
+       "enabled" é o que importa. Os outros dois casos são justamente os que
+       deixam a pessoa olhando pra um botão ligado sem nada acontecer:
+       verificação pendente, ou verificação que falhou. */
+    if ($linha && (string) $linha['sub_id'] !== '') {
+        try {
+            [$h, $r] = tw_helix_app('GET', '/eventsub/subscriptions', ['type' => 'channel.chat.message']);
+            foreach (($r['data'] ?? []) as $sub) {
+                if ((string) ($sub['id'] ?? '') === (string) $linha['sub_id']) {
+                    $saida['estado'] = (string) ($sub['status'] ?? '');
+                    break;
+                }
+            }
+            if ($h === 200 && $saida['estado'] === '') $saida['estado'] = 'sumiu';
+        } catch (Throwable $e) { /* sem resposta da Twitch, vale o que temos */ }
+    }
+
+    json_saida($saida);
 }
 
 $d = corpo_json();
@@ -87,6 +108,21 @@ $corpo   = [
     'transport' => ['method' => 'webhook', 'callback' => api_base() . '/chat-evento.php', 'secret' => $segredo],
 ];
 
+/* O SEGREDO VAI PRO BANCO ANTES DE PEDIR A ASSINATURA.
+
+   A Twitch confirma o endereço na mesma hora: ela chama o chat-evento.php
+   enquanto esta requisição ainda está aberta. Sem a linha gravada, essa
+   primeira confirmação chega, não acha segredo nenhum e é recusada — e a
+   assinatura só vive porque a Twitch tenta de novo depois. */
+try {
+    db()->prepare(
+        "INSERT INTO bot_chat (usuario_id, sub_id, segredo, ligado) VALUES (?, '', ?, 1)
+         ON DUPLICATE KEY UPDATE segredo = VALUES(segredo), ligado = 1"
+    )->execute([$uid, $segredo]);
+} catch (PDOException $e) {
+    json_saida(['erro' => erro_publico($e, 'Falta rodar o SQL 055 no banco.')], 500);
+}
+
 [$http, $r] = tw_helix_app('POST', '/eventsub/subscriptions', [], $corpo);
 
 /* JÁ EXISTE UMA IGUAL: ela tem um segredo que não temos mais, e sem o
@@ -103,18 +139,14 @@ if ($http === 409) {
 }
 
 if ($http !== 202 && $http !== 200) {
+    /* Não deu: a linha sai, senão o painel diz que está ligado sem estar. */
+    db()->prepare('DELETE FROM bot_chat WHERE usuario_id = ?')->execute([$uid]);
     $msg = (string) ($r['message'] ?? ('http ' . $http));
     error_log('[zc] bot no chat recusado (' . $http . '): ' . json_encode($r, JSON_UNESCAPED_UNICODE));
-    json_saida(['erro' => 'A Twitch recusou: ' . mb_substr($msg, 0, 120)], 502);
+    json_saida(['erro' => 'A Twitch recusou: ' . mb_substr($msg, 0, 140)], 502);
 }
 
-try {
-    db()->prepare(
-        'INSERT INTO bot_chat (usuario_id, sub_id, segredo, ligado) VALUES (?, ?, ?, 1)
-         ON DUPLICATE KEY UPDATE sub_id = VALUES(sub_id), segredo = VALUES(segredo), ligado = 1'
-    )->execute([$uid, (string) ($r['data'][0]['id'] ?? ''), $segredo]);
-} catch (PDOException $e) {
-    json_saida(['erro' => erro_publico($e, 'Falta rodar o SQL 055 no banco.')], 500);
-}
+db()->prepare('UPDATE bot_chat SET sub_id = ? WHERE usuario_id = ?')
+    ->execute([(string) ($r['data'][0]['id'] ?? ''), $uid]);
 
 json_saida(['ok' => true, 'ligado' => true, 'estado' => (string) ($r['data'][0]['status'] ?? 'pending')]);
