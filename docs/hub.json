@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-18",
+      "titulo": "O bot fica no seu chat, com o OBS fechado",
+      "texto": "Em Comandos tem uma chave nova: \"Deixar o bot no meu chat\". Ligada, a Twitch avisa o nosso servidor a cada mensagem e os comandos de resposta funcionam mesmo com o OBS fechado — como no StreamElements. As ações no OBS (cena, mute, luz) continuam precisando da fonte aberta, porque só ela fala com o seu OBS. A tela também ficou mais enxuta e o texto, mais escuro no modo claro."
+    },
+    {
+      "data": "2026-09-18",
       "titulo": "Tela de comandos nova, e o comando vale na hora",
       "texto": "A tela de Comandos virou uma lista: cada comando numa linha, com a chave de ligar ali mesmo, e a edição abre numa janela. Junto vieram a busca, os gatilhos e os recados no mesmo formato. E o mais importante: comando criado ou mudado passa a valer na hora — antes a fonte do OBS só relia a lista a cada cinco minutos, e parecia que não funcionava."
     },

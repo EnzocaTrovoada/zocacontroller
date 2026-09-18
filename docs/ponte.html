@@ -187,7 +187,7 @@ if (cfg.hud) el('hud').classList.remove('oculto');
    código velho enquanto o site já mudou — e de fora ninguém vê. A ponte
    conta a versão dela junto do estado, e o painel avisa quando está
    atrasada. Sobe junto com qualquer mudança nesta página. */
-const PONTE_VERSAO = '2026-09-17';
+const PONTE_VERSAO = '2026-09-18';
 
 const estado = {
   obs: false, chat: false,
@@ -1875,6 +1875,10 @@ async function dispararGatilhos(evento, dados) {
    duas, e só a primeira leva. */
 let RECADOS = [];
 
+/* O bot da nuvem está no chat? Então as respostas são dele: aqui só ficam
+   as ações no OBS, que só esta fonte sabe fazer. */
+let NUVEM = false;
+
 async function mandaRecados(aoVivo) {
   const linhas = linhasRecentes();
   for (const r of RECADOS) {
@@ -1922,6 +1926,7 @@ async function carregarComandos() {
     /* Vêm na mesma resposta dos comandos: uma requisição só. */
     GATILHOS = (d.gatilhos || []).filter((g) => (g.passos || []).length);
     RECADOS = (d.recados || []).filter((r) => r.quantas > 0);
+    NUVEM = !!d.nuvem;
 
     const apelidos = [];
     for (const c of (d.comandos || [])) {
@@ -1949,6 +1954,7 @@ async function carregarComandos() {
           for (const p of passos) {
             try {
               if (p.acao === 'responder') {
+                if (NUVEM) continue;          // quem responde é o bot da nuvem
                 await ACOES.responder.fazer(quem, arg, cargo, extra, { comando: c.id, passo: p.i });
               } else {
                 await ACOES[p.acao].fazer(quem, p.argumento || arg, cargo, extra);

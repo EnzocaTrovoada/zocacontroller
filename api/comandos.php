@@ -150,7 +150,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         }
     } catch (Throwable $e) { /* sem o SQL 054, ninguém tem recado */ }
 
+    /* Com o bot na nuvem no chat, quem responde é o servidor. A ponte
+       precisa saber pra não responder também: sairia em dobro. */
+    $nuvem = false;
+    try {
+        $bn = db()->prepare('SELECT ligado FROM bot_chat WHERE usuario_id = ?');
+        $bn->execute([$quem['usuario_id']]);
+        $nuvem = (bool) $bn->fetchColumn();
+    } catch (Throwable $e) { /* sem o SQL 055, ninguém tem bot na nuvem */ }
+
     $saida = [
+        'nuvem'     => $nuvem,
         'comandos'  => $lista,
         'gatilhos'  => $gatilhos,
         'recados'   => $recados,

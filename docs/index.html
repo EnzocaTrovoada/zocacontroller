@@ -43,7 +43,11 @@ try {
   :root {
     color-scheme: light;
     --fundo:#FFFFFF; --caixa:#F6F8F6; --caixa2:#EDF2EE; --linha:#DCE4DD; --linha2:#C9D5CC;
-    --tinta:#101A14; --fraco:#5C6C62; --apagado:#8A9990;
+    /* O TEXTO PEQUENO PRECISA SER LEGIVEL NO CLARO.
+       O apagado estava em #8A9990: 2.8:1 sobre o branco, abaixo do 4.5:1 que
+       texto pequeno pede — e é justamente a cor das explicações. Agora dá
+       5.1:1, e o fraco, 7.4:1. */
+    --tinta:#101A14; --fraco:#47554D; --apagado:#5E6D65;
     --verde:#12A150; --verde-fraco:#E4F5EA; --verde-forte:#0B7A3B;
     --perigo:#C4432B;
     /* O vermelho de estar no ar. Ele NÃO é o --perigo: erro e live são
@@ -1488,8 +1492,10 @@ try {
   .resposta-campo:focus { outline: 0; border-color: var(--verde); }
   .variaveis { margin: 2px 0 14px; font-size: 12.5px; color: var(--fraco); }
   .variaveis summary { cursor: pointer; color: var(--verde-forte); }
-  .variaveis ul { margin: 6px 0 0; padding-left: 18px; }
-  .variaveis li { margin: 3px 0; }
+  .variaveis ul { margin: 6px 0 0; padding: 0; list-style: none; columns: 2; column-gap: 22px; }
+  .variaveis li { margin: 0 0 4px; break-inside: avoid; }
+  .variaveis li code { display: block; }
+  @media (max-width: 560px) { .variaveis ul { columns: 1; } }
   .variaveis code { font: 12px var(--mono); color: var(--tinta); }
   .cmd-desligado { opacity: .5; }
   .imp-linha { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--linha); cursor: pointer; }
@@ -6926,35 +6932,37 @@ function campoDoPasso(p, comModo) {
   return [area, modo];
 }
 
-/* O que a resposta entende, do jeito do StreamElements. */
+/* O que a resposta entende. Curto e em duas colunas: aberta, a lista antiga
+   ocupava meia janela. */
 function ajudaVariaveis() {
   const itens = [
-    ['$(sender)', 'quem mandou o comando'],
-    ['$(touser)', 'a primeira palavra depois do comando (ou quem mandou)'],
-    ['$(1)  $(2)  $(1:)', 'as palavras depois do comando; $(1:) é tudo'],
-    ['$(1|todo mundo)', 'com um padrão pra quando ninguém digitou nada'],
-    ['$(channel)  $(game)  $(title)  $(uptime)', 'o seu canal: nome, jogo, título e há quanto tempo está ao vivo'],
-    ['$(game fulano)', 'o jogo de outro canal, bom pro !so'],
-    ['$(random.1-6)', 'um número sorteado'],
-    ["$(random.pick 'a' 'b')", 'um item sorteado da lista'],
-    ['$(random.chatter)', 'alguém que falou no chat há pouco'],
-    ['$(count)  $(getcount nome)', 'um contador que sobe a cada uso, e a leitura de um contador'],
-    ["$(if $(random.pick 1,0) 'sim' 'não')", 'escolhe um dos lados'],
+    ['$(sender)', 'quem mandou'],
+    ['$(touser)', 'a quem o comando aponta'],
+    ['$(1) $(2) $(1:)', 'as palavras digitadas'],
+    ['$(1|padrão)', 'com um padrão'],
+    ['$(channel) $(game)', 'o seu canal e o jogo'],
+    ['$(title) $(uptime)', 'título e tempo no ar'],
+    ['$(game fulano)', 'o jogo de outro canal'],
+    ['$(random.1-6)', 'número sorteado'],
+    ["$(random.pick 'a' 'b')", 'item sorteado'],
+    ['$(random.chatter)', 'alguém do chat'],
+    ['$(count)', 'contador que sobe'],
+    ['$(getcount nome)', 'lê um contador'],
+    ["$(if x 'sim' 'não')", 'escolhe um lado'],
     ['$(math 2*3)', 'uma conta'],
-    ['$(time America/Sao_Paulo)', 'a hora agora'],
-    ['$(customapi https://...)', 'o começo do que um endereço responde'],
+    ['$(time America/Sao_Paulo)', 'a hora'],
+    ['$(customapi https://…)', 'o que um endereço responde'],
   ];
   return h('details', { cls: 'variaveis' }, [
     h('summary', { txt: 'O que dá pra usar na resposta' }),
-    h('ul', {}, itens.map((i) => h('li', {}, [h('code', { txt: i[0] }), document.createTextNode(' — ' + i[1])]))),
-    h('p', { style: 'margin:6px 0 0', txt: 'Nos gatilhos, {quem} vira o nome da pessoa e {quanto} vira o número.' }),
+    h('ul', {}, itens.map((i) => h('li', {}, [h('code', { txt: i[0] }), document.createTextNode(' ' + i[1])]))),
   ]);
 }
 
 /* A versão que a fonte do OBS deveria estar rodando. Quando ela publica
    outra, é cache do OBS — e a tela diz isso em vez de deixar a pessoa
    adivinhando. Sobe junto com o PONTE_VERSAO do ponte.html. */
-const PONTE_VERSAO = '2026-09-17';
+const PONTE_VERSAO = '2026-09-18';
 
 const resumoTexto = (s) => {
   const t = String(s || '').replace(/\s+/g, ' ').trim();
@@ -7069,6 +7077,50 @@ function telaComandos() {
     pintaPonte();
   };
 
+  /* ----- o bot dentro do chat -----
+
+     Ligado, a Twitch avisa o nosso servidor a cada mensagem e a resposta
+     sai com o OBS fechado. As ações no OBS continuam sendo da fonte. */
+  const chaveNuvem = h('input', { type: 'checkbox' });
+  const dizNuvem = h('span', { cls: 'd', style: 'font-size:12.5px' });
+  const linhaNuvem = h('div', { cls: 'escondido',
+    style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px' }, [
+    h('span', { cls: 'chave', title: 'O bot no seu chat' }, [chaveNuvem, h('span')]),
+    h('b', { style: 'font-size:13px', txt: 'Deixar o bot no meu chat' }),
+    dizNuvem,
+  ]);
+  let nuvemLigada = false;
+
+  async function pintaNuvem() {
+    let d;
+    try { d = await api('/bot.php'); } catch (e) { return; }
+    linhaNuvem.classList.remove('escondido');
+    nuvemLigada = !!d.ligado;
+    chaveNuvem.checked = nuvemLigada;
+    chaveNuvem.disabled = d.falta === 'sem-bot';
+    dizNuvem.textContent = nuvemLigada
+      ? 'responde mesmo com o OBS fechado'
+      : (d.falta === 'sem-bot' ? 'o bot ainda não foi ligado neste servidor'
+        : (d.falta === 'sem-permissao' ? 'entre com a Twitch de novo pra liberar'
+        : 'sem isso, os comandos só respondem com o OBS aberto'));
+  }
+
+  chaveNuvem.onchange = async () => {
+    const entrando = chaveNuvem.checked;
+    chaveNuvem.disabled = true;
+    dizNuvem.textContent = entrando ? 'entrando no chat…' : 'saindo do chat…';
+    try {
+      await api('/bot.php', { method: 'POST', body: JSON.stringify({ acao: entrando ? 'entrar' : 'sair' }) });
+      recado(entrando ? 'O bot entrou no seu chat.' : 'O bot saiu do seu chat.', 'bom');
+    } catch (e) {
+      chaveNuvem.checked = !entrando;
+      recado(e.message, 'ruim');
+    }
+    chaveNuvem.disabled = false;
+    pintaNuvem();
+    pintaPonte();
+  };
+
   /* A ponte vive escondida no OBS: é aqui que ela aparece. */
   async function pintaPonte() {
     estadoPonte.innerHTML = '';
@@ -7078,7 +7130,10 @@ function telaComandos() {
     const linha = (txt, cor) => estadoPonte.appendChild(h('div', { style: cor ? 'color:' + cor : '', txt: txt }));
 
     if (!d.ligada) {
-      linha('A fonte do OBS não está publicando nada. Abra o OBS e confira se a fonte da ponte está lá.', 'var(--perigo)');
+      linha(nuvemLigada
+        ? 'A fonte do OBS está fechada: as respostas saem pelo bot, mas cena, mute e luz precisam dela aberta.'
+        : 'A fonte do OBS não está publicando nada. Abra o OBS e confira se a fonte da ponte está lá.',
+        nuvemLigada ? 'var(--dourado)' : 'var(--perigo)');
     } else if ((e.versao || '') !== PONTE_VERSAO) {
       linha('A fonte do OBS está com o código antigo (o OBS guarda em cache). No OBS: botão direito na fonte da ponte → Atualizar.', 'var(--dourado)');
     } else {
@@ -7091,6 +7146,7 @@ function telaComandos() {
     h('h3', { txt: 'Os seus' }),
     h('div', { cls: 'barra-cmd' }, [busca, btNovo, btImportar, btTeste, dizTeste,
       h('span', { cls: 'espaco' }), contaCmd]),
+    linhaNuvem,
     avisoResposta,
     estadoPonte,
     h('div', { cls: 'rolo-tab' }, [
@@ -7263,14 +7319,12 @@ function telaComandos() {
       h('div', { cls: 'campo' }, [h('label', { txt: 'Outros nomes' }), cApelidos]),
       h('p', { style: 'margin:14px 0 4px;font-size:13px;color:var(--fraco)', txt: 'Faz o quê, nesta ordem' }),
       listaPassos,
-      h('p', { style: 'margin:6px 0 8px;font-size:11.5px;color:var(--apagado)',
-               txt: 'o argumento é o nome de uma cena, de uma fonte, ou o texto de uma enquete — deixe vazio no que não precisa. Pra falar no chat, escolha "responder".' }),
       ajudaVariaveis(),
       h('div', { cls: 'campo' }, [h('label', { txt: 'Quem pode usar' }), cQuem]),
       h('div', { cls: 'campo' }, [h('label', { txt: 'Espera entre usos' }), cEspera,
         h('span', { cls: 'd', txt: 'segundos' })]),
       h('div', { cls: 'campo' }, [h('label', { txt: 'Espera de cada pessoa' }), cPessoa,
-        h('span', { cls: 'd', txt: 'segundos (0 = sem espera própria)' })]),
+        h('span', { cls: 'd', txt: 'segundos' })]),
       h('div', { cls: 'campo' }, [h('label', { txt: 'Ligado' }), h('span', { cls: 'chave' }, [cLigado, h('span')])]),
     ], ehNovo ? [salvar, cancelar, diz] : [salvar, cancelar, h('span', { cls: 'espaco', style: 'flex:1' }), apagar, diz]);
     cNome.focus();
@@ -7295,7 +7349,7 @@ function telaComandos() {
 
   tela.appendChild(h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Sozinho, quando acontecer' }),
-    h('p', { cls: 'd', txt: 'O mesmo comando de cima, só que ninguém precisa digitar: quem dispara é o evento. No texto, {quem} vira o nome da pessoa e {quanto} vira o número.' }),
+    h('p', { cls: 'd', txt: 'Ninguém digita: quem dispara é o evento. No texto, {quem} é a pessoa e {quanto} é o número.' }),
     h('div', { cls: 'barra-cmd' }, [btNovoGat]),
     h('div', { cls: 'rolo-tab' }, [
       h('table', { cls: 'tab' }, [
@@ -7440,7 +7494,7 @@ function telaComandos() {
       h('div', { cls: 'campo' }, [h('label', { txt: 'Quando' }), gEvento]),
       h('div', { cls: 'campo' }, [h('label', { txt: 'A partir de' }), gMin, gUnid]),
       h('p', { cls: 'd', style: 'margin:-4px 0 10px;font-size:11.5px',
-               txt: 'Com o mínimo em 1, uma live movimentada dispara o tempo todo. Dez subs de presente valem "10" de uma vez.' }),
+               txt: 'Dez subs de presente valem "10" de uma vez.' }),
       h('p', { style: 'margin:14px 0 4px;font-size:13px;color:var(--fraco)', txt: 'Faz o quê, nesta ordem' }),
       listaGPassos,
       ajudaVariaveis(),
@@ -7458,7 +7512,7 @@ function telaComandos() {
 
   tela.appendChild(h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'De tempo em tempo' }),
-    h('p', { cls: 'd', txt: 'Um recado que o bot manda sozinho. Com mais de uma mensagem, elas se revezam — e ele só fala se o chat estiver andando, pra não ficar falando sozinho numa sala vazia.' }),
+    h('p', { cls: 'd', txt: 'O bot fala sozinho de tempos em tempos. Com mais de uma mensagem, elas se revezam, e ele só fala se o chat estiver andando.' }),
     h('div', { cls: 'barra-cmd' }, [btNovoRec]),
     h('div', { cls: 'rolo-tab' }, [
       h('table', { cls: 'tab' }, [
@@ -7608,7 +7662,7 @@ function telaComandos() {
       ]),
       h('div', { cls: 'campo' }, [h('label', { txt: 'Ligado' }), h('span', { cls: 'chave' }, [rLigado, h('span')])]),
       h('p', { cls: 'd', style: 'margin:6px 0 0;font-size:11.5px',
-               txt: 'Quem manda é a fonte do OBS: com o OBS fechado, o recado não sai.' }),
+               txt: 'Com o OBS fechado, o recado não sai.' }),
     ], ehNovo ? [salvar, cancelar, diz] : [salvar, cancelar, h('span', { style: 'flex:1' }), apagar, diz]);
     rNome.focus();
   }
@@ -7617,7 +7671,7 @@ function telaComandos() {
 
   const fab = h('details', { cls: 'fatia' });
   fab.appendChild(h('summary', { style: 'cursor:pointer;font:700 15px var(--disp)', txt: 'Os que já funcionam sem criar nada' }));
-  fab.appendChild(h('p', { cls: 'd', style: 'margin:10px 0', txt: 'Quem pode usar cada um é decidido pela etiqueta que a Twitch manda junto da mensagem — não dá pra fingir ser mod. A ordem é: chat, sub, VIP, mod, moderador-chefe, você.' }));
+  fab.appendChild(h('p', { cls: 'd', style: 'margin:10px 0', txt: 'Quem pode usar vem da etiqueta que a Twitch manda na mensagem: não dá pra fingir ser mod.' }));
   const corpoFab = h('tbody');
   DE_FABRICA.filter((c) => c[0] !== 'responder').forEach((c) => {
     corpoFab.appendChild(h('tr', {}, [
@@ -7662,6 +7716,7 @@ function telaComandos() {
   }
 
   carrega();
+  pintaNuvem();
   pintaPonte();
 }
 
