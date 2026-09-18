@@ -1478,6 +1478,27 @@ try {
   .linha-ponte { font-size: 12.5px; margin: 0 0 10px; }
   .linha-ponte div { margin: 2px 0; }
 
+  /* ---------- a frase de um aviso ---------- */
+  .campo--inteiro { display: block; }
+  .campo--inteiro > .rotulo { display: block; margin: 0 0 5px; }
+  .frase textarea {
+    width: 100%; box-sizing: border-box; resize: vertical; overflow: hidden;
+    min-height: 40px; padding: 8px 10px; line-height: 1.45;
+    font: 400 13.5px var(--mono); color: var(--tinta);
+    background: var(--fundo); border: 1px solid var(--linha); border-radius: 6px;
+  }
+  .frase textarea:focus { outline: 0; border-color: var(--verde); }
+  .frase__pe {
+    display: flex; gap: 10px; align-items: center;
+    margin: 5px 0 12px; min-height: 24px;
+  }
+  /* A prévia é o que a frase VAI dizer, então ela fica em itálico: sem
+     isso, lida de canto de olho, parece mais um campo pra preencher. */
+  .frase__previa {
+    flex: 1 1 auto; font-size: 12.5px; font-style: italic; color: var(--apagado);
+    overflow-wrap: anywhere;
+  }
+
   /* ---------- desfazer ----------
      Barra presa embaixo, e não um recado no topo: o apagar acontece numa
      lista que pode estar rolada, e um aviso lá em cima ninguém vê. */
@@ -2215,7 +2236,7 @@ const GRUPOS = [
     { k: 'spour',   l: 'Cor de trecho recorde', c: 'cor', se: so('speedrun') },
     { k: 'asub',    l: 'Aparecer quando alguém assinar', c: 'chave', se: so('alerta') },
     { k: 'afollow', l: 'Aparecer quando alguém seguir', c: 'chave', se: so('alerta'),
-      dica: 'o follow só chega se você tiver ligado os avisos da Twitch em Meu Controller' },
+      dica: 'o follow só chega se você tiver ligado os avisos da Twitch em Meu ZocaHub' },
     { k: 'abits',   l: 'Aparecer quando mandarem bits', c: 'chave', se: so('alerta') },
     { k: 'abitsmin', l: 'Ignorar abaixo de', c: 'faixa', min: 1, max: 5000,
       u: (n) => n === 1 ? ' bit' : ' bits',
@@ -2311,16 +2332,17 @@ const GRUPOS = [
     { k: 'mcapraio', l: 'Cantos da capa', c: 'faixa', min: 0, max: 80, u: 'px', se: (c) => !!c.mcapa },
   ] },
 
+  /* A explicação encolheu de propósito: a prévia embaixo de cada caixa já
+     mostra {quem} e {quanto} preenchidos, e mostrar ensina mais rápido do
+     que contar. */
   { t: 'A frase de cada aviso', aberto: true, se: so('alerta'),
-    intro: 'Escreva do jeito que você fala. Onde você puser {quem} entra o nome da pessoa, '
-         + 'e onde puser {quanto} entra o número — quantos subs, quantos bits, quantos reais.',
+    intro: 'Escreva do jeito que você fala. Embaixo de cada caixa aparece como vai sair.',
     itens: [
-    { k: 'atsub',    l: 'Alguém assinou', c: 'texto', se: (c) => !!c.asub },
-    { k: 'atpres',   l: 'Alguém deu subs de presente', c: 'texto', se: (c) => !!c.asub,
-      dica: 'aqui o {quanto} é quantos subs a pessoa deu de uma vez' },
-    { k: 'atfollow', l: 'Alguém começou a seguir', c: 'texto', se: (c) => !!c.afollow },
-    { k: 'atbits',   l: 'Alguém mandou bits', c: 'texto', se: (c) => !!c.abits },
-    { k: 'atreal',   l: 'Alguém doou', c: 'texto', se: (c) => !!c.areal },
+    { k: 'atsub',    l: 'Alguém assinou', c: 'frase', ensaio: 'sub', se: (c) => !!c.asub },
+    { k: 'atpres',   l: 'Alguém deu subs de presente', c: 'frase', ensaio: 'presente', se: (c) => !!c.asub },
+    { k: 'atfollow', l: 'Alguém começou a seguir', c: 'frase', ensaio: 'follow', se: (c) => !!c.afollow },
+    { k: 'atbits',   l: 'Alguém mandou bits', c: 'frase', ensaio: 'bits', se: (c) => !!c.abits },
+    { k: 'atreal',   l: 'Alguém doou', c: 'frase', ensaio: 'real', se: (c) => !!c.areal },
     { k: 'anome', l: 'Cor do nome da pessoa', c: 'cor',
       dica: 'o nome sai nesta cor e o resto da frase na cor da letra, lá embaixo' },
   ] },
@@ -3104,7 +3126,64 @@ function abreModelos(grava) {
 /* Cada controle guarda como se REDESENHAR a partir da config. Sem isso o
    desfazer teria que remontar a tela inteira, e a pessoa perderia o grupo
    que estava aberto e o lugar onde estava rolando. */
+/* Manda a prévia ensaiar um aviso só. Sem o "qual", ela passa todos. */
+function ensaia(qual) {
+  try { quadro.contentWindow.postMessage({ type: 'zc:exemplo', qual: qual }, location.origin); }
+  catch (e) {}
+}
+
+/* Nomes de mentira pra prévia da frase: os mesmos do ensaio do overlay,
+   senão a frase escrita aqui e o aviso que passa ali diriam nomes
+   diferentes e a pessoa pensaria que uma das duas está errada. */
+const FRASE_EXEMPLO = {
+  sub:      ['fulaninha', 1],
+  presente: ['ciclana', 5],
+  follow:   ['novato', 1],
+  bits:     ['beltrano', 500],
+  real:     ['madrinha', 25],
+};
+
 const FABRICA = {
+  /* A FRASE DE UM AVISO.
+
+     Três coisas que o campo de texto normal não dava, e que juntas tiram a
+     explicação da tela:
+
+     a caixa é larga e cresce — a frase não cabia, e escrever sem ver o que
+     se escreveu é o pior jeito de escrever;
+
+     embaixo sai a frase montada com um nome de verdade, então {quem} e
+     {quanto} se explicam sozinhos e o parágrafo que explicava os dois sai;
+
+     e o Testar dispara SÓ este aviso na prévia. Antes era um botão só, que
+     passava todos em fila: pra conferir a frase do follow, a pessoa via
+     dois subs e um bits primeiro. */
+  frase(it) {
+    const i = h('textarea', { rows: '2', spellcheck: 'true' });
+    i.value = cfg[it.k] || '';
+
+    const [quem, quanto] = FRASE_EXEMPLO[it.ensaio] || ['fulaninha', 1];
+    const previa = h('span', { cls: 'frase__previa' });
+    const bt = h('button', { cls: 'bt mini', type: 'button', txt: 'Testar' });
+    bt.onclick = () => ensaia(it.ensaio);
+
+    const cresce = () => { i.style.height = 'auto'; i.style.height = (i.scrollHeight + 2) + 'px'; };
+    const mostra = () => {
+      previa.textContent = String(i.value || '')
+        .replace(/\{quem\}/g, quem).replace(/\{quanto\}/g, String(quanto)) || '—';
+    };
+
+    i.oninput = () => { mudou(it.k, i.value); cresce(); mostra(); };
+    i.__sincroniza = () => { i.value = cfg[it.k] || ''; cresce(); mostra(); };
+
+    const cx = h('div', { cls: 'frase' }, [i, h('div', { cls: 'frase__pe' }, [previa, bt])]);
+    cx.__sincroniza = i.__sincroniza;
+    cx.__inteiro = true;          /* ocupa a linha toda, sem rótulo ao lado */
+    mostra();
+    setTimeout(cresce, 0);        /* scrollHeight só existe depois de montado */
+    return cx;
+  },
+
   texto(it) {
     const i = h('input', { type: 'text' });
     i.value = cfg[it.k] || '';
@@ -3813,7 +3892,7 @@ const COMO_USAR = {
     ['Salve no fim', 'Enquanto você mexe, nada muda no OBS de quem está assistindo. Só o salvar publica.'],
   ]],
 
-  meu: ['Meu Controller', [
+  meu: ['Meu ZocaHub', [
     ['A chave é sua senha', 'Ela abre este painel. Nunca mostre na live, e não cole em site nenhum além deste.'],
     ['A ponte é o que fala com o OBS', 'Ponha o link da ponte como Fonte de navegador numa cena que fique sempre ativa. Sem ela, comando do chat não mexe no OBS.'],
     ['Ligue os avisos da Twitch', 'Follow e alguns eventos não passam pelo chat. Sem ligar isso, o alerta de follow nunca dispara.'],
@@ -6367,9 +6446,12 @@ function telaEditor(perfil, tipoNovo) {
          pixels, e o texto ao lado não fazia nada quando clicado: eram
          irmãos, não pai e filho. */
       const ehChave = !!controle.__marcavel;
-      const linha = h(ehChave ? 'label' : 'div',
-        ehChave ? { cls: 'campo campo--chave' } : { cls: 'campo' },
-        [h('span', { cls: 'rotulo', txt: it.l }), controle]);
+      const linha = controle.__inteiro
+        ? h('div', { cls: 'campo campo--inteiro' },
+            [h('span', { cls: 'rotulo', txt: it.l }), controle])
+        : h(ehChave ? 'label' : 'div',
+            ehChave ? { cls: 'campo campo--chave' } : { cls: 'campo' },
+            [h('span', { cls: 'rotulo', txt: it.l }), controle]);
       camposPorChave[it.k] = { controle, grupo: null, linha };
       const caixa = it.dica
         ? h('div', {}, [linha, h('p', { style: 'margin:-4px 0 10px;font-size:11.5px;color:var(--apagado)', txt: it.dica })])
@@ -6441,7 +6523,7 @@ function telaEditor(perfil, tipoNovo) {
 function telaControlador() {
   const tela = el('tela');
   tela.innerHTML = '';
-  tela.appendChild(h('h1', { txt: 'Meu Controller' }));
+  tela.appendChild(h('h1', { txt: 'Meu ZocaHub' }));
   tela.appendChild(h('p', { cls: 'sub', txt: 'Sua chave, seus links e sua conta. Nada aparece destapado sozinho.' }));
 
   const base = location.origin + location.pathname.replace(/[^/]*$/, '');
@@ -6811,7 +6893,7 @@ function abreImportarSE(aoTerminar) {
   x.onclick = fechaPop;
 
   const canal = h('input', { type: 'text', placeholder: 'o seu canal', autocomplete: 'off', value: quemSou || '' });
-  const jwt = h('input', { type: 'password', placeholder: 'opcional', autocomplete: 'off', spellcheck: 'false' });
+  const jwt = h('input', { type: 'password', placeholder: 'cole aqui', autocomplete: 'off', spellcheck: 'false' });
   const ler = h('button', { cls: 'bt principal', type: 'button', txt: 'Ler os comandos' });
   const diz = h('p', { cls: 'd', style: 'min-height:1em;margin:10px 0 0' });
   const lista = h('div', { style: 'margin-top:6px' });
@@ -6931,17 +7013,19 @@ function abreImportarSE(aoTerminar) {
     }
   };
 
-  const onde = h('a', { href: 'https://streamelements.com/dashboard/account/channels', target: '_blank',
-    rel: 'noopener noreferrer', txt: 'Account → Channels → Show secrets' });
+  /* BOTÃO, E NÃO UM LINK NO MEIO DO PARÁGRAFO.
+     A chave é o que separa "trouxe metade" de "trouxe tudo": sem ela, todo
+     comando que busca um endereço chega vazio. Quem precisa dela tem que
+     tropeçar no caminho, não ler até achar. */
+  const onde = h('a', { cls: 'bt mini', href: 'https://streamelements.com/dashboard/account/channels',
+    target: '_blank', rel: 'noopener noreferrer', txt: 'Pegar minha chave ↗' });
+
   const corpo = h('div', { cls: 'pop__corpo' }, [
     h('p', { cls: 'sub', txt: 'Os comandos que respondem no chat chegam prontos: a resposta, quem pode usar, as esperas e os outros nomes.' }),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Canal no StreamElements' }), canal]),
-    h('div', { cls: 'campo' }, [h('label', { txt: 'Chave JWT (opcional)' }), jwt]),
-    h('p', { cls: 'd', style: 'font-size:12px;margin:-2px 0 12px' }, [
-      document.createTextNode('Só faz falta nos comandos que buscam um endereço ($(customapi)): a lista pública do StreamElements esconde o endereço deles. Fica em '),
-      onde,
-      document.createTextNode(', no campo JWT Token. Ela vai direto pro StreamElements, não passa pelo nosso servidor e não fica guardada — mas não mostre na live.'),
-    ]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Chave JWT' }), jwt, onde]),
+    h('p', { cls: 'd', style: 'font-size:12px;margin:-2px 0 12px',
+      txt: 'Sem ela vêm só os comandos de texto. Na página, ligue "Show secrets" e copie o JWT Token. Ele vai direto pro StreamElements, não passa pelo nosso servidor e não fica guardado — mas não mostre na live.' }),
     h('p', { style: 'margin:0' }, [ler]),
     diz,
     lista,
@@ -8572,7 +8656,7 @@ const PASSOS_CHAT = [
   ['Monte o endereço da fonte do OBS', 'Em Ferramentas → Fonte do OBS. Ela lê as suas cenas conversando com o OBS, então deixe o OBS aberto.'],
   ['Ligue o servidor do OBS', 'No OBS: Ferramentas → Configurações do WebSocket → marque "Ativar servidor". É por aí que o chat fala com ele.'],
   ['Cole o endereço numa Fonte de Navegador', 'Igual à de cima, mas essa não aparece na live: pode deixar 100 por 100 e escondida num canto.'],
-  ['Essa fonte carrega a sua chave', 'Não mostre ela na tela e não mande pra ninguém. Se aparecer em print ou VOD, troque a chave em Meu Controller.'],
+  ['Essa fonte carrega a sua chave', 'Não mostre ela na tela e não mande pra ninguém. Se aparecer em print ou VOD, troque a chave em Meu ZocaHub.'],
 ];
 
 /* ---------------- dinheiro ---------------- */
@@ -9378,7 +9462,7 @@ function telaTutorial() {
     ['O chat não controla nada', 'O servidor do WebSocket do OBS está desligado, ou a fonte da ponte não está numa cena ativa.'],
     ['A overlay de música fica vazia', 'Falta conectar o Spotify em Ferramentas, ou não tem nada tocando. Na prévia daqui aparece uma música de mentira mesmo sem conexão — no OBS, não.'],
     ['O alerta aparece mas não toca som', 'Na fonte do alerta no OBS, marque "Controlar áudio pelo OBS". Sem isso o som existe, só não passa pelo OBS.'],
-    ['O alerta de follow não dispara', 'Follow chega por fora do chat: ligue o EventSub em Meu Controller. Sub e bits chegam pelo chat e funcionam sem isso.'],
+    ['O alerta de follow não dispara', 'Follow chega por fora do chat: ligue o EventSub em Meu ZocaHub. Sub e bits chegam pelo chat e funcionam sem isso.'],
     ['Tirei do VOD e mesmo assim deu strike', 'A trilha separada do VOD só existe no modo Avançado de saída do OBS. Em Configurações → Saída, troque para Avançado e marque "Trilha do VOD da Twitch". O painel avisa quando isso está errado.'],
   ].forEach((p) => {
     fatiaAjuda.appendChild(h('div', { cls: 'campo', style: 'align-items:flex-start' }, [

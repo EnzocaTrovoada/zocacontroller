@@ -19,6 +19,17 @@
     follow: 'afollow', bits: 'abits', real: 'areal',
   };
 
+  /* O evento de mentira de cada aviso, pro botão "Testar".
+     Nomes e números inventados; o id alto não encosta em evento de
+     verdade, que vem numerado pelo servidor. */
+  var ENSAIO = {
+    sub:     { id: 9001, tipo: 'sub1',   quem: 'fulaninha', quantidade: 1,   presente: false },
+    presente:{ id: 9002, tipo: 'sub1',   quem: 'ciclana',   quantidade: 5,   presente: true  },
+    follow:  { id: 9003, tipo: 'follow', quem: 'novato',    quantidade: 1 },
+    bits:    { id: 9004, tipo: 'bits',   quem: 'beltrano',  quantidade: 500 },
+    real:    { id: 9005, tipo: 'real',   quem: 'madrinha',  quantidade: 25  },
+  };
+
   function textoDe(cfg, e) {
     var molde =
         e.tipo === 'follow' ? cfg.atfollow
@@ -36,6 +47,7 @@
   function passa(cfg, e) {
     var chave = LIGA[e.tipo];
     if (!chave || !cfg[chave]) return false;
+    if (e.id >= 9000) return true;            /* ensaio: o mínimo não vale */
     if (e.tipo === 'bits' && (e.quantidade || 0) < cfg.abitsmin) return false;
     if (e.tipo === 'real' && (e.quantidade || 0) < cfg.arealmin) return false;
     return true;
@@ -257,8 +269,25 @@
       feed: eventos,          /* o overlay.html entrega os eventos por aqui */
       som: poeSom,            /* e o endereço do som próprio, por aqui */
       ouvir: tocaSom,         /* o botão "Ouvir" do editor */
-      exemplo: function () {
+      /* UM DE CADA VEZ, QUANDO PEDIREM UM.
+         Sem o "qual", passam todos em fila — e pra conferir uma frase que
+         acabou de mudar, a pessoa esperava os outros desfilarem antes.
+         O mínimo de bits e de reais é ignorado no teste de propósito: quem
+         está testando quer VER, não descobrir que o próprio filtro comeu. */
+      exemplo: function (qual) {
         vistoAte = 0;
+        var e = ENSAIO[qual];
+        if (e) {
+          /* A FILA SAI DA FRENTE, E O DA TELA TAMBÉM.
+             Clicar em "Testar" no follow e esperar dois subs passarem é o
+             defeito que este botão veio consertar — e esperar só um também
+             é esperar, ainda mais com o tempo na tela em 30 segundos. O
+             que está aparecendo é cortado agora e o pedido entra. */
+          fila.length = 0;
+          if (mostrando) { trocaEm = 0; root.classList.add('al--saindo'); }
+          fila.push(JSON.parse(JSON.stringify(e)));
+          return;
+        }
         fila.push({ id: 1, tipo: 'sub1', quem: 'fulaninha', quantidade: 1, presente: false });
         fila.push({ id: 2, tipo: 'bits', quem: 'beltrano', quantidade: 500 });
         fila.push({ id: 3, tipo: 'sub1', quem: 'ciclana', quantidade: 5, presente: true });

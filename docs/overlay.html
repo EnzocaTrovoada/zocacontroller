@@ -97,7 +97,7 @@
     if (d.type === 'zc:editar') ligaEdicao(!!d.on);
     /* Sem isso o editor do chat abre vazio e a pessoa nao ve o que esta
        ajustando ate alguem falar no chat naquele instante. */
-    if (d.type === 'zc:exemplo' && relogio && relogio.exemplo) relogio.exemplo();
+    if (d.type === 'zc:exemplo' && relogio && relogio.exemplo) relogio.exemplo(d.qual);
     /* O botão "Ouvir" do editor. Só a prévia recebe esta mensagem — a fonte
        que roda no OBS nunca toca som por pedido de ninguém. */
     if (d.type === 'zc:ouvir' && relogio && relogio.ouvir) relogio.ouvir();
