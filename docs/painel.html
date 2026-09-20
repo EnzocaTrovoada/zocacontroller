@@ -412,7 +412,14 @@ function pedir(tipo, dados) {
   });
 }
 
-function anotar(txt) {
+/* Erro escrito aqui abre o "Últimas ações" sozinho: fechado, ele guardava
+   a resposta e ninguém ia procurar. Acerto não abre nada — só o que deu
+   errado merece interromper. */
+function anotar(txt, ruim) {
+  if (ruim) {
+    const sec = document.querySelector('details.secao[data-secao="log"]');
+    if (sec) sec.open = true;
+  }
   const d = document.createElement('div');
   const h = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   d.innerHTML = '<time>' + h + '</time>' + txt.replace(/&/g,'&amp;').replace(/</g,'&lt;');
@@ -767,7 +774,22 @@ async function lerCanal() {
     el('vCat').textContent = d.categoria || '—';
     poeTags(d.tags);
     pintaUsados(d.usados, d.titulo, d.semente);
-  } catch (e) { anotar('canal: ' + e.message); }
+  } catch (e) {
+    anotar('canal: ' + e.message, true);
+    /* O ERRO TEM QUE APARECER ONDE ELE ACONTECEU.
+       Ele ia só pro "Últimas ações", que agora nasce fechado: o campo do
+       título ficava vazio, a lista não vinha, e o motivo estava escondido
+       atrás de um clique que ninguém sabia que precisava dar. */
+    const cx = el('usados');
+    if (cx) {
+      cx.innerHTML = '';
+      const p = document.createElement('p');
+      p.className = 'dica';
+      p.style.color = 'var(--perigo)';
+      p.textContent = 'não consegui ler o canal: ' + e.message;
+      cx.appendChild(p);
+    }
+  }
 }
 
 /* ---------- tags ----------

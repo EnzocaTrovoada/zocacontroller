@@ -375,4 +375,16 @@ try {
 
 } catch (RuntimeException $e) {
     json_saida(['erro' => erro_publico($e)], 400);
+} catch (Throwable $e) {
+    /* QUALQUER COISA, E NÃO SÓ RuntimeException.
+
+       Só a RuntimeException era pega; um PDOException ou um Error passavam
+       reto e viravam erro fatal do PHP — que sai como página HTML, não como
+       JSON. Do outro lado, a tela recebe algo ilegível, a leitura do canal
+       morre inteira e o campo do título fica vazio sem explicar nada.
+
+       Agora vira mensagem. Ela chega genérica pra quem usa, e o motivo de
+       verdade fica no log do servidor. */
+    error_log('[zc] canal: ' . get_class($e) . ': ' . $e->getMessage());
+    json_saida(['erro' => 'Não consegui falar com o canal agora. Tente recarregar.'], 500);
 }
