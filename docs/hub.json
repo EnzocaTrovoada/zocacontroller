@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-20",
+      "titulo": "As tags voltam junto com o jogo",
+      "texto": "No painel do OBS, as tags da live agora ficam ao lado do título — e trocar de categoria traz de volta as que você usou da última vez naquele jogo. Nada de lista pronta adivinhando o que o seu canal é: quem acerta é a sua própria escolha anterior. Acento e espaço são arrumados na hora, porque a Twitch não aceita."
+    },
+    {
+      "data": "2026-09-20",
       "titulo": "O painel do OBS mais curto, e títulos de antes num clique",
       "texto": "As seções do painel que fica dentro do OBS — áudio, estado, título, palpite — agora nascem fechadas, com uma seta pra abrir. O que você abrir continua aberto da próxima vez que o OBS subir. E embaixo do título aparecem os últimos que você usou: clicou, volta o título E a categoria juntos, que é o par que importa. O microfone e o PÂNICO continuam sempre à vista."
     },

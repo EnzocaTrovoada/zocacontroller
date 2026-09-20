@@ -21,6 +21,10 @@ CREATE TABLE IF NOT EXISTS canal_usados (
   titulo        VARCHAR(160) NOT NULL,
   categoria     VARCHAR(120) NOT NULL DEFAULT '',
   categoria_id  VARCHAR(20)  NOT NULL DEFAULT '',
+  /* As tags que estavam no ar com esse par. Separadas por espaco, que e o
+     unico caractere que a Twitch NAO aceita dentro de uma tag - entao ele
+     nunca vai aparecer no meio de uma. */
+  tags          VARCHAR(300) NOT NULL DEFAULT '',
   usado_em      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   /* O par e unico: usar de novo levanta a data em vez de criar linha nova,
      senao a lista vira o mesmo titulo dez vezes seguidas. */

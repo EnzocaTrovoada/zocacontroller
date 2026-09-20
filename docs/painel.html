@@ -134,6 +134,20 @@
   input:focus { outline: 2px solid var(--sinal); outline-offset: 1px; }
   button.fraco { background: transparent; color: var(--fraco); }
   .dica { font-size: 11px; color: var(--fraco); margin: 8px 0 0; }
+  .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .tags:empty { margin: 0; }
+  .tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 5px 3px 8px; border: 1px solid var(--linha); background: var(--caixa);
+    font-size: 11px; border-radius: 2px;
+  }
+  .tag b { font-weight: 400; }
+  .tag button {
+    width: auto; padding: 0 3px; margin: 0; border: 0; background: none;
+    color: var(--fraco); font-size: 13px; line-height: 1; letter-spacing: 0;
+  }
+  .tag button:hover { color: var(--perigo); background: none; }
+  #novaTag { margin-top: 5px; }
   .usado {
     display: block; width: 100%; text-align: left; margin-top: 5px;
     padding: 7px 10px; border: 1px solid var(--linha); background: var(--caixa);
@@ -259,8 +273,13 @@
   <details id="secaoCanal" class="secao escondido" data-secao="canal">
     <summary>Título e categoria</summary>
     <input id="titulo" type="text" placeholder="título da live">
+    <!-- As tags ficam com o titulo e salvam no mesmo botao: dois botoes
+         numa secao tao curta so fariam a pessoa escolher errado. -->
+    <div id="tags"></div>
+    <input id="novaTag" type="text" placeholder="+ tag (Enter pra somar)" maxlength="25">
+    <p class="dica" id="dicaTags">Ao trocar de jogo, voltam as tags que você usou nele da última vez.</p>
     <div class="grade" style="margin-top:6px">
-      <button id="btTitulo">Salvar título</button>
+      <button id="btTitulo">Salvar</button>
       <button id="btLerCanal" class="fraco">Recarregar</button>
     </div>
     <input id="buscaCat" type="text" placeholder="trocar de jogo: digite mesmo que erre" style="margin-top:8px">
@@ -746,9 +765,72 @@ async function lerCanal() {
     const d = await api('/canal.php');
     if (document.activeElement !== el('titulo')) el('titulo').value = d.titulo || '';
     el('vCat').textContent = d.categoria || '—';
+    poeTags(d.tags);
     pintaUsados(d.usados, d.titulo);
   } catch (e) { anotar('canal: ' + e.message); }
 }
+
+/* ---------- tags ----------
+
+   A automacao mora no servidor: trocar de categoria traz de volta as tags
+   que esta pessoa usou da ultima vez naquele jogo. Aqui e so a tela.
+
+   Tag da Twitch e so letra e numero, no maximo 25 e no maximo 10. Cortar
+   aqui tambem, e nao so la, e pra pessoa VER o que vai ficar: mandar
+   "so chill" e receber "sochill" de volta sem aviso confunde. */
+let TAGS = [];
+
+function limpaTag(t) {
+  return String(t || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')   /* ç vira c, ê vira e */
+    .replace(/[^A-Za-z0-9]/g, '')
+    .slice(0, 25);
+}
+
+function poeTags(lista) {
+  TAGS = (lista || []).map(limpaTag).filter(Boolean).slice(0, 10);
+  pintaTags();
+}
+
+function pintaTags() {
+  const cx = el('tags');
+  if (!cx) return;
+  cx.innerHTML = '';
+  cx.className = 'tags';
+
+  TAGS.forEach((t, i) => {
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.textContent = '×';
+    x.title = 'tirar';
+    x.addEventListener('click', () => { TAGS.splice(i, 1); pintaTags(); });
+
+    const c = document.createElement('span');
+    c.className = 'tag';
+    const b = document.createElement('b');
+    b.textContent = t;
+    c.append(b, x);
+    cx.appendChild(c);
+  });
+
+  const campo = el('novaTag');
+  if (campo) {
+    const cheio = TAGS.length >= 10;
+    campo.disabled = cheio;
+    campo.placeholder = cheio ? 'dez é o máximo da Twitch' : '+ tag (Enter pra somar)';
+  }
+}
+
+el('novaTag').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const t = limpaTag(el('novaTag').value);
+  el('novaTag').value = '';
+  if (!t || TAGS.length >= 10) return;
+  if (TAGS.some((x) => x.toLowerCase() === t.toLowerCase())) return;
+  TAGS.push(t);
+  pintaTags();
+});
 
 /* OS ULTIMOS TITULOS, PRA CLICAR EM VEZ DE DIGITAR.
 
@@ -786,6 +868,7 @@ function pintaUsados(lista, agora) {
       b.disabled = true;
       const corpo = { titulo: u.titulo };
       if (u.categoria_id) corpo.categoria_id = u.categoria_id;
+      if (u.tags && u.tags.length) corpo.tags = u.tags;
       try {
         await api('/canal.php', { method: 'POST', body: JSON.stringify(corpo) });
         anotar('voltou: ' + u.titulo);
@@ -805,8 +888,9 @@ el('btTitulo').addEventListener('click', async () => {
   const titulo = el('titulo').value.trim();
   if (!titulo) return anotar('o título não pode ficar vazio');
   try {
-    await api('/canal.php', { method: 'POST', body: JSON.stringify({ titulo }) });
-    anotar('título trocado');
+    await api('/canal.php', { method: 'POST', body: JSON.stringify({ titulo, tags: TAGS }) });
+    anotar('salvo');
+    lerCanal();
   } catch (e) { anotar('título: ' + e.message); }
 });
 
@@ -832,11 +916,14 @@ el('buscaCat').addEventListener('input', () => {
         l.appendChild(n);
         l.addEventListener('click', async () => {
           try {
-            await api('/canal.php', { method: 'POST', body: JSON.stringify({ categoria_id: c.id }) });
+            /* Sem mandar tags: e isso que faz o servidor devolver as que
+               esta pessoa usou da ultima vez neste jogo. */
+            const r = await api('/canal.php', { method: 'POST', body: JSON.stringify({ categoria_id: c.id }) });
             el('vCat').textContent = c.nome;
             el('buscaCat').value = '';
             cx.innerHTML = '';
-            anotar('categoria: ' + c.nome);
+            poeTags(r.tags);
+            anotar('categoria: ' + c.nome + ((r.tags || []).length ? ' (tags de volta)' : ''));
           } catch (e) { anotar('categoria: ' + e.message); }
         });
         cx.appendChild(l);
