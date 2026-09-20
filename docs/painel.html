@@ -84,6 +84,31 @@
   .on { color: var(--sinal); } .off { color: var(--perigo); } .meh { color: var(--ambar); }
 
   h2 { font: 600 10px var(--disp); letter-spacing: .16em; text-transform: uppercase; color: var(--fraco); margin: 14px 0 7px; }
+
+  /* AS SEÇÕES DO DOCK NASCEM FECHADAS.
+     Aqui dentro do OBS a coluna é estreita e alta: nove seções abertas
+     viram uma rolagem em que nada se acha justamente quando se procura
+     rápido, ao vivo. Fechadas, tudo cabe e o que cada uma faz se lê de
+     uma olhada. O que a pessoa abrir continua aberto. */
+  .secao { border-bottom: 1px solid var(--linha); }
+  .secao > summary {
+    cursor: pointer; list-style: none; padding: 11px 2px; margin: 0;
+    display: flex; align-items: center; gap: 7px;
+    font: 600 10px var(--disp); letter-spacing: .16em; text-transform: uppercase; color: var(--fraco);
+  }
+  .secao > summary::-webkit-details-marker { display: none; }
+  .secao > summary::before {
+    content: ''; flex: none; width: 5px; height: 5px;
+    border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg); margin: -2px 0 0 1px;
+  }
+  .secao[open] > summary::before { transform: rotate(45deg); margin: -3px 0 0 0; }
+  .secao > summary:hover { color: var(--tinta); }
+  .secao[open] > summary { color: var(--sinal); }
+  /* O "editar" do Áudio mora dentro do resumo: sem isto ele empurraria a
+     seta pra longe do título. */
+  .secao > summary button.mini { float: none; margin-left: auto; }
+  .secao > :last-child { margin-bottom: 11px; }
   select { width: 100%; font: 12px var(--mono); color: var(--tinta); background: var(--fundo); border: 1px solid var(--linha); padding: 8px; border-radius: 2px; }
 
   /* mixer */
@@ -180,12 +205,15 @@
     <button id="btVoltar" disabled>Sair do pânico</button>
   </div>
 
-  <h2>Áudio <button id="btEditarSons" class="mini">editar</button></h2>
+  <details class="secao" data-secao="audio">
+  <summary>Áudio <button id="btEditarSons" class="mini">editar</button></summary>
   <p class="dica escondido" id="dicaSons">Desmarque o que você não quer ver aqui nem no painel dos mods.
      A fonte continua no OBS funcionando — isso não é o olhinho.</p>
   <div id="mixer"></div>
+  </details>
 
-  <h2>Fora do VOD</h2>
+  <details class="secao" data-secao="vod">
+  <summary>Fora do VOD</summary>
   <p class="dica">A Twitch grava o VOD numa trilha de áudio separada da que vai ao vivo.
      Tirando o Spotify dessa trilha, quem assiste ao vivo continua ouvindo e o vídeo
      gravado fica sem a música — que é o que evita o strike.</p>
@@ -204,13 +232,15 @@
   </div>
   <p class="dica escondido" id="vodAviso"></p>
   <div class="fila"><b>Agora</b><span id="vVod">—</span></div>
+  </details>
 
-  <div id="secaoFontes" class="escondido">
-    <h2>Fontes da cena</h2>
+  <details id="secaoFontes" class="secao escondido" data-secao="fontes">
+    <summary>Fontes da cena</summary>
     <div id="fontes"></div>
-  </div>
+  </details>
 
-  <h2>Estado</h2>
+  <details class="secao" data-secao="estado">
+  <summary>Estado</summary>
   <div class="fila"><b>Cena</b><span id="vCena">—</span></div>
   <div class="fila"><b>Chat</b><span id="vChat">—</span></div>
   <div class="fila"><b>Fonte do OBS</b><span id="vPonte">—</span></div>
@@ -219,12 +249,15 @@
   <div class="grade um" style="margin-top:8px">
     <button id="btCamera" disabled>Troca por câmera</button>
   </div>
+  </details>
 
-  <h2>Trocar de cena</h2>
+  <details class="secao" data-secao="cena">
+  <summary>Trocar de cena</summary>
   <select id="cenas"></select>
+  </details>
 
-  <div id="secaoCanal" class="escondido">
-    <h2>Título e categoria</h2>
+  <details id="secaoCanal" class="secao escondido" data-secao="canal">
+    <summary>Título e categoria</summary>
     <input id="titulo" type="text" placeholder="título da live">
     <div class="grade" style="margin-top:6px">
       <button id="btTitulo">Salvar título</button>
@@ -237,19 +270,19 @@
          semana. Titulo e categoria voltam JUNTOS: um sem o outro e o erro
          que se comete ao vivo. -->
     <div id="usados"></div>
-  </div>
+  </details>
 
-  <div id="secaoMomentos" class="escondido">
-    <h2>Momentos</h2>
+  <details id="secaoMomentos" class="secao escondido" data-secao="momentos">
+    <summary>Momentos</summary>
     <div class="grade" style="grid-template-columns:1fr auto">
       <input id="notaMomento" type="text" placeholder="o que foi? (opcional)" maxlength="120">
       <button id="btMarcar">Marcar</button>
     </div>
     <div id="momentos"></div>
-  </div>
+  </details>
 
-  <div id="secaoPalpite" class="escondido">
-    <h2>Palpite</h2>
+  <details id="secaoPalpite" class="secao escondido" data-secao="palpite">
+    <summary>Palpite</summary>
 
     <div id="palpiteFechado">
       <input id="pergunta" type="text" placeholder="Vou ganhar essa?" maxlength="45">
@@ -274,10 +307,12 @@
       </div>
       <p class="dica" id="pDica">Clique na opção que ganhou para pagar.</p>
     </div>
-  </div>
+  </details>
 
-  <h2>Últimas ações</h2>
+  <details class="secao" data-secao="log">
+  <summary>Últimas ações</summary>
   <div id="log"></div>
+  </details>
 
   <div class="grade um" style="margin-top:12px">
     <button id="btConfig" class="fraco">Trocar senha ou chave</button>
@@ -652,6 +687,37 @@ setInterval(pintar, 1000);
  * ------------------------------------------------------------------ */
 
 const API = 'https://api.zocahop.com';
+/* QUE SEÇÕES FICAM ABERTAS, ENTRE UMA ABERTURA DO OBS E OUTRA.
+
+   Guarda as ABERTAS, e não as fechadas: seção nova entra fechada junto com
+   as outras em vez de aparecer aberta pra quem já usava o dock.
+
+   Enquanto não houver nada guardado, a primeira abre — um dock inteiro
+   fechado na primeira vez é uma lista de títulos sem pista de que clica. */
+const SECOES_LS = 'zc:secoes-dock';
+
+function ligaSecoes() {
+  let abertas = [];
+  try { const v = JSON.parse(guardado(SECOES_LS) || '[]'); if (Array.isArray(v)) abertas = v; } catch (e) {}
+
+  const todas = [...document.querySelectorAll('details.secao')];
+  const semMemoria = !abertas.length;
+
+  todas.forEach((d, i) => {
+    d.open = semMemoria ? i === 0 : abertas.includes(d.dataset.secao);
+    d.addEventListener('toggle', () => {
+      const agora = todas.filter((x) => x.open).map((x) => x.dataset.secao);
+      guardar(SECOES_LS, JSON.stringify(agora));
+    });
+  });
+
+  /* O "editar" do Áudio abriria e fecharia a seção junto, porque ele está
+     dentro do resumo. O clique dele para aqui. */
+  const ed = el('btEditarSons');
+  if (ed) ed.addEventListener('click', (e) => e.preventDefault());
+}
+ligaSecoes();
+
 let chavePainel = guardado('zc:chave') || '';
 let palpiteAtual = null;
 
