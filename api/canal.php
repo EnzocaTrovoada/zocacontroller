@@ -12,6 +12,7 @@
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
 require_once __DIR__ . '/lib/twitch.php';
+require_once __DIR__ . '/lib/seguranca.php';
 
 cors();
 $quem = quem_chama();
@@ -76,6 +77,7 @@ function canal_anota(int $uid, string $titulo, string $cat, string $catId, array
              VALUES (?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE usado_em = NOW(), categoria = VALUES(categoria), tags = VALUES(tags)'
         )->execute([$uid, mb_substr($titulo, 0, 160), mb_substr($cat, 0, 120), $catId, $tagsTexto]);
+        canal_tira_gemeo($uid, $titulo, $catId);
         return;
     } catch (Throwable $e) { /* pode ser só a coluna nova faltando */ }
 
@@ -88,7 +90,80 @@ function canal_anota(int $uid, string $titulo, string $cat, string $catId, array
              VALUES (?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE usado_em = NOW(), categoria = VALUES(categoria)'
         )->execute([$uid, mb_substr($titulo, 0, 160), mb_substr($cat, 0, 120), $catId]);
+        canal_tira_gemeo($uid, $titulo, $catId);
     } catch (Throwable $e) { /* sem o SQL 057 ninguém tem lista */ }
+}
+
+/**
+ * Tira a versão sem categoria do mesmo título.
+ *
+ * As transmissões passadas entram sem categoria, porque a Twitch não diz a
+ * categoria de um VOD. Quando o mesmo título aparece de novo COM categoria,
+ * o par é único pela categoria e os dois virariam duas linhas iguais na
+ * lista — uma completa e uma pela metade. Fica a completa.
+ */
+function canal_tira_gemeo(int $uid, string $titulo, string $catId): void
+{
+    if ($catId === '') return;
+    try {
+        db()->prepare("DELETE FROM canal_usados WHERE usuario_id = ? AND titulo = ? AND categoria_id = ''")
+            ->execute([$uid, mb_substr($titulo, 0, 160)]);
+    } catch (Throwable $e) { /* nada a fazer */ }
+}
+
+/**
+ * Semeia a lista com os títulos das transmissões passadas.
+ *
+ * SEM ISTO A LISTA NASCE VAZIA E PARECE QUEBRADA. Anotar o que está no ar
+ * só dá uma linha — e é justamente essa que a lista esconde, porque
+ * oferecer o título que já está valendo não serve pra nada. Resultado: a
+ * pessoa tinha que trocar o título uma vez pra a lista começar a existir.
+ *
+ * Os VODs resolvem: o título de cada transmissão passada é o que estava no
+ * ar naquele dia. Vem sem categoria — a Twitch não guarda a categoria de um
+ * VOD, e não tem outro endereço que dê isso — então clicar num desses
+ * troca só o título.
+ *
+ * Só acontece enquanto a lista é curta, e no máximo uma vez por dia: é uma
+ * chamada a mais, e depois que a pessoa usa o painel a lista se mantém
+ * sozinha. Canal com "guardar transmissões anteriores" desligado não tem
+ * VOD, e aí não há o que semear.
+ */
+function canal_semeia(int $uid, string $bid): void
+{
+    try {
+        $st = db()->prepare('SELECT COUNT(*) FROM canal_usados WHERE usuario_id = ?');
+        $st->execute([$uid]);
+        if ((int) $st->fetchColumn() > 2) return;
+    } catch (Throwable $e) {
+        return;                       /* sem o SQL 057 não há onde semear */
+    }
+
+    if (!limite_ok('semear:' . $uid, 1, 86400)) return;
+
+    try {
+        [$http, $r] = tw_helix($uid, 'GET', '/videos',
+            ['user_id' => $bid, 'type' => 'archive', 'first' => '20', 'sort' => 'time']);
+        if ($http !== 200) return;
+
+        /* usado_em vem da data do VOD, e não de agora: a ordem da lista é a
+           ordem em que as coisas aconteceram. E o ON DUPLICATE não mexe em
+           nada — o que a pessoa já usou por aqui vale mais que o VOD. */
+        $ins = db()->prepare(
+            'INSERT INTO canal_usados (usuario_id, titulo, categoria, categoria_id, usado_em)
+             VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE id = id'
+        );
+
+        foreach (($r['data'] ?? []) as $v) {
+            $t = trim((string) ($v['title'] ?? ''));
+            if ($t === '') continue;
+            $quando = strtotime((string) ($v['created_at'] ?? ''));
+            $ins->execute([$uid, mb_substr($t, 0, 160), '', '', date('Y-m-d H:i:s', $quando ?: time())]);
+        }
+    } catch (Throwable $e) {
+        error_log('[zc] canal: não consegui semear com os VODs: ' . $e->getMessage());
+    }
 }
 
 /**
@@ -190,6 +265,7 @@ try {
         canal_anota((int) $quem['usuario_id'], (string) ($c['title'] ?? ''),
                     (string) ($c['game_name'] ?? ''), (string) ($c['game_id'] ?? ''),
                     (array) ($c['tags'] ?? []));
+        canal_semeia((int) $quem['usuario_id'], $bid);
 
         json_saida([
             'titulo'        => $c['title'] ?? '',
