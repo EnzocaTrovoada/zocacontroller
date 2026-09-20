@@ -753,6 +753,16 @@ async function api(caminho, opcoes) {
   o.headers = Object.assign({ 'X-Chave': chavePainel, 'Content-Type': 'application/json' }, o.headers);
   const r = await fetch(API + caminho, o);
   const d = await r.json().catch(() => ({}));
+
+  /* "CHAVE INVÁLIDA" NÃO DIZ O QUE FAZER.
+
+     É a mensagem do servidor, e pra ele está certa. Mas aqui dentro do OBS
+     quem lê não sabe que chave é essa nem onde arrumar outra — e a chave é
+     por aparelho, então ela some sozinha quando o aparelho é desconectado
+     ou fica velho demais. A saída é sempre a mesma, e cabe na frase. */
+  if (r.status === 401) {
+    throw new Error('a chave deste painel não vale mais — pegue o link do "Painel do OBS" em Meu ZocaHub e troque aqui embaixo');
+  }
   if (!r.ok) throw new Error(d.erro || ('falhou (' + r.status + ')'));
   return d;
 }
