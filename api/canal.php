@@ -129,22 +129,34 @@ function canal_tira_gemeo(int $uid, string $titulo, string $catId): void
  * sozinha. Canal com "guardar transmissões anteriores" desligado não tem
  * VOD, e aí não há o que semear.
  */
-function canal_semeia(int $uid, string $bid): void
+function canal_semeia(int $uid, string $bid): array
 {
+    $conta = -1;
     try {
         $st = db()->prepare('SELECT COUNT(*) FROM canal_usados WHERE usuario_id = ?');
         $st->execute([$uid]);
-        if ((int) $st->fetchColumn() > 2) return;
+        $conta = (int) $st->fetchColumn();
     } catch (Throwable $e) {
-        return;                       /* sem o SQL 057 não há onde semear */
+        return ['fase' => 'sem-tabela'];        /* falta o SQL 057 */
     }
 
-    if (!limite_ok('semear:' . $uid, 1, 86400)) return;
+    if ($conta > 4) return ['fase' => 'ja-tem', 'tem' => $conta];
+
+    /* DEZ MINUTOS, E NÃO UM DIA.
+
+       Era um dia, e isso virou armadilha: uma tentativa que falhava —
+       Twitch fora do ar, token renovando — trancava a próxima por 24
+       horas, e não havia como nem tentar de novo. Com dez minutos, quem
+       está mexendo agora recarrega e tenta; e como o teto de linhas acima
+       corta assim que a semeadura pega, isso não vira chamada repetida. */
+    if (!limite_ok('semear:' . $uid, 1, 600)) {
+        return ['fase' => 'espera', 'tem' => $conta];
+    }
 
     try {
         [$http, $r] = tw_helix($uid, 'GET', '/videos',
             ['user_id' => $bid, 'type' => 'archive', 'first' => '20', 'sort' => 'time']);
-        if ($http !== 200) return;
+        if ($http !== 200) return ['fase' => 'twitch-recusou', 'http' => $http, 'tem' => $conta];
 
         /* usado_em vem da data do VOD, e não de agora: a ordem da lista é a
            ordem em que as coisas aconteceram. E o ON DUPLICATE não mexe em
@@ -155,14 +167,18 @@ function canal_semeia(int $uid, string $bid): void
              ON DUPLICATE KEY UPDATE id = id'
         );
 
+        $postos = 0;
         foreach (($r['data'] ?? []) as $v) {
             $t = trim((string) ($v['title'] ?? ''));
             if ($t === '') continue;
             $quando = strtotime((string) ($v['created_at'] ?? ''));
             $ins->execute([$uid, mb_substr($t, 0, 160), '', '', date('Y-m-d H:i:s', $quando ?: time())]);
+            $postos++;
         }
+        return ['fase' => 'semeou', 'vods' => count((array) ($r['data'] ?? [])), 'postos' => $postos, 'tem' => $conta];
     } catch (Throwable $e) {
         error_log('[zc] canal: não consegui semear com os VODs: ' . $e->getMessage());
+        return ['fase' => 'erro', 'tem' => $conta];
     }
 }
 
@@ -265,7 +281,7 @@ try {
         canal_anota((int) $quem['usuario_id'], (string) ($c['title'] ?? ''),
                     (string) ($c['game_name'] ?? ''), (string) ($c['game_id'] ?? ''),
                     (array) ($c['tags'] ?? []));
-        canal_semeia((int) $quem['usuario_id'], $bid);
+        $semente = canal_semeia((int) $quem['usuario_id'], $bid);
 
         json_saida([
             'titulo'        => $c['title'] ?? '',
@@ -274,6 +290,13 @@ try {
             'idioma'        => $c['broadcaster_language'] ?? '',
             'tags'          => array_values((array) ($c['tags'] ?? [])),
             'usados'        => canal_usados((int) $quem['usuario_id']),
+            /* POR QUE A LISTA ESTÁ DO TAMANHO QUE ESTÁ.
+
+               Sem isto, "não aparece nada" não tem como virar pergunta com
+               resposta: pode ser canal sem VOD guardado, pode ser a Twitch
+               recusando, pode ser SQL que faltou rodar. Só a tela do dono
+               vê, e não tem nada de ninguém aqui — só contagem. */
+            'semente'       => $semente,
         ]);
     }
 

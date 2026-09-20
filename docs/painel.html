@@ -766,7 +766,7 @@ async function lerCanal() {
     if (document.activeElement !== el('titulo')) el('titulo').value = d.titulo || '';
     el('vCat').textContent = d.categoria || '—';
     poeTags(d.tags);
-    pintaUsados(d.usados, d.titulo);
+    pintaUsados(d.usados, d.titulo, d.semente);
   } catch (e) { anotar('canal: ' + e.message); }
 }
 
@@ -841,7 +841,25 @@ el('novaTag').addEventListener('keydown', (e) => {
 
    O que ja esta no ar fica de fora da lista: repetir a linha de cima nao
    ajuda ninguem e ainda ocupa a vaga de um titulo que serviria. */
-function pintaUsados(lista, agora) {
+/* POR QUE A LISTA ESTA VAZIA.
+
+   "Nao aparece nada" tem cinco causas diferentes e nenhuma delas se
+   adivinha olhando. O servidor diz em qual parou; aqui isso vira uma
+   frase. Sem isso, a unica saida e perguntar pra mim. */
+function porQueVazia(sem) {
+  if (!sem || !sem.fase) return 'os títulos que você usar aparecem aqui pra reusar';
+
+  if (sem.fase === 'sem-tabela')     return 'falta rodar o SQL 057 no banco';
+  if (sem.fase === 'twitch-recusou') return 'a Twitch recusou a busca das transmissões passadas (' + (sem.http || '?') + ')';
+  if (sem.fase === 'erro')           return 'não consegui buscar as transmissões passadas';
+  if (sem.fase === 'espera')         return 'procurando transmissões passadas; recarregue daqui a pouco';
+  if (sem.fase === 'semeou' && !sem.vods) {
+    return 'você não tem transmissão guardada na Twitch, então a lista começa vazia e se forma usando';
+  }
+  return 'os títulos que você usar aparecem aqui pra reusar';
+}
+
+function pintaUsados(lista, agora, semente) {
   const cx = el('usados');
   if (!cx) return;
   cx.innerHTML = '';
@@ -858,7 +876,7 @@ function pintaUsados(lista, agora) {
      nao sobra nada. Ele busca as transmissoes passadas pra preencher; canal
      sem VOD guardado nao tem de onde tirar, e ai a lista se forma usando. */
   if (!vistos.length) {
-    t.textContent = 'os títulos que você usar aparecem aqui pra reusar';
+    t.textContent = porQueVazia(semente);
     return;
   }
 
