@@ -14,6 +14,11 @@
 
   "novidades": [
     {
+      "data": "2026-09-20",
+      "titulo": "Títulos de antes num clique, e o editor mais limpo",
+      "texto": "No painel de moderador, embaixo do título, aparecem os últimos que você usou — clicou, volta o título E a categoria juntos, que é o par que importa. E as seções do editor de overlay agora nascem fechadas: abra a que você vai mexer, e ela continua aberta da próxima vez."
+    },
+    {
       "data": "2026-09-18",
       "titulo": "Testar um alerta só, e ver a frase antes",
       "texto": "Cada frase de aviso agora tem caixa larga, um botão Testar só dela e, embaixo, como ela vai sair com nome e número de verdade — \"fulaninha assinou!\". Antes o teste passava sub, bits e presente em fila, e pra conferir o follow você esperava os três. Agora o que estiver na tela sai na hora e só o pedido aparece."

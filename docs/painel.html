@@ -109,6 +109,13 @@
   input:focus { outline: 2px solid var(--sinal); outline-offset: 1px; }
   button.fraco { background: transparent; color: var(--fraco); }
   .dica { font-size: 11px; color: var(--fraco); margin: 8px 0 0; }
+  .usado {
+    display: block; width: 100%; text-align: left; margin-top: 5px;
+    padding: 7px 10px; border: 1px solid var(--linha); background: var(--caixa);
+    color: inherit; cursor: pointer; font-size: 12px; letter-spacing: 0; text-transform: none;
+  }
+  .usado:hover { border-color: var(--sinal); color: var(--sinal); }
+  .usado small { display: block; color: var(--fraco); font-size: 10.5px; margin-top: 2px; }
   .opc {
     display: flex; align-items: center; gap: 8px; padding: 9px 11px; margin-top: 6px;
     border: 1px solid var(--linha); background: var(--caixa); cursor: pointer; border-radius: 2px;
@@ -226,6 +233,10 @@
     <input id="buscaCat" type="text" placeholder="trocar de jogo: digite mesmo que erre" style="margin-top:8px">
     <div class="fila"><b>Agora</b><span id="vCat">—</span></div>
     <div id="resultadosCat"></div>
+    <!-- Os ultimos titulos usados, pra nao redigitar a mesma coisa toda
+         semana. Titulo e categoria voltam JUNTOS: um sem o outro e o erro
+         que se comete ao vivo. -->
+    <div id="usados"></div>
   </div>
 
   <div id="secaoMomentos" class="escondido">
@@ -669,7 +680,57 @@ async function lerCanal() {
     const d = await api('/canal.php');
     if (document.activeElement !== el('titulo')) el('titulo').value = d.titulo || '';
     el('vCat').textContent = d.categoria || '—';
+    pintaUsados(d.usados, d.titulo);
   } catch (e) { anotar('canal: ' + e.message); }
+}
+
+/* OS ULTIMOS TITULOS, PRA CLICAR EM VEZ DE DIGITAR.
+
+   Quem transmite a mesma serie tres vezes por semana reescreve o mesmo
+   titulo tres vezes por semana. Cada botao devolve o par inteiro - titulo
+   e categoria - porque metade nao serve: e escolher um sem o outro o erro
+   que se comete ao vivo.
+
+   O que ja esta no ar fica de fora da lista: repetir a linha de cima nao
+   ajuda ninguem e ainda ocupa a vaga de um titulo que serviria. */
+function pintaUsados(lista, agora) {
+  const cx = el('usados');
+  if (!cx) return;
+  cx.innerHTML = '';
+
+  const vistos = (lista || []).filter((u) => u.titulo && u.titulo !== agora).slice(0, 6);
+  if (!vistos.length) return;
+
+  const t = document.createElement('p');
+  t.className = 'dica';
+  t.textContent = 'usados antes';
+  cx.appendChild(t);
+
+  for (const u of vistos) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'usado';
+    b.appendChild(document.createTextNode(u.titulo));
+    if (u.categoria) {
+      const s2 = document.createElement('small');
+      s2.textContent = u.categoria;
+      b.appendChild(s2);
+    }
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      const corpo = { titulo: u.titulo };
+      if (u.categoria_id) corpo.categoria_id = u.categoria_id;
+      try {
+        await api('/canal.php', { method: 'POST', body: JSON.stringify(corpo) });
+        anotar('voltou: ' + u.titulo);
+        lerCanal();
+      } catch (e) {
+        anotar('nao deu: ' + e.message);
+        b.disabled = false;
+      }
+    });
+    cx.appendChild(b);
+  }
 }
 
 el('btLerCanal').addEventListener('click', lerCanal);

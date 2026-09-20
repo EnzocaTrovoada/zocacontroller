@@ -1392,12 +1392,28 @@ try {
   .controles > details {
     border: 1px solid var(--linha); border-radius: 6px; background: var(--caixa); margin-bottom: 8px;
   }
+  /* AS SEÇÕES NASCEM FECHADAS, ENTÃO ELAS PRECISAM PARECER ABRÍVEIS.
+     Com tudo aberto, o cabeçalho era só um rótulo e não precisava dizer
+     nada. Fechado e sem seta, vira uma lista de títulos que ninguém sabe
+     que clica. */
   .controles summary {
     cursor: pointer; padding: 12px 14px; list-style: none;
+    display: flex; align-items: center; gap: 8px;
     font: 600 11px var(--disp); letter-spacing: .14em; text-transform: uppercase; color: var(--fraco);
   }
   .controles summary::-webkit-details-marker { display: none; }
+  .controles summary::before {
+    content: ''; flex: none; width: 6px; height: 6px;
+    border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor;
+    transform: rotate(-45deg); margin: -2px 0 0 2px;
+    transition: transform .16s ease-out;
+  }
+  .controles details[open] summary::before { transform: rotate(45deg); margin: -4px 0 0 0; }
+  .controles summary:hover { color: var(--tinta); }
   .controles details[open] summary { color: var(--verde-forte); border-bottom: 1px solid var(--linha); }
+  @media (prefers-reduced-motion: reduce) {
+    .controles summary::before { transition: none; }
+  }
   .corpo { padding: 12px 14px; }
   /* A prévia da fonte ocupa a linha toda: numa linha estreita ao lado do
      rótulo não daria pra ver o desenho da letra. */
@@ -2212,7 +2228,7 @@ const FUSOS = [
 ];
 
 const GRUPOS = [
-  { t: 'Conteúdo', aberto: true, itens: [
+  { t: 'Conteúdo', itens: [
     /* O alerta abre por aqui porque "o que faz ele aparecer" é a primeira
        pergunta que a pessoa tem na cabeça. Letra, cor e som só fazem sentido
        depois de existir alerta pra enfeitar. */
@@ -2273,7 +2289,7 @@ const GRUPOS = [
     { k: '_tempo', l: 'Tempo', c: 'tempo', se: so('subathon') },
   ] },
 
-  { t: 'Como aparece', aberto: true, se: so('musica'), itens: [
+  { t: 'Como aparece', se: so('musica'), itens: [
     { k: 'manim', l: 'Animação', c: 'lista',
       dica: 'a de quatro tempos é a do desenho: o quadrado cresce, a barra estica pro lado, o nome aparece',
       ops: [['revelar', 'Quadrado → barra → nome'], ['surge', 'Só desliza pro lado'], ['nenhum', 'Nada, fica parado']] },
@@ -2296,7 +2312,7 @@ const GRUPOS = [
     { k: 'mtestar', l: 'Testar', c: 'testar' },
   ] },
 
-  { t: 'A música', aberto: true, se: so('musica'), itens: [
+  { t: 'A música', se: so('musica'), itens: [
     { k: 'mcapa',  l: 'Mostrar a capa', c: 'chave' },
     { k: 'mtam',   l: 'Tamanho da capa', c: 'faixa', min: 24, max: 260, u: 'px', se: (c) => !!c.mcapa },
     { k: 'mlado',  l: 'Capa fica', c: 'lista', se: (c) => !!c.mcapa,
@@ -2335,7 +2351,7 @@ const GRUPOS = [
   /* A explicação encolheu de propósito: a prévia embaixo de cada caixa já
      mostra {quem} e {quanto} preenchidos, e mostrar ensina mais rápido do
      que contar. */
-  { t: 'A frase de cada aviso', aberto: true, se: so('alerta'),
+  { t: 'A frase de cada aviso', se: so('alerta'),
     intro: 'Escreva do jeito que você fala. Embaixo de cada caixa aparece como vai sair.',
     itens: [
     { k: 'atsub',    l: 'Alguém assinou', c: 'frase', ensaio: 'sub', se: (c) => !!c.asub },
@@ -2347,7 +2363,7 @@ const GRUPOS = [
       dica: 'o nome sai nesta cor e o resto da frase na cor da letra, lá embaixo' },
   ] },
 
-  { t: 'Movimento e som', aberto: true, se: so('alerta'), itens: [
+  { t: 'Movimento e som', se: so('alerta'), itens: [
     { k: 'aentre', l: 'Como o alerta entra', c: 'lista', ops: [
       ['descer', 'Descendo de cima'], ['zoom', 'Crescendo'],
       ['lado', 'Entrando pelo lado'], ['surgir', 'Só aparecendo']],
@@ -2361,7 +2377,7 @@ const GRUPOS = [
       dica: 'pra quem assiste ouvir, marque "Controlar áudio pelo OBS" nas propriedades da fonte' },
   ] },
 
-  { t: 'O feed', aberto: true, se: so('feed'), itens: [
+  { t: 'O feed', se: so('feed'), itens: [
     { k: 'cmax',  l: 'Quantos eventos', c: 'faixa', min: 1, max: 20 },
     { k: 'cdir',  l: 'O mais novo entra', c: 'lista',
       ops: [['baixo', 'Por baixo'], ['cima', 'Por cima']] },
@@ -2375,7 +2391,7 @@ const GRUPOS = [
     { k: 'freal', l: 'Mostrar doações', c: 'chave' },
   ] },
 
-  { t: 'O chat', aberto: true, se: so('chat'), itens: [
+  { t: 'O chat', se: so('chat'), itens: [
     { k: 'canal', l: 'Canal da Twitch', c: 'texto',
       dica: 'o nome do canal, sem @ e sem o link. Lê sem login e sem bot.' },
     { k: 'cmax',  l: 'Quantas mensagens', c: 'faixa', min: 1, max: 40,
@@ -2517,7 +2533,7 @@ const GRUPOS = [
       ops: [['below', 'Abaixo do número'], ['above', 'Acima do número']] },
   ] },
 
-  { t: 'Letra do número', aberto: true, itens: [
+  { t: 'Letra do número', itens: [
     { k: 'font',  l: 'Fonte', c: 'fontes' },
     { k: 'size',  l: 'Tamanho', c: 'faixa', min: 20, max: 260, u: 'px' },
     { k: 'weight', l: 'Peso', c: 'faixa', min: 100, max: 900, passo: 100 },
@@ -2525,7 +2541,7 @@ const GRUPOS = [
     { k: 'caps',  l: 'MAIÚSCULAS', c: 'chave' },
   ] },
 
-  { t: 'Cor', aberto: true, itens: [
+  { t: 'Cor', itens: [
     { k: 'color', l: 'Cor', c: 'cor' },
     { k: 'mode',  l: 'Pintura', c: 'lista', ops: [['solid', 'Sólida'], ['grad', 'Degradê']] },
     { k: 'c2',    l: 'Segunda cor', c: 'cor', se: (c) => c.mode === 'grad' },
@@ -6030,6 +6046,33 @@ function telaLista(filtro) {
   tela.appendChild(grade);
 }
 
+/* QUE SEÇÕES DO EDITOR FICAM ABERTAS.
+
+   Fica no navegador de quem usa, por tipo de overlay. Guardar as ABERTAS,
+   e não as fechadas, é de propósito: seção nova entra fechada junto com as
+   outras, em vez de aparecer aberta pra todo mundo que já usava o editor.
+
+   localStorage bloqueado (aba anônima, site sem permissão) só significa
+   que elas nascem fechadas toda vez — o editor funciona igual. */
+const SECOES_LS = 'zc:secoes-';
+
+function secoesAbertas(tipo) {
+  try {
+    const v = JSON.parse(localStorage.getItem(SECOES_LS + tipo) || '[]');
+    return Array.isArray(v) ? v : [];
+  } catch (e) { return []; }
+}
+
+function secaoAberta(tipo, titulo) {
+  return secoesAbertas(tipo).includes(titulo);
+}
+
+function guardaSecao(tipo, titulo, aberta) {
+  const antes = secoesAbertas(tipo).filter((x) => x !== titulo);
+  if (aberta) antes.push(titulo);
+  try { localStorage.setItem(SECOES_LS + tipo, JSON.stringify(antes.slice(-20))); } catch (e) {}
+}
+
 function telaEditor(perfil, tipoNovo) {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -6423,6 +6466,8 @@ function telaEditor(perfil, tipoNovo) {
   };
 
   const controles = h('div', { cls: 'controles' });
+  const semMemoria = !secoesAbertas(tipo).length;
+  let abriuAlguma = false;
   GRUPOS.forEach((g) => {
     if (g.se && !g.se(cfg)) return;
     const corpo = h('div', { cls: 'corpo' });
@@ -6465,7 +6510,22 @@ function telaEditor(perfil, tipoNovo) {
     });
 
     if (!temAlgo) return;
-    const det = h('details', g.aberto ? { open: '' } : {}, [h('summary', { txt: g.t }), corpo]);
+    /* FECHADAS DE PARTIDA, E DEPOIS DO JEITO QUE A PESSOA DEIXOU.
+       Cinco seções abertas de uma vez viram uma parede de campos onde nada
+       se acha. Fechadas, a coluna cabe na tela e a prévia ao lado passa a
+       ser o que se olha. O que a pessoa abrir fica aberto na próxima vez —
+       por tipo de overlay, porque quem mexe em música procura outra coisa
+       do que quem mexe em alerta.
+
+       A PRIMEIRA ABRE ENQUANTO NÃO HOUVER MEMÓRIA. Quem chega pra criar o
+       primeiro overlay veria uma lista de títulos e uma prévia vazia, sem
+       pista de por onde começar. Uma aberta resolve, e some sozinha assim
+       que a pessoa mexer em qualquer seção. */
+    const aberta = semMemoria ? !abriuAlguma : secaoAberta(tipo, g.t);
+    if (aberta) abriuAlguma = true;
+
+    const det = h('details', aberta ? { open: '' } : {}, [h('summary', { txt: g.t }), corpo]);
+    det.addEventListener('toggle', () => guardaSecao(tipo, g.t, det.open));
     g.itens.forEach((it) => { if (camposPorChave[it.k]) camposPorChave[it.k].grupo = det; });
     controles.appendChild(det);
   });
