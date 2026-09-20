@@ -148,13 +148,8 @@
   }
   .tag button:hover { color: var(--perigo); background: none; }
   #novaTag { margin-top: 5px; }
-  .usado {
-    display: block; width: 100%; text-align: left; margin-top: 5px;
-    padding: 7px 10px; border: 1px solid var(--linha); background: var(--caixa);
-    color: inherit; cursor: pointer; font-size: 12px; letter-spacing: 0; text-transform: none;
-  }
-  .usado:hover { border-color: var(--sinal); color: var(--sinal); }
-  .usado small { display: block; color: var(--fraco); font-size: 10.5px; margin-top: 2px; }
+  #usados { margin-top: 5px; }
+  #usadosDica a { color: var(--sinal); }
   .opc {
     display: flex; align-items: center; gap: 8px; padding: 9px 11px; margin-top: 6px;
     border: 1px solid var(--linha); background: var(--caixa); cursor: pointer; border-radius: 2px;
@@ -273,6 +268,12 @@
   <details id="secaoCanal" class="secao escondido" data-secao="canal">
     <summary>Título e categoria</summary>
     <input id="titulo" type="text" placeholder="título da live">
+    <!-- LISTA SUSPENSA, E NAO UMA PILHA DE BOTOES.
+         Como botao, um clique sem querer publicava o titulo na hora e ainda
+         apagava o que estava sendo escrito. Aqui escolher e deliberado,
+         cabe numa linha, e nada vai pra Twitch ate salvar. -->
+    <select id="usados" class="escondido"></select>
+    <p class="dica escondido" id="usadosDica"></p>
     <!-- As tags ficam com o titulo e salvam no mesmo botao: dois botoes
          numa secao tao curta so fariam a pessoa escolher errado. -->
     <div id="tags"></div>
@@ -285,10 +286,6 @@
     <input id="buscaCat" type="text" placeholder="trocar de jogo: digite mesmo que erre" style="margin-top:8px">
     <div class="fila"><b>Agora</b><span id="vCat">—</span></div>
     <div id="resultadosCat"></div>
-    <!-- Os ultimos titulos usados, pra nao redigitar a mesma coisa toda
-         semana. Titulo e categoria voltam JUNTOS: um sem o outro e o erro
-         que se comete ao vivo. -->
-    <div id="usados"></div>
   </details>
 
   <details id="secaoMomentos" class="secao escondido" data-secao="momentos">
@@ -891,64 +888,101 @@ function porQueVazia(sem) {
   return 'os títulos que você usar aparecem aqui pra reusar';
 }
 
+/* ---------- reusar um título de antes ----------
+
+   ESCOLHER NAO PUBLICA. Antes cada titulo era um botao que mandava pra
+   Twitch na hora; um clique errado trocava o titulo da live e ainda comia
+   o que estava sendo digitado. Agora escolher so PREENCHE o campo, e quem
+   publica continua sendo o Salvar.
+
+   A categoria vem junto e fica esperando aqui ate o Salvar: e o par que
+   importa, e mandar so o titulo deixaria a live com o jogo errado. */
+let USADOS = [];
+let CAT_PENDENTE = '';
+let RASCUNHO = null;
+
 function pintaUsados(lista, agora, semente) {
-  const cx = el('usados');
-  if (!cx) return;
-  cx.innerHTML = '';
+  const sel = el('usados');
+  const dica = el('usadosDica');
+  if (!sel) return;
 
-  const vistos = (lista || []).filter((u) => u.titulo && u.titulo !== agora).slice(0, 6);
+  USADOS = (lista || []).filter((u) => u.titulo && u.titulo !== agora).slice(0, 8);
 
-  const t = document.createElement('p');
-  t.className = 'dica';
-  cx.appendChild(t);
+  sel.classList.toggle('escondido', !USADOS.length);
+  dica.classList.toggle('escondido', !!USADOS.length);
+  if (!USADOS.length) { dica.textContent = porQueVazia(semente); return; }
 
-  /* VAZIO PRECISA DIZER QUE ESTA VAZIO.
-     Nao mostrar nada parecia defeito: o servidor ate anota o titulo que
-     esta no ar, mas e justamente esse que a lista esconde, entao no comeco
-     nao sobra nada. Ele busca as transmissoes passadas pra preencher; canal
-     sem VOD guardado nao tem de onde tirar, e ai a lista se forma usando. */
-  if (!vistos.length) {
-    t.textContent = porQueVazia(semente);
-    return;
-  }
+  sel.innerHTML = '';
+  const zero = document.createElement('option');
+  zero.value = '';
+  zero.textContent = 'reusar um título de antes…';
+  sel.appendChild(zero);
 
-  t.textContent = 'usados antes';
-
-  for (const u of vistos) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'usado';
-    b.appendChild(document.createTextNode(u.titulo));
-    if (u.categoria) {
-      const s2 = document.createElement('small');
-      s2.textContent = u.categoria;
-      b.appendChild(s2);
-    }
-    b.addEventListener('click', async () => {
-      b.disabled = true;
-      const corpo = { titulo: u.titulo };
-      if (u.categoria_id) corpo.categoria_id = u.categoria_id;
-      if (u.tags && u.tags.length) corpo.tags = u.tags;
-      try {
-        await api('/canal.php', { method: 'POST', body: JSON.stringify(corpo) });
-        anotar('voltou: ' + u.titulo);
-        lerCanal();
-      } catch (e) {
-        anotar('nao deu: ' + e.message);
-        b.disabled = false;
-      }
-    });
-    cx.appendChild(b);
-  }
+  USADOS.forEach((u, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = u.categoria ? u.titulo + '  ·  ' + u.categoria : u.titulo;
+    sel.appendChild(o);
+  });
 }
 
-el('btLerCanal').addEventListener('click', lerCanal);
+el('usados').addEventListener('change', () => {
+  const sel = el('usados');
+  const u = USADOS[parseInt(sel.value, 10)];
+  sel.value = '';                       /* volta pro rótulo: não é estado */
+  if (!u) return;
+
+  /* O que estava escrito não some sem deixar rastro. */
+  RASCUNHO = { titulo: el('titulo').value, tags: TAGS.slice(), cat: CAT_PENDENTE };
+
+  el('titulo').value = u.titulo;
+  if (u.tags && u.tags.length) poeTags(u.tags);
+  CAT_PENDENTE = u.categoria_id || '';
+  mostraVolta(u.categoria);
+});
+
+/* Um "voltar" curto, que some sozinho: o campo foi sobrescrito, e mesmo
+   escolhendo de propósito dá pra ter escolhido o de baixo. */
+let voltaRelogio = 0;
+function mostraVolta(cat) {
+  const dica = el('usadosDica');
+  clearTimeout(voltaRelogio);
+  dica.classList.remove('escondido');
+  dica.textContent = (cat ? 'com a categoria ' + cat + '. ' : '') + 'clique em Salvar pra valer — ';
+
+  const a = document.createElement('a');
+  a.href = '#';
+  a.textContent = 'voltar ao que eu estava escrevendo';
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!RASCUNHO) return;
+    el('titulo').value = RASCUNHO.titulo;
+    poeTags(RASCUNHO.tags);
+    CAT_PENDENTE = RASCUNHO.cat;
+    RASCUNHO = null;
+    escondeVolta();
+  });
+  dica.appendChild(a);
+
+  voltaRelogio = setTimeout(escondeVolta, 15000);
+}
+
+function escondeVolta() {
+  const dica = el('usadosDica');
+  if (USADOS.length) { dica.classList.add('escondido'); dica.textContent = ''; }
+  else dica.textContent = porQueVazia(null);
+}
 
 el('btTitulo').addEventListener('click', async () => {
   const titulo = el('titulo').value.trim();
   if (!titulo) return anotar('o título não pode ficar vazio');
   try {
-    await api('/canal.php', { method: 'POST', body: JSON.stringify({ titulo, tags: TAGS }) });
+    const corpo = { titulo, tags: TAGS };
+    if (CAT_PENDENTE) corpo.categoria_id = CAT_PENDENTE;
+    await api('/canal.php', { method: 'POST', body: JSON.stringify(corpo) });
+    CAT_PENDENTE = '';
+    RASCUNHO = null;
+    escondeVolta();
     anotar('salvo');
     lerCanal();
   } catch (e) { anotar('título: ' + e.message); }

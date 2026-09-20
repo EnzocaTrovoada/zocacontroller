@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-20",
+      "titulo": "Reusar um título não troca mais a live sem avisar",
+      "texto": "A lista de títulos usados virou uma lista suspensa acima das tags. Escolher um só preenche o campo — quem publica continua sendo o Salvar. Antes era uma pilha de botões que mandava pra Twitch no clique, e um clique sem querer trocava o título da live e apagava o que você estava escrevendo. Se escolher o errado, tem \"voltar ao que eu estava escrevendo\"."
+    },
+    {
+      "data": "2026-09-20",
       "titulo": "As tags voltam junto com o jogo",
       "texto": "No painel do OBS, as tags da live agora ficam ao lado do título — e trocar de categoria traz de volta as que você usou da última vez naquele jogo. Nada de lista pronta adivinhando o que o seu canal é: quem acerta é a sua própria escolha anterior. Acento e espaço são arrumados na hora, porque a Twitch não aceita. A lista de títulos também começa preenchida: ela busca os das suas transmissões passadas, então já dá pra reusar sem ter trocado nada antes."
     },
