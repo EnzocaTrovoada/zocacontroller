@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-21",
+      "titulo": "Configurações avançadas: PC dedicado, áudio e multistream",
+      "texto": "Em \"Configurar OBS\" tem um \"Configurações avançadas\" agora. Diga se o PC só transmite ou também joga: num PC dedicado eu peço mais qualidade da máquina. Tem um botão que acerta o áudio (160 kbps, 48 kHz, estéreo) e a qualidade do codificador de uma vez. E marcando que a live também vai pro Kick ou YouTube, o bitrate passa a respeitar o teto mais baixo entre elas — mandar 8000 do Kick numa live que também vai pra Twitch derruba uma das duas."
+    },
+    {
+      "data": "2026-09-21",
       "titulo": "Configurar OBS: uma seção só",
       "texto": "Medir a subida da internet, ver o que melhorar e criar um perfil do OBS agora moram juntos em \"Configurar OBS\", no painel que fica dentro do OBS. O perfil do ZocaHub é limpo: é nele que eu consigo mexer no bitrate, coisa que a saída avançada não deixa. O seu perfil de hoje fica intacto — e as suas cenas têm backup aqui no site de qualquer jeito. Escolhendo Kick ou YouTube, os limites mudam junto."
     },

@@ -148,6 +148,17 @@
   }
   .tag button:hover { color: var(--perigo); background: none; }
   #novaTag { margin-top: 5px; }
+  .mais > summary {
+    cursor: pointer; list-style: none; padding: 9px 0 4px;
+    font-size: 11.5px; color: var(--fraco);
+  }
+  .mais > summary::-webkit-details-marker { display: none; }
+  .mais > summary::before { content: '+ '; }
+  .mais[open] > summary::before { content: '\2212 '; }
+  .mais > summary:hover { color: var(--sinal); }
+  .mais label { font-size: 11.5px; }
+  .mais input[type=checkbox] { accent-color: var(--sinal); vertical-align: -2px; }
+
   /* ---------- ajustar a live ---------- */
   .aj { border-top: 1px solid var(--linha); padding: 8px 0; font-size: 12px; }
   .aj:first-child { border-top: 0; }
@@ -285,6 +296,23 @@
       <button id="btAjuste">Ver o que melhorar</button>
       <button id="btMedir" class="fraco">Medir internet</button>
     </div>
+
+    <details class="mais">
+      <summary>Configurações avançadas</summary>
+      <div class="fila"><b>Este PC</b>
+        <select id="pcTipo" style="width:auto">
+          <option value="jogo">Joga e transmite</option>
+          <option value="dedicado">Só transmite</option>
+        </select></div>
+      <div class="fila"><b>Também vai pro</b>
+        <span>
+          <label><input type="checkbox" id="msKick"> Kick</label>
+          <label style="margin-left:8px"><input type="checkbox" id="msYoutube"> YouTube</label>
+        </span></div>
+      <div class="grade um" style="margin-top:6px">
+        <button id="btAudio" class="fraco">Ajustar áudio e qualidade</button>
+      </div>
+    </details>
     <div id="ajusteLido"></div>
     <div id="ajusteDicas"></div>
 
@@ -964,13 +992,23 @@ function ajusteEscolhe(up, d, onde) {
      subida até o topo é onde a live começa a engasgar. */
   const teto = up > 0 ? Math.floor(up * 1000 * 0.7) : 999999;
 
-  /* Sem placa que codifique, 1080p60 no processador é pedir demais de quem
-     também está jogando. */
-  const bruto = !d.placa.codifica && d.placa.nucleos > 0 && d.placa.nucleos < 12;
+  /* Sem placa que codifique, 1080p60 no processador é pedir demais — de
+     quem também está jogando. Num PC que só transmite, o processador está
+     livre e esse freio não faz sentido: é justamente pra isso que existe
+     um PC dedicado. */
+  const soTransmite = el('pcTipo').value === 'dedicado';
+  const bruto = !soTransmite && !d.placa.codifica && d.placa.nucleos > 0 && d.placa.nucleos < 12;
 
   /* A plataforma é mais um teto por cima da internet, e vale o menor dos
-     dois: subida de sobra não faz a Twitch aceitar 9000. */
-  const daPlat = (AJUSTE_ONDE[onde] || AJUSTE_ONDE.twitch).teto;
+     dois: subida de sobra não faz a Twitch aceitar 9000.
+
+     MULTISTREAM MANDA NO MAIS APERTADO. Saindo um encode só pra vários
+     lugares, quem manda é o teto mais baixo entre eles — 8000 no Kick não
+     serve de nada se o mesmo vídeo também vai pra Twitch, que corta em
+     6000. Errar isso é a live cair num dos dois e ninguém entender por quê. */
+  let daPlat = (AJUSTE_ONDE[onde] || AJUSTE_ONDE.twitch).teto;
+  if (el('msKick').checked) daPlat = Math.min(daPlat, AJUSTE_ONDE.kick.teto);
+  if (el('msYoutube').checked) daPlat = Math.min(daPlat, AJUSTE_ONDE.youtube.teto);
 
   for (const g of AJUSTE_DEGRAUS) {
     if (g.piso > teto) continue;
@@ -1085,6 +1123,15 @@ el('btAjuste').addEventListener('click', async () => {
     ajusteLinha(dicas, 'Falta a sua internet', 'clique em "Medir internet" aí em cima.');
   }
 
+  const juntos = [AJUSTE_ONDE[onde].nome]
+    .concat(el('msKick').checked && onde !== 'kick' ? ['Kick'] : [])
+    .concat(el('msYoutube').checked && onde !== 'youtube' ? ['YouTube'] : []);
+  if (juntos.length > 1) {
+    ajusteLinha(dicas, 'Indo pra ' + juntos.join(' + '),
+      'o número abaixo respeita o mais apertado dos três. O OBS sozinho não manda pra vários '
+      + 'lugares — pra isso precisa de um serviço de restream ou plugin.');
+  }
+
   const alvo = ajusteEscolhe(up, d, onde);
   if (!alvo) {
     ajusteLinha(dicas, 'A sua subida não dá nem pra 480p30',
@@ -1183,6 +1230,84 @@ el('btMedir').addEventListener('click', async () => {
     ajusteLinha(dicas, 'Não consegui medir', e.message, 'ruim');
   }
   bt.textContent = 'Medir minha internet';
+  bt.disabled = false;
+});
+
+/* ---------- áudio e qualidade ----------
+
+   AS CHAVES SÃO DO CÓDIGO-FONTE DO OBS, NÃO DE CHUTE. Chave errada não dá
+   erro: o OBS aceita, guarda num nome que ninguém lê e nada acontece. As
+   daqui saíram dos config_set_default do OBSBasic.cpp.
+
+   O preset tem um nome DIFERENTE pra cada codificador, e é o erro fácil:
+   escrever "Preset" com o NVENC ligado mexe no preset do x264, que não
+   está sendo usado. O OBS decide pelo codificador, e aqui também.
+
+   Isto só funciona no modo simples. No avançado o bitrate e o preset
+   moram no arquivo do codificador, onde o obs-websocket não chega — é por
+   isso que existe o perfil do ZocaHub. */
+function audioChavePreset(encoder) {
+  const e = String(encoder || '').toLowerCase();
+  if (e.includes('nvenc')) return 'NVENCPreset2';
+  if (e.includes('qsv')) return 'QSVPreset';
+  if (e.includes('amd') && e.includes('av1')) return 'AMDAV1Preset';
+  if (e.includes('amd')) return 'AMDPreset';
+  if (e.includes('x264')) return 'Preset';
+  return '';                       /* Apple não tem preset */
+}
+
+/* Mais lento = mais bonito no mesmo bitrate, e mais trabalho pra máquina.
+   Quem também está jogando fica no padrão; quem só transmite tem folga. */
+function audioValorPreset(chave, soTransmite) {
+  if (chave === 'NVENCPreset2') return soTransmite ? 'p6' : 'p5';
+  if (chave === 'Preset') return soTransmite ? 'faster' : 'veryfast';
+  if (chave === 'QSVPreset') return soTransmite ? 'quality' : 'balanced';
+  if (chave === 'AMDPreset' || chave === 'AMDAV1Preset') return soTransmite ? 'quality' : 'balanced';
+  return '';
+}
+
+const põe = (cat, nome, valor) =>
+  pedir('SetProfileParameter', { parameterCategory: cat, parameterName: nome, parameterValue: String(valor) });
+
+el('btAudio').addEventListener('click', async () => {
+  const bt = el('btAudio');
+  const dicas = el('ajusteDicas');
+  bt.disabled = true;
+  dicas.innerHTML = '';
+
+  try {
+    const d = await ajusteLe();
+    if (!d.simples) {
+      ajusteLinha(dicas, 'Só no modo simples',
+        'crie o perfil do ZocaHub aqui embaixo; no avançado o OBS não me deixa chegar nesses valores.', 'ruim');
+      bt.disabled = false;
+      return;
+    }
+
+    const soTransmite = el('pcTipo').value === 'dedicado';
+    const feitos = [];
+
+    /* 160 kbps em estéreo a 48 kHz: é o que as plataformas entregam sem
+       recodificar, e som ruim se nota antes de imagem ruim. */
+    await põe('SimpleOutput', 'ABitrate', 160);
+    await põe('Audio', 'SampleRate', 48000);
+    await põe('Audio', 'ChannelSetup', 'Stereo');
+    feitos.push('áudio em 160 kbps, 48 kHz, estéreo');
+
+    const chave = audioChavePreset(d.encoder);
+    const valor = audioValorPreset(chave, soTransmite);
+    if (chave && valor) {
+      /* Sem isto o OBS ignora o preset no modo simples. */
+      await põe('SimpleOutput', 'UseAdvanced', 'true');
+      await põe('SimpleOutput', chave, valor);
+      feitos.push('qualidade em "' + valor + '"' + (soTransmite ? ' (PC só de live)' : ''));
+    }
+
+    ajusteLinha(dicas, 'Ajustado', feitos.join(' · ') + '. Reabra as Configurações do OBS pra ver.', 'bom');
+    anotar('áudio e qualidade ajustados');
+  } catch (e) {
+    ajusteLinha(dicas, 'Não consegui ajustar', e.message, 'ruim');
+  }
   bt.disabled = false;
 });
 
@@ -1285,6 +1410,18 @@ try {
   if (o) el('ondeTx').value = o;
 } catch (e) { /* fica na Twitch */ }
 el('ondeTx').addEventListener('change', () => guardar('zc:onde-tx', el('ondeTx').value));
+
+/* As escolhas do avançado ficam gravadas: quem tem PC dedicado tem todo
+   dia, e remarcar isso a cada abertura do OBS seria só atrito. */
+[['pcTipo', 'zc:pc-tipo'], ['msKick', 'zc:ms-kick'], ['msYoutube', 'zc:ms-youtube']].forEach(([id, ls]) => {
+  const e = el(id);
+  if (!e) return;
+  try {
+    const v = guardado(ls);
+    if (v !== null) { if (e.type === 'checkbox') e.checked = v === '1'; else e.value = v; }
+  } catch (err) { /* sem memória, vale o padrão */ }
+  e.addEventListener('change', () => guardar(ls, e.type === 'checkbox' ? (e.checked ? '1' : '0') : e.value));
+});
 
 /* ---------- tags ----------
 
