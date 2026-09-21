@@ -270,18 +270,30 @@
 
   <details class="secao" data-secao="ajuste">
   <summary>Ajustar a live</summary>
-    <p class="dica">Eu leio a sua placa, o seu OBS e como a live está indo. Só a internet
-       você precisa me dizer.</p>
-    <div class="fila"><b>Subida da sua internet</b>
-      <span><input id="upMbps" type="number" min="1" max="1000" step="0.1"
-                   style="width:70px;text-align:right"> Mbps</span></div>
-    <p class="dica"><a href="https://fast.com" target="_blank" rel="noopener noreferrer">medir no fast.com ↗</a>
-       — é o número de <b>upload</b>.</p>
-    <div class="grade um" style="margin-top:6px">
-      <button id="btAjuste">Ver o que dá pra melhorar</button>
+    <div class="fila"><b>Onde você transmite</b>
+      <select id="ondeTx" style="width:auto">
+        <option value="twitch">Twitch</option>
+        <option value="kick">Kick</option>
+        <option value="youtube">YouTube</option>
+      </select></div>
+    <div class="fila"><b>Subida da internet</b>
+      <span><input id="upMbps" type="number" min="0.5" max="2000" step="0.1"
+                   style="width:64px;text-align:right"> Mbps</span></div>
+    <div class="grade" style="margin-top:6px">
+      <button id="btAjuste">Ver o que melhorar</button>
+      <button id="btMedir" class="fraco">Medir minha internet</button>
     </div>
     <div id="ajusteLido"></div>
     <div id="ajusteDicas"></div>
+  </details>
+
+  <details class="secao" data-secao="perfil">
+  <summary>Perfil do ZocaHub</summary>
+    <p class="dica">Um perfil só seu no OBS, pra eu poder ajustar sem encostar no que
+       você já tem. O seu perfil de hoje fica intacto, e dá pra voltar quando quiser.</p>
+    <div class="fila"><b>Perfil em uso</b><span id="perfilAtual">—</span></div>
+    <div id="perfilBotoes" class="grade um" style="margin-top:6px"></div>
+    <p class="dica" id="perfilAviso"></p>
   </details>
 
   <details class="secao" data-secao="cena">
@@ -794,6 +806,7 @@ function ligarSecoes() {
   el('secaoPalpite').classList.toggle('escondido', !tem);
   el('secaoMomentos').classList.toggle('escondido', !tem);
   if (tem) { lerCanal(); lerPalpite(); lerMomentos(); }
+  perfilPinta();
 }
 
 /* ---------- título e categoria ---------- */
@@ -871,6 +884,18 @@ const AJUSTE_DEGRAUS = [
   { l: '480p30',  w:  854, h:  480, fps: 30, piso:  900, ideal: 1500 },
 ];
 
+/* CADA PLATAFORMA ACEITA UM TETO DIFERENTE, e o ideal de cima é o da
+   Twitch. A Twitch corta em 6000 pra quem não é parceiro; o Kick libera
+   8000 pra todo mundo; o YouTube vai até 9000. Mandar acima do teto da
+   plataforma não melhora nada — a transmissão é que cai.
+
+   Pra somar outra: nome que aparece, e o teto em kbps. */
+const AJUSTE_ONDE = {
+  twitch:  { nome: 'Twitch',  teto: 6000 },
+  kick:    { nome: 'Kick',    teto: 8000 },
+  youtube: { nome: 'YouTube', teto: 9000 },
+};
+
 /* O que a placa sabe codificar sozinha. Tirar isso do processador é o
    ganho mais barato que existe: o jogo para de brigar com a transmissão. */
 function ajustePlaca() {
@@ -936,7 +961,7 @@ async function ajusteLe() {
 }
 
 /* O degrau que cabe nos DOIS limites. */
-function ajusteEscolhe(up, d) {
+function ajusteEscolhe(up, d, onde) {
   /* 70% da subida: o resto é o que sobra pro áudio, pro reenvio do que se
      perde no caminho e pra tudo mais que usa a internet na casa. Encher a
      subida até o topo é onde a live começa a engasgar. */
@@ -946,10 +971,17 @@ function ajusteEscolhe(up, d) {
      também está jogando. */
   const bruto = !d.placa.codifica && d.placa.nucleos > 0 && d.placa.nucleos < 12;
 
+  /* A plataforma é mais um teto por cima da internet, e vale o menor dos
+     dois: subida de sobra não faz a Twitch aceitar 9000. */
+  const daPlat = (AJUSTE_ONDE[onde] || AJUSTE_ONDE.twitch).teto;
+
   for (const g of AJUSTE_DEGRAUS) {
     if (g.piso > teto) continue;
     if (bruto && (g.fps > 30 || g.h > 720)) continue;
-    return Object.assign({}, g, { kbps: Math.min(g.ideal, teto) });
+    /* No Kick e no YouTube o mesmo degrau aguenta mais, então o ideal da
+       Twitch vira piso e o teto da plataforma vira o alvo. */
+    const alvo = Math.min(Math.max(g.ideal, Math.min(daPlat, Math.round(g.ideal * 1.5))), daPlat);
+    return Object.assign({}, g, { kbps: Math.min(alvo, teto) });
   }
   return null;
 }
@@ -994,6 +1026,7 @@ el('btAjuste').addEventListener('click', async () => {
   dicas.innerHTML = '';
 
   const up = parseFloat(el('upMbps').value) || 0;
+  const onde = el('ondeTx').value;
   if (up > 0) guardar(AJUSTE_LS, String(up));
 
   let d;
@@ -1024,17 +1057,17 @@ el('btAjuste').addEventListener('click', async () => {
 
   if (s.outputTotalFrames > 500 && perdaRede > 1) {
     ajusteLinha(dicas, 'A sua internet não está dando conta agora',
-      'perdeu ' + perdaRede.toFixed(1) + ' por cento dos quadros no envio. Isso é engasgo pra quem assiste: baixe o bitrate.',
+      'perdeu ' + perdaRede.toFixed(1) + '% dos quadros no envio — isso é engasgo pra quem assiste.',
       'ruim');
   }
   if (s.renderTotalFrames > 500 && perdaPC > 1) {
     ajusteLinha(dicas, 'O computador não está dando conta agora',
-      'perdeu ' + perdaPC.toFixed(1) + ' por cento dos quadros no desenho. Baixe a resolução ou passe a codificar pela placa.',
+      'perdeu ' + perdaPC.toFixed(1) + '% dos quadros no desenho.',
       'ruim');
   }
   if (s.cpuUsage > 25) {
-    ajusteLinha(dicas, 'O OBS está usando ' + Math.round(s.cpuUsage) + ' por cento do processador',
-      'se o jogo travar junto, o culpado é esse.', 'ruim');
+    ajusteLinha(dicas, 'O OBS está comendo ' + Math.round(s.cpuUsage) + '% do processador',
+      'se o jogo travar junto, é isso.', 'ruim');
   }
 
   /* ---------- multi-encode: quando dá, dispensa a conta ----------
@@ -1043,29 +1076,30 @@ el('btAjuste').addEventListener('click', async () => {
      conta abaixo deixa de fazer falta. Ligar é dentro do OBS, na mão: não
      dá pra virar essa chave daqui, e não é bom que desse. */
   if (d.versao >= 30.002) {
-    ajusteLinha(dicas, 'Ligue o Enhanced Broadcasting',
-      'o seu OBS tem. Em Configurações, Transmissão, conecte a conta da Twitch e marque a opção. '
-      + 'Aí o OBS manda várias qualidades de uma vez e a Twitch entrega a melhor pra cada pessoa, '
-      + 'e nada abaixo aqui precisa ser ajustado na mão.', 'bom');
-  } else {
-    ajusteLinha(dicas, 'O seu OBS é antigo demais pro Enhanced Broadcasting',
-      'da versão 30.2 em diante dá pra mandar várias qualidades de uma vez. Vale atualizar.');
+    if (onde === 'twitch') {
+      ajusteLinha(dicas, 'Ligue o Enhanced Broadcasting',
+        'Configurações → Transmissão, conecte a conta da Twitch e marque. O OBS passa a mandar '
+        + 'várias qualidades e quem escolhe vira a Twitch — nada abaixo importa mais.', 'bom');
+    }
+  } else if (onde === 'twitch') {
+    ajusteLinha(dicas, 'Atualize o OBS',
+      'da 30.2 em diante dá pra mandar várias qualidades de uma vez.');
   }
 
   /* ---------- a conta ---------- */
   if (!up) {
-    ajusteLinha(dicas, 'Diga a subida da sua internet',
-      'sem esse número eu só consigo olhar o computador, e é a internet que costuma mandar.');
+    ajusteLinha(dicas, 'Falta a sua internet',
+      'clique em "Medir minha internet". Sem esse número eu só olho o computador, e é a internet que costuma mandar.');
   }
 
-  const alvo = ajusteEscolhe(up, d);
+  const alvo = ajusteEscolhe(up, d, onde);
   if (!alvo) {
-    ajusteLinha(dicas, 'A sua subida não alcança nem 480p30',
-      'com menos de uns 2,2 Mbps de upload, transmitir fica instável em qualquer ajuste.', 'ruim');
+    ajusteLinha(dicas, 'A sua subida não dá nem pra 480p30',
+      'abaixo de uns 1,3 Mbps de upload a live fica instável em qualquer ajuste.', 'ruim');
   } else if (!d.simples) {
-    ajusteLinha(dicas, 'Sugerido: ' + alvo.l + ' a ' + alvo.kbps + ' kbps',
-      'o seu OBS está na saída avançada, então eu não mexo: ali cada codificador guarda o bitrate '
-      + 'no lugar dele, e chutar errado é pior que não fazer nada.');
+    ajusteLinha(dicas, 'Ideal pra você: ' + alvo.l + ' a ' + alvo.kbps + ' kbps',
+      'você está na saída avançada e o OBS não me deixa mexer no bitrate dela. Crie o perfil do '
+      + 'ZocaHub aqui embaixo que eu ajusto tudo sozinho.');
   } else {
     const mudaTela = d.w !== alvo.w || d.h !== alvo.h || d.fps !== alvo.fps;
     const mudaTaxa = Math.abs(d.bitrate - alvo.kbps) > 200;
@@ -1100,18 +1134,158 @@ el('btAjuste').addEventListener('click', async () => {
      O nome do codificador muda de versão pra versão do OBS, e escrever o
      errado é a transmissão não subir. Aqui vale a boca, não a mão. */
   if (d.placa.codifica && /x264/i.test(d.encoder || '')) {
-    ajusteLinha(dicas, 'Codifique pela placa, e não pelo processador',
-      'a sua ' + (d.placa.nome || 'placa') + ' faz isso sozinha. Em Configurações, Saída, '
-      + 'escolha o codificador ' + d.placa.codifica + '. O jogo para de brigar com a live.');
+    ajusteLinha(dicas, 'Use a placa pra codificar',
+      'a sua ' + (d.placa.nome || 'placa') + ' faz isso sozinha. Configurações → Saída → '
+      + d.placa.codifica + '. O jogo para de brigar com a live.');
   }
 
   bt.disabled = false;
 });
 
+/* ---------- medir a subida aqui mesmo ----------
+
+   Manda bytes pro nosso servidor e cronometra. NÃO é um teste de
+   velocidade: mede até a nossa hospedagem, que é compartilhada, então o
+   teto é o dela e não o da pessoa. Quem tem fibra vai ver bem menos.
+
+   E não faz falta. A pergunta não é "quantos megas você tem", é "a sua
+   subida passa do que a plataforma aceita?". Pra isso, medir até uns 15
+   basta; acima disso a resposta é sempre a mesma.
+
+   Três rodadas, e vale a MELHOR: o começo de cada envio é lento por
+   desenho do próprio TCP, e a primeira rodada sempre sai pior que a
+   verdade. A média puxaria o número pra baixo à toa. */
+const MEDIR_PEDACO = 2 * 1024 * 1024;
+
+async function medirSubida(aoAndar) {
+  const carga = new Uint8Array(MEDIR_PEDACO);
+  let melhor = 0;
+
+  for (let i = 0; i < 3; i++) {
+    if (aoAndar) aoAndar('medindo… ' + (i + 1) + ' de 3');
+    const t0 = performance.now();
+    const r = await api('/velocidade.php', { method: 'POST', body: carga,
+                                             headers: { 'Content-Type': 'application/octet-stream' } });
+    const seg = (performance.now() - t0) / 1000;
+
+    /* Os bytes que CHEGARAM, não os que saíram: se a hospedagem cortar o
+       corpo no limite dela, contar o que saiu daria um número inflado. */
+    const bytes = Number(r.recebi) || 0;
+    if (seg > 0.05 && bytes > 0) melhor = Math.max(melhor, (bytes * 8) / seg / 1e6);
+  }
+  return melhor;
+}
+
+el('btMedir').addEventListener('click', async () => {
+  const bt = el('btMedir');
+  const dicas = el('ajusteDicas');
+  bt.disabled = true;
+  dicas.innerHTML = '';
+
+  try {
+    const mbps = await medirSubida((t) => { bt.textContent = t; });
+    el('upMbps').value = mbps.toFixed(1);
+    guardar(AJUSTE_LS, String(mbps.toFixed(1)));
+    ajusteLinha(dicas, 'Medi ' + mbps.toFixed(1) + ' Mbps de subida',
+      mbps >= 15
+        ? 'daqui pra cima a internet deixa de ser o seu limite — e o teto real seu é maior que isso, porque quem limita a medida é o nosso servidor.'
+        : 'agora clique em "Ver o que melhorar".', mbps >= 15 ? 'bom' : '');
+  } catch (e) {
+    ajusteLinha(dicas, 'Não consegui medir', e.message, 'ruim');
+  }
+  bt.textContent = 'Medir minha internet';
+  bt.disabled = false;
+});
+
+/* ---------- o perfil do ZocaHub ----------
+
+   POR QUE UM PERFIL, E NÃO MEXER NO QUE JÁ EXISTE.
+
+   Duas razões, e a segunda é a que resolve de verdade. A primeira é óbvia:
+   o que a pessoa montou é dela, e um botão que reescreve isso por cima é
+   um botão que ninguém aperta duas vezes.
+
+   A segunda: na SAÍDA AVANÇADA o obs-websocket não alcança o bitrate. Ele
+   não mora no basic.ini, mora num arquivo do codificador, e não existe
+   pedido no protocolo que chegue lá. Então em perfil avançado eu só sei
+   recomendar. Um perfil novo nasce na saída simples — e aí eu ajusto tudo.
+
+   O QUE ELE NÃO LEVA JUNTO: a chave de transmissão. Perfil novo nasce sem
+   ela, e eu não copio: ler a chave é a única coisa que, vazando, deixa um
+   estranho transmitir no canal de alguém. Conectar a conta no perfil novo
+   é uma vez, na mão — e é o mesmo passo que o Enhanced Broadcasting pede,
+   então não é trabalho perdido. */
+const PERFIL_ZOCA = 'ZocaHub';
+const PERFIL_ANTES = 'zc:perfil-antes';
+
+async function perfilPinta() {
+  const cx = el('perfilBotoes');
+  const aviso = el('perfilAviso');
+  cx.innerHTML = '';
+  aviso.textContent = '';
+
+  let d;
+  try { d = await pedir('GetProfileList'); }
+  catch (e) { el('perfilAtual').textContent = 'OBS desligado'; return; }
+
+  const atual = d.currentProfileName || '?';
+  const existe = (d.profiles || []).includes(PERFIL_ZOCA);
+  el('perfilAtual').textContent = atual;
+
+  const bt = (texto, fraco, faz) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = texto;
+    if (fraco) b.className = 'fraco';
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      try { await faz(); } catch (e) { anotar('perfil: ' + e.message, true); }
+      b.disabled = false;
+      perfilPinta();
+    });
+    cx.appendChild(b);
+  };
+
+  if (atual === PERFIL_ZOCA) {
+    const antes = guardado(PERFIL_ANTES);
+    aviso.textContent = 'Você está no perfil do ZocaHub. Se ainda não transmitiu por ele, '
+      + 'abra Configurações → Transmissão e conecte a sua conta — o perfil nasce sem a chave, '
+      + 'e eu não copio chave de transmissão de propósito.';
+    if (antes && (d.profiles || []).includes(antes)) {
+      bt('Voltar pro perfil ' + antes, true, () => pedir('SetCurrentProfile', { profileName: antes }));
+    }
+    return;
+  }
+
+  if (existe) {
+    aviso.textContent = 'Ele já existe. Trocar não apaga nada: o "' + atual + '" continua aí.';
+    bt('Usar o perfil do ZocaHub', false, async () => {
+      guardar(PERFIL_ANTES, atual);
+      await pedir('SetCurrentProfile', { profileName: PERFIL_ZOCA });
+    });
+    return;
+  }
+
+  aviso.textContent = 'Crio um perfil limpo chamado ZocaHub e passo pra ele. O "' + atual
+    + '" fica do jeito que está, e dá pra voltar em um clique.';
+  bt('Criar o perfil ZocaHub', false, async () => {
+    guardar(PERFIL_ANTES, atual);
+    await pedir('CreateProfile', { profileName: PERFIL_ZOCA });
+    await pedir('SetCurrentProfile', { profileName: PERFIL_ZOCA });
+    anotar('perfil ZocaHub criado');
+  });
+}
+
 try {
   const u = guardado(AJUSTE_LS);
   if (u) el('upMbps').value = u;
 } catch (e) { /* sem memória do upload, é só redigitar */ }
+
+try {
+  const o = guardado('zc:onde-tx');
+  if (o) el('ondeTx').value = o;
+} catch (e) { /* fica na Twitch */ }
+el('ondeTx').addEventListener('change', () => guardar('zc:onde-tx', el('ondeTx').value));
 
 /* ---------- tags ----------
 
