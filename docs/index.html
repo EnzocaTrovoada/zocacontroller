@@ -6872,6 +6872,108 @@ function seProblemaNome(nome) {
   return '';
 }
 
+/* ---------------- trazer do Botrix ----------------
+
+   O Botrix é multiplataforma (Twitch, Kick, YouTube, Trovo), e é por isso
+   que as pessoas usam ele. A leitura passa pelo NOSSO servidor, e não pelo
+   navegador como a do StreamElements: o Botrix não manda cabeçalho de CORS,
+   então o navegador recusa a resposta antes de olhar. Ver api/botrix.php.
+
+   A lista pública deles devolve três campos por comando: nome, mensagem e
+   um nível de cargo. Não tem apelido, nem espera, nem ligado/desligado —
+   esses saem no padrão daqui, e não é perda: o Botrix não guarda. */
+
+/* 0 é "user"; a página deles mostra "moderator" pra 1 e pra 3. Qualquer
+   coisa acima de zero vira mod — liberar demais é pior que de menos. */
+const botrixCargo = (m) => (Number(m) > 0 ? 'mod' : 'chat');
+
+function botrixConverte(c) {
+  const nome = seNome(c.cmd);
+  const texto = String(c.msg || '');
+  const avisos = [];
+  let problema = seProblemaNome(nome);
+  const problemaNome = !!problema;
+
+  const barra = texto.trim().match(/^[/.](\w+)/);
+  if (!problema && barra && barra[1].toLowerCase() !== 'me') {
+    problema = 'a resposta é um comando da plataforma (/' + barra[1] + '), que não roda por aqui';
+  }
+  if (!problema && !texto.trim()) problema = 'a resposta está vazia';
+
+  /* A LISTA PÚBLICA DO BOTRIX ESCONDE AS VARIÁVEIS.
+     Toda variável vira o texto literal "$(variable)" — não é o nome dela
+     mascarado, é a informação jogada fora. Diferente do StreamElements,
+     não existe chave que destrave: a API de verdade deles é fechada. Então
+     o comando vem com buraco, e quem preenche é a pessoa. */
+  const buracos = (texto.match(/\$\(variable\)/g) || []).length;
+  if (buracos) {
+    avisos.push(buracos === 1
+      ? 'tinha uma variável aqui e o Botrix não diz qual: troque o $(variable) pelo que faltar'
+      : 'tinha ' + buracos + ' variáveis aqui e o Botrix não diz quais: troque cada $(variable) pelo que faltar');
+  }
+  if (texto.length > 500) avisos.push('a resposta passa de 500 letras e vai cortada');
+
+  return {
+    problema: problema,
+    problemaNome: problemaNome,
+    avisos: avisos,
+    item: {
+      nome: nome,
+      apelidos: '',
+      passos: [{ acao: 'responder', argumento: texto.slice(0, 500), modo: 'say' }],
+      quem: botrixCargo(c.mods),
+      espera: 5,
+      espera_pessoa: 0,
+      ligado: 1,
+    },
+  };
+}
+
+/* ---------------- de onde dá pra trazer ----------------
+
+   O CONTRATO, pra somar outra fonte sem ler o resto do arquivo:
+
+     nome     — como ela aparece nos botões e nas frases
+     campos   — o que perguntar antes de ler. Cada um:
+                { chave, rotulo, tipo?, placeholder?, valor?, dica? }
+     ler(v)   — recebe { chave: valor } e devolve
+                { canal, comandos: [ ... ] }, ou lança Error com o motivo
+     converte(c, v) — um comando cru vira
+                { problema, problemaNome, avisos, item }
+
+   O resto — a lista, as marcações, renomear, o envio — é igual pra todas
+   e não precisa ser tocado. */
+const FONTES = {
+  streamelements: {
+    nome: 'StreamElements',
+    campos: [
+      { chave: 'canal', rotulo: 'Canal no StreamElements', placeholder: 'o seu canal' },
+      { chave: 'jwt', rotulo: 'Chave JWT', tipo: 'password', placeholder: 'cole aqui',
+        botao: { texto: 'Pegar minha chave ↗', href: 'https://streamelements.com/dashboard/account/channels' },
+        dica: 'Sem ela vêm só os comandos de texto. Na página, ligue "Show secrets" e copie o JWT Token. '
+            + 'Ele vai direto pro StreamElements, não passa pelo nosso servidor e não fica guardado — mas não mostre na live.' },
+    ],
+    ler: (v) => seLer(v.canal, v.jwt),
+    converte: (c, v) => seConverte(c, !!v.jwt),
+    /* Usou, apagou: a chave não fica nem no campo. */
+    limpar: ['jwt'],
+  },
+
+  botrix: {
+    nome: 'Botrix',
+    campos: [
+      { chave: 'canal', rotulo: 'Canal no Botrix', placeholder: 'o seu canal',
+        dica: 'É o mesmo nome que aparece no endereço botrix.live/u/SEUCANAL. Procuro na Twitch, no Kick, no YouTube e no Trovo.' },
+    ],
+    ler: async (v) => {
+      if (!v.canal) throw new Error('Escreva o nome do seu canal.');
+      const d = await api('/botrix.php?canal=' + encodeURIComponent(v.canal));
+      return { canal: d.canal + ' (' + d.onde + ')', comandos: d.comandos || [] };
+    },
+    converte: (c) => botrixConverte(c),
+  },
+};
+
 /* O StreamElements guarda "sem data" como o ano 1. */
 const seData = (v) => {
   const ms = Date.parse(v || '');
@@ -6941,7 +7043,7 @@ function seConverte(c, comChave) {
   };
 }
 
-function abreImportarSE(aoTerminar) {
+function abreImportar(fonte, aoTerminar) {
   fechaPop();
 
   const caixa = h('div', { cls: 'pop__caixa pop__caixa--largo' });
@@ -6952,8 +7054,30 @@ function abreImportarSE(aoTerminar) {
   const x = h('button', { cls: 'pop__x', type: 'button', txt: '×', title: 'Fechar' });
   x.onclick = fechaPop;
 
-  const canal = h('input', { type: 'text', placeholder: 'o seu canal', autocomplete: 'off', value: quemSou || '' });
-  const jwt = h('input', { type: 'password', placeholder: 'cole aqui', autocomplete: 'off', spellcheck: 'false' });
+  /* Os campos são da fonte: cada uma pergunta o que precisa. */
+  const entradas = {};
+  const linhasCampo = [];
+  fonte.campos.forEach((c) => {
+    const i = h('input', {
+      type: c.tipo || 'text',
+      placeholder: c.placeholder || '',
+      autocomplete: 'off',
+      spellcheck: 'false',
+      value: c.chave === 'canal' ? (quemSou || '') : (c.valor || ''),
+    });
+    entradas[c.chave] = i;
+
+    const dentro = [h('label', { txt: c.rotulo }), i];
+    if (c.botao) {
+      dentro.push(h('a', { cls: 'bt mini', href: c.botao.href, target: '_blank',
+                           rel: 'noopener noreferrer', txt: c.botao.texto }));
+    }
+    linhasCampo.push(h('div', { cls: 'campo' }, dentro));
+    if (c.dica) {
+      linhasCampo.push(h('p', { cls: 'd', style: 'font-size:12px;margin:-2px 0 12px', txt: c.dica }));
+    }
+  });
+
   const ler = h('button', { cls: 'bt principal', type: 'button', txt: 'Ler os comandos' });
   const diz = h('p', { cls: 'd', style: 'min-height:1em;margin:10px 0 0' });
   const lista = h('div', { style: 'margin-top:6px' });
@@ -7021,23 +7145,25 @@ function abreImportarSE(aoTerminar) {
   }
 
   ler.onclick = async () => {
-    const chave = jwt.value.trim();
-    const nomeCanal = canal.value.trim().replace(/^@/, '').toLowerCase();
-    if (!chave && !nomeCanal) { diz.textContent = 'Escreva o nome do seu canal.'; return; }
+    const v = {};
+    Object.entries(entradas).forEach(([k, i]) => {
+      v[k] = i.value.trim();
+      if (k === 'canal') v[k] = v[k].replace(/^@/, '').toLowerCase();
+    });
+
     ler.disabled = true;
-    diz.textContent = 'lendo no StreamElements…';
+    diz.textContent = 'lendo no ' + fonte.nome + '…';
     lista.innerHTML = '';
     lidos = [];
     rodape.classList.add('escondido');
     try {
-      const d = await seLer(nomeCanal, chave);
-      /* Usou, apagou: a chave não fica nem no campo. */
-      jwt.value = '';
-      lidos = d.comandos.map((c) => Object.assign(seConverte(c, !!chave), { marcado: true }));
+      const d = await fonte.ler(v);
+      (fonte.limpar || []).forEach((k) => { if (entradas[k]) entradas[k].value = ''; });
+      lidos = (d.comandos || []).map((c) => Object.assign(fonte.converte(c, v), { marcado: true }));
       lidos.forEach((l) => { if (l.problema) l.marcado = false; });
       diz.textContent = lidos.length
         ? d.canal + ': ' + lidos.length + (lidos.length === 1 ? ' comando.' : ' comandos.') + ' Desmarque o que não quiser trazer.'
-        : 'Esse canal não tem comandos próprios no StreamElements.';
+        : 'Esse canal não tem comandos próprios no ' + fonte.nome + '.';
       pinta();
     } catch (e) {
       diz.textContent = e.message;
@@ -7073,27 +7199,18 @@ function abreImportarSE(aoTerminar) {
     }
   };
 
-  /* BOTÃO, E NÃO UM LINK NO MEIO DO PARÁGRAFO.
-     A chave é o que separa "trouxe metade" de "trouxe tudo": sem ela, todo
-     comando que busca um endereço chega vazio. Quem precisa dela tem que
-     tropeçar no caminho, não ler até achar. */
-  const onde = h('a', { cls: 'bt mini', href: 'https://streamelements.com/dashboard/account/channels',
-    target: '_blank', rel: 'noopener noreferrer', txt: 'Pegar minha chave ↗' });
-
   const corpo = h('div', { cls: 'pop__corpo' }, [
-    h('p', { cls: 'sub', txt: 'Os comandos que respondem no chat chegam prontos: a resposta, quem pode usar, as esperas e os outros nomes.' }),
-    h('div', { cls: 'campo' }, [h('label', { txt: 'Canal no StreamElements' }), canal]),
-    h('div', { cls: 'campo' }, [h('label', { txt: 'Chave JWT' }), jwt, onde]),
-    h('p', { cls: 'd', style: 'font-size:12px;margin:-2px 0 12px',
-      txt: 'Sem ela vêm só os comandos de texto. Na página, ligue "Show secrets" e copie o JWT Token. Ele vai direto pro StreamElements, não passa pelo nosso servidor e não fica guardado — mas não mostre na live.' }),
+    h('p', { cls: 'sub', txt: 'Os comandos que respondem no chat chegam prontos: a resposta e quem pode usar.' }),
+    ...linhasCampo,
     h('p', { style: 'margin:0' }, [ler]),
     diz,
     lista,
   ]);
 
-  caixa.append(h('div', { cls: 'pop__topo' }, [x, h('h2', { txt: 'Trazer do StreamElements' })]), corpo, rodape);
+  caixa.append(h('div', { cls: 'pop__topo' }, [x, h('h2', { txt: 'Trazer do ' + fonte.nome })]), corpo, rodape);
   document.body.appendChild(fundo);
-  canal.focus();
+  const primeiro = entradas[fonte.campos[0].chave];
+  if (primeiro) primeiro.focus();
 }
 
 /* De que overlay é cada comando. Serve pra mostrar os comandos na página
@@ -7494,6 +7611,7 @@ function telaComandos() {
   const busca = h('input', { type: 'search', placeholder: 'procurar…' });
   const btNovo = h('button', { cls: 'bt principal', type: 'button', txt: '+ Novo comando' });
   const btImportar = h('button', { cls: 'bt', type: 'button', txt: 'Trazer do StreamElements' });
+  const btBotrix = h('button', { cls: 'bt', type: 'button', txt: 'Trazer do Botrix' });
   const btTeste = h('button', { cls: 'bt fraco', type: 'button', txt: 'Testar no chat' });
   const dizTeste = h('span', { cls: 'd', style: 'font-size:12.5px' });
   const contaCmd = h('span', { cls: 'd', style: 'font-size:12px' });
@@ -7502,7 +7620,8 @@ function telaComandos() {
   const corpoCmd = h('tbody');
 
   btNovo.onclick = () => abreComando(null);
-  btImportar.onclick = () => abreImportarSE(carrega);
+  btImportar.onclick = () => abreImportar(FONTES.streamelements, carrega);
+  btBotrix.onclick = () => abreImportar(FONTES.botrix, carrega);
 
   btTeste.onclick = async () => {
     btTeste.disabled = true;
@@ -7561,7 +7680,7 @@ function telaComandos() {
 
   const meus = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Os seus' }),
-    h('div', { cls: 'barra-cmd' }, [busca, btNovo, btImportar, btTeste, dizTeste,
+    h('div', { cls: 'barra-cmd' }, [busca, btNovo, btImportar, btBotrix, btTeste, dizTeste,
       h('span', { cls: 'espaco' }), contaCmd]),
     linhaNuvem,
     avisoResposta,

@@ -14,6 +14,11 @@
 
   "novidades": [
     {
+      "data": "2026-09-21",
+      "titulo": "Dá pra trazer os comandos do Botrix",
+      "texto": "Quem vem do Botrix agora tem o botão \"Trazer do Botrix\" na tela de comandos: escreve o nome do canal e eu procuro na Twitch, no Kick, no YouTube e no Trovo. Os comandos de texto chegam prontos. Os que usavam variável chegam com o lugar marcado — a lista pública do Botrix esconde qual variável era, e não existe chave que destrave."
+    },
+    {
       "data": "2026-09-20",
       "titulo": "Reusar um título não troca mais a live sem avisar",
       "texto": "A lista de títulos usados virou uma lista suspensa acima das tags. Escolher um só preenche o campo — quem publica continua sendo o Salvar. Antes era uma pilha de botões que mandava pra Twitch no clique, e um clique sem querer trocava o título da live e apagava o que você estava escrevendo. Se escolher o errado, tem \"voltar ao que eu estava escrevendo\"."
