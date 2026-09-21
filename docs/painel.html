@@ -148,6 +148,14 @@
   }
   .tag button:hover { color: var(--perigo); background: none; }
   #novaTag { margin-top: 5px; }
+  /* ---------- ajustar a live ---------- */
+  .aj { border-top: 1px solid var(--linha); padding: 8px 0; font-size: 12px; }
+  .aj:first-child { border-top: 0; }
+  .aj b { display: block; font-weight: 400; color: var(--tinta); margin-bottom: 2px; }
+  .aj span { color: var(--fraco); }
+  .aj button { width: auto; margin-top: 6px; padding: 4px 10px; font-size: 11px; }
+  .aj--bom b { color: var(--sinal); }
+  .aj--ruim b { color: var(--perigo); }
   #usados { margin-top: 5px; }
   #usadosDica a { color: var(--sinal); }
   .opc {
@@ -258,6 +266,22 @@
   <div class="grade um" style="margin-top:8px">
     <button id="btCamera" disabled>Troca por câmera</button>
   </div>
+  </details>
+
+  <details class="secao" data-secao="ajuste">
+  <summary>Ajustar a live</summary>
+    <p class="dica">Eu leio a sua placa, o seu OBS e como a live está indo. Só a internet
+       você precisa me dizer.</p>
+    <div class="fila"><b>Subida da sua internet</b>
+      <span><input id="upMbps" type="number" min="1" max="1000" step="0.1"
+                   style="width:70px;text-align:right"> Mbps</span></div>
+    <p class="dica"><a href="https://fast.com" target="_blank" rel="noopener noreferrer">medir no fast.com ↗</a>
+       — é o número de <b>upload</b>.</p>
+    <div class="grade um" style="margin-top:6px">
+      <button id="btAjuste">Ver o que dá pra melhorar</button>
+    </div>
+    <div id="ajusteLido"></div>
+    <div id="ajusteDicas"></div>
   </details>
 
   <details class="secao" data-secao="cena">
@@ -798,6 +822,296 @@ async function lerCanal() {
     }
   }
 }
+
+/* ================= AJUSTAR A LIVE =================
+
+   O QUE ESTA PARTE FAZ, E O QUE ELA SE RECUSA A FAZER.
+
+   Ela lê: a placa de vídeo e os núcleos (pelo navegador, que aqui roda
+   DENTRO do OBS, na máquina de quem transmite), a versão do OBS, a
+   resolução, os quadros por segundo, o codificador, o bitrate, e como a
+   transmissão de agora está indo. Nada disso se pergunta.
+
+   Ela pergunta uma coisa só: a subida da internet. Não dá pra medir daqui
+   de um jeito que valha — o teste que importa é contra o servidor da
+   Twitch, e quem faz isso é o Twitch Inspector, que a gente não consegue
+   ler. Então o número entra na mão e serve de chute inicial; quem corrige
+   é a leitura da live de verdade, que é a parte que ninguém mais faz.
+
+   O MENOR MANDA, NUNCA A MÉDIA. Internet e computador são dois limites
+   independentes. PC excelente com internet ruim não dá uma configuração
+   média: dá a que a internet aguenta, senão a live perde quadro inteira.
+
+   E ELA NÃO ENCOSTA NA CHAVE DE TRANSMISSÃO. Dá pra ler e escrever por
+   aqui, e é a única coisa que, vazando, deixa um estranho transmitir no
+   canal de alguém. Não é lida, não é guardada, não é mostrada. */
+
+const AJUSTE_LS = 'zc:upload';
+
+/* Os degraus, do melhor pro mais leve.
+
+   DOIS NÚMEROS POR DEGRAU, E NÃO UM. O "piso" é o mínimo em que ele ainda
+   fica bonito; o "ideal" é onde ele para de melhorar. Com um número só, o
+   degrau era descartado inteiro quando a subida ficava um pouco abaixo do
+   ideal — e alguém com 4200 kbps sobrando caía pra 720p30 quando 936p60
+   caberia folgado. Agora passa quem cabe no piso, e o bitrate vira o
+   menor entre o ideal e o que a internet dá.
+
+   O ideal nunca passa de 6000: a Twitch não aceita mais que isso fora do
+   programa de parceiros, e mandar demais é a live cair, não melhorar.
+
+   SESSENTA QUADROS VÊM ANTES DE MAIS PIXEL. A ordem é escolha: o público
+   daqui joga, e jogo a 30 quadros incomoda mais do que 936p incomoda. */
+const AJUSTE_DEGRAUS = [
+  { l: '1080p60', w: 1920, h: 1080, fps: 60, piso: 4500, ideal: 6000 },
+  { l: '936p60',  w: 1664, h:  936, fps: 60, piso: 3500, ideal: 4500 },
+  { l: '720p60',  w: 1280, h:  720, fps: 60, piso: 2500, ideal: 4500 },
+  { l: '1080p30', w: 1920, h: 1080, fps: 30, piso: 3000, ideal: 4500 },
+  { l: '720p30',  w: 1280, h:  720, fps: 30, piso: 1800, ideal: 3000 },
+  { l: '480p30',  w:  854, h:  480, fps: 30, piso:  900, ideal: 1500 },
+];
+
+/* O que a placa sabe codificar sozinha. Tirar isso do processador é o
+   ganho mais barato que existe: o jogo para de brigar com a transmissão. */
+function ajustePlaca() {
+  let nome = '';
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+    const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    if (ext) nome = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '');
+  } catch (e) { /* sem WebGL, fica no x264 mesmo */ }
+
+  /* O WebGL devolve isto: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080
+     (0x00002206) Direct3D11 vs_5_0 ps_5_0, D3D11)". Quem lê quer saber se
+     é a placa dele, e o resto é ruído do driver. */
+  const limpo = (nome.match(/((?:NVIDIA GeForce|Radeon|Intel|Apple)[^,(]*)/i) || [, nome])[1]
+    .replace(/\s+(Direct3D|OpenGL|Metal|Vulkan).*$/i, '')
+    .replace(/\s+/g, ' ').trim();
+  let codifica = '';
+  if (/nvidia|geforce|rtx|gtx|quadro/i.test(nome)) codifica = 'NVENC';
+  else if (/radeon|\bamd\b|rx \d/i.test(nome)) codifica = 'AMF';
+  else if (/intel|iris|uhd graphics|hd graphics/i.test(nome)) codifica = 'QuickSync';
+  else if (/apple/i.test(nome)) codifica = 'VideoToolbox';
+
+  return { nome: limpo, codifica: codifica, nucleos: navigator.hardwareConcurrency || 0 };
+}
+
+/** Um parâmetro do perfil do OBS, com o padrão dele quando não foi mexido. */
+async function ajusteParam(cat, nome) {
+  try {
+    const r = await pedir('GetProfileParameter', { parameterCategory: cat, parameterName: nome });
+    const v = r.parameterValue;
+    return (v === null || v === undefined || v === '') ? String(r.defaultParameterValue || '') : String(v);
+  } catch (e) { return ''; }
+}
+
+/* A versão do OBS em número, pra comparar com a que trouxe o Enhanced
+   Broadcasting. "30.2.3" vira 30.002. */
+function ajusteVersao(v) {
+  const m = String(v || '').match(/^(\d+)\.(\d+)/);
+  return m ? Number(m[1]) + Number(m[2]) / 1000 : 0;
+}
+
+async function ajusteLe() {
+  const [ver, vid, stats] = await Promise.all([
+    pedir('GetVersion'), pedir('GetVideoSettings'), pedir('GetStats'),
+  ]);
+  const modo = (await ajusteParam('Output', 'Mode')) || 'Simple';
+  const simples = modo.toLowerCase().indexOf('adv') !== 0;
+
+  return {
+    placa: ajustePlaca(),
+    obs: ver.obsVersion || '?',
+    versao: ajusteVersao(ver.obsVersion),
+    w: vid.outputWidth,
+    h: vid.outputHeight,
+    fps: Math.round((vid.fpsNumerator || 0) / (vid.fpsDenominator || 1)),
+    simples: simples,
+    bitrate: simples ? Number(await ajusteParam('SimpleOutput', 'VBitrate')) || 0 : 0,
+    encoder: simples ? await ajusteParam('SimpleOutput', 'StreamEncoder')
+                     : await ajusteParam('AdvOut', 'Encoder'),
+    stats: stats,
+  };
+}
+
+/* O degrau que cabe nos DOIS limites. */
+function ajusteEscolhe(up, d) {
+  /* 70% da subida: o resto é o que sobra pro áudio, pro reenvio do que se
+     perde no caminho e pra tudo mais que usa a internet na casa. Encher a
+     subida até o topo é onde a live começa a engasgar. */
+  const teto = up > 0 ? Math.floor(up * 1000 * 0.7) : 999999;
+
+  /* Sem placa que codifique, 1080p60 no processador é pedir demais de quem
+     também está jogando. */
+  const bruto = !d.placa.codifica && d.placa.nucleos > 0 && d.placa.nucleos < 12;
+
+  for (const g of AJUSTE_DEGRAUS) {
+    if (g.piso > teto) continue;
+    if (bruto && (g.fps > 30 || g.h > 720)) continue;
+    return Object.assign({}, g, { kbps: Math.min(g.ideal, teto) });
+  }
+  return null;
+}
+
+function ajusteLinha(pai, titulo, detalhe, tom, aplica) {
+  const d = document.createElement('div');
+  d.className = 'aj' + (tom ? ' aj--' + tom : '');
+  const b = document.createElement('b');
+  b.textContent = titulo;
+  d.appendChild(b);
+  if (detalhe) {
+    const s = document.createElement('span');
+    s.textContent = detalhe;
+    d.appendChild(s);
+  }
+  if (aplica) {
+    const bt = document.createElement('button');
+    bt.type = 'button';
+    bt.textContent = aplica.rotulo;
+    bt.addEventListener('click', async () => {
+      bt.disabled = true;
+      try {
+        await aplica.faz();
+        anotar(aplica.feito);
+        bt.textContent = 'feito';
+      } catch (e) {
+        anotar('ajuste: ' + e.message, true);
+        bt.disabled = false;
+      }
+    });
+    d.appendChild(bt);
+  }
+  pai.appendChild(d);
+}
+
+el('btAjuste').addEventListener('click', async () => {
+  const bt = el('btAjuste');
+  const lido = el('ajusteLido');
+  const dicas = el('ajusteDicas');
+  bt.disabled = true;
+  lido.innerHTML = '';
+  dicas.innerHTML = '';
+
+  const up = parseFloat(el('upMbps').value) || 0;
+  if (up > 0) guardar(AJUSTE_LS, String(up));
+
+  let d;
+  try {
+    d = await ajusteLe();
+  } catch (e) {
+    anotar('ajuste: ' + e.message, true);
+    bt.disabled = false;
+    return;
+  }
+
+  /* ---------- o que eu vi ---------- */
+  ajusteLinha(lido, 'Encontrei', [
+    d.placa.nome || 'placa desconhecida',
+    d.placa.nucleos ? d.placa.nucleos + ' núcleos' : '',
+    'OBS ' + d.obs,
+    d.w + 'x' + d.h + ' a ' + d.fps + 'fps',
+    d.simples ? (d.bitrate ? d.bitrate + ' kbps' : '') : 'saída avançada',
+    d.encoder || '',
+  ].filter(Boolean).join(' · '));
+
+  /* ---------- como a live de agora está indo ----------
+     Esta é a parte que vale mais que qualquer conta: número de verdade, da
+     máquina de verdade, na live de verdade. */
+  const s = d.stats || {};
+  const perdaRede = s.outputTotalFrames ? (s.outputSkippedFrames / s.outputTotalFrames) * 100 : 0;
+  const perdaPC = s.renderTotalFrames ? (s.renderSkippedFrames / s.renderTotalFrames) * 100 : 0;
+
+  if (s.outputTotalFrames > 500 && perdaRede > 1) {
+    ajusteLinha(dicas, 'A sua internet não está dando conta agora',
+      'perdeu ' + perdaRede.toFixed(1) + ' por cento dos quadros no envio. Isso é engasgo pra quem assiste: baixe o bitrate.',
+      'ruim');
+  }
+  if (s.renderTotalFrames > 500 && perdaPC > 1) {
+    ajusteLinha(dicas, 'O computador não está dando conta agora',
+      'perdeu ' + perdaPC.toFixed(1) + ' por cento dos quadros no desenho. Baixe a resolução ou passe a codificar pela placa.',
+      'ruim');
+  }
+  if (s.cpuUsage > 25) {
+    ajusteLinha(dicas, 'O OBS está usando ' + Math.round(s.cpuUsage) + ' por cento do processador',
+      'se o jogo travar junto, o culpado é esse.', 'ruim');
+  }
+
+  /* ---------- multi-encode: quando dá, dispensa a conta ----------
+     Desde junho a Twitch liberou o Dual Format pra todo mundo. Com ele, o
+     OBS manda várias qualidades e QUEM ESCOLHE O BITRATE É A TWITCH — a
+     conta abaixo deixa de fazer falta. Ligar é dentro do OBS, na mão: não
+     dá pra virar essa chave daqui, e não é bom que desse. */
+  if (d.versao >= 30.002) {
+    ajusteLinha(dicas, 'Ligue o Enhanced Broadcasting',
+      'o seu OBS tem. Em Configurações, Transmissão, conecte a conta da Twitch e marque a opção. '
+      + 'Aí o OBS manda várias qualidades de uma vez e a Twitch entrega a melhor pra cada pessoa, '
+      + 'e nada abaixo aqui precisa ser ajustado na mão.', 'bom');
+  } else {
+    ajusteLinha(dicas, 'O seu OBS é antigo demais pro Enhanced Broadcasting',
+      'da versão 30.2 em diante dá pra mandar várias qualidades de uma vez. Vale atualizar.');
+  }
+
+  /* ---------- a conta ---------- */
+  if (!up) {
+    ajusteLinha(dicas, 'Diga a subida da sua internet',
+      'sem esse número eu só consigo olhar o computador, e é a internet que costuma mandar.');
+  }
+
+  const alvo = ajusteEscolhe(up, d);
+  if (!alvo) {
+    ajusteLinha(dicas, 'A sua subida não alcança nem 480p30',
+      'com menos de uns 2,2 Mbps de upload, transmitir fica instável em qualquer ajuste.', 'ruim');
+  } else if (!d.simples) {
+    ajusteLinha(dicas, 'Sugerido: ' + alvo.l + ' a ' + alvo.kbps + ' kbps',
+      'o seu OBS está na saída avançada, então eu não mexo: ali cada codificador guarda o bitrate '
+      + 'no lugar dele, e chutar errado é pior que não fazer nada.');
+  } else {
+    const mudaTela = d.w !== alvo.w || d.h !== alvo.h || d.fps !== alvo.fps;
+    const mudaTaxa = Math.abs(d.bitrate - alvo.kbps) > 200;
+
+    if (!mudaTela && !mudaTaxa) {
+      ajusteLinha(dicas, 'A sua configuração já é a que eu recomendaria',
+        alvo.l + ' a ' + alvo.kbps + ' kbps.', 'bom');
+    }
+    if (mudaTela) {
+      ajusteLinha(dicas, 'Mudar para ' + alvo.l,
+        'hoje está em ' + d.w + 'x' + d.h + ' a ' + d.fps + 'fps.', '', {
+          rotulo: 'Aplicar',
+          feito: 'resolução e fps trocados',
+          faz: () => pedir('SetVideoSettings', {
+            outputWidth: alvo.w, outputHeight: alvo.h, fpsNumerator: alvo.fps, fpsDenominator: 1,
+          }),
+        });
+    }
+    if (mudaTaxa) {
+      ajusteLinha(dicas, 'Mudar o bitrate para ' + alvo.kbps + ' kbps',
+        'hoje está em ' + (d.bitrate || '?') + '.', '', {
+          rotulo: 'Aplicar',
+          feito: 'bitrate trocado',
+          faz: () => pedir('SetProfileParameter', {
+            parameterCategory: 'SimpleOutput', parameterName: 'VBitrate', parameterValue: String(alvo.kbps),
+          }),
+        });
+    }
+  }
+
+  /* ---------- codificador: eu recomendo, você troca ----------
+     O nome do codificador muda de versão pra versão do OBS, e escrever o
+     errado é a transmissão não subir. Aqui vale a boca, não a mão. */
+  if (d.placa.codifica && /x264/i.test(d.encoder || '')) {
+    ajusteLinha(dicas, 'Codifique pela placa, e não pelo processador',
+      'a sua ' + (d.placa.nome || 'placa') + ' faz isso sozinha. Em Configurações, Saída, '
+      + 'escolha o codificador ' + d.placa.codifica + '. O jogo para de brigar com a live.');
+  }
+
+  bt.disabled = false;
+});
+
+try {
+  const u = guardado(AJUSTE_LS);
+  if (u) el('upMbps').value = u;
+} catch (e) { /* sem memória do upload, é só redigitar */ }
 
 /* ---------- tags ----------
 

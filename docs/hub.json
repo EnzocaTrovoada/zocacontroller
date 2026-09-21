@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-21",
+      "titulo": "O painel do OBS agora ajusta a sua live",
+      "texto": "Nova seção \"Ajustar a live\": eu leio a sua placa de vídeo, os núcleos, a versão do OBS, a resolução e o bitrate, e olho quantos quadros a transmissão de agora está perdendo. Você só me diz a subida da sua internet. Aí eu digo o que mudar — e mudo com um clique, se você quiser. A chave de transmissão eu não leio nem toco."
+    },
+    {
+      "data": "2026-09-21",
       "titulo": "Dá pra trazer os comandos do Botrix",
       "texto": "Quem vem do Botrix agora tem o botão \"Trazer do Botrix\" na tela de comandos: escreve o nome do canal e eu procuro na Twitch, no Kick, no YouTube e no Trovo. Os comandos de texto chegam prontos. Os que usavam variável chegam com o lugar marcado — a lista pública do Botrix esconde qual variável era, e não existe chave que destrave."
     },
