@@ -816,9 +816,7 @@ function chat_url_segura(string $url)
 /** Os escopos que a pessoa deu na última entrada com a Twitch. */
 function chat_escopos(int $uid): array
 {
-    $st = db()->prepare('SELECT tw_escopos FROM usuarios WHERE id = ?');
-    $st->execute([$uid]);
-    return preg_split('/\s+/', (string) $st->fetchColumn(), -1, PREG_SPLIT_NO_EMPTY);
+    return tw_escopos($uid);
 }
 
 /** Dá pra responder no chat desta conta? Pelo bot, ou pela própria conta. */

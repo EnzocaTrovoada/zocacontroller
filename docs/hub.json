@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-21",
+      "titulo": "Anúncios sozinhos, de X em X minutos",
+      "texto": "Em Comandos tem \"Anúncios sozinhos\": você diz de quanto em quanto tempo, quantos segundos, e a partir de quantos minutos de live — porque ninguém quer anúncio nos primeiros minutos. Parece contra o seu interesse e é o contrário: rodar anúncio no meio é o que rende tempo livre de pré-roll, e é esse tempo que impede a Twitch de jogar propaganda na cara de quem acabou de chegar. A tela mostra quanto você tem. Precisa entrar com a Twitch de novo pra liberar a permissão."
+    },
+    {
+      "data": "2026-09-21",
       "titulo": "Configurações avançadas: PC dedicado, áudio e multistream",
       "texto": "Em \"Configurar OBS\" tem um \"Configurações avançadas\" agora. Diga se o PC só transmite ou também joga: num PC dedicado eu peço mais qualidade da máquina. Tem um botão que acerta o áudio (160 kbps, 48 kHz, estéreo) e a qualidade do codificador de uma vez. E marcando que a live também vai pro Kick ou YouTube, o bitrate passa a respeitar o teto mais baixo entre elas — mandar 8000 do Kick numa live que também vai pra Twitch derruba uma das duas."
     },

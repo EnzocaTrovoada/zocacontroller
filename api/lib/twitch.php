@@ -22,7 +22,22 @@ const TW_ESCOPOS = [
     'bits:read',                    // bits, para as metas
     'user:write:chat',              // comando que responde no chat, pela própria conta
     'channel:bot',                  // deixar o bot do ZocaController falar no canal
+    'channel:edit:commercial',      // rodar anuncio sozinho, de tempo em tempo
+    'channel:read:ads',             // quanto tempo sem pre-roll o canal ganhou
 ];
+
+/**
+ * As permissoes que esta conta deu, do jeito que a Twitch devolveu.
+ *
+ * Mora aqui porque e assunto da Twitch, nao do chat: quem precisa saber se
+ * uma permissao existe e qualquer parte que va chamar a API dela.
+ */
+function tw_escopos(int $usuario_id): array
+{
+    $st = db()->prepare('SELECT tw_escopos FROM usuarios WHERE id = ?');
+    $st->execute([$usuario_id]);
+    return preg_split('/\s+/', (string) $st->fetchColumn(), -1, PREG_SPLIT_NO_EMPTY);
+}
 
 /* O que a conta do BOT autoriza, uma vez só, em entrar.php?bot=1. Com isso
    o token do aplicativo manda mensagem como ela nos canais que deram

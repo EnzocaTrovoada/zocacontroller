@@ -7274,7 +7274,7 @@ function ajudaVariaveis() {
 /* A versão que a fonte do OBS deveria estar rodando. Quando ela publica
    outra, é cache do OBS — e a tela diz isso em vez de deixar a pessoa
    adivinhando. Sobe junto com o PONTE_VERSAO do ponte.html. */
-const PONTE_VERSAO = '2026-09-18';
+const PONTE_VERSAO = '2026-09-21';
 
 const resumoTexto = (s) => {
   const t = String(s || '').replace(/\s+/g, ' ').trim();
@@ -7589,6 +7589,114 @@ function telaBot() {
     h('p', { cls: 'd', txt: 'As últimas vinte. Serve pra saber se o problema foi o comando, a permissão ou a Twitch.' }),
     cxFalas,
   ]));
+
+  carrega();
+}
+
+/* ================== ANÚNCIOS SOZINHOS ==================
+
+   Parece contra o próprio interesse, e é o contrário: rodar anúncio no
+   meio rende tempo livre de pré-roll, e é esse tempo que impede a Twitch
+   de jogar propaganda na cara de quem acabou de chegar. Quem nunca roda é
+   quem mais castiga o espectador novo.
+
+   Por isso o número que a tela mostra em destaque não é quantos anúncios
+   passaram: é quanto tempo sem pré-roll o canal tem. Esse é o placar. */
+function telaAnuncios(caixa) {
+  const liga = h('input', { type: 'checkbox' });
+  const cada = h('input', { type: 'number', min: '5', max: '240', style: 'flex:0 0 80px' });
+  const dura = h('select', { style: 'flex:0 0 110px' });
+  const espera = h('input', { type: 'number', min: '0', max: '120', style: 'flex:0 0 80px' });
+  const salvar = h('button', { cls: 'bt principal', type: 'button', txt: 'Salvar' });
+  const agora = h('button', { cls: 'bt fraco', type: 'button', txt: 'Rodar um agora' });
+  const diz = h('span', { cls: 'd', style: 'font-size:12.5px' });
+  const placar = h('p', { cls: 'd', style: 'margin:0 0 10px;font-size:12.5px' });
+
+  [30, 60, 90, 120, 180].forEach((seg) => {
+    dura.appendChild(h('option', { value: String(seg), txt: seg + ' segundos' }));
+  });
+
+  function pinta(d) {
+    liga.checked = !!d.ligado;
+    cada.value = d.minutos;
+    dura.value = String(d.duracao);
+    espera.value = d.espera_ini;
+
+    const t = d.twitch || {};
+    const partes = [];
+    if (t.sem_preroll > 0) {
+      partes.push('Agora quem chega no seu canal passa ' + Math.round(t.sem_preroll / 60)
+        + ' min sem levar anúncio na cara.');
+    } else if (d.ligado) {
+      partes.push('Ainda sem tempo livre de pré-roll — ele aparece depois do primeiro anúncio.');
+    }
+    if (d.quantos) partes.push(d.quantos + ' já rodados por aqui.');
+    if (d.ultimo_erro) partes.push('Último: ' + d.ultimo_erro);
+    placar.textContent = partes.join(' ');
+    placar.style.color = d.ultimo_erro ? 'var(--perigo)' : '';
+
+    if (d.falta === 'sem-permissao') {
+      diz.textContent = 'Entre com a Twitch de novo pra liberar o anúncio.';
+      diz.style.color = 'var(--dourado)';
+      liga.disabled = true;
+      agora.disabled = true;
+    }
+  }
+
+  async function carrega() {
+    try { pinta(await api('/anuncios.php')); }
+    catch (e) { placar.textContent = e.message; placar.style.color = 'var(--perigo)'; }
+  }
+
+  salvar.onclick = async () => {
+    salvar.disabled = true;
+    diz.style.color = '';
+    try {
+      await api('/anuncios.php', { method: 'POST', body: JSON.stringify({
+        ligado: liga.checked ? 1 : 0,
+        minutos: parseInt(cada.value, 10) || 30,
+        duracao: parseInt(dura.value, 10) || 90,
+        espera_ini: parseInt(espera.value, 10) || 0,
+      }) });
+      diz.textContent = 'Salvo.';
+      diz.style.color = 'var(--verde-forte)';
+      carrega();
+    } catch (e) {
+      diz.textContent = e.message;
+      diz.style.color = 'var(--perigo)';
+    }
+    salvar.disabled = false;
+  };
+
+  agora.onclick = async () => {
+    agora.disabled = true;
+    diz.textContent = 'pedindo pra Twitch…';
+    diz.style.color = '';
+    try {
+      await api('/anuncios.php', { method: 'POST', body: JSON.stringify({ agora: 1 }) });
+      diz.textContent = 'Rodou.';
+      diz.style.color = 'var(--verde-forte)';
+      carrega();
+    } catch (e) {
+      diz.textContent = e.message;
+      diz.style.color = 'var(--perigo)';
+    }
+    agora.disabled = false;
+  };
+
+  caixa.append(
+    h('h3', { txt: 'Anúncios sozinhos' }),
+    h('p', { cls: 'd', txt: 'Rodar anúncio no meio da live é o que rende tempo sem anúncio '
+        + 'pra quem chega depois. Precisa da fonte do OBS aberta.' }),
+    placar,
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Ligado' }), liga]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'A cada' }), cada, h('span', { cls: 'd', txt: 'minutos' })]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Duração' }), dura]),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Só depois de' }), espera,
+      h('span', { cls: 'd', txt: 'minutos de live' })]),
+    h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' },
+      [salvar, agora, diz]),
+  );
 
   carrega();
 }
@@ -8066,6 +8174,10 @@ function telaComandos() {
       ]),
     ]),
   ]));
+
+  const cxAnuncios = h('div', { cls: 'fatia' });
+  telaAnuncios(cxAnuncios);
+  tela.appendChild(cxAnuncios);
 
   function pintaRecados() {
     corpoRec.innerHTML = '';
