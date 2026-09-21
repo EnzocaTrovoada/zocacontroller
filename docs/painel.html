@@ -268,9 +268,11 @@
   </div>
   </details>
 
+  <!-- Uma secao so: escolher onde, medir, ver o que muda e trocar de
+       perfil sao passos da MESMA coisa, que e deixar o OBS no ponto. -->
   <details class="secao" data-secao="ajuste">
-  <summary>Ajustar a live</summary>
-    <div class="fila"><b>Onde você transmite</b>
+  <summary>Configurar OBS</summary>
+    <div class="fila"><b>Onde transmite</b>
       <select id="ondeTx" style="width:auto">
         <option value="twitch">Twitch</option>
         <option value="kick">Kick</option>
@@ -281,18 +283,13 @@
                    style="width:64px;text-align:right"> Mbps</span></div>
     <div class="grade" style="margin-top:6px">
       <button id="btAjuste">Ver o que melhorar</button>
-      <button id="btMedir" class="fraco">Medir minha internet</button>
+      <button id="btMedir" class="fraco">Medir internet</button>
     </div>
     <div id="ajusteLido"></div>
     <div id="ajusteDicas"></div>
-  </details>
 
-  <details class="secao" data-secao="perfil">
-  <summary>Perfil do ZocaHub</summary>
-    <p class="dica">Um perfil só seu no OBS, pra eu poder ajustar sem encostar no que
-       você já tem. O seu perfil de hoje fica intacto, e dá pra voltar quando quiser.</p>
-    <div class="fila"><b>Perfil em uso</b><span id="perfilAtual">—</span></div>
-    <div id="perfilBotoes" class="grade um" style="margin-top:6px"></div>
+    <div class="fila" style="margin-top:10px"><b>Perfil do OBS</b><span id="perfilAtual">—</span></div>
+    <div id="perfilBotoes" class="grade um"></div>
     <p class="dica" id="perfilAviso"></p>
   </details>
 
@@ -1057,13 +1054,11 @@ el('btAjuste').addEventListener('click', async () => {
 
   if (s.outputTotalFrames > 500 && perdaRede > 1) {
     ajusteLinha(dicas, 'A sua internet não está dando conta agora',
-      'perdeu ' + perdaRede.toFixed(1) + '% dos quadros no envio — isso é engasgo pra quem assiste.',
-      'ruim');
+      'perdeu ' + perdaRede.toFixed(1) + '% dos quadros no envio.', 'ruim');
   }
   if (s.renderTotalFrames > 500 && perdaPC > 1) {
-    ajusteLinha(dicas, 'O computador não está dando conta agora',
-      'perdeu ' + perdaPC.toFixed(1) + '% dos quadros no desenho.',
-      'ruim');
+    ajusteLinha(dicas, 'O computador não está dando conta',
+      'perdeu ' + perdaPC.toFixed(1) + '% dos quadros no desenho.', 'ruim');
   }
   if (s.cpuUsage > 25) {
     ajusteLinha(dicas, 'O OBS está comendo ' + Math.round(s.cpuUsage) + '% do processador',
@@ -1078,8 +1073,7 @@ el('btAjuste').addEventListener('click', async () => {
   if (d.versao >= 30.002) {
     if (onde === 'twitch') {
       ajusteLinha(dicas, 'Ligue o Enhanced Broadcasting',
-        'Configurações → Transmissão, conecte a conta da Twitch e marque. O OBS passa a mandar '
-        + 'várias qualidades e quem escolhe vira a Twitch — nada abaixo importa mais.', 'bom');
+        'Configurações → Transmissão → conecte a conta e marque. Aí a Twitch escolhe a qualidade.', 'bom');
     }
   } else if (onde === 'twitch') {
     ajusteLinha(dicas, 'Atualize o OBS',
@@ -1088,29 +1082,26 @@ el('btAjuste').addEventListener('click', async () => {
 
   /* ---------- a conta ---------- */
   if (!up) {
-    ajusteLinha(dicas, 'Falta a sua internet',
-      'clique em "Medir minha internet". Sem esse número eu só olho o computador, e é a internet que costuma mandar.');
+    ajusteLinha(dicas, 'Falta a sua internet', 'clique em "Medir internet" aí em cima.');
   }
 
   const alvo = ajusteEscolhe(up, d, onde);
   if (!alvo) {
     ajusteLinha(dicas, 'A sua subida não dá nem pra 480p30',
-      'abaixo de uns 1,3 Mbps de upload a live fica instável em qualquer ajuste.', 'ruim');
+      'abaixo de 1,3 Mbps a live fica instável em qualquer ajuste.', 'ruim');
   } else if (!d.simples) {
     ajusteLinha(dicas, 'Ideal pra você: ' + alvo.l + ' a ' + alvo.kbps + ' kbps',
-      'você está na saída avançada e o OBS não me deixa mexer no bitrate dela. Crie o perfil do '
-      + 'ZocaHub aqui embaixo que eu ajusto tudo sozinho.');
+      'na saída avançada o OBS não me deixa mexer. Use o perfil aqui embaixo.');
   } else {
     const mudaTela = d.w !== alvo.w || d.h !== alvo.h || d.fps !== alvo.fps;
     const mudaTaxa = Math.abs(d.bitrate - alvo.kbps) > 200;
 
     if (!mudaTela && !mudaTaxa) {
-      ajusteLinha(dicas, 'A sua configuração já é a que eu recomendaria',
-        alvo.l + ' a ' + alvo.kbps + ' kbps.', 'bom');
+      ajusteLinha(dicas, 'Já está no ponto', alvo.l + ' a ' + alvo.kbps + ' kbps.', 'bom');
     }
     if (mudaTela) {
       ajusteLinha(dicas, 'Mudar para ' + alvo.l,
-        'hoje está em ' + d.w + 'x' + d.h + ' a ' + d.fps + 'fps.', '', {
+        'hoje: ' + d.w + 'x' + d.h + ' a ' + d.fps + 'fps.', '', {
           rotulo: 'Aplicar',
           feito: 'resolução e fps trocados',
           faz: () => pedir('SetVideoSettings', {
@@ -1120,7 +1111,7 @@ el('btAjuste').addEventListener('click', async () => {
     }
     if (mudaTaxa) {
       ajusteLinha(dicas, 'Mudar o bitrate para ' + alvo.kbps + ' kbps',
-        'hoje está em ' + (d.bitrate || '?') + '.', '', {
+        'hoje: ' + (d.bitrate || '?') + '.', '', {
           rotulo: 'Aplicar',
           feito: 'bitrate trocado',
           faz: () => pedir('SetProfileParameter', {
@@ -1135,8 +1126,7 @@ el('btAjuste').addEventListener('click', async () => {
      errado é a transmissão não subir. Aqui vale a boca, não a mão. */
   if (d.placa.codifica && /x264/i.test(d.encoder || '')) {
     ajusteLinha(dicas, 'Use a placa pra codificar',
-      'a sua ' + (d.placa.nome || 'placa') + ' faz isso sozinha. Configurações → Saída → '
-      + d.placa.codifica + '. O jogo para de brigar com a live.');
+      (d.placa.nome || 'a placa') + ' faz isso sozinha: Configurações → Saída → ' + d.placa.codifica + '.');
   }
 
   bt.disabled = false;
@@ -1187,9 +1177,8 @@ el('btMedir').addEventListener('click', async () => {
     el('upMbps').value = mbps.toFixed(1);
     guardar(AJUSTE_LS, String(mbps.toFixed(1)));
     ajusteLinha(dicas, 'Medi ' + mbps.toFixed(1) + ' Mbps de subida',
-      mbps >= 15
-        ? 'daqui pra cima a internet deixa de ser o seu limite — e o teto real seu é maior que isso, porque quem limita a medida é o nosso servidor.'
-        : 'agora clique em "Ver o que melhorar".', mbps >= 15 ? 'bom' : '');
+      mbps >= 15 ? 'a internet não é o seu limite. O seu número real é maior: quem trava a medida é o nosso servidor.'
+                 : 'agora clique em "Ver o que melhorar".', mbps >= 15 ? 'bom' : '');
   } catch (e) {
     ajusteLinha(dicas, 'Não consegui medir', e.message, 'ruim');
   }
@@ -1246,28 +1235,38 @@ async function perfilPinta() {
     cx.appendChild(b);
   };
 
+  /* O BACKUP APARECE AQUI PORQUE É AQUI QUE DÁ MEDO.
+     Trocar de perfil não encosta em cena nenhuma — mas ninguém sabe disso
+     antes de clicar, e o site guarda as cenas de qualquer jeito. */
+  const comBackup = (txt) => {
+    aviso.textContent = txt + ' ';
+    const a = document.createElement('a');
+    a.href = 'index.html#/backup';
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = 'Suas cenas têm backup no site';
+    aviso.appendChild(a);
+  };
+
   if (atual === PERFIL_ZOCA) {
     const antes = guardado(PERFIL_ANTES);
-    aviso.textContent = 'Você está no perfil do ZocaHub. Se ainda não transmitiu por ele, '
-      + 'abra Configurações → Transmissão e conecte a sua conta — o perfil nasce sem a chave, '
-      + 'e eu não copio chave de transmissão de propósito.';
+    comBackup('Conecte a conta em Configurações → Transmissão: perfil novo nasce sem chave, e eu não copio chave.');
     if (antes && (d.profiles || []).includes(antes)) {
-      bt('Voltar pro perfil ' + antes, true, () => pedir('SetCurrentProfile', { profileName: antes }));
+      bt('Voltar pro ' + antes, true, () => pedir('SetCurrentProfile', { profileName: antes }));
     }
     return;
   }
 
   if (existe) {
-    aviso.textContent = 'Ele já existe. Trocar não apaga nada: o "' + atual + '" continua aí.';
-    bt('Usar o perfil do ZocaHub', false, async () => {
+    comBackup('Já existe. Trocar não apaga nada.');
+    bt('Usar o perfil ZocaHub', false, async () => {
       guardar(PERFIL_ANTES, atual);
       await pedir('SetCurrentProfile', { profileName: PERFIL_ZOCA });
     });
     return;
   }
 
-  aviso.textContent = 'Crio um perfil limpo chamado ZocaHub e passo pra ele. O "' + atual
-    + '" fica do jeito que está, e dá pra voltar em um clique.';
+  comBackup('Perfil limpo, onde eu consigo ajustar tudo. O seu fica intacto.');
   bt('Criar o perfil ZocaHub', false, async () => {
     guardar(PERFIL_ANTES, atual);
     await pedir('CreateProfile', { profileName: PERFIL_ZOCA });

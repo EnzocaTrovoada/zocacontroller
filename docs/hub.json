@@ -15,8 +15,8 @@
   "novidades": [
     {
       "data": "2026-09-21",
-      "titulo": "Perfil do ZocaHub no OBS, e a internet medida aqui mesmo",
-      "texto": "Agora dá pra medir a subida da sua internet pelo próprio painel, sem sair pra outro site. E existe o perfil do ZocaHub: um perfil limpo no OBS onde eu consigo ajustar tudo sozinho — na saída avançada o OBS não me deixa mexer no bitrate, e era isso que travava. O seu perfil de hoje fica intacto e dá pra voltar num clique. Escolhendo Kick ou YouTube, os limites mudam junto."
+      "titulo": "Configurar OBS: uma seção só",
+      "texto": "Medir a subida da internet, ver o que melhorar e criar um perfil do OBS agora moram juntos em \"Configurar OBS\", no painel que fica dentro do OBS. O perfil do ZocaHub é limpo: é nele que eu consigo mexer no bitrate, coisa que a saída avançada não deixa. O seu perfil de hoje fica intacto — e as suas cenas têm backup aqui no site de qualquer jeito. Escolhendo Kick ou YouTube, os limites mudam junto."
     },
     {
       "data": "2026-09-21",
