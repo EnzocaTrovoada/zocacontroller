@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-21",
+      "titulo": "Os comandos de fábrica agora ligam e desligam",
+      "texto": "Em Comandos, na lista \"os que já funcionam sem criar nada\", cada um ganhou a mesma chavinha dos seus: quem não usa palpite desliga o !aposta e acabou. O !voltar não tem chave de propósito — é a saída do pânico. E no painel do OBS o Enhanced Broadcasting agora liga num botão, em vez de mandar você achar a opção."
+    },
+    {
+      "data": "2026-09-21",
       "titulo": "Anúncios sozinhos, de X em X minutos",
       "texto": "Em Comandos tem \"Anúncios sozinhos\": você diz de quanto em quanto tempo, quantos segundos, e a partir de quantos minutos de live — porque ninguém quer anúncio nos primeiros minutos. Parece contra o seu interesse e é o contrário: rodar anúncio no meio é o que rende tempo livre de pré-roll, e é esse tempo que impede a Twitch de jogar propaganda na cara de quem acabou de chegar. A tela mostra quanto você tem. Precisa entrar com a Twitch de novo pra liberar a permissão."
     },

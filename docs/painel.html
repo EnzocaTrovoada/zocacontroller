@@ -1110,8 +1110,27 @@ el('btAjuste').addEventListener('click', async () => {
      dá pra virar essa chave daqui, e não é bom que desse. */
   if (d.versao >= 30.002) {
     if (onde === 'twitch') {
+      /* DÁ PRA MARCAR DAQUI. A chave é Stream1/EnableMultitrackVideo, e a
+         condição do OBS pra ela valer é só não ser RTMP personalizado e
+         não estar transmitindo — conta conectada só faz falta na hora de
+         subir. Por isso é botão, e não instrução. */
       ajusteLinha(dicas, 'Ligue o Enhanced Broadcasting',
-        'Configurações → Transmissão → conecte a conta e marque. Aí a Twitch escolhe a qualidade.', 'bom');
+        'a Twitch passa a escolher a qualidade e nada abaixo importa. Só não dá com a live no ar.',
+        'bom', {
+          rotulo: 'Ligar',
+          feito: 'Enhanced Broadcasting marcado',
+          faz: async () => {
+            const st = await pedir('GetStreamStatus');
+            if (st.outputActive) throw new Error('não dá com a live no ar — pare e tente de novo');
+            await pedir('SetProfileParameter', {
+              parameterCategory: 'Stream1', parameterName: 'EnableMultitrackVideo',
+              parameterValue: 'true',
+            });
+            ajusteLinha(dicas, 'Marcado',
+              'confira em Configurações → Transmissão. Se não aparecer, é porque o seu serviço é '
+              + 'RTMP personalizado, e aí só conectando a conta da Twitch.', 'bom');
+          },
+        });
     }
   } else if (onde === 'twitch') {
     ajusteLinha(dicas, 'Atualize o OBS',

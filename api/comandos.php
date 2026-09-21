@@ -159,8 +159,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         $nuvem = (bool) $bn->fetchColumn();
     } catch (Throwable $e) { /* sem o SQL 055, ninguém tem bot na nuvem */ }
 
+    /* OS DE FÁBRICA QUE ESTÃO DESLIGADOS.
+
+       Guardamos os desligados, não os ligados: comando de fábrica novo
+       entra funcionando pra todo mundo. Ao contrário, cada um que a gente
+       criasse nasceria morto pra quem já usa o site. */
+    $desligados = [];
+    try {
+        $eo = db()->prepare('SELECT embutidos_off FROM usuarios WHERE id = ?');
+        $eo->execute([$quem['usuario_id']]);
+        $desligados = preg_split('/\s+/', (string) $eo->fetchColumn(), -1, PREG_SPLIT_NO_EMPTY);
+    } catch (Throwable $e) { /* sem o SQL 060, nada está desligado */ }
+
     $saida = [
-        'nuvem'     => $nuvem,
+        'nuvem'         => $nuvem,
+        'embutidos_off' => $desligados,
         'comandos'  => $lista,
         'gatilhos'  => $gatilhos,
         'recados'   => $recados,
@@ -280,6 +293,35 @@ if ($acao === 'ligar') {
     } catch (PDOException $e) {
         json_saida(['erro' => erro_publico($e, 'Falta rodar o SQL 053 no banco.')], 500);
     }
+}
+
+/* ---------- ligar e desligar um de fábrica ---------- */
+if ($acao === 'embutido') {
+    $nome = mb_strtolower(trim((string) ($d['nome'] ?? '')));
+
+    /* Só nome que a ponte conhece: guardar um inventado encheria a coluna
+       de lixo que nunca mais sai. E o 'voltar' nunca desliga — é a saída
+       do pânico, e desligar a saída é ficar preso dentro. */
+    if (!in_array($nome, ACOES_VALIDAS, true) || $nome === 'voltar') {
+        json_saida(['erro' => 'Esse comando não desliga.'], 400);
+    }
+
+    $uid = (int) $quem['usuario_id'];
+    try {
+        $st = db()->prepare('SELECT embutidos_off FROM usuarios WHERE id = ?');
+        $st->execute([$uid]);
+        $lista = preg_split('/\s+/', (string) $st->fetchColumn(), -1, PREG_SPLIT_NO_EMPTY);
+
+        $lista = array_values(array_diff($lista, [$nome]));
+        if (empty($d['ligado'])) $lista[] = $nome;
+
+        db()->prepare('UPDATE usuarios SET embutidos_off = ? WHERE id = ?')
+            ->execute([mb_substr(implode(' ', $lista), 0, 400), $uid]);
+    } catch (PDOException $e) {
+        json_saida(['erro' => erro_publico($e, 'Falta rodar o SQL 060 no banco.')], 500);
+    }
+
+    json_saida(['ok' => true, 'embutidos_off' => $lista]);
 }
 
 /* ---------- recados de tempo em tempo ---------- */

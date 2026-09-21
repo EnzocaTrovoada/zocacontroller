@@ -7711,6 +7711,7 @@ function telaComandos() {
   let gatilhos = [];
   let recados = [];
   let podeResponder = true;
+  let embutidosOff = new Set();
   let temSQL = true;
   let maxCmd = 100;
 
@@ -8324,13 +8325,46 @@ function telaComandos() {
   fab.appendChild(h('summary', { style: 'cursor:pointer;font:700 15px var(--disp)', txt: 'Os que já funcionam sem criar nada' }));
   fab.appendChild(h('p', { cls: 'd', style: 'margin:10px 0', txt: 'Quem pode usar vem da etiqueta que a Twitch manda na mensagem: não dá pra fingir ser mod.' }));
   const corpoFab = h('tbody');
-  DE_FABRICA.filter((c) => c[0] !== 'responder').forEach((c) => {
-    corpoFab.appendChild(h('tr', {}, [
-      h('td', { cls: 'nome', txt: '!' + c[0] }),
-      h('td', { cls: 'num', txt: QUEM_ROTULO[c[1]] || c[1] }),
-      h('td', { cls: 'oque', txt: c[2] }),
-    ]));
-  });
+
+  /* O !voltar não tem chavinha: é a saída do pânico, e desligar a saída é
+     ficar preso do lado de dentro. O servidor recusa também. */
+  function chaveDeFabrica(nome) {
+    const i = h('input', { type: 'checkbox' });
+    i.checked = !embutidosOff.has(nome);
+    i.onchange = async () => {
+      i.disabled = true;
+      try {
+        await api('/comandos.php', { method: 'POST', body: JSON.stringify({
+          acao: 'embutido', nome: nome, ligado: i.checked ? 1 : 0,
+        }) });
+        if (i.checked) embutidosOff.delete(nome); else embutidosOff.add(nome);
+        /* A linha inteira acompanha a chave: chave cinza com a linha
+           acesa parece que só metade da coisa desligou. */
+        const linha = i.closest('tr');
+        if (linha) linha.classList.toggle('off', !i.checked);
+        avisaPonte();
+      } catch (e) {
+        i.checked = !i.checked;
+        recado(e.message, 'ruim');
+      }
+      i.disabled = false;
+    };
+    return h('span', { cls: 'chave', title: 'Ligar e desligar' }, [i, h('span')]);
+  }
+
+  function pintaFabrica() {
+    corpoFab.innerHTML = '';
+    DE_FABRICA.filter((c) => c[0] !== 'responder').forEach((c) => {
+      const off = embutidosOff.has(c[0]);
+      corpoFab.appendChild(h('tr', { cls: off ? 'off' : '' }, [
+        h('td', { cls: 'nome', txt: '!' + c[0] }),
+        h('td', { cls: 'num', txt: QUEM_ROTULO[c[1]] || c[1] }),
+        h('td', { cls: 'oque', txt: c[2] }),
+        h('td', {}, c[0] === 'voltar' ? [] : [chaveDeFabrica(c[0])]),
+      ]));
+    });
+  }
+  pintaFabrica();
   fab.appendChild(h('div', { cls: 'rolo-tab' }, [h('table', { cls: 'tab' }, [corpoFab])]));
   tela.appendChild(fab);
 
@@ -8343,6 +8377,8 @@ function telaComandos() {
     gatilhos = d.gatilhos || [];
     recados = d.recados || [];
     maxCmd = d.max || 100;
+    embutidosOff = new Set(d.embutidos_off || []);
+    pintaFabrica();
     podeResponder = d.pode_responder !== false;
     temSQL = d.completo !== false;
 

@@ -1108,9 +1108,21 @@ ACOES.categoria = {
 
 const ultimoUso = new Map();
 
+/* Os de fábrica que quem transmite desligou. Chega junto dos comandos, na
+   mesma leitura — não é uma requisição a mais. */
+let EMBUTIDOS_OFF = new Set();
+
 async function executar(nome, arg, tags, texto) {
   const acao = ACOES[nome];
   if (!acao || acao.soPasso) return;                    // negar por padrão
+
+  /* DESLIGADO VALE ATÉ PRA QUEM MANDA. Quem tirou o !panico tirou pra
+     todo mundo, inclusive pra si — senão "desligado" viraria "desligado
+     pros outros", que não é o que a chavinha promete.
+
+     Só pros de fábrica: comando criado no painel carrega o próprio
+     ligado, e é marcado com apelido na hora de registrar. */
+  if (!acao.apelido && EMBUTIDOS_OFF.has(nome)) return;
 
   const cargo = cargoDe(tags);
   if (CARGOS[cargo] < CARGOS[acao.minimo]) return;      // sem permissão: silêncio
@@ -1947,6 +1959,8 @@ async function carregarComandos() {
     GATILHOS = (d.gatilhos || []).filter((g) => (g.passos || []).length);
     RECADOS = (d.recados || []).filter((r) => r.quantas > 0);
     NUVEM = !!d.nuvem;
+
+    EMBUTIDOS_OFF = new Set(d.embutidos_off || []);
 
     const apelidos = [];
     for (const c of (d.comandos || [])) {
