@@ -14,6 +14,11 @@
 
   "novidades": [
     {
+      "data": "2026-09-22",
+      "titulo": "Quem ainda não entrou já vê os preços",
+      "texto": "A aba de planos aparece pra quem chega sem conta — antes o preço ficava atrás do login, o que é o mesmo que tapar a vitrine. E clicar numa tela que precisa de conta não joga mais você de volta calado: agora ela explica o que dá pra fazer ali e oferece entrar."
+    },
+    {
       "data": "2026-09-21",
       "titulo": "Mais fácil de ler, e a Administração achável",
       "texto": "Os campos de escrever do suporte agora ocupam a linha inteira — antes sobrava um terço da tela pra escrever e você não via o que tinha digitado. O texto que explica cada tela cresceu e escureceu. A Administração virou aba, em vez de um item escondido dentro de Ferramentas. E a etiqueta do plano vitalício parou de ser cortada."

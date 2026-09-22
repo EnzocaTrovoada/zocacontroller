@@ -4682,6 +4682,57 @@ function abrePro(estado) {
    painel, e guardar: isto não muda no meio da sessão. */
 let proEstado = null;
 
+/* A tela de planos, com ou sem conta.
+
+   Sem chave a gente pede a lista pública — só nome, preço e período. O
+   popup normal precisa de proEstado pra saber o plano da pessoa e os
+   cupons dela; um visitante não tem nem um nem outro, então ele vê os
+   cartões e um botão de entrar no lugar do de pagar. */
+async function abrePlanos() {
+  if (chave && proEstado) return abrePro(proEstado);
+
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Planos' }));
+
+  let d;
+  try {
+    const r = await fetch(API + '/checkout.php?publico=1');
+    d = await r.json();
+  } catch (e) { d = null; }
+
+  if (!d || !d.ligado || !(d.planos || []).length) {
+    tela.appendChild(h('p', { cls: 'sub', txt: 'A cobrança ainda não abriu — está tudo liberado por enquanto.' }));
+    return;
+  }
+
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Os três dão exatamente o mesmo. O que muda é de quanto em quanto tempo você paga.' }));
+
+  const PERIODO = { mensal: 'por mês', anual: 'por ano', vitalicio: 'uma vez só' };
+  const ETIQUETA = { anual: 'mais escolhido', vitalicio: 'melhor a longo prazo' };
+  const grade = h('div', { cls: 'planos3' });
+
+  d.planos.forEach((pl) => {
+    const marca = pl.periodo === 'vitalicio' ? ' vital' : pl.periodo === 'anual' ? ' anual' : '';
+    const cartao = h('div', { cls: 'pcard' + marca });
+    if (ETIQUETA[pl.periodo]) cartao.appendChild(h('span', { cls: 'pcard__tag', txt: ETIQUETA[pl.periodo] }));
+    cartao.appendChild(h('span', { cls: 'pcard__nome', txt: pl.nome }));
+    cartao.appendChild(h('span', { cls: 'pcard__preco', txt: reaisDe(pl.preco_centavos) }));
+    cartao.appendChild(h('span', { cls: 'pcard__periodo', txt: PERIODO[pl.periodo] || '' }));
+    grade.appendChild(cartao);
+  });
+  tela.appendChild(grade);
+
+  tela.appendChild(h('p', {}, [
+    h('a', { cls: 'bt principal', href: API + '/entrar.php' }, [
+      h('span', { cls: 'ic', txt: '▶' }),
+      document.createTextNode('Entrar com a Twitch pra assinar'),
+    ]),
+  ]));
+  tela.appendChild(h('p', { cls: 'd', style: 'margin-top:14px',
+    txt: 'Dá pra usar de graça sem assinar nada. O Pro tira os limites.' }));
+}
+
 function ligaUpgrade() {
   api('/checkout.php?estado=1').then((c) => {
     if (!c.ligado) return;
@@ -4726,10 +4777,7 @@ function avisaVencimento(c) {
   cx.classList.remove('escondido');
 }
 
-el('abaUpgrade').onclick = () => {
-  fechaBandejas(null);
-  if (proEstado) abrePro(proEstado);
-};
+el('abaUpgrade').onclick = () => { fechaBandejas(null); vaiPara('#/planos'); };
 
 /* ---------------- a vitrine da inicial ---------------- */
 
@@ -9872,11 +9920,19 @@ function rota() {
     /* O botão de entrar acompanha o visitante em tudo que ele pode ver. Na
        própria tela de entrada ele seria o mesmo botão duas vezes. */
     el('abaEntrar').classList.toggle('escondido', !aberta);
-    if (!aberta) return telaEntrar();
+
+    /* TELA FECHADA EXPLICA; NÃO JOGA DE VOLTA.
+
+       Antes, clicar em qualquer coisa que precisa de conta devolvia pra
+       tela de entrar, calado. Quem clicou não entendia o que aconteceu —
+       parecia defeito, e era a impressão que o site deixava em quem estava
+       decidindo se valia a pena. */
+    if (!aberta) return olhando ? telaPrecisaEntrar(p[0]) : telaEntrar();
   }
 
   if (p[0] === 'inicio') return telaInicio();
   if (p[0] === 'meu') return telaControlador();
+  if (p[0] === 'planos') return abrePlanos();
   if (p[0] === 'bot') return telaBot();
   if (p[0] === 'comandos') return telaComandos();
   if (p[0] === 'tutorial') return telaTutorial();
@@ -9915,8 +9971,47 @@ const OLHADINHA = 'zc:olhadinha';
 let olhando = false;
 try { olhando = localStorage.getItem(OLHADINHA) === '1'; } catch (e) {}
 
-/* As telas que um visitante alcança. O resto leva pra entrada. */
-const TELAS_ABERTAS = ['inicio', 'artistas', 'tutorial'];
+/* As telas que um visitante alcança. O resto explica e oferece entrar.
+
+   PLANOS ENTROU PORQUE PREÇO É O QUE DECIDE COMPRA. Ele ficava fechado
+   junto com o resto, e quem chegava no site não via quanto custava — numa
+   loja isso seria a vitrine tapada. */
+const TELAS_ABERTAS = ['inicio', 'artistas', 'tutorial', 'planos'];
+
+/* O que cada tela fechada faz, pra frase dizer o que a pessoa perde. */
+const PRECISA_CONTA = {
+  comandos: 'criar comandos que o seu chat usa',
+  bot:      'pôr o bot no seu chat',
+  overlays: 'montar os seus overlays',
+  meu:      'ver a sua chave e a sua conta',
+  luzes:    'deixar o chat mudar a cor das suas luzes',
+  subathon: 'rodar um subathon',
+  mods:     'dar acesso pros seus moderadores',
+  backup:   'guardar as suas cenas do OBS',
+  conquistas: 'ganhar conquistas',
+  suporte:  'falar comigo',
+};
+
+function telaPrecisaEntrar(qual) {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  const faz = PRECISA_CONTA[qual] || 'usar esta parte';
+
+  tela.appendChild(h('h1', { txt: 'Precisa da sua conta' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Pra ' + faz + ', entre com a Twitch. '
+    + 'É de graça, sem senha nova, e leva um clique.' }));
+
+  const bt = h('a', { cls: 'bt principal', href: API + '/entrar.php' }, [
+    h('span', { cls: 'ic', txt: '▶' }),
+    document.createTextNode('Entrar com a Twitch'),
+  ]);
+  const planos = h('button', { cls: 'bt fraco', type: 'button', txt: 'Ver os planos' });
+  planos.onclick = () => vaiPara('#/planos');
+
+  tela.appendChild(h('p', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, [bt, planos]));
+  tela.appendChild(h('p', { cls: 'd', style: 'margin-top:18px',
+    txt: 'Enquanto isso dá pra olhar o início, os artistas e o tutorial.' }));
+}
 
 function ficaOlhando() {
   olhando = true;
@@ -10028,6 +10123,19 @@ async function carrega() {
       const a = el(id);
       if (a) a.classList.add('escondido');
     });
+
+    /* A ABA DE PLANOS APARECE PRA QUEM NÃO ENTROU.
+       Ela nasce escondida e só o ligaUpgrade() a mostrava — e ele exige
+       chave. Resultado: o visitante não via preço. Aqui a gente pergunta a
+       lista pública e mostra a aba se houver o que vender. */
+    fetch(API + '/checkout.php?publico=1')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && d.ligado && (d.planos || []).length) {
+          el('abaUpgrade').classList.remove('escondido');
+        }
+      })
+      .catch(() => { /* sem preço, sem aba */ });
     /* Quem já tinha clicado em "só dando uma olhadinha" volta pro feed, e
        não pra tela de entrar de novo. */
     if (olhando && !location.hash) { vaiPara('#/inicio'); return; }

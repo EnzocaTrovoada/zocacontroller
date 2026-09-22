@@ -19,10 +19,38 @@ require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/mercadopago.php';
 
 cors();
-$quem = exige_painel();
-trava('checkout', 10, 300);
 
 $mp = mp_cfg();
+
+/* ---------- a tabela de preços, sem chave ----------
+
+   QUEM CHEGA NO SITE PRECISA VER QUANTO CUSTA.
+
+   Isto ficava atrás do exige_painel() junto com todo o resto, e o efeito
+   era o pior possível pra quem vai vender: o visitante não via preço
+   nenhum. A tabela de preços é a informação mais pública que existe num
+   produto pago — ela está na página de vendas de qualquer um.
+
+   Vai SÓ a lista. Nada daqui olha quem está perguntando, porque ninguém
+   está: sem plano da pessoa, sem validade, sem cupom, sem beta. Com a
+   cobrança desligada ou em teste, nem a lista sai. */
+if (isset($_GET['publico'])) {
+    if (!$mp['ligado'] || $mp['modo'] === 'teste') {
+        json_saida(['ligado' => false, 'planos' => []]);
+    }
+
+    $st = db()->query("SELECT slug, nome, preco_centavos, periodo FROM planos
+                        WHERE preco_centavos > 0 ORDER BY preco_centavos");
+
+    json_saida([
+        'ligado' => true,
+        'modo'   => $mp['modo'],
+        'planos' => $st->fetchAll(PDO::FETCH_ASSOC),
+    ]);
+}
+
+$quem = exige_painel();
+trava('checkout', 10, 300);
 
 /* OS CUPONS QUE VALEM AGORA.
 
