@@ -1552,6 +1552,11 @@ try {
     overflow-wrap: anywhere;
   }
 
+  /* ---------- a cor de cada um ---------- */
+  .cor-amostra { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+  .cor-bolha { width: 22px; height: 22px; border-radius: 50%; flex: none; }
+  .cor-chip { padding: 3px 9px; border-radius: 5px; font-size: 12px; }
+
   /* ---------- desfazer ----------
      Barra presa embaixo, e não um recado no topo: o apagar acontece numa
      lista que pode estar rolada, e um aviso lá em cima ninguém vê. */
@@ -1855,6 +1860,97 @@ function intensidadeGuardada(t) {
 
 /* A troca em si, com o esmaecimento. Sem suporte a view transition, as
    cores deslizam; com movimento reduzido pedido no sistema, troca seco. */
+/* ================== A COR DE ACENTO DE CADA UM ==================
+
+   O site inteiro deriva de três tokens: --verde (o acento), --verde-forte
+   (o mesmo acento legível como TEXTO) e --verde-fraco (o fundo de coisa
+   selecionada). Trocar os três troca a cara do site sem tocar em fundo nem
+   em letra — que é onde a legibilidade morre.
+
+   OS TONS SÃO CALCULADOS, E NÃO ESCOLHIDOS. Se a pessoa escolhesse os três,
+   ela escolheria três cores que não combinam e um texto que não se lê. Aqui
+   ela escolhe UMA, e os outros dois saem dela na direção certa: no tema
+   claro o texto escurece até dar contraste sobre o cartão; no escuro, ele
+   clareia. Por isso o cálculo depende do tema e refaz quando ele muda. */
+
+const COR_LS = 'zc:cor';
+
+function corParaRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+const corParaHex = (r) => '#' + r.map((v) => Math.round(Math.max(0, Math.min(255, v)))
+  .toString(16).padStart(2, '0')).join('');
+
+/* Luminância relativa, a mesma conta que a régua de contraste usa. */
+function corLuz(rgb) {
+  const c = rgb.map((v) => {
+    const x = v / 255;
+    return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+
+const corContraste = (a, b) => {
+  const [x, y] = [corLuz(a), corLuz(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+};
+
+const corMistura = (a, b, p) => a.map((v, i) => v + (b[i] - v) * p);
+
+/* O tom legível como texto: aproxima do preto (tema claro) ou do branco
+   (escuro) até passar de 4.5:1 sobre o fundo do cartão. Passo a passo em
+   vez de fórmula fechada porque o ponto onde cada cor cruza a régua não é
+   o mesmo, e errar pra menos é texto que não se lê. */
+function corLegivel(rgb, escuro) {
+  const fundo = escuro ? [14, 21, 18] : [246, 248, 246];
+  const alvo = escuro ? [255, 255, 255] : [0, 0, 0];
+  let saida = rgb;
+  for (let i = 0; i <= 20; i++) {
+    saida = corMistura(rgb, alvo, i / 20);
+    if (corContraste(saida, fundo) >= 4.5) break;
+  }
+  return saida;
+}
+
+/** Põe a cor nos três tokens, ou tira tudo quando ela é vazia. */
+function aplicaCor(hex) {
+  const raiz = document.documentElement;
+  const rgb = corParaRgb(hex);
+  if (!rgb) {
+    ['--verde', '--verde-forte', '--verde-fraco'].forEach((t) => raiz.style.removeProperty(t));
+    return;
+  }
+
+  const escuro = raiz.getAttribute('data-tema') !== 'claro';
+  raiz.style.setProperty('--verde', corParaHex(rgb));
+  raiz.style.setProperty('--verde-forte', corParaHex(corLegivel(rgb, escuro)));
+  /* O fundo de selecionado é a mesma cor quase apagada: no claro puxando
+     pro branco, no escuro pro preto. */
+  raiz.style.setProperty('--verde-fraco',
+    corParaHex(corMistura(rgb, escuro ? [7, 11, 9] : [255, 255, 255], escuro ? 0.86 : 0.9)));
+}
+
+/* A cor escolhida fica no navegador também: assim ela entra no primeiro
+   quadro, antes de o servidor responder. Sem isso o site pisca no verde
+   padrão e troca depois, que é pior do que não ter a cor. */
+function corGuardada() {
+  try { return localStorage.getItem(COR_LS) || ''; } catch (e) { return ''; }
+}
+
+function guardaCor(hex) {
+  try { hex ? localStorage.setItem(COR_LS, hex) : localStorage.removeItem(COR_LS); } catch (e) {}
+}
+
+aplicaCor(corGuardada());
+
+/* Trocar de tema refaz os tons: o mesmo acento precisa de um texto escuro
+   no claro e claro no escuro. */
+function corRefaz() { aplicaCor(corGuardada()); }
+
 function aplicaTema(t, intensidade) {
   const raiz = document.documentElement;
   const muda = () => {
@@ -1866,11 +1962,15 @@ function aplicaTema(t, intensidade) {
   let calmo = false;
   try { calmo = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
-  if (calmo) return muda();
-  if (document.startViewTransition) { document.startViewTransition(muda); return; }
+  if (calmo) { muda(); corRefaz(); return; }
+  if (document.startViewTransition) {
+    document.startViewTransition(() => { muda(); corRefaz(); });
+    return;
+  }
 
   raiz.classList.add('trocando-tema');
   muda();
+  corRefaz();
   clearTimeout(aplicaTema.relogio);
   aplicaTema.relogio = setTimeout(() => raiz.classList.remove('trocando-tema'), 450);
 }
@@ -6669,6 +6769,82 @@ function telaEditor(perfil, tipoNovo) {
   ]));
 }
 
+/* A caixa de escolher a cor. Fica em Meu ZocaHub, junto do resto que é
+   preferência da pessoa. */
+function caixaDaCor(caixa) {
+  const campo = h('input', { type: 'color' });
+  const salvar = h('button', { cls: 'bt principal', type: 'button', txt: 'Usar esta cor' });
+  const padrao = h('button', { cls: 'bt fraco', type: 'button', txt: 'Voltar ao verde' });
+  const diz = h('span', { cls: 'd', style: 'font-size:12.5px' });
+  const amostra = h('div', { cls: 'cor-amostra' });
+
+  /* Uma prévia de verdade: os três tons como eles vão aparecer, e não um
+     quadradinho da cor crua. O do meio é o que vira TEXTO, que é onde a
+     escolha ruim aparece. */
+  function pintaAmostra(hex) {
+    amostra.innerHTML = '';
+    const rgb = corParaRgb(hex);
+    if (!rgb) return;
+    const escuro = document.documentElement.getAttribute('data-tema') !== 'claro';
+    const forte = corLegivel(rgb, escuro);
+
+    amostra.append(
+      h('span', { cls: 'cor-bolha', style: 'background:' + corParaHex(rgb), title: 'botões e destaques' }),
+      h('b', { style: 'color:' + corParaHex(forte), txt: 'um texto assim' }),
+      h('span', { cls: 'cor-chip',
+        style: 'background:' + corParaHex(corMistura(rgb, escuro ? [7, 11, 9] : [255, 255, 255], escuro ? 0.86 : 0.9))
+             + ';color:' + corParaHex(forte), txt: 'selecionado' }),
+    );
+  }
+
+  campo.oninput = () => { aplicaCor(campo.value); pintaAmostra(campo.value); diz.textContent = ''; };
+
+  async function manda(cor) {
+    salvar.disabled = padrao.disabled = true;
+    try {
+      await api('/tema.php', { method: 'POST', body: JSON.stringify({ cor: cor }) });
+      guardaCor(cor);
+      aplicaCor(cor);
+      diz.textContent = cor ? 'Pronto.' : 'Voltou ao padrão.';
+      diz.style.color = 'var(--verde-forte)';
+    } catch (e) {
+      /* Recusou: desfaz o que estava na tela, senão a cor fica aplicada
+         localmente e a pessoa acha que salvou. */
+      aplicaCor(corGuardada());
+      diz.textContent = e.message;
+      diz.style.color = 'var(--perigo)';
+    }
+    salvar.disabled = padrao.disabled = false;
+  }
+
+  salvar.onclick = () => manda(campo.value);
+  padrao.onclick = () => { campo.value = '#12a150'; pintaAmostra(campo.value); manda(''); };
+
+  caixa.append(
+    h('h3', { txt: 'A cor do site' }),
+    h('p', { cls: 'd', txt: 'Vale só pra você, em qualquer aparelho onde entrar.' }),
+    h('div', { cls: 'campo' }, [h('label', { txt: 'Cor' }), campo, amostra]),
+    h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' },
+      [salvar, padrao, diz]),
+  );
+
+  api('/tema.php').then((d) => {
+    campo.value = d.cor || '#12a150';
+    pintaAmostra(campo.value);
+    if (!d.pode) {
+      campo.disabled = salvar.disabled = padrao.disabled = true;
+      diz.textContent = 'Escolher a cor é do Pro.';
+      diz.style.color = 'var(--dourado)';
+    }
+    /* O servidor manda; o navegador só adianta. Se as duas divergirem
+       (entrou noutro aparelho e trocou lá), vale a do servidor. */
+    if ((d.cor || '') !== corGuardada()) { guardaCor(d.cor || ''); aplicaCor(d.cor || ''); }
+  }).catch(() => {
+    diz.textContent = 'Este servidor ainda não tem a cor. Suba os arquivos novos da pasta api.';
+    diz.style.color = 'var(--dourado)';
+  });
+}
+
 function telaControlador() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -6676,6 +6852,9 @@ function telaControlador() {
   tela.appendChild(h('p', { cls: 'sub', txt: 'Sua chave, seus links e sua conta. Nada aparece destapado sozinho.' }));
 
   const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+
+  const cxCor = h('div', { cls: 'fatia' });
+  caixaDaCor(cxCor);
 
   /* ----- o plano -----
 
@@ -6882,6 +7061,7 @@ function telaControlador() {
     });
   }
   tela.appendChild(fatiaOv);
+  tela.appendChild(cxCor);
 }
 
 /* Os quinze que a ponte já sabe fazer. A lista mora aqui só pra explicar —

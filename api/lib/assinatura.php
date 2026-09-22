@@ -198,6 +198,7 @@ function recursos_do_plano(string $plano): array
             'musica_chat'     => true,
             'oque_streamar'   => true,
             'selo_pro'        => true,
+            'cor_propria'     => true,
             'anuncios'        => true,
             'bot_nuvem'       => true,
             'comandos_max'    => 200,
@@ -249,6 +250,7 @@ function recursos_do_plano(string $plano): array
            escolha: apagar o trabalho de quem parou de pagar é como se
            ganha estorno e print no Twitter. */
         'selo_pro'        => false,
+        'cor_propria'     => false,
         'anuncios'        => false,
         'bot_nuvem'       => false,
         'comandos_max'    => 30,
