@@ -130,6 +130,9 @@ if (JSON.stringify(cargosPonte) === JSON.stringify(cargosCmds)
    TEXTOS_ANTIGOS, no docs/index.html. */
 const TEXTOS_DINAMICOS = [
   'Novo Meta',   // título montado na hora: 'Novo ' + o nome do tipo
+  // Montado com o nome do bot, que vem do config: no código a frase está
+  // partida em volta da variável e nunca vai bater inteira aqui.
+  'Quem fala no seu chat é a conta ZocaHub.',
 ];
 
 async function confereTextos() {

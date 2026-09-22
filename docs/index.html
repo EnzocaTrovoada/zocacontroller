@@ -836,7 +836,14 @@ try {
      mensal. Lado a lado a comparação se faz sozinha. */
   .pop__caixa.largo { max-width: 880px; }
 
-  .planos3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; margin: 4px 0 20px; }
+  /* PADDING, E NÃO MARGIN, POR CAUSA DA ETIQUETA.
+     Ela fica em top:-9px, pra fora do cartão, e o corpo do popup rola com
+     overflow — então o que sai por cima é cortado. Margem aqui colapsaria
+     com o pai e não resolveria; padding não colapsa. */
+  .planos3 {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px;
+    padding-top: 13px; margin: 0 0 20px;
+  }
   @media (max-width: 760px) { .planos3 { grid-template-columns: 1fr; } }
 
   .pcard {
@@ -878,11 +885,26 @@ try {
      Os três cartões precisam se diferenciar sem legenda. O anual é o mais
      escolhido e leva o dourado; o vitalício é o que para de custar, e a
      onda passando de um lado pro outro é o que faz o olho voltar nele. */
-  .pcard.anual { border-color: rgba(138,98,16,.45); }
-  .pcard.anual:hover, .pcard.anual.on { border-color: var(--dourado); }
-  .pcard.anual.on { background: rgba(138,98,16,.07); box-shadow: inset 0 0 0 1px var(--dourado); }
-  .pcard.anual .pcard__preco, .pcard.anual .pcard__comp { color: var(--dourado); }
-  .pcard.anual .pcard__tag { background: var(--dourado); }
+  /* O ANUAL ERA DOURADO E O DOURADO ESCURECE FEIO NO TEMA CLARO: #8A6210
+     dá um marrom de lama. Ele só está escuro assim porque precisa de
+     contraste sobre o cartão claro, então não tem como "clarear um pouco"
+     sem perder legibilidade.
+
+     O violeta resolve os dois: lê como plano de cima, contrasta nos dois
+     temas, e não briga com o verde do mensal. O dourado fica só onde ele
+     é significado, que é o vitalício de quem já comprou. */
+  .pcard.anual { border-color: color-mix(in srgb, var(--violeta) 45%, transparent); }
+  .pcard.anual:hover, .pcard.anual.on { border-color: var(--violeta); }
+  .pcard.anual.on {
+    background: color-mix(in srgb, var(--violeta) 8%, transparent);
+    box-shadow: inset 0 0 0 1px var(--violeta);
+  }
+  .pcard.anual .pcard__preco, .pcard.anual .pcard__comp { color: var(--violeta); }
+  /* Degradê em vez de chapado: ao lado do vitalício animado, cor lisa
+     parecia etiqueta de aviso. */
+  .pcard.anual .pcard__tag {
+    background: linear-gradient(100deg, var(--violeta), color-mix(in srgb, var(--violeta) 55%, var(--ciano)));
+  }
 
   @keyframes arco { to { background-position: 200% 0; } }
 
@@ -1684,8 +1706,12 @@ try {
   <!-- Só aparece quando o servidor diz que a cobrança está aberta. Em modo
        de teste, só pra admin. -->
   <button class="aba pro escondido" id="abaUpgrade" type="button">Ver planos</button>
-  <!-- Só admin vê. Liga o modo em que clicar num texto abre a caixa de
-       reescrever. -->
+  <!-- As duas só admin vê. A Administração era um item dentro da bandeja
+       Ferramentas, e lá ninguém achava: quem procurava selo ou conquista
+       não abre um menu chamado Ferramentas. Ao lado do "Editar textos",
+       que já é admin, as duas ficam juntas onde se procura. -->
+  <button class="aba escondido" id="abaAdmin" type="button">Administração</button>
+  <!-- Liga o modo em que clicar num texto abre a caixa de reescrever. -->
   <button class="aba escondido" id="abaTextos" type="button">Editar textos</button>
 
   <!-- Buscar leva direto ao lugar: com dez tipos de overlay e sete telas,
@@ -2855,7 +2881,7 @@ function montaBandejas() {
      qualquer outro. */
   const adm = h('button', { type: 'button', id: 'linkAdmin', cls: 'escondido' }, [
     document.createTextNode('Administração'),
-    h('small', { txt: 'quem entrou e o que cada um pode' }),
+    h('small', { txt: 'selos, conquistas, cupons, vitrine e artistas' }),
   ]);
   adm.onclick = () => { fechaBandejas(null); vaiPara('#/admin'); };
   bf.appendChild(adm);
@@ -9857,6 +9883,7 @@ window.addEventListener('hashchange', rota);
 /* A marca leva pra vitrine, não pra lista. Quem clica no nome do site espera
    a porta de entrada — a lista já tem aba própria. */
 el('irInicio').onclick = () => vaiPara('#/inicio');
+el('abaAdmin').onclick = () => { fechaBandejas(null); vaiPara('#/admin'); };
 el('abaBot').onclick = () => { fechaBandejas(null); vaiPara('#/bot'); };
 el('abaMeu').onclick = () => { fechaBandejas(null); vaiPara('#/meu'); };
 el('abaArtistas').onclick = () => { fechaBandejas(null); vaiPara('#/artistas'); };
@@ -9980,7 +10007,7 @@ async function carrega() {
     /* As abas do painel não servem pra quem não entrou: clicar em qualquer
        uma delas só levaria a uma tela que falha. Some com elas e o que resta
        é a vitrine e o botão de entrar. */
-    ['abaOverlays', 'abaFerramentas', 'abaBot', 'abaMeu', 'busca'].forEach((id) => {
+    ['abaOverlays', 'abaFerramentas', 'abaBot', 'abaMeu', 'busca', 'abaAdmin'].forEach((id) => {
       const a = el(id);
       if (a) a.classList.add('escondido');
     });
@@ -9992,7 +10019,15 @@ async function carrega() {
   }
 
   if (!await carrega()) return;
-  if (souAdmin) ['abaTextos', 'linkAdmin'].forEach((id) => el(id).classList.remove('escondido'));
+  if (souAdmin) {
+    /* Null-safe: um id que sumisse daqui apagaria os outros junto, porque
+       o erro para o forEach no meio — e foi assim que a Administração
+       ficaria invisível sem ninguém saber por quê. */
+    ['abaAdmin', 'abaTextos', 'linkAdmin'].forEach((id) => {
+      const e = el(id);
+      if (e) e.classList.remove('escondido');
+    });
+  }
   /* Sem await: o painel não espera as contagens. Quando elas voltam, o
      sino pergunta de novo e já mostra o aviso da conquista. */
   confereConquistas().then(buscaAvisos);
