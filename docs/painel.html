@@ -825,12 +825,93 @@ async function api(caminho, opcoes) {
   return d;
 }
 
+/* ---------- a cor escolhida, aqui dentro também ----------
+
+   O dock é arquivo separado do site e tem os próprios tokens, então a cor
+   do painel não chegava aqui sozinha — e um dock verde ao lado de um site
+   roxo é pior do que não ter escolha nenhuma.
+
+   A receita é a mesma do index.html: a cor entra pela MATIZ e a escada de
+   saturação e luz continua sendo a daqui. Como a luz não muda, o contraste
+   não muda. Medido nos tokens deste arquivo:
+
+     fundo  sat 18%  luz  7%     linha  sat 14%  luz 19%
+     caixa  sat 17%  luz 10%     sinal2 sat 41%  luz 13%
+
+   O dock é SEMPRE escuro: ele vive dentro do OBS, e um retângulo claro
+   encravado ali seria um estrago. Por isso não há escada clara aqui. */
+const CORD = { fundo: [18, 7], caixa: [17, 10], linha: [14, 19], sinal2: [41, 13] };
+
+function cordMatiz(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  const [r, g, b] = [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  if (max === min) return { h: 0, cinza: true, rgb: [r * 255, g * 255, b * 255] };
+  const d = max - min;
+  let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: ((h * 60) + 360) % 360, cinza: false, rgb: [r * 255, g * 255, b * 255] };
+}
+
+function cordHsl(h, sat, luz) {
+  sat /= 100; luz /= 100;
+  const c = (1 - Math.abs(2 * luz - 1)) * sat;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = luz - c / 2;
+  const t = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
+          : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return '#' + t.map((v) => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('');
+}
+
+/* O sinal precisa ser lido sobre o cartão escuro. Clareia até passar de
+   4.5:1 — senão escolher azul-marinho apagaria metade do dock. */
+function cordSinal(rgb) {
+  const luz = (c) => {
+    const v = c.map((x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); });
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  };
+  const fundo = [22, 31, 26];
+  let saida = rgb;
+  for (let i = 0; i <= 20; i++) {
+    saida = rgb.map((v) => v + (255 - v) * (i / 20));
+    if ((luz(saida) + 0.05) / (luz(fundo) + 0.05) >= 4.5) break;
+  }
+  return '#' + saida.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+}
+
+function aplicaCorDock(hex) {
+  const raiz = document.documentElement;
+  const c = cordMatiz(hex);
+  if (!c) {
+    ['--fundo', '--caixa', '--linha', '--sinal', '--sinal2'].forEach((t) => raiz.style.removeProperty(t));
+    return;
+  }
+  Object.keys(CORD).forEach((nome) => {
+    const [sat, luz] = CORD[nome];
+    raiz.style.setProperty('--' + nome, cordHsl(c.h, c.cinza ? 0 : sat, luz));
+  });
+  raiz.style.setProperty('--sinal', cordSinal(c.rgb));
+}
+
+/* Do navegador primeiro (entra no primeiro quadro), do servidor depois. */
+try { aplicaCorDock(guardado('zc:cor')); } catch (e) {}
+
+async function corDoDock() {
+  if (!chavePainel) return;
+  try {
+    const d = await api('/tema.php');
+    guardar('zc:cor', d.cor || '');
+    aplicaCorDock(d.cor || '');
+  } catch (e) { /* servidor sem a cor: fica no verde */ }
+}
+
 function ligarSecoes() {
   const tem = !!chavePainel;
   el('secaoCanal').classList.toggle('escondido', !tem);
   el('secaoPalpite').classList.toggle('escondido', !tem);
   el('secaoMomentos').classList.toggle('escondido', !tem);
-  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); }
+  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); }
   perfilPinta();
 }
 
