@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-21",
+      "titulo": "Mais fácil de ler, e a Administração achável",
+      "texto": "Os campos de escrever do suporte agora ocupam a linha inteira — antes sobrava um terço da tela pra escrever e você não via o que tinha digitado. O texto que explica cada tela cresceu e escureceu. A Administração virou aba, em vez de um item escondido dentro de Ferramentas. E a etiqueta do plano vitalício parou de ser cortada."
+    },
+    {
+      "data": "2026-09-21",
       "titulo": "Os comandos de fábrica agora ligam e desligam",
       "texto": "Em Comandos, na lista \"os que já funcionam sem criar nada\", cada um ganhou a mesma chavinha dos seus: quem não usa palpite desliga o !aposta e acabou. O !voltar não tem chave de propósito — é a saída do pânico. E no painel do OBS o Enhanced Broadcasting agora liga num botão, em vez de mandar você achar a opção."
     },

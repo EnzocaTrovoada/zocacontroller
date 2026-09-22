@@ -1002,7 +1002,10 @@ try {
   /* ---------- conteúdo ---------- */
   .w { max-width: 1080px; margin: 0 auto; padding: 30px 20px 90px; }
   h1 { font: 700 clamp(24px,4vw,34px)/1.05 var(--disp); letter-spacing: -.02em; margin: 0 0 8px; }
-  .sub { color: var(--fraco); font-size: 14px; margin: 0 0 26px; max-width: 60ch; }
+  /* A LINHA QUE EXPLICA A TELA É PRA SER LIDA, ENTÃO ELA CRESCEU.
+     Estava em 14px na cor fraca, do tamanho de legenda — e é o texto que
+     diz pra que serve a tela inteira. */
+  .sub { color: var(--fraco); font-size: 15.5px; line-height: 1.5; margin: 0 0 26px; max-width: 62ch; }
   h2 { font: 600 10px var(--disp); letter-spacing: .18em; text-transform: uppercase; color: var(--fraco); margin: 26px 0 10px; }
 
   button.bt {
@@ -1517,8 +1520,20 @@ try {
   .linha-ponte div { margin: 2px 0; }
 
   /* ---------- a frase de um aviso ---------- */
+  /* CAMPO QUE OCUPA A LINHA TODA.
+     No .campo normal o rótulo e o controle dividem a largura, e um campo de
+     texto livre sobra com um terço da tela — escrever sem ver o que se
+     escreveu. Aqui o rótulo sobe e o controle fica inteiro. */
   .campo--inteiro { display: block; }
-  .campo--inteiro > .rotulo { display: block; margin: 0 0 5px; }
+  .campo--inteiro > .rotulo,
+  .campo--inteiro > label { display: block; margin: 0 0 5px; flex: none; }
+  /* Com [type] pra ganhar da regra de 130px lá embaixo, que tem a mesma
+     força e vem depois no arquivo. */
+  .campo--inteiro > input[type=text],
+  .campo--inteiro > input[type=number],
+  .campo--inteiro > input[type=search],
+  .campo--inteiro > textarea,
+  .campo--inteiro > select { width: 100%; box-sizing: border-box; }
   .frase textarea {
     width: 100%; box-sizing: border-box; resize: vertical; overflow: hidden;
     min-height: 40px; padding: 8px 10px; line-height: 1.45;
@@ -1634,7 +1649,7 @@ try {
 
   .fatia { border: 1px solid var(--linha); border-radius: 6px; background: var(--caixa); padding: 16px; margin-bottom: 12px; }
   .fatia h3 { font: 600 15px var(--disp); margin: 0 0 4px; }
-  .fatia p.d { margin: 0 0 12px; font-size: 12.5px; color: var(--apagado); max-width: 62ch; }
+  .fatia p.d { margin: 0 0 12px; font-size: 13.5px; line-height: 1.5; color: var(--fraco); max-width: 62ch; }
   .aviso {
     border-left: 3px solid var(--perigo); background: var(--caixa2);
     padding: 10px 12px; font-size: 12.5px; color: var(--fraco); margin: 10px 0 0; border-radius: 0 4px 4px 0;
@@ -9728,9 +9743,11 @@ function telaSuporte() {
 
   tela.appendChild(h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Abrir um chamado' }),
-    h('div', { cls: 'campo' }, [h('label', { txt: 'Assunto' }), assunto]),
-    h('div', { cls: 'campo' }, [mensagem]),
-    h('div', { cls: 'campo' }, [h('label', { txt: 'Contato' }), contato]),
+    /* Inteiros: são os três campos de escrever da tela, e espremidos num
+       terço da largura ninguém lê o que acabou de digitar. */
+    h('div', { cls: 'campo campo--inteiro' }, [h('label', { txt: 'Assunto' }), assunto]),
+    h('div', { cls: 'campo campo--inteiro' }, [mensagem]),
+    h('div', { cls: 'campo campo--inteiro' }, [h('label', { txt: 'Contato' }), contato]),
     h('div', { cls: 'campo', style: 'gap:8px' }, [btPrint, arq, enviar]),
   ]));
   tela.appendChild(h('h3', { style: 'margin-top:26px', txt: 'Os seus chamados' }));
