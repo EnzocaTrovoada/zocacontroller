@@ -1916,12 +1916,53 @@ function corLegivel(rgb, escuro) {
   return saida;
 }
 
+/* A ESCADA DAS SUPERFÍCIES.
+
+   A paleta que o site já usava não era cinza: era o verde da marca em
+   cinco degraus de luminosidade. Medido: matiz ~148°, saturação de 15 a
+   22%, luz de 4% a 20% no escuro e de 81% a 100% no claro.
+
+   Então a cor da pessoa entra pela MATIZ, e a saturação e a luz continuam
+   sendo as de cá. É o que faz o site inteiro virar a cor dela sem que o
+   contraste mude um ponto — a luz de cada superfície é a mesma de antes, e
+   contraste depende de luz, não de matiz. Escolher amarelo não clareia o
+   fundo escuro; deixa ele amarelado e igualmente escuro. */
+const COR_ESCADA = {
+  escuro: { fundo: [22, 4], caixa: [20, 7], caixa2: [18, 10], linha: [17, 14], linha2: [15, 20] },
+  claro:  { fundo: [6, 99], caixa: [12, 97], caixa2: [16, 94], linha: [13, 88], linha2: [13, 81] },
+};
+
+function corMatiz(rgb) {
+  const [r, g, b] = rgb.map((v) => v / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === min) return null;         /* cinza puro: não há matiz */
+  const d = max - min;
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return ((h * 60) + 360) % 360;
+}
+
+/* HSL pra RGB, com saturação e luz em porcentagem. */
+function corDeHsl(h, s, l) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  const t = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
+          : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return t.map((v) => (v + m) * 255);
+}
+
 /** Põe a cor nos três tokens, ou tira tudo quando ela é vazia. */
 function aplicaCor(hex) {
   const raiz = document.documentElement;
   const rgb = corParaRgb(hex);
   if (!rgb) {
-    ['--verde', '--verde-forte', '--verde-fraco'].forEach((t) => raiz.style.removeProperty(t));
+    ['--verde', '--verde-forte', '--verde-fraco', '--fundo', '--caixa', '--caixa2',
+     '--linha', '--linha2', '--brilho'].forEach((t) => raiz.style.removeProperty(t));
     return;
   }
 
@@ -1932,6 +1973,23 @@ function aplicaCor(hex) {
      pro branco, no escuro pro preto. */
   raiz.style.setProperty('--verde-fraco',
     corParaHex(corMistura(rgb, escuro ? [7, 11, 9] : [255, 255, 255], escuro ? 0.86 : 0.9)));
+
+  /* AS SUPERFÍCIES SEGUEM A MATIZ. Cinza puro não tem matiz — e aí o site
+     fica cinza mesmo, que é o que a pessoa pediu ao escolher cinza. */
+  const matiz = corMatiz(rgb);
+  const escada = COR_ESCADA[escuro ? 'escuro' : 'claro'];
+  Object.keys(escada).forEach((nome) => {
+    const [sat, luz] = escada[nome];
+    raiz.style.setProperty('--' + nome,
+      corParaHex(corDeHsl(matiz === null ? 0 : matiz, matiz === null ? 0 : sat, luz)));
+  });
+
+  /* O brilho do fundo é o mesmo verde em radial; sem trocá-lo, sobra uma
+     mancha verde no canto de um site que virou roxo. */
+  const g = corParaHex(rgb);
+  raiz.style.setProperty('--brilho',
+    'radial-gradient(900px 520px at 6% -12%, ' + g + (escuro ? '1c' : '12') + ', transparent 60%),'
+    + 'radial-gradient(800px 520px at 100% -8%, ' + g + (escuro ? '14' : '0d') + ', transparent 60%)');
 }
 
 /* A cor escolhida fica no navegador também: assim ela entra no primeiro
@@ -2220,6 +2278,17 @@ function padraoDe(tipo) {
       mrola: 1, mabrir: 1000, mfechar: 1500, mtempo: 7,
     });
   }
+  if (tipo === 'tts') {
+    return Object.assign(base, {
+      /* A caixa na tela é pra quem assiste saber DE QUEM é a voz. Nasce
+         discreta: o recurso é o som, não o texto. */
+      titulo: '', font: 'Archivo', size: 22, weight: 500, color: '#FFFFFF',
+      sw: 0, glow: 0, shx: 0, shy: 2, shb: 8, sho: 60, shc: '#000000',
+      align: 'left', valign: 'bottom',
+      tvoz: 'padrao', tvol: 100, tlingua: 'pt-BR', anome: '#7CE07C',
+    });
+  }
+
   if (tipo === 'alerta') {
     return Object.assign(base, {
       titulo: '', font: 'Anton', size: 44, weight: 700, color: '#FFFFFF',
@@ -2503,6 +2572,20 @@ const GRUPOS = [
     { k: 'atreal',   l: 'Alguém doou', c: 'frase', ensaio: 'real', se: (c) => !!c.areal },
     { k: 'anome', l: 'Cor do nome da pessoa', c: 'cor',
       dica: 'o nome sai nesta cor e o resto da frase na cor da letra, lá embaixo' },
+  ] },
+
+  { t: 'A voz', se: so('tts'), itens: [
+    { k: 'tvoz', l: 'Voz padrão', c: 'lista', ops: [
+      ['padrao', 'Padrão'], ['grave', 'Grave'], ['agudo', 'Agudo'],
+      ['crianca', 'Criança'], ['narrador', 'Narrador'], ['apressado', 'Apressado'],
+      ['arrastado', 'Arrastado'], ['robo', 'Robô'], ['gigante', 'Gigante']],
+      dica: 'quem escolhe quais vozes valem é a tela de TTS, em Comandos' },
+    { k: 'tlingua', l: 'Idioma', c: 'lista', ops: [
+      ['pt-BR', 'Português do Brasil'], ['pt-PT', 'Português de Portugal'],
+      ['en-US', 'Inglês'], ['es-ES', 'Espanhol']],
+      dica: 'usa a voz que o computador tem instalada nesse idioma' },
+    { k: 'tvol', l: 'Volume', c: 'faixa', min: 0, max: 100, u: '%' },
+    { k: 'anome', l: 'Cor de quem mandou', c: 'cor' },
   ] },
 
   { t: 'Movimento e som', se: so('alerta'), itens: [

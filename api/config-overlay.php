@@ -7,6 +7,7 @@ require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/contagem.php';
 require_once __DIR__ . '/lib/eventos.php';
+require_once __DIR__ . '/lib/tts.php';
 require_once __DIR__ . '/lib/spotify.php';
 
 header('Access-Control-Allow-Origin: *');   // o overlay roda dentro do OBS
@@ -165,6 +166,20 @@ if ($perfil['tipo'] === 'feed') {
     $eventos = evento_recentes((int) $perfil['usuario_id'], 12);
 }
 
+/* A FILA DO TTS.
+
+   Pega aqui, e não num endereço próprio: a fonte já bate neste a cada
+   poucos segundos, e um segundo canal seria o dobro de requisição pelo
+   mesmo dado. O tts_pega() já marca como falado ao entregar — o que sai
+   daqui não sai duas vezes.
+
+   SÓ O TIPO TTS. Um overlay de relógio não tem por que ler fila de fala,
+   e cada leitura dessas é um UPDATE no banco. */
+$fala = null;
+if ($perfil['tipo'] === 'tts') {
+    $fala = tts_pega((int) $perfil['usuario_id']);
+}
+
 /* O ENDEREÇO DO SOM PRÓPRIO.
 
    Vai montado daqui porque quem sabe onde a API mora é o servidor, não a
@@ -192,10 +207,16 @@ if ($perfil['tipo'] === 'speedrun' && !empty($config['sptre']) && is_array($conf
 /* ETag: quase toda resposta vira um 304 de poucos bytes. O polling sai de graça.
    O número automático entra na conta — sem ele o 304 devolveria o valor velho
    pra sempre e a meta ficaria congelada, justo a que deveria se mexer sozinha. */
+/* A FALA ENTRA NA CONTA, E É OBRIGATÓRIO.
+
+   Sem ela, uma mensagem nova não mudaria o ETag: a resposta viraria 304,
+   a fonte não receberia nada, e o TTS ficaria mudo pra sempre sem dar
+   erro nenhum. É o mesmo motivo do número automático logo acima. */
 $etag = '"' . md5($perfil['atualizado_em'] . '|' . json_encode($recursos)
                   . '|' . (string) ($config['atual'] ?? '')
                   . '|' . ($eventos === null ? '' : md5(json_encode($eventos)))
                   . '|' . ($musica === null ? '' : md5(json_encode($musica)))
+                  . '|' . ($fala ? md5(json_encode($fala)) : '')
                   . '|' . (string) $som) . '"';
 header('ETag: ' . $etag);
 header('Cache-Control: no-cache, must-revalidate');
@@ -235,6 +256,7 @@ json_saida([
     'tipo'     => $perfil['tipo'],
     'config'   => $config,
     'eventos'  => $eventos,
+    'fala'     => $fala,
     'musica'   => $musica,
     'som'      => $som,
     'recursos' => $recursos,
