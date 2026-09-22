@@ -81,7 +81,11 @@
       'Europe/Moscow', 'Africa/Luanda', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Shanghai',
       'Asia/Dubai', 'Australia/Sydney', 'Pacific/Auckland', 'UTC'
     ] },
-    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat', 'feed', 'musica', 'alerta', 'speedrun'] },
+    tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat', 'feed', 'musica', 'alerta', 'speedrun', 'tts'] },
+    /* ---- tts ---- */
+    tvoz:     { t: 'e', d: 'padrao', v: ['padrao', 'grave', 'agudo', 'crianca', 'narrador', 'apressado', 'arrastado', 'robo', 'gigante'] },
+    tvol:     { t: 'n', d: 100, min: 0, max: 100 },
+    tlingua:  { t: 'e', d: 'pt-BR', v: ['pt-BR', 'pt-PT', 'en-US', 'es-ES'] },
 
     /* ---------------- speedrun ----------------
 

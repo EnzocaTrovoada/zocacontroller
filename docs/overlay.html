@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="chat.css?v=34">
 <link rel="stylesheet" href="musica.css?v=34">
 <link rel="stylesheet" href="alerta.css?v=34">
+<link rel="stylesheet" href="tts.css?v=34">
 <link rel="stylesheet" href="spd.css?v=34">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
@@ -35,6 +36,7 @@
 <script src="chat.js?v=34"></script>
 <script src="musica.js?v=34"></script>
 <script src="alerta.js?v=34"></script>
+<script src="tts.js?v=34"></script>
 <script src="spd.js?v=34"></script>
 <script>
 (function () {
@@ -67,6 +69,7 @@
     raiz.innerHTML = '';
     relogio = quer === 'chat'     ? Chat.mount(raiz, config)
             : quer === 'musica'   ? Musica.mount(raiz, config)
+            : quer === 'tts'      ? Tts.mount(raiz, config)
             : quer === 'alerta'   ? Alerta.mount(raiz, config)
             : quer === 'speedrun' ? Speedrun.mount(raiz, config)
             : Relogio.mount(raiz, config);
@@ -302,6 +305,9 @@
 
         if (j.som !== undefined && relogio && relogio.som) relogio.som(j.som);
         if (j.eventos && relogio && relogio.feed) relogio.feed(j.eventos);
+        /* A fila do TTS vem na mesma leitura da config: não vale abrir um
+           segundo canal só pra isso. */
+        if (j.fala && relogio && relogio.falar) relogio.falar(j.fala);
         /* undefined é "esta resposta não fala de música"; null é "não tem
            nada tocando". Só o segundo apaga a tela. */
         if (j.musica !== undefined && relogio && relogio.musica) relogio.musica(j.musica);

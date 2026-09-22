@@ -1,0 +1,23 @@
+/* A caixa do TTS na tela. Ela existe pra quem assiste saber DE QUEM é a
+   voz que está falando — sem isso o canal fala sozinho e ninguém liga o
+   som ao nome. Quem não quiser nada na tela deixa ela vazia. */
+.tts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: opacity .25s ease-out;
+}
+.tts--vazio { opacity: 0; }
+
+.tts__quem {
+  font: 700 var(--tam, 20px) / 1.15 var(--fonte, system-ui, sans-serif);
+  color: var(--cor-nome, #7CE07C);
+}
+.tts__texto {
+  font: 400 var(--tam, 20px) / 1.35 var(--fonte, system-ui, sans-serif);
+  color: var(--cor, #FFFFFF);
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tts { transition: none; }
+}
