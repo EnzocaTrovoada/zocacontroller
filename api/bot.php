@@ -15,6 +15,7 @@ require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
 require_once __DIR__ . '/lib/seguranca.php';
 require_once __DIR__ . '/lib/chat.php';
+require_once __DIR__ . '/lib/assinatura.php';
 
 cors();
 
@@ -56,10 +57,19 @@ function bot_comandos(int $uid): array
     }
 }
 
-/** O que falta pra poder ligar: '' quando está tudo pronto. */
+/**
+ * O que falta pra poder ligar: '' quando está tudo pronto.
+ *
+ * O PRO ENTRA AQUI PORQUE ISTO CUSTA. Cada canal ligado é uma assinatura
+ * de EventSub viva na Twitch e uma chamada ao nosso servidor por mensagem
+ * de chat — a conta cresce com gente usando, não com gente cadastrada.
+ * Sem ele os comandos continuam respondendo pela fonte do OBS, que roda na
+ * máquina de quem transmite e não custa nada aqui.
+ */
 function bot_falta(int $uid): string
 {
     if (chat_bot_id() === '') return 'sem-bot';
+    if (!limite($uid, 'bot_nuvem', 1)) return 'so-pro';
     return in_array('channel:bot', chat_escopos($uid), true) ? '' : 'sem-permissao';
 }
 
@@ -120,6 +130,9 @@ if ($acao !== 'entrar') {
 $falta = bot_falta($uid);
 if ($falta === 'sem-bot') {
     json_saida(['erro' => 'O bot ainda não foi configurado neste servidor.'], 400);
+}
+if ($falta === 'so-pro') {
+    json_saida(['erro' => 'O bot no chat é do Pro. No grátis os comandos respondem pela fonte do OBS, com ela aberta.'], 402);
 }
 if ($falta === 'sem-permissao') {
     json_saida(['erro' => 'Falta a permissão pra deixar o bot falar no seu canal. Entre com a Twitch de novo.'], 400);

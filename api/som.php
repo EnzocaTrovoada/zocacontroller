@@ -29,6 +29,7 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/assinatura.php';
 
 /* Fora da pasta servida: mesmo com o servidor mal configurado, nada aqui
    dentro é alcançável por URL direta. */
@@ -149,8 +150,9 @@ if (!is_uploaded_file($f['tmp_name'])) json_saida(['erro' => 'Arquivo inválido.
 
 $st = db()->prepare('SELECT COUNT(*) FROM sons WHERE usuario_id = ?');
 $st->execute([$uid]);
-if ((int) $st->fetchColumn() >= SONS_MAX) {
-    json_saida(['erro' => 'Você já tem ' . SONS_MAX . ' sons. Apague um pra subir outro.'], 400);
+$tetoSons = limite($uid, 'sons_max', SONS_MAX);
+if ((int) $st->fetchColumn() >= $tetoSons) {
+    json_saida(['erro' => 'Você já tem ' . $tetoSons . ' sons. Apague um, ou seja Pro pra ter 30.'], 400);
 }
 
 /* O TIPO SAI DOS BYTES, NÃO DA EXTENSÃO.

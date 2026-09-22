@@ -14,6 +14,7 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/seguranca.php';
 require_once __DIR__ . '/lib/luzes.php';
 
@@ -231,7 +232,10 @@ if ($acao === 'cena_salvar') {
 
     $st = db()->prepare('SELECT COUNT(*) FROM luzes_cenas WHERE usuario_id = ?');
     $st->execute([$uid]);
-    if ((int) $st->fetchColumn() >= 40) json_saida(['erro' => 'Você já tem 40 cenas.'], 400);
+    $teto = limite($uid, 'luzes_max', 40);
+    if ((int) $st->fetchColumn() >= $teto) {
+        json_saida(['erro' => 'Você já tem ' . $teto . ' cores. No Pro cabem 40.'], 400);
+    }
 
     $brilho = $d['brilho'] === null || $d['brilho'] === '' ? null : max(1, min(100, (int) $d['brilho']));
     $cargo  = in_array((string) ($d['cargo'] ?? ''), LUZ_CARGOS, true) ? (string) $d['cargo'] : 'mod';

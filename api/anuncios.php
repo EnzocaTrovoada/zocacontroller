@@ -26,6 +26,7 @@ require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
 require_once __DIR__ . '/lib/seguranca.php';
 require_once __DIR__ . '/lib/twitch.php';
+require_once __DIR__ . '/lib/assinatura.php';
 
 cors();
 $quem = quem_chama();
@@ -53,6 +54,10 @@ function anuncio_linha(int $uid): array
 /** As permissões que a Twitch pede. Sem elas, não adianta tentar. */
 function anuncio_falta(int $uid): string
 {
+    /* Rodar anúncio sozinho é ferramenta de quem já vive disso: quem está
+       começando não tem pré-roll pra economizar. */
+    if (!limite($uid, 'anuncios', 1)) return 'so-pro';
+
     try {
         $esc = tw_escopos($uid);
     } catch (Throwable $e) {
@@ -181,6 +186,7 @@ exige_painel();
 
 /* ================= rodar um agora ================= */
 if (!empty($d['agora'])) {
+    if (anuncio_falta($uid) === 'so-pro') json_saida(['erro' => 'Anúncio automático é do Pro.'], 402);
     trava('anuncio-agora', 4, 300);
     $l = anuncio_linha($uid);
     $r = anuncio_roda($uid, (int) $l['duracao']);
@@ -203,7 +209,11 @@ $duracao = in_array($pedida, ANUNCIO_DURACOES, true) ? $pedida : 90;
 $inicio  = max(0, min(120, (int) ($d['espera_ini'] ?? 20)));
 $ligado  = !empty($d['ligado']) ? 1 : 0;
 
-if ($ligado && anuncio_falta($uid) !== '') {
+$falta = anuncio_falta($uid);
+if ($falta === 'so-pro') {
+    json_saida(['erro' => 'Anúncio automático é do Pro.'], 402);
+}
+if ($ligado && $falta !== '') {
     json_saida(['erro' => 'Falta a permissão de rodar anúncio. Entre com a Twitch de novo pra liberar.'], 400);
 }
 

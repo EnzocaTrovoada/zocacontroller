@@ -106,7 +106,11 @@ function bk_poda(int $uid): void
     $st->execute([$uid]);
     $todos = $st->fetchAll(PDO::FETCH_ASSOC);
 
-    foreach (array_slice($todos, BK_MAX) as $velho) {
+    /* O teto é do plano, e a poda respeita ele: backup é disco nosso, e
+       disco é a conta que cresce com gente usando. */
+    $teto = function_exists('limite') ? limite($uid, 'backups_max', BK_MAX) : BK_MAX;
+
+    foreach (array_slice($todos, max(1, $teto)) as $velho) {
         @unlink(bk_caminho((string) $velho['arquivo']));
         db()->prepare('DELETE FROM backups WHERE id = ?')->execute([(int) $velho['id']]);
     }

@@ -15,6 +15,7 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/chat.php';
 
 cors();
@@ -37,7 +38,10 @@ const ACOES_VALIDAS = [
 const QUEM_VALIDO = ['chat', 'sub', 'vip', 'mod', 'supermod', 'dono'];
 /* Cem, e não quarenta: quem vem do StreamElements chega com dezenas de
    comandos de resposta, e deixar metade pra trás não é importar. */
-const COMANDOS_MAX = 100;
+/* Teto de emergência, e não o do plano: mesmo no Pro ninguém precisa de
+   mais que isto, e um número aqui evita que um laço maluco encha a tabela.
+   Quem manda é o limite() do plano. */
+const COMANDOS_MAX = 300;
 
 /* Recados de tempo em tempo. Dez já é mais do que qualquer chat aguenta. */
 const RECADOS_MAX = 10;
@@ -498,7 +502,8 @@ function comando_grava(int $uid, array $c, int $id, ?string $origem): int
 
     $st = db()->prepare('SELECT COUNT(*) FROM comandos WHERE usuario_id = ?');
     $st->execute([$uid]);
-    if ((int) $st->fetchColumn() >= COMANDOS_MAX) return -1;
+    $tem = (int) $st->fetchColumn();
+    if ($tem >= min(COMANDOS_MAX, limite($usuario_id, 'comandos_max', COMANDOS_MAX))) return -1;
 
     if (comandos_053()) {
         db()->prepare(

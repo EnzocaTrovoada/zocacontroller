@@ -17,6 +17,7 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/seguranca.php';
 require_once __DIR__ . '/lib/cifra.php';
 
@@ -171,8 +172,11 @@ if ($nome === '' || mb_strlen($nome) > 64) {
 
 $st = db()->prepare('SELECT COUNT(*) FROM convites_mod WHERE usuario_id = ? AND revogado = 0');
 $st->execute([$quem['usuario_id']]);
-if ((int) $st->fetchColumn() >= 30) {
-    json_saida(['erro' => 'Você já tem 30 convites ativos. Revogue algum antes.'], 400);
+$tetoMods = limite((int) $quem['usuario_id'], 'mods_max', 30);
+if ((int) $st->fetchColumn() >= $tetoMods) {
+    json_saida(['erro' => $tetoMods <= 3
+        ? 'No plano grátis são ' . $tetoMods . ' moderadores. No Pro, quantos você quiser.'
+        : 'Você já tem ' . $tetoMods . ' convites ativos. Revogue algum antes.'], 400);
 }
 
 [$id, $link, $guardado] = convite_novo($quem['usuario_id'], $nome, (array) ($d['pode'] ?? []));
