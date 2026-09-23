@@ -133,6 +133,37 @@
   }
   input:focus { outline: 2px solid var(--sinal); outline-offset: 1px; }
   button.fraco { background: transparent; color: var(--fraco); }
+  /* ---------- no ar ---------- */
+  .aovivo {
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 10px; margin-bottom: 8px;
+    border: 1px solid var(--linha); border-radius: 7px; background: var(--caixa);
+    font-size: 12px;
+  }
+  .aovivo i {
+    width: 8px; height: 8px; border-radius: 50%; flex: none;
+    background: var(--fraco);
+  }
+  .aovivo b { font: 600 12px var(--disp); letter-spacing: .04em; text-transform: uppercase; }
+  .aovivo span { margin-left: auto; color: var(--fraco); font-variant-numeric: tabular-nums; }
+  .aovivo.no-ar { border-color: var(--perigo); }
+  .aovivo.no-ar i { background: var(--perigo); animation: pulsa 2s ease-in-out infinite; }
+  .aovivo.no-ar b { color: var(--perigo); }
+  .aovivo.gravando i { background: var(--ambar); }
+  .aovivo.gravando b { color: var(--ambar); }
+  @keyframes pulsa { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .aovivo.no-ar i { animation: none; } }
+
+  /* ---------- as chaves de silêncio ---------- */
+  .chaves { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chave {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    padding: 6px 10px; border: 1px solid var(--linha); border-radius: 7px;
+    background: var(--caixa); font-size: 12px; flex: 1 1 auto;
+  }
+  .chave input { accent-color: var(--sinal); margin: 0; }
+  .chave.off { border-color: var(--perigo); color: var(--perigo); }
+
   /* ---------- a janela de raid ---------- */
   .raid-um {
     display: grid; grid-template-columns: 1fr auto; gap: 2px 8px;
@@ -244,15 +275,39 @@
     <div id="vu"><i></i></div>
   </div>
 
+  <!-- NO AR OU NÃO, ANTES DE TUDO.
+       Quem abre o painel no meio da montagem precisa saber se já está
+       valendo. Errar isso é falar sozinho achando que ninguém ouve, ou o
+       contrário — e o contrário é pior. -->
+  <div class="aovivo" id="aoVivo" title="">
+    <i></i><b id="aoVivoTxt">vendo…</b><span id="aoVivoTempo"></span>
+  </div>
+
   <div class="grade">
     <button id="btPanico" class="perigo">PÂNICO</button>
     <button id="btVoltar" disabled>Sair do pânico</button>
   </div>
+  <p class="dica" style="margin:-2px 0 10px">
+    O pânico muta o seu microfone e o som do computador de uma vez, e troca
+    pra cena de pânico se você tiver escolhido uma. Um mod pode ligar; só
+    você desliga.
+  </p>
 
-  <!-- Fica junto do pânico, e não dentro de uma seção fechada: quando
-       precisa, precisa agora. Nasce escondido pra quem não usa TTS. -->
+  <!-- AS DUAS CHAVES DE SILÊNCIO.
+       Ficam junto do pânico, e não dentro de uma seção fechada: quando
+       precisa, precisa agora. Cada uma nasce escondida pra quem não usa o
+       recurso dela — chave de desligar o que não existe é confusão. -->
+  <div class="chaves">
+    <label class="chave escondido" id="chVozCaixa">
+      <input type="checkbox" id="chVoz"><span>Mensagens de voz</span>
+    </label>
+    <label class="chave escondido" id="chAlertasCaixa">
+      <input type="checkbox" id="chAlertas"><span>Alertas</span>
+    </label>
+  </div>
+
   <div class="grade escondido" id="grTts">
-    <button id="btCalar" class="perigo">CALAR O BOT</button>
+    <button id="btCalar" class="perigo">CALAR A FRASE DE AGORA</button>
   </div>
 
   <details class="secao" data-secao="overlays">
@@ -801,6 +856,12 @@ function pintar() {
 }
 setInterval(pintar, 1000);
 
+/* O "no ar" tem de acompanhar: começar a transmitir com o painel aberto é
+   o caso normal, e um aviso que só vale de quando o painel abriu mente
+   justamente na hora que importa. De 3 em 3 segundos é barato — a pergunta
+   é local, pro OBS, e não sai pela internet. */
+setInterval(vendoAoVivo, 3000);
+
 /* ------------------------------------------------------------------ *
  *  Palpite, título e categoria — falam com o relé, não com o OBS.
  * ------------------------------------------------------------------ */
@@ -961,6 +1022,80 @@ async function talvezMostrarCalar() {
        não faz nada. */
     el('grTts').classList.add('escondido');
   }
+}
+
+/* ---------- no ar ou não ----------
+
+   Vem do OBS, e não do servidor: o OBS sabe na hora, e o servidor só
+   saberia depois que a Twitch avisasse. Aqui o atraso seria justamente na
+   informação que não pode atrasar. */
+async function vendoAoVivo() {
+  const caixa = el('aoVivo');
+  if (!caixa) return;
+
+  let live = null, rec = null;
+  try { live = await pedir('GetStreamStatus'); } catch (e) { /* OBS fechado */ }
+  try { rec = await pedir('GetRecordStatus'); } catch (e) {}
+
+  caixa.classList.remove('no-ar', 'gravando');
+
+  if (live && live.outputActive) {
+    caixa.classList.add('no-ar');
+    el('aoVivoTxt').textContent = 'no ar';
+    el('aoVivoTempo').textContent = (live.outputTimecode || '').split('.')[0];
+    caixa.title = 'Transmitindo. Tudo o que sair daqui está indo pra live.';
+    return;
+  }
+
+  if (rec && rec.outputActive) {
+    caixa.classList.add('gravando');
+    el('aoVivoTxt').textContent = 'gravando';
+    el('aoVivoTempo').textContent = (rec.outputTimecode || '').split('.')[0];
+    caixa.title = 'Gravando, mas não transmitindo.';
+    return;
+  }
+
+  el('aoVivoTxt').textContent = live ? 'fora do ar' : 'sem o OBS';
+  el('aoVivoTempo').textContent = '';
+  caixa.title = live ? 'Não está transmitindo nem gravando.' : 'O painel não está falando com o OBS.';
+}
+
+/* ---------- as chaves de silêncio ----------
+
+   Elas DESLIGAM o recurso, e é o que as separa do "calar a frase de
+   agora": aquele corta o que está saindo e o próximo resgate volta a
+   falar; estas param de aceitar até você religar. */
+async function lerChaves() {
+  if (!chavePainel) return;
+  let d;
+  try { d = await api('/silenciar.php'); }
+  catch (e) { return; }              /* servidor velho: as chaves não aparecem */
+
+  el('chVozCaixa').classList.toggle('escondido', !d.voz_tem);
+  el('chVoz').checked = !!d.voz;
+  el('chVozCaixa').classList.toggle('off', !d.voz);
+
+  el('chAlertasCaixa').classList.remove('escondido');
+  el('chAlertas').checked = !!d.alertas;
+  el('chAlertasCaixa').classList.toggle('off', !d.alertas);
+}
+
+async function mexeChave(qual, marca, caixa) {
+  const valor = marca.checked ? 1 : 0;
+  marca.disabled = true;
+  try {
+    const corpo = {};
+    corpo[qual] = valor;
+    await api('/silenciar.php', { method: 'POST', body: JSON.stringify(corpo) });
+    caixa.classList.toggle('off', !valor);
+    anotar(qual === 'voz'
+      ? (valor ? 'mensagens de voz ligadas' : 'mensagens de voz desligadas')
+      : (valor ? 'alertas ligados' : 'alertas desligados — some em até 15s'));
+  } catch (e) {
+    marca.checked = !valor;          /* desfaz: a tela não pode mentir */
+    anotar('não deu: ' + e.message);
+  }
+  marca.disabled = false;
 }
 
 /* ================== PÔR O OVERLAY NO OBS ==================
@@ -1186,7 +1321,8 @@ function ligarSecoes() {
   el('secaoCanal').classList.toggle('escondido', !tem);
   el('secaoPalpite').classList.toggle('escondido', !tem);
   el('secaoMomentos').classList.toggle('escondido', !tem);
-  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); lerOverlays(); ordemDasSecoes(); }
+  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); lerOverlays(); lerChaves(); ordemDasSecoes(); }
+  vendoAoVivo();
   perfilPinta();
 }
 
@@ -2397,6 +2533,8 @@ el('senha').addEventListener('keydown', (e) => { if (e.key === 'Enter') el('btEn
 
 el('btPanico').addEventListener('click', () => { mandar('panico'); anotar('pânico pedido'); });
 el('btCalar').addEventListener('click', calarBot);
+el('chVoz').addEventListener('change', (e) => mexeChave('voz', e.target, el('chVozCaixa')));
+el('chAlertas').addEventListener('change', (e) => mexeChave('alertas', e.target, el('chAlertasCaixa')));
 el('btVoltar').addEventListener('click', () => { mandar('voltar'); anotar('saindo do pânico'); });
 
 el('btCamera').addEventListener('click', () => {

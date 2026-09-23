@@ -160,10 +160,25 @@ $eventos = null;
 if ($perfil['tipo'] === 'feed') {
     $eventos = evento_recentes((int) $perfil['usuario_id'], max(1, min(30, (int) ($config['cmax'] ?? 8))));
 } elseif ($perfil['tipo'] === 'alerta') {
+    /* A CHAVE GERAL DOS ALERTAS.
+
+       Desligada, a fonte não recebe nem o evento — e não há como ela
+       decidir errado. Marcar como visto mesmo assim é de propósito: sair
+       do silêncio não pode despejar de uma vez tudo o que aconteceu
+       enquanto ele estava desligado. */
+    $ligados = true;
+    try {
+        $ch = db()->prepare('SELECT alertas_ligados FROM usuarios WHERE id = ?');
+        $ch->execute([(int) $perfil['usuario_id']]);
+        $v = $ch->fetchColumn();
+        $ligados = $v === false ? true : (bool) $v;
+    } catch (Throwable $e) { /* sem o SQL 065: os alertas seguem ligados */ }
+
     /* Poucos: o alerta mostra um de cada vez e a consulta é de 15 em 15
        segundos. Mais que isso viraria fila do dia inteiro se a fonte ficasse
        um tempo fora do ar. */
     $eventos = evento_recentes((int) $perfil['usuario_id'], 12);
+    if (!$ligados) $eventos = [];
 }
 
 /* A FILA DO TTS.
