@@ -177,6 +177,8 @@
     padding: 1px 5px; border-radius: 4px;
     background: var(--sinal2); color: var(--sinal);
   }
+  .raid-selo--meu { background: var(--linha); color: var(--fraco); }
+  .raid-selo--sorte { background: var(--perigo2); color: var(--ambar); }
   .raid-n { font-size: 11px; color: var(--fraco); }
   .raid-jogo { grid-column: 1; font-size: 11px; color: var(--fraco); }
 
@@ -331,6 +333,7 @@
   <details class="secao" data-secao="raid">
   <summary>Raid <span id="raidQuantos" class="mini"></span></summary>
   <p class="dica">Ao vivo agora: quem você acompanha e o pessoal do ZocaHub.</p>
+  <div class="grade um"><button id="btSorte" class="mini">Achar alguém pequeno pra raidar</button></div>
   <div id="raidLista"></div>
   <p class="dica" id="raidSaldo"></p>
   </details>
@@ -1110,6 +1113,23 @@ async function mexeChave(qual, marca, caixa) {
   marca.disabled = false;
 }
 
+/* Um streamer pequeno em português, pra quem não tem lista. O sorteado
+   entra no topo da lista de agora — não fica guardado em lugar nenhum. */
+async function raidSorte() {
+  const bt = el('btSorte');
+  bt.disabled = true;
+  bt.textContent = 'procurando…';
+  try {
+    const d = await api('/raid.php?aleatorio=1');
+    const q = d.quem;
+    raidVivos = [Object.assign({ sorte: true }, q)].concat(raidVivos.filter((x) => x.login !== q.login));
+    raidPinta();
+    anotar('achei ' + (q.nome || q.login) + ' — ' + q.espectadores + ' assistindo');
+  } catch (e) { anotar(e.message); }
+  bt.disabled = false;
+  bt.textContent = 'Achar alguém pequeno pra raidar';
+}
+
 /* ================== A CONTAGEM REGRESSIVA ==================
 
    Daqui, e não do site: quem liga isso está montando a live, com o OBS
@@ -1312,7 +1332,11 @@ function raidPinta() {
     const linha = raidTexto('div', 'raid-um');
     const quem = raidTexto('div', 'raid-quem');
     quem.appendChild(raidTexto('b', '', v.nome || v.login));
+    /* De onde ele veio. Sem isto, "por que este nome está aqui?" não tem
+       resposta — e é a pergunta que a lista provoca. */
     if (v.casa) quem.appendChild(raidTexto('span', 'raid-selo', 'ZocaHub'));
+    else if (v.meu) quem.appendChild(raidTexto('span', 'raid-selo raid-selo--meu', 'sua lista'));
+    else if (v.sorte) quem.appendChild(raidTexto('span', 'raid-selo raid-selo--sorte', 'sorteado'));
     quem.appendChild(raidTexto('span', 'raid-n', v.espectadores + ' assistindo'));
     linha.appendChild(quem);
     linha.appendChild(raidTexto('span', 'raid-jogo', v.jogo || ''));
@@ -2610,6 +2634,7 @@ el('crPorHora').addEventListener('click', () => {
   if (el('crHora').value) crMarca({ hora: el('crHora').value });
 });
 el('crParar').addEventListener('click', () => crMarca({ parar: 1 }));
+el('btSorte').addEventListener('click', raidSorte);
 el('chVoz').addEventListener('change', (e) => mexeChave('voz', e.target, el('chVozCaixa')));
 el('chAlertas').addEventListener('change', (e) => mexeChave('alertas', e.target, el('chAlertasCaixa')));
 el('btVoltar').addEventListener('click', () => { mandar('voltar'); anotar('saindo do pânico'); });

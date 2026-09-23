@@ -43,19 +43,39 @@ function raid_lista(int $uid): array
  */
 function raid_da_casa(int $menos): array
 {
+    /* TODO MUNDO, E A TWITCH DIZ QUEM ESTA AO VIVO.
+
+       A primeira versao disto filtrava por ao_vivo_desde, que so e
+       preenchido pelo evento stream.online. So que esse evento e novo:
+       quem nao religou o EventSub nunca teve ele, e quem religou so passa
+       a ter depois de abrir uma live. Resultado: a lista ficava vazia pra
+       todo mundo, justo o recurso que existe pra mostrar gente.
+
+       Perguntar a Twitch responde na hora e sem depender de nada nosso.
+       Uma chamada cobre 100 logins, entao isto custa pouco. */
     try {
         $st = db()->prepare(
             'SELECT login FROM usuarios
-              WHERE id <> ? AND login <> \'\' AND raid_oculto = 0
-                AND ao_vivo_desde IS NOT NULL
-                AND ao_vivo_desde > DATE_SUB(NOW(), INTERVAL 24 HOUR)
-              LIMIT 100'
+              WHERE id <> ? AND LENGTH(login) > 0 AND raid_oculto = 0
+              ORDER BY id DESC LIMIT 300'
         );
         $st->execute([$menos]);
         return $st->fetchAll(PDO::FETCH_COLUMN);
     } catch (Throwable $e) {
         return [];
     }
+}
+
+/* ---------- um streamer pequeno em português, ao vivo ----------
+
+   Serve pra quem não tem lista e não conhece ninguém: dá uma pessoa de
+   verdade pra raidar em vez de uma tela vazia. */
+if (isset($_GET['aleatorio'])) {
+    $pool = tw_pequenos_pt();
+    if (!$pool) {
+        json_saida(['erro' => 'Não achei ninguém pequeno ao vivo agora. Tente daqui a pouco.'], 404);
+    }
+    json_saida(['quem' => $pool[random_int(0, count($pool) - 1)], 'de' => count($pool)]);
 }
 
 /* ---------- o histórico ----------

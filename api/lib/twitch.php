@@ -110,19 +110,29 @@ function tw_helix_app(string $metodo, string $caminho, array $query = [], $corpo
  */
 function tw_ao_vivo(array $logins): array
 {
-    $logins = array_slice(array_values(array_unique(array_filter($logins))), 0, 100);
+    $logins = array_values(array_unique(array_filter($logins)));
     if (!$logins) return [];
 
-    $q = implode('&', array_map(
-        static fn($l) => 'user_login=' . rawurlencode(mb_strtolower($l)),
-        $logins
-    ));
+    /* MAIS DE CEM PEDE MAIS DE UMA CHAMADA. O /streams aceita 100 logins
+       por vez; com a lista da casa crescendo, cortar em 100 faria os
+       cadastrados mais antigos sumirem da vitrine pra sempre. Teto de 4
+       chamadas (400 canais) pra isto não virar uma conta que cresce sem
+       limite junto com o cadastro. */
+    $blocos = array_slice(array_chunk($logins, 100), 0, 4);
 
-    [$http, $r] = tw_helix_app('GET', '/streams?' . $q);
-    if ($http !== 200) return [];
+    $todos = [];
+    foreach ($blocos as $bloco) {
+        $q = implode('&', array_map(
+            static fn($l) => 'user_login=' . rawurlencode(mb_strtolower($l)),
+            $bloco
+        ));
+        [$http, $r] = tw_helix_app('GET', '/streams?' . $q);
+        if ($http !== 200) continue;
+        foreach ((array) ($r['data'] ?? []) as $um) $todos[] = $um;
+    }
 
     $vivos = [];
-    foreach ((array) ($r['data'] ?? []) as $s) {
+    foreach ($todos as $s) {
         $vivos[mb_strtolower((string) $s['user_login'])] = [
             /* O id vem de graça aqui. Pedir ele de novo num /users seria
                uma segunda chamada pra saber o que a primeira já disse. */
@@ -138,6 +148,71 @@ function tw_ao_vivo(array $logins): array
         ];
     }
     return $vivos;
+}
+
+/**
+ * Um punhado de canais pequenos em portugues, ao vivo agora.
+ *
+ * A TWITCH ORDENA POR AUDIENCIA, E E ISSO QUE TORNA ISTO DIFICIL.
+ *
+ * Pegar a primeira pagina de /streams?language=pt daria sempre os dez
+ * maiores do Brasil - raidar eles nao ajuda ninguem, e o raid se perde.
+ * Quem ganha com um raid e quem tem vinte pessoas assistindo.
+ *
+ * Entao a gente ANDA pelas paginas enquanto os numeros forem grandes, e
+ * so comeca a recolher quando chega na faixa dos pequenos. Sao poucas
+ * chamadas porque cada pagina traz 100 e a queda e rapida.
+ *
+ * O resultado fica guardado por dez minutos e vale pra TODO MUNDO: e a
+ * mesma pergunta pra qualquer pessoa que aperte o botao, e sem isso cada
+ * clique custaria a caminhada inteira.
+ */
+function tw_pequenos_pt(int $teto = 150, int $quero = 60): array
+{
+    try {
+        $st = db()->prepare('SELECT valor FROM ajustes WHERE chave = ?');
+        $st->execute(['raid_pt']);
+        $guardado = json_decode((string) $st->fetchColumn(), true);
+        if (is_array($guardado) && ($guardado['ate'] ?? 0) > time()) {
+            return $guardado['lista'] ?? [];
+        }
+    } catch (Throwable $e) { /* sem cache, anda de novo */ }
+
+    $lista = [];
+    $cursor = '';
+
+    /* Teto de paginas: sem ele, um dia de pouca gente ao vivo faria isto
+       andar ate o fim da Twitch. */
+    for ($pagina = 0; $pagina < 8 && count($lista) < $quero; $pagina++) {
+        $q = 'language=pt&first=100' . ($cursor !== '' ? '&after=' . rawurlencode($cursor) : '');
+        [$http, $r] = tw_helix_app('GET', '/streams?' . $q);
+        if ($http !== 200) break;
+
+        foreach ((array) ($r['data'] ?? []) as $s) {
+            $espect = (int) ($s['viewer_count'] ?? 0);
+            /* Abaixo de 2 costuma ser canal esquecido ligado; acima do teto
+               nao precisa do seu raid. */
+            if ($espect < 2 || $espect > $teto) continue;
+            $lista[] = [
+                'id'           => (string) ($s['user_id'] ?? ''),
+                'login'        => (string) $s['user_login'],
+                'nome'         => (string) $s['user_name'],
+                'jogo'         => (string) ($s['game_name'] ?? ''),
+                'espectadores' => $espect,
+            ];
+        }
+
+        $cursor = (string) ($r['pagination']['cursor'] ?? '');
+        if ($cursor === '') break;
+    }
+
+    try {
+        db()->prepare('INSERT INTO ajustes (chave, valor) VALUES (?, ?)
+                       ON DUPLICATE KEY UPDATE valor = VALUES(valor)')
+            ->execute(['raid_pt', json_encode(['ate' => time() + 600, 'lista' => $lista])]);
+    } catch (Throwable $e) { /* sem guardar, so custa mais na proxima */ }
+
+    return $lista;
 }
 
 function tw_url_login(string $estado, array $escopos = TW_ESCOPOS): string
