@@ -4569,7 +4569,21 @@ el('abaTextos').onclick = () => {
 
    Cada linha corresponde a uma chave de recursos_do_plano(). Se divergirem, a
    promessa daqui vira mentira lá — mexeu numa, mexe na outra. */
+/* O QUE O PRO DÁ, NA ORDEM DE QUEM AINDA NÃO COMPROU.
+
+   Primeiro o que a pessoa VÊ e quer; os limites depois. E cada linha diz o
+   que o grátis dá, porque "ilimitado" só significa alguma coisa ao lado do
+   número que ele substitui.
+
+   Cada item aqui tem de existir na tabela do api/lib/assinatura.php. Uma
+   promessa nesta lista que o código não cumpre vira pedido de reembolso. */
 const PRO_BENEFICIOS = [
+  ['Todas as vozes do TTS',
+   'no grátis é uma; no Pro são as nove, com sorteio e o chat escolhendo pelo "grave: mensagem"'],
+  ['A cor do site é sua',
+   'o site e o painel do OBS inteiros na cor que você escolher'],
+  ['Lista de raid sem limite',
+   'acompanhe quantos canais quiser; no grátis são 3'],
   ['Overlays ilimitados',
    'sem teto nenhum; no grátis são 8'],
   ['Twitch, YouTube e Kick ao mesmo tempo',
@@ -4578,6 +4592,12 @@ const PRO_BENEFICIOS = [
    'o chat usa !pular, !fila e !like direto no seu Spotify'],
   ['Qual jogo transmitir hoje',
    'cruza a sua biblioteca da Steam com o que está rendendo audiência e sugere'],
+  ['200 comandos e 20 gatilhos',
+   'no grátis são 30 e 5'],
+  ['30 moderadores no painel',
+   'cada um com o que você liberar; no grátis são 3'],
+  ['Backup do OBS de 20 em 20 horas',
+   'e 8 guardados; no grátis é de 7 em 7 dias, com 3'],
   ['Todos os temas',
    'no grátis só os básicos'],
   ['Pokébot liberado',
@@ -4944,6 +4964,23 @@ async function abrePlanos() {
   ]));
   tela.appendChild(h('p', { cls: 'd', style: 'margin-top:14px',
     txt: 'Dá pra usar de graça sem assinar nada. O Pro tira os limites.' }));
+
+  /* O QUE ELE LEVA, E NÃO SÓ QUANTO CUSTA.
+
+     A tela tinha três preços e nenhum motivo pra pagar. Quem chega no site
+     sem conta é justamente quem ainda não sabe o que o produto faz — pedir
+     que ele entre pra descobrir é inverter a ordem. É a mesma lista que o
+     popup de quem já tem conta mostra. */
+  tela.appendChild(h('h2', { txt: 'O que vem no Pro', style: 'margin-top:28px' }));
+
+  const lista = h('ul', { cls: 'pop__lista' });
+  PRO_BENEFICIOS.forEach(([titulo, detalhe], i) => {
+    const marca = h('span', { cls: 'pop__ok', txt: '✓' });
+    marca.style.color = PRO_CORES[i % PRO_CORES.length];
+    lista.appendChild(h('li', {}, [marca, h('div', {}, [
+      h('b', { txt: titulo }), h('small', { txt: detalhe })])]));
+  });
+  tela.appendChild(lista);
 }
 
 function ligaUpgrade() {
@@ -10464,7 +10501,12 @@ function rota() {
      de entrar da barra só aparece na galeria: na tela de entrada ele seria
      o mesmo botão duas vezes. */
   if (!chave) {
-    const aberta = p[0] === 'artistas' || (olhando && TELAS_ABERTAS.includes(p[0]));
+    /* Artistas e PLANOS abrem sem precisar do "estou só dando uma
+       olhadinha": a aba de planos aparece pra qualquer visitante, e clicar
+       nela caía na tela de entrar — a trava estava escondendo justamente o
+       que decide a compra. O resto continua atrás da olhadinha. */
+    const SEM_OLHADINHA = ['artistas', 'planos'];
+    const aberta = SEM_OLHADINHA.includes(p[0]) || (olhando && TELAS_ABERTAS.includes(p[0]));
     /* O botão de entrar acompanha o visitante em tudo que ele pode ver. Na
        própria tela de entrada ele seria o mesmo botão duas vezes. */
     el('abaEntrar').classList.toggle('escondido', !aberta);
