@@ -1579,6 +1579,24 @@ try {
     @keyframes sobe { from { transform: translate(-50%, 14px); opacity: 0 } }
   }
 
+  /* ---------- os raids ---------- */
+  .raid-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
+  .raid-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 6px 4px 9px; border: 1px solid var(--linha);
+    border-radius: 6px; background: var(--caixa2); font-size: 12.5px;
+  }
+  .raid-x {
+    border: 0; background: none; cursor: pointer; padding: 0 2px;
+    color: var(--apagado); font-size: 15px; line-height: 1;
+  }
+  .raid-x:hover { color: var(--perigo); }
+  .raid-barra {
+    height: 6px; border-radius: 3px; background: var(--caixa2);
+    overflow: hidden; margin: 4px 0 6px;
+  }
+  .raid-barra i { display: block; height: 100%; background: var(--verde); transition: width .3s ease-out; }
+
   /* ---------- as vozes do TTS ---------- */
   .tts-vozes { display: flex; flex-wrap: wrap; gap: 6px; }
   .tts-voz {
@@ -7783,6 +7801,98 @@ function refazRecado(r) {
   }) }).then(avisaPonte);
 }
 
+/* ================== OS RAIDS ==================
+
+   A CONTA DOS PONTOS MORA NO SERVIDOR, e esta tela só mostra. O prêmio é
+   Pro de graça: se o número viesse do navegador, bastaria mexer nele. */
+function caixaDosRaids(caixa) {
+  const campo = h('input', { type: 'text', placeholder: 'nome do canal na Twitch' });
+  const somar = h('button', { cls: 'bt', type: 'button', txt: 'Acompanhar' });
+  const lista = h('div', { cls: 'raid-chips' });
+  const barra = h('div', { cls: 'raid-barra' }, [h('i')]);
+  const conta = h('p', { cls: 'd' });
+  const desconto = h('input', { type: 'checkbox' });
+  const oculto = h('input', { type: 'checkbox' });
+  const diz = h('span', { cls: 'd', style: 'font-size:12.5px' });
+
+  async function recarrega() {
+    let d;
+    try { d = await api('/raid.php'); }
+    catch (e) {
+      diz.textContent = 'Este servidor ainda não tem os raids. Suba a pasta api e rode o SQL 063.';
+      diz.style.color = 'var(--dourado)';
+      return;
+    }
+
+    lista.innerHTML = '';
+    (d.lista || []).forEach((login) => {
+      const x = h('button', { cls: 'raid-x', type: 'button', txt: '×', title: 'tirar da lista' });
+      x.onclick = async () => {
+        try { await api('/raid.php', { method: 'POST', body: JSON.stringify({ tirar: login }) }); recarrega(); }
+        catch (e) { recado(e.message, 'ruim'); }
+      };
+      lista.appendChild(h('span', { cls: 'raid-chip' }, [h('span', { txt: login }), x]));
+    });
+    if (!(d.lista || []).length) {
+      lista.appendChild(h('span', { cls: 'd', txt: 'Ninguém ainda. Ponha quem você costuma raidar.' }));
+    }
+
+    const s = d.saldo || {};
+    /* A barra mostra o caminho até o próximo dia, e não o total: "faltam
+       3" move mais gente que "você tem 11". */
+    const feito = 14 - (s.falta == null ? 14 : s.falta);
+    barra.firstChild.style.width = Math.round((feito / 14) * 100) + '%';
+    conta.textContent = (s.dias || 0) + (s.dias === 1 ? ' dia' : ' dias') + ' de Pro no saldo · faltam '
+      + (s.falta == null ? 14 : s.falta) + ' pontos pro próximo · '
+      + (s.mes || 0) + ' de ' + (s.teto || 10) + ' ganhos neste mês';
+    desconto.checked = !!s.desconto;
+
+    const teto = d.limite;
+    campo.disabled = somar.disabled = teto !== null && (d.lista || []).length >= teto;
+    if (campo.disabled) {
+      diz.textContent = 'No grátis dá pra acompanhar ' + teto + '. O Pro tira o limite.';
+      diz.style.color = 'var(--dourado)';
+    } else diz.textContent = '';
+  }
+
+  somar.onclick = async () => {
+    const login = campo.value.trim().toLowerCase();
+    if (!login) return;
+    try {
+      await api('/raid.php', { method: 'POST', body: JSON.stringify({ somar: login }) });
+      campo.value = '';
+      recarrega();
+    } catch (e) { recado(e.message, 'ruim'); }
+  };
+
+  desconto.onchange = async () => {
+    try { await api('/raid.php', { method: 'POST', body: JSON.stringify({ desconto: desconto.checked ? 1 : 0 }) }); }
+    catch (e) { desconto.checked = !desconto.checked; recado(e.message, 'ruim'); }
+  };
+  oculto.onchange = async () => {
+    try { await api('/raid.php', { method: 'POST', body: JSON.stringify({ oculto: oculto.checked ? 1 : 0 }) }); }
+    catch (e) { oculto.checked = !oculto.checked; recado(e.message, 'ruim'); }
+  };
+
+  caixa.append(
+    h('h3', { txt: 'Raids' }),
+    h('p', { cls: 'd', txt: 'Quem você acompanha aparece no painel do OBS quando estiver ao vivo, '
+        + 'junto do pessoal do ZocaHub. Raidar dá pontos, e pontos viram dias de Pro.' }),
+    h('div', { cls: 'campo' }, [h('span', { cls: 'rotulo', txt: 'Canal' }), campo, somar]),
+    lista,
+    barra,
+    conta,
+    h('div', { cls: 'campo campo--chave' }, [h('span', { cls: 'rotulo', txt: 'Usar os dias como desconto' }), desconto]),
+    h('p', { cls: 'd', style: 'margin:-6px 0 10px;font-size:11.5px',
+      txt: 'Ligado, até 5 dias por mês viram desconto na sua próxima cobrança. '
+         + 'Desligado, o saldo só acumula — dá pra guardar pra quando parar de pagar.' }),
+    h('div', { cls: 'campo campo--chave' }, [h('span', { cls: 'rotulo', txt: 'Não aparecer na lista do ZocaHub' }), oculto]),
+    h('p', { style: 'margin:10px 0 0' }, [diz]),
+  );
+
+  recarrega();
+}
+
 /* ================== O TTS ==================
 
    O nome de cada voz vive aqui e no api/lib/tts.php. As duas listas têm de
@@ -8106,6 +8216,10 @@ function telaBot() {
   const cxTts = h('div', { cls: 'fatia' });
   caixaDoTts(cxTts);
   tela.appendChild(cxTts);
+
+  const cxRaid = h('div', { cls: 'fatia' });
+  caixaDosRaids(cxRaid);
+  tela.appendChild(cxRaid);
 
   tela.appendChild(h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'O que ele falou' }),

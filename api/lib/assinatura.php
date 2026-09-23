@@ -202,6 +202,7 @@ function recursos_do_plano(string $plano): array
             'tts'             => true,
             'tts_varias_vozes' => true,
             'tts_prefixo'     => true,
+            'raid_lista'      => null,     // sem limite de quem acompanhar
             'anuncios'        => true,
             'bot_nuvem'       => true,
             'comandos_max'    => 200,
@@ -261,6 +262,9 @@ function recursos_do_plano(string $plano): array
         'tts'             => true,
         'tts_varias_vozes' => false,
         'tts_prefixo'     => false,
+        /* Três na lista. Os "do ZocaHub ao vivo" aparecem pros dois planos:
+           é o que dá graça pra quem só tem três. */
+        'raid_lista'      => 3,
         'anuncios'        => false,
         'bot_nuvem'       => false,
         'comandos_max'    => 30,

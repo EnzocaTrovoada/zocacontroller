@@ -121,6 +121,55 @@ function mp_referencia_usuario(string $referencia): ?int
  * um pagamento muito rápido (Pix é imediato) poderia trazer o aviso antes da
  * linha existir — e o aviso não teria onde encaixar.
  */
+/** Quantos dias de Pro uma pessoa pode gastar por mês. */
+const MP_DIAS_MES = 5;
+
+/**
+ * Tira do preço os dias ganhos raidando, respeitando o teto.
+ *
+ * Um dia vale um dia do plano MENSAL, sempre — inclusive quando se está
+ * comprando o anual. Valer "um dia do plano que está comprando" faria o
+ * mesmo esforço valer dez vezes menos no anual, o que ninguém entenderia.
+ */
+function mp_menos_dias(int $usuario_id, array $plano, int $centavos, int &$usados): int
+{
+    $usados = 0;
+
+    try {
+        $st = db()->prepare('SELECT dias, desconto FROM raid_saldo WHERE usuario_id = ?');
+        $st->execute([$usuario_id]);
+        $s = $st->fetch();
+    } catch (Throwable $e) {
+        return $centavos;                    /* sem o SQL 063: ninguém tem dias */
+    }
+
+    if (!$s || !(int) $s['desconto'] || (int) $s['dias'] < 1) return $centavos;
+
+    try {
+        $m = db()->query("SELECT preco_centavos FROM planos
+                           WHERE periodo = 'mensal' AND preco_centavos > 0 LIMIT 1");
+        $mensal = (int) $m->fetchColumn();
+    } catch (Throwable $e) {
+        return $centavos;
+    }
+    if ($mensal < 1) return $centavos;
+
+    $usados = min(MP_DIAS_MES, (int) $s['dias']);
+    $tira = (int) round($usados * ($mensal / 30));
+
+    /* NO MÁXIMO METADE DA FATURA. Com cupom em cima, os dois juntos
+       poderiam zerar a cobrança — e cobrança de zero real é pedido que o
+       Mercado Pago recusa, com a pessoa achando que o site quebrou. */
+    $teto = intdiv($centavos, 2);
+    if ($tira > $teto) {
+        $tira = $teto;
+        /* Gastar só o que coube: o resto continua no saldo. */
+        $usados = $mensal > 0 ? (int) floor($tira / ($mensal / 30)) : 0;
+    }
+
+    return max(1, $centavos - $tira);
+}
+
 function mp_criar_cobranca(int $usuario_id, array $plano, string $codigo = ''): array
 {
     $mp = mp_cfg();
@@ -141,13 +190,30 @@ function mp_criar_cobranca(int $usuario_id, array $plano, string $codigo = ''): 
         }
     }
 
+    /* ---------- os dias ganhos raidando ----------
+
+       ACUMULAR É ILIMITADO; GASTAR É QUE TEM TETO. A pessoa junta quantos
+       dias quiser, mas só 5 por mês viram desconto — e só se ela tiver
+       ligado o modo desconto, porque tem quem prefira guardar pra quando
+       parar de pagar.
+
+       A CONTA SAI DAQUI, NO SERVIDOR, e nunca chega do navegador: o prêmio
+       é dinheiro, e número que vem do cliente é número que se troca.
+
+       Os dias NÃO são gastos agora. Eles saem do saldo quando o pagamento
+       é aprovado, lá no webhook — senão dois checkouts abertos gastariam o
+       mesmo saldo duas vezes, e um checkout abandonado gastaria à toa. */
+    $diasUsados = 0;
+    $centavos = mp_menos_dias($usuario_id, $plano, $centavos, $diasUsados);
+
     $valor = $centavos / 100;
 
     $corpo = [
         'items' => [[
             'id'          => (string) $plano['slug'],
             'title'       => 'ZocaController — ' . $plano['nome']
-                             . ($cupom !== '' ? ' (cupom ' . $cupom . ')' : ''),
+                             . ($cupom !== '' ? ' (cupom ' . $cupom . ')' : '')
+                             . ($diasUsados > 0 ? ' (-' . $diasUsados . ' dias de raid)' : ''),
             'quantity'    => 1,
             'currency_id' => 'BRL',
             'unit_price'  => $valor,
@@ -181,12 +247,15 @@ function mp_criar_cobranca(int $usuario_id, array $plano, string $codigo = ''): 
     }
 
     db()->prepare(
-        'INSERT INTO assinaturas (usuario_id, plano_id, provedor, provedor_id, referencia, status, teste, cupom)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO assinaturas (usuario_id, plano_id, provedor, provedor_id, referencia, status, teste, cupom, dias_raid)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )->execute([
         $usuario_id, (int) $plano['id'], 'mercadopago',
         (string) $r['id'], $ref, 'pendente', $mp['modo'] === 'teste' ? 1 : 0,
         $cupom !== '' ? $cupom : null,
+        /* Anotado aqui, gasto só na aprovação: a linha é o que amarra este
+           checkout aos dias que ele prometeu usar. */
+        $diasUsados,
     ]);
 
     /* SEMPRE O init_point, NUNCA O sandbox_init_point.
@@ -240,6 +309,21 @@ function mp_liberar(int $usuario_id, array $plano, string $referencia, string $p
     );
     $ja->execute([$pagamento_id]);
     if ($ja->fetchColumn()) return;
+
+    /* OS DIAS DE RAID SAEM DO SALDO AGORA, E SÓ AGORA.
+
+       Este ponto roda uma vez por pagamento — a trava logo acima garante.
+       O UPDATE tira no máximo o que existe, então um saldo que encolheu
+       entre o checkout e a aprovação não vira saldo negativo. */
+    try {
+        $dr = db()->prepare('SELECT dias_raid FROM assinaturas WHERE referencia = ? LIMIT 1');
+        $dr->execute([$referencia]);
+        $gastar = (int) $dr->fetchColumn();
+        if ($gastar > 0) {
+            db()->prepare('UPDATE raid_saldo SET dias = GREATEST(0, dias - ?) WHERE usuario_id = ?')
+                ->execute([$gastar, $usuario_id]);
+        }
+    } catch (Throwable $e) { /* sem o SQL 063: não havia desconto mesmo */ }
 
     if (($plano['periodo'] ?? '') === 'vitalicio') {
         $ate = MP_VITALICIO_ATE;

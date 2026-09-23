@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-23",
+      "titulo": "Raids, e raid virando dia de Pro",
+      "texto": "No painel do OBS aparece quem você acompanha e o pessoal do ZocaHub que está ao vivo agora, com um botão de raidar. Raid pra quem usa o ZocaHub vale 2 pontos, pra fora vale 1, e 14 pontos viram um dia de Pro — que você pode usar como desconto na sua cobrança. A live precisa ter durado 2 horas e ter pelo menos 3 espectadores, e tem que revezar o alvo: raidar sempre a mesma pessoa não soma."
+    },
+    {
+      "data": "2026-09-23",
       "titulo": "O chat manda o bot falar (TTS)",
       "texto": "O espectador gasta pontos do canal e o bot fala a mensagem dele, com nove jeitos de falar — grave, agudo, criança, robô e mais. O som sai do overlay de TTS, na sua máquina, então não custa nada por mensagem. Endereços não são lidos, palavras que você barrar não saem, e tem um CALAR O BOT no painel do OBS pra cortar uma frase no meio. No Pro dá pra usar várias vozes, sortear entre elas e deixar quem resgatou escolher escrevendo \"grave: a mensagem\"."
     },

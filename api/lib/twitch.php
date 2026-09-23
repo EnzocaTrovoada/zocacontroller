@@ -26,6 +26,7 @@ const TW_ESCOPOS = [
     'channel:read:ads',             // quanto tempo sem pre-roll o canal ganhou
     'channel:read:redemptions',     // resgate de pontos do canal, que dispara o TTS
     'channel:manage:redemptions',   // criar o premio do TTS pela pessoa, em vez de pedir o id
+    'channel:manage:raids',         // abrir a janela de raid pelo painel
 ];
 
 /**
@@ -95,6 +96,48 @@ function tw_helix_app(string $metodo, string $caminho, array $query = [], $corpo
     }
     return tw_http($metodo, TW_HELIX . $caminho . ($query ? '?' . http_build_query($query) : ''),
         $cabecalhos, $corpo);
+}
+
+/**
+ * Quem destes logins esta ao vivo agora.
+ *
+ * UMA CHAMADA PRA LISTA INTEIRA. O /streams aceita ate 100 logins de uma
+ * vez, entao uma lista de acompanhar cabe num pedido so - perguntar de um
+ * em um estouraria o limite da Twitch com dez pessoas na lista.
+ *
+ * O http_build_query nao serve aqui: ele viraria user_login[0]=fulano, e a
+ * Twitch quer o mesmo nome repetido. Por isso a query e montada a mao.
+ */
+function tw_ao_vivo(array $logins): array
+{
+    $logins = array_slice(array_values(array_unique(array_filter($logins))), 0, 100);
+    if (!$logins) return [];
+
+    $q = implode('&', array_map(
+        static fn($l) => 'user_login=' . rawurlencode(mb_strtolower($l)),
+        $logins
+    ));
+
+    [$http, $r] = tw_helix_app('GET', '/streams?' . $q);
+    if ($http !== 200) return [];
+
+    $vivos = [];
+    foreach ((array) ($r['data'] ?? []) as $s) {
+        $vivos[mb_strtolower((string) $s['user_login'])] = [
+            /* O id vem de graça aqui. Pedir ele de novo num /users seria
+               uma segunda chamada pra saber o que a primeira já disse. */
+            'id'           => (string) ($s['user_id'] ?? ''),
+            'login'        => (string) $s['user_login'],
+            'nome'         => (string) $s['user_name'],
+            'jogo'         => (string) ($s['game_name'] ?? ''),
+            'titulo'       => (string) ($s['title'] ?? ''),
+            'espectadores' => (int) ($s['viewer_count'] ?? 0),
+            'desde'        => (string) ($s['started_at'] ?? ''),
+            'capa'         => str_replace(['{width}', '{height}'], ['320', '180'],
+                                          (string) ($s['thumbnail_url'] ?? '')),
+        ];
+    }
+    return $vivos;
 }
 
 function tw_url_login(string $estado, array $escopos = TW_ESCOPOS): string

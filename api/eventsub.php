@@ -40,8 +40,15 @@ if ($tipoMsg !== '') {
         exit;
     }
 
-    // De qual canal é este aviso? Cada um tem o seu segredo.
-    $twitch_id = (string) ($dados['subscription']['condition']['broadcaster_user_id'] ?? '');
+    /* De qual canal é este aviso? Cada um tem o seu segredo.
+
+       O channel.raid não traz broadcaster_user_id: a condição dele é
+       from_broadcaster_user_id, porque ele escuta pelo lado de quem manda
+       o raid. Sem olhar os dois, o aviso de raid cairia aqui como "canal
+       desconhecido" e sumiria calado — o recurso não funcionaria e não
+       haveria erro nenhum pra seguir. */
+    $cond = (array) ($dados['subscription']['condition'] ?? []);
+    $twitch_id = (string) ($cond['broadcaster_user_id'] ?? $cond['from_broadcaster_user_id'] ?? '');
     $st = db()->prepare('SELECT id, es_segredo FROM usuarios WHERE twitch_user_id = ? LIMIT 1');
     $st->execute([$twitch_id]);
     $u = $st->fetch();
@@ -151,6 +158,44 @@ function tratar_evento(int $usuario_id, string $tipo, array $ev): void
         return;
     }
 
+    /* QUANDO A LIVE COMEÇOU E QUANDO ACABOU.
+
+       Guardado na hora, porque na hora do raid já é tarde: muita gente
+       encerra a live logo depois de raidar, e aí a Twitch responde "não
+       está ao vivo" e a duração se perde. */
+    if ($tipo === 'stream.online') {
+        try {
+            db()->prepare('UPDATE usuarios SET ao_vivo_desde = ? WHERE id = ?')
+                ->execute([date('Y-m-d H:i:s', strtotime((string) ($ev['started_at'] ?? 'now'))), $usuario_id]);
+        } catch (Throwable $e) { /* sem o SQL 063: os raids não contam */ }
+        return;
+    }
+
+    if ($tipo === 'stream.offline') {
+        try {
+            db()->prepare('UPDATE usuarios SET ao_vivo_desde = NULL WHERE id = ?')->execute([$usuario_id]);
+        } catch (Throwable $e) { /* idem */ }
+        return;
+    }
+
+    /* O RAID QUE ACONTECEU DE VERDADE.
+
+       Este é o aviso que a própria Twitch manda quando o raid ocorreu, com
+       quantos espectadores foram. É a única prova que o cliente não tem
+       como forjar — e por isso o ponto nasce AQUI, e nunca no clique do
+       botão do painel. De quebra, raid dado direto pela Twitch, sem passar
+       pelo nosso painel, conta igual. */
+    if ($tipo === 'channel.raid') {
+        require_once __DIR__ . '/lib/raid-pontos.php';
+        raid_registrar(
+            $usuario_id,
+            (string) ($ev['to_broadcaster_user_id'] ?? ''),
+            (string) ($ev['to_broadcaster_user_login'] ?? ''),
+            (int) ($ev['viewers'] ?? 0)
+        );
+        return;
+    }
+
     if ($tipo !== 'channel.follow') {
         return;
     }
@@ -179,6 +224,13 @@ const TIPOS = [
     // O resgate de pontos: é ele que faz o TTS existir. Sem moderador na
     // condição, e o escopo é channel:read:redemptions.
     'channel.channel_points_custom_reward_redemption.add' => ['versao' => '1'],
+    // Quando a live começa. É o que permite saber, na hora do raid, se ela
+    // já durou as duas horas que os pontos exigem. Não pede escopo.
+    'stream.online'  => ['versao' => '1'],
+    'stream.offline' => ['versao' => '1'],
+    // O raid que de fato aconteceu, com quantos espectadores foram. Não
+    // pede escopo, e é a única prova que o cliente não tem como forjar.
+    'channel.raid'   => ['versao' => '1', 'de' => true],
 ];
 
 $bid = tw_broadcaster_id($quem['usuario_id']);
@@ -228,7 +280,12 @@ foreach (TIPOS as $tipo => $spec) {
         continue;
     }
 
-    $condicao = ['broadcaster_user_id' => $bid];
+    /* O channel.raid é o único que escuta pelo lado de QUEM MANDA: a
+       condição dele é from_broadcaster_user_id, e não broadcaster_user_id.
+       Assinar com a chave errada daria um evento que nunca chega. */
+    $condicao = !empty($spec['de'])
+        ? ['from_broadcaster_user_id' => $bid]
+        : ['broadcaster_user_id' => $bid];
     if (!empty($spec['moderador'])) {
         $condicao['moderator_user_id'] = $bid;
     }

@@ -133,6 +133,22 @@
   }
   input:focus { outline: 2px solid var(--sinal); outline-offset: 1px; }
   button.fraco { background: transparent; color: var(--fraco); }
+  /* ---------- a janela de raid ---------- */
+  .raid-um {
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 8px;
+    align-items: center; padding: 7px 0; border-bottom: 1px solid var(--linha);
+  }
+  .raid-um:last-child { border-bottom: 0; }
+  .raid-quem { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .raid-quem b { font-size: 13px; }
+  .raid-selo {
+    font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase;
+    padding: 1px 5px; border-radius: 4px;
+    background: var(--sinal2); color: var(--sinal);
+  }
+  .raid-n { font-size: 11px; color: var(--fraco); }
+  .raid-jogo { grid-column: 1; font-size: 11px; color: var(--fraco); }
+
   .dica { font-size: 11px; color: var(--fraco); margin: 8px 0 0; }
   .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
   .tags:empty { margin: 0; }
@@ -238,6 +254,13 @@
   <div class="grade escondido" id="grTts">
     <button id="btCalar" class="perigo">CALAR O BOT</button>
   </div>
+
+  <details class="secao" data-secao="raid">
+  <summary>Raid <span id="raidQuantos" class="mini"></span></summary>
+  <p class="dica">Quem você acompanha, e o pessoal do ZocaHub, ao vivo agora.</p>
+  <div id="raidLista"></div>
+  <p class="dica" id="raidSaldo"></p>
+  </details>
 
   <details class="secao" data-secao="audio">
   <summary>Áudio <button id="btEditarSons" class="mini">editar</button></summary>
@@ -934,6 +957,85 @@ async function talvezMostrarCalar() {
   }
 }
 
+/* ================== RAID ==================
+
+   A JANELA DE 90 SEGUNDOS É DA TWITCH. O nosso pedido abre a contagem no
+   chat; ela termina sozinha e o raid sai. Ninguém precisa confirmar nada,
+   mas também não é instantâneo — e o botão diz isso depois do clique,
+   senão parece que não aconteceu nada. */
+let raidVivos = [];
+
+/* O dock cria elemento na mão, sem ajudante: são poucos e o estilo daqui
+   é esse. Um <span> com texto, e o texto entra por textContent. */
+function raidTexto(tag, cls, txt) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt != null) e.textContent = txt;
+  return e;
+}
+
+function raidPinta() {
+  const cx = el('raidLista');
+  cx.innerHTML = '';
+
+  if (!raidVivos.length) {
+    cx.appendChild(raidTexto('p', 'dica', 'Ninguém ao vivo agora.'));
+    return;
+  }
+
+  raidVivos.forEach((v) => {
+    const bt = raidTexto('button', 'mini', 'Raidar');
+    bt.onclick = async () => {
+      bt.disabled = true;
+      bt.textContent = 'abrindo…';
+      try {
+        const r = await api('/raid.php', { method: 'POST', body: JSON.stringify({ raidar: v.login }) });
+        bt.textContent = 'em 90s';
+        anotar(r.aviso || 'contagem aberta no seu chat');
+      } catch (e) {
+        bt.textContent = 'Raidar';
+        bt.disabled = false;
+        anotar(e.message);
+      }
+    };
+
+    /* O NOME É TEXTO, SEMPRE. Título e jogo vêm da Twitch, digitados por
+       outra pessoa — nada disso vira HTML. */
+    const linha = raidTexto('div', 'raid-um');
+    const quem = raidTexto('div', 'raid-quem');
+    quem.appendChild(raidTexto('b', '', v.nome || v.login));
+    if (v.casa) quem.appendChild(raidTexto('span', 'raid-selo', 'ZocaHub'));
+    quem.appendChild(raidTexto('span', 'raid-n', v.espectadores + ' assistindo'));
+    linha.appendChild(quem);
+    linha.appendChild(raidTexto('span', 'raid-jogo', v.jogo || ''));
+    linha.appendChild(bt);
+    cx.appendChild(linha);
+  });
+}
+
+async function lerRaid() {
+  if (!chavePainel) return;
+  try {
+    const d = await api('/raid.php');
+    raidVivos = d.ao_vivo || [];
+    el('raidQuantos').textContent = raidVivos.length ? raidVivos.length + ' ao vivo' : '';
+    raidPinta();
+
+    const s = d.saldo || {};
+    if (!d.escopo) {
+      el('raidSaldo').textContent = 'Entre de novo com a Twitch pra liberar o raid por aqui.';
+    } else if (s.dias) {
+      el('raidSaldo').textContent = s.dias + (s.dias === 1 ? ' dia' : ' dias') + ' de Pro no saldo · '
+        + 'faltam ' + s.falta + ' pontos pro próximo';
+    } else {
+      el('raidSaldo').textContent = 'faltam ' + (s.falta || 14) + ' pontos pro primeiro dia de Pro';
+    }
+  } catch (e) {
+    el('raidLista').innerHTML = '';
+    el('raidSaldo').textContent = 'Este servidor ainda não tem os raids.';
+  }
+}
+
 async function corDoDock() {
   if (!chavePainel) return;
   try {
@@ -948,7 +1050,7 @@ function ligarSecoes() {
   el('secaoCanal').classList.toggle('escondido', !tem);
   el('secaoPalpite').classList.toggle('escondido', !tem);
   el('secaoMomentos').classList.toggle('escondido', !tem);
-  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); }
+  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); }
   perfilPinta();
 }
 
