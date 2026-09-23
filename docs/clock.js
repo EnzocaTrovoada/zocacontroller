@@ -82,6 +82,12 @@
       'Asia/Dubai', 'Australia/Sydney', 'Pacific/Auckland', 'UTC'
     ] },
     tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat', 'feed', 'musica', 'alerta', 'speedrun', 'tts'] },
+    /* ---- quando aparecer ---- */
+    apmodo:   { t: 'e', d: 'sempre', v: ['sempre', 'ciclo', 'muda'] },
+    apver:    { t: 'n', d: 15, min: 2, max: 600 },
+    apsumir:  { t: 'n', d: 45, min: 2, max: 3600 },
+    apfica:   { t: 'n', d: 8, min: 1, max: 120 },
+
     /* ---- tts ---- */
     tvoz:     { t: 'e', d: 'padrao', v: ['padrao', 'grave', 'agudo', 'crianca', 'narrador', 'apressado', 'arrastado', 'robo', 'gigante'] },
     tvol:     { t: 'n', d: 100, min: 0, max: 100 },

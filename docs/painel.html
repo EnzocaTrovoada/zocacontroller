@@ -288,9 +288,7 @@
     <button id="btVoltar" disabled>Sair do pânico</button>
   </div>
   <p class="dica" style="margin:-2px 0 10px">
-    O pânico muta o seu microfone e o som do computador de uma vez, e troca
-    pra cena de pânico se você tiver escolhido uma. Um mod pode ligar; só
-    você desliga.
+    Muta seu microfone e o som do PC, e troca de cena. Um mod liga; só você desliga.
   </p>
 
   <!-- AS DUAS CHAVES DE SILÊNCIO.
@@ -307,18 +305,18 @@
   </div>
 
   <div class="grade escondido" id="grTts">
-    <button id="btCalar" class="perigo">CALAR A FRASE DE AGORA</button>
+    <button id="btCalar" class="perigo">PULAR A FALA</button>
   </div>
 
   <details class="secao" data-secao="overlays">
   <summary>Overlays</summary>
-  <p class="dica">Põe a fonte no OBS sozinho, na cena que está no ar, já com os ajustes certos.</p>
+  <p class="dica">Cria a fonte na cena que está no ar, já ajustada.</p>
   <div id="ovLista"></div>
   </details>
 
   <details class="secao" data-secao="raid">
   <summary>Raid <span id="raidQuantos" class="mini"></span></summary>
-  <p class="dica">Quem você acompanha, e o pessoal do ZocaHub, ao vivo agora.</p>
+  <p class="dica">Ao vivo agora: quem você acompanha e o pessoal do ZocaHub.</p>
   <div id="raidLista"></div>
   <p class="dica" id="raidSaldo"></p>
   </details>
@@ -1004,7 +1002,7 @@ async function calarBot() {
   bt.disabled = true;
   try {
     await api('/tts.php', { method: 'POST', body: JSON.stringify({ calar: 1 }) });
-    anotar('bot calado');
+    anotar('fala pulada');
   } catch (e) { anotar('não deu pra calar: ' + e.message); }
   setTimeout(() => { bt.disabled = false; }, 600);
 }

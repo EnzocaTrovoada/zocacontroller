@@ -62,6 +62,7 @@
     var quer = (tipo === 'chat' || tipo === 'feed') ? 'chat'
              : tipo === 'musica' ? 'musica'
              : tipo === 'alerta' ? 'alerta'
+             : tipo === 'tts' ? 'tts'
              : tipo === 'speedrun' ? 'speedrun' : 'relogio';
     if (atual === quer) return false;
     if (relogio) relogio.destroy();
@@ -82,13 +83,110 @@
   function desenha(config) {
     /* Se acabou de montar, o mount ja recebeu a config. */
     if (!montaPara(config)) relogio.update(config);
+    quandoAparece(config);
+  }
+
+  /* ================== QUANDO O OVERLAY APARECE ==================
+
+     Tela limpa vale mais que tela cheia. Uma barra de meta parada a live
+     inteira vira parte do cenario e ninguem mais le; a mesma barra que
+     aparece quando alguem segue e some depois e olhada toda vez.
+
+     Tres modos, e o padrao e o de sempre - quem nao pediu nada nao pode
+     ver o overlay dele comecar a sumir.
+
+       sempre  fica na tela, como sempre foi
+       ciclo   aparece X segundos, some Y, repete
+       muda    fica escondido ate o conteudo mudar, ai aparece por N
+
+     O MODO "MUDA" NAO PERGUNTA NADA AO DESENHISTA. Ele olha o que esta
+     escrito na tela e percebe quando mudou. Assim vale pra meta, contador,
+     placar, musica e relogio de uma vez - e um tipo novo que eu criar
+     amanha ja nasce funcionando, sem uma linha a mais. */
+  var apRelogio = null;
+  var apOlheiro = null;
+  var apModoAtual = null;
+
+  function apMostra(ver) {
+    raiz.style.transition = 'opacity .6s ease-in-out';
+    raiz.style.opacity = ver ? '1' : '0';
+    /* Escondido nao pode continuar clicavel no modo de edicao. */
+    raiz.style.pointerEvents = ver ? '' : 'none';
+  }
+
+  function apLimpa() {
+    clearTimeout(apRelogio);
+    clearInterval(apRelogio);
+    if (apOlheiro) { apOlheiro.disconnect(); apOlheiro = null; }
+  }
+
+  function quandoAparece(config) {
+    var modo = (config && config.apmodo) || 'sempre';
+
+    /* NO EDITOR, FICA SEMPRE VISIVEL.
+
+       Um overlay que some enquanto a pessoa mexe nele e uma tortura: ela
+       muda a cor, olha, e a tela esta vazia. O comportamento vale na live,
+       que e onde ele serve pra alguma coisa. */
+    if (editando) modo = 'sempre';
+
+    /* So remonta quando o modo muda de verdade: esta funcao roda a cada
+       leitura da config, e reiniciar o ciclo toda vez faria o overlay
+       piscar de quinze em quinze segundos pra sempre. */
+    if (modo === apModoAtual) return;
+    apModoAtual = modo;
+    apLimpa();
+
+    if (modo === 'sempre') {
+      raiz.style.transition = '';
+      raiz.style.opacity = '';
+      raiz.style.pointerEvents = '';
+      return;
+    }
+
+    if (modo === 'ciclo') {
+      var ver = Math.max(2, +config.apver || 15) * 1000;
+      var some = Math.max(2, +config.apsumir || 45) * 1000;
+      var visivel = true;
+      apMostra(true);
+      /* Um relogio so, que se reagenda: o tempo visivel e o escondido sao
+         diferentes, entao um setInterval unico nao serve. */
+      (function passo() {
+        apRelogio = setTimeout(function () {
+          visivel = !visivel;
+          apMostra(visivel);
+          passo();
+        }, visivel ? ver : some);
+      })();
+      return;
+    }
+
+    if (modo === 'muda') {
+      var fica = Math.max(1, +config.apfica || 8) * 1000;
+      apMostra(false);
+
+      var calmo = false;
+      try { calmo = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+      if (calmo) raiz.style.transition = 'none';
+
+      /* O PRIMEIRO DESENHO CONTA COMO MUDANCA, e e de proposito: quando o
+         OBS abre, o overlay aparece uma vez mostrando como esta e depois
+         se cala. Comecar invisivel pra sempre deixaria a pessoa sem saber
+         se ele foi criado certo. */
+      apOlheiro = new MutationObserver(function () {
+        apMostra(true);
+        clearTimeout(apRelogio);
+        apRelogio = setTimeout(function () { apMostra(false); }, fica);
+      });
+      apOlheiro.observe(raiz, { childList: true, subtree: true, characterData: true });
+    }
   }
 
   /* NADA NA TELA ATÉ SABER O QUE DESENHAR: Antes eu montava o desenhista
      já na carga, com a config que viesse na URL — e no modo link fixo não
      vem nenhuma, então o padrão valia: um RELÓGIO. */
   if (k) raiz.innerHTML = '';
-  else montaPara(Relogio.parseConfig());
+  else { var cfgUrl = Relogio.parseConfig(); montaPara(cfgUrl); quandoAparece(cfgUrl); }
 
   /* PREVIEW DO EDITOR: O hub mostra este mesmo arquivo num iframe e manda
      a config a cada ajuste. */

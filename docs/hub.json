@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-23",
+      "titulo": "Escolher quando o overlay aparece",
+      "texto": "No editor de qualquer overlay, a seção \"Quando aparecer\". Ele pode ficar sempre na tela, aparecer de vez em quando (X segundos sim, Y não) ou só quando mudar — a barra de seguidores aparece quando alguém segue e some depois. Entra e sai com esmaecimento. Tela limpa chama mais atenção que tela cheia."
+    },
+    {
+      "data": "2026-09-23",
       "titulo": "No ar, e as chaves de desligar",
       "texto": "O painel do OBS agora mostra em cima se você está no ar, gravando ou parado, com o tempo correndo. E ganhou duas chaves: \"Mensagens de voz\" e \"Alertas\", que desligam cada um até você religar — diferente do botão vermelho, que só corta a frase que está saindo agora. O pânico também passou a dizer o que faz: muta o microfone e o som do computador e troca pra cena de pânico."
     },

@@ -2639,6 +2639,23 @@ const GRUPOS = [
       dica: 'o nome sai nesta cor e o resto da frase na cor da letra, lá embaixo' },
   ] },
 
+  /* Alerta e TTS ficam de fora: eles JA aparecem e somem sozinhos, que e
+     o trabalho deles. Dar a opcao ali seria oferecer o que ja existe. */
+  { t: 'Quando aparecer', se: (c) => c.tipo !== 'alerta' && c.tipo !== 'tts', itens: [
+    { k: 'apmodo', l: 'Aparece', c: 'lista', ops: [
+      ['sempre', 'Sempre na tela'],
+      ['ciclo', 'De vez em quando'],
+      ['muda', 'Só quando mudar']],
+      dica: 'tela limpa chama mais atenção que tela cheia' },
+    { k: 'apver', l: 'Fica na tela', c: 'faixa', min: 2, max: 120, u: 's',
+      se: (c) => c.apmodo === 'ciclo' },
+    { k: 'apsumir', l: 'Some por', c: 'faixa', min: 2, max: 600, u: 's',
+      se: (c) => c.apmodo === 'ciclo' },
+    { k: 'apfica', l: 'Fica visível', c: 'faixa', min: 1, max: 60, u: 's',
+      se: (c) => c.apmodo === 'muda',
+      dica: 'aparece quando o número muda — um follow, um ponto, uma música nova' },
+  ] },
+
   { t: 'A voz', se: so('tts'), itens: [
     { k: 'tvoz', l: 'Voz padrão', c: 'lista', ops: [
       ['padrao', 'Padrão'], ['grave', 'Grave'], ['agudo', 'Agudo'],
@@ -7037,7 +7054,7 @@ function caixaDaCor(caixa) {
 
   caixa.append(
     h('h3', { txt: 'A cor do site' }),
-    h('p', { cls: 'd', txt: 'Vale só pra você, em qualquer aparelho onde entrar.' }),
+    h('p', { cls: 'd', txt: 'Só você vê. Vale em qualquer aparelho.' }),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Cor' }), campo, amostra]),
     h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' },
       [salvar, padrao, diz]),
@@ -7931,8 +7948,7 @@ function telaPainel() {
   const tela = el('tela');
   tela.innerHTML = '';
   tela.appendChild(h('h1', { txt: 'Painel do OBS' }));
-  tela.appendChild(h('p', { cls: 'sub', txt: 'O que aparece dentro do OBS, e em que ordem. '
-    + 'Vale em qualquer computador onde você abrir o painel.' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'O que aparece dentro do OBS, e em que ordem.' }));
 
   const fatia = h('div', { cls: 'fatia' });
   const lista = h('div', { cls: 'pn-lista' });
@@ -8017,8 +8033,7 @@ function telaPainel() {
   const base = location.origin + location.pathname.replace(/[^/]*$/, '');
   tela.appendChild(h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Onde ele fica' }),
-    h('p', { cls: 'd', txt: 'No OBS: Docas → Docas personalizadas do navegador. '
-      + 'Dê um nome, cole o endereço e clique em Aplicar.' }),
+    h('p', { cls: 'd', txt: 'No OBS: Docas → Docas personalizadas do navegador. Cole isto:' }),
     h('div', { cls: 'campo campo--inteiro' }, [
       h('input', { type: 'text', value: base + 'painel.html', readonly: 'readonly' }),
     ]),
@@ -8149,16 +8164,15 @@ function caixaDosRaids(caixa) {
 
   caixa.append(
     h('h3', { txt: 'Raids' }),
-    h('p', { cls: 'd', txt: 'Quem você acompanha aparece no painel do OBS quando estiver ao vivo, '
-        + 'junto do pessoal do ZocaHub. Raidar dá pontos, e pontos viram dias de Pro.' }),
+    h('p', { cls: 'd', txt: 'Quem você acompanha aparece no painel do OBS quando entra ao vivo. '
+        + 'Raidar dá pontos, e 14 pontos viram um dia de Pro.' }),
     h('div', { cls: 'campo' }, [h('span', { cls: 'rotulo', txt: 'Canal' }), campo, somar]),
     lista,
     barra,
     conta,
     h('div', { cls: 'campo campo--chave' }, [h('span', { cls: 'rotulo', txt: 'Usar os dias como desconto' }), desconto]),
     h('p', { cls: 'd', style: 'margin:-6px 0 10px;font-size:11.5px',
-      txt: 'Ligado, até 5 dias por mês viram desconto na sua próxima cobrança. '
-         + 'Desligado, o saldo só acumula — dá pra guardar pra quando parar de pagar.' }),
+      txt: 'Até 5 dias por mês saem da sua cobrança. Desligado, o saldo só acumula.' }),
     h('div', { cls: 'campo campo--chave' }, [h('span', { cls: 'rotulo', txt: 'Não aparecer na lista do ZocaHub' }), oculto]),
     h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [verHist, diz]),
     hist,
@@ -8274,8 +8288,8 @@ function caixaDoTts(caixa) {
     const base = location.origin + location.pathname.replace(/[^/]*$/, '');
     const url = base + 'overlay.html?k=' + meu.chave_publica;
 
-    linhaOverlay.appendChild(h('p', { cls: 'd', txt: 'No painel dentro do OBS, a seção "Overlays" '
-      + 'põe ela sozinha, já com o áudio ligado. Se preferir na mão, o endereço é este:' }));
+    linhaOverlay.appendChild(h('p', { cls: 'd', txt: 'O painel dentro do OBS cria ela sozinho, '
+      + 'com o áudio já ligado. Na mão, o endereço é este:' }));
 
     const campo = h('input', { type: 'text', value: url, readonly: 'readonly' });
     const copiar = h('button', { cls: 'bt', type: 'button', txt: 'Copiar' });
@@ -8286,15 +8300,13 @@ function caixaDoTts(caixa) {
     };
     linhaOverlay.appendChild(h('div', { cls: 'campo' }, [campo, copiar]));
     linhaOverlay.appendChild(h('p', { cls: 'd', style: 'font-size:11.5px',
-      txt: 'Criando na mão, marque "Controlar áudio pelo OBS" na fonte — sem isso a voz sai no seu '
-         + 'alto-falante e não entra na live.' }));
+      txt: 'Na mão, marque "Controlar áudio pelo OBS" — sem isso a voz não entra na live.' }));
   }
   pintaOverlay();
 
   caixa.append(
     h('h3', { txt: 'Falar no chat (TTS)' }),
-    h('p', { cls: 'd', txt: 'O espectador gasta pontos do canal e o bot fala a mensagem dele. '
-        + 'O som sai do overlay de TTS, que você põe no OBS.' }),
+    h('p', { cls: 'd', txt: 'O chat gasta pontos do canal e o bot fala a mensagem.' }),
     h('div', { cls: 'campo campo--chave' }, [h('span', { cls: 'rotulo', txt: 'Ligado' }), liga]),
     h('div', { cls: 'campo campo--inteiro' }, [h('span', { cls: 'rotulo', txt: 'Vozes que valem' }), listaVozes]),
     h('div', { cls: 'campo campo--chave' }, [h('span', { cls: 'rotulo', txt: 'Sortear entre elas' }), sorteia]),
