@@ -7913,6 +7913,7 @@ function refazRecado(r) {
    lista de verdade está no api/painel-config.php. O conferir.js compara
    os três. */
 const PAINEL_NOMES = {
+  overlays: ['Overlays', 'põe a fonte no OBS com um clique, já ajustada'],
   raid:     ['Raid', 'quem está ao vivo agora, com botão de raidar'],
   audio:    ['Áudio', 'mudo e volume das suas fontes'],
   vod:      ['Fora do VOD', 'tirar uma fonte da gravação, contra strike'],
@@ -8246,6 +8247,50 @@ function caixaDoTts(caixa) {
     salvar.disabled = false;
   };
 
+  /* O TTS NÃO FALA SEM UMA FONTE NO OBS, e a tela não dizia isso.
+
+     Dá pra configurar tudo aqui, salvar, resgatar o prêmio — e não sair
+     som nenhum, porque a fonte que fala nunca foi criada. O endereço tem
+     de estar nesta tela, ao lado da configuração. */
+  const linhaOverlay = h('div', { cls: 'fatia', style: 'margin:16px 0 0' });
+
+  async function pintaOverlay() {
+    linhaOverlay.innerHTML = '';
+    linhaOverlay.appendChild(h('h3', { txt: 'A fonte que fala' }));
+
+    let perfis = [];
+    try { perfis = (await api('/perfil.php')).perfis || []; } catch (e) { /* segue */ }
+    const meu = perfis.find((x) => x.tipo === 'tts');
+
+    if (!meu) {
+      linhaOverlay.appendChild(h('p', { cls: 'd', txt: 'Você ainda não tem a overlay de TTS. '
+        + 'Sem ela nada sai no som, por mais que o resto esteja certo.' }));
+      const bt = h('button', { cls: 'bt principal', type: 'button', txt: 'Criar a overlay de TTS' });
+      bt.onclick = () => vaiPara('#/novo/tts');
+      linhaOverlay.appendChild(h('p', {}, [bt]));
+      return;
+    }
+
+    const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+    const url = base + 'overlay.html?k=' + meu.chave_publica;
+
+    linhaOverlay.appendChild(h('p', { cls: 'd', txt: 'No painel dentro do OBS, a seção "Overlays" '
+      + 'põe ela sozinha, já com o áudio ligado. Se preferir na mão, o endereço é este:' }));
+
+    const campo = h('input', { type: 'text', value: url, readonly: 'readonly' });
+    const copiar = h('button', { cls: 'bt', type: 'button', txt: 'Copiar' });
+    copiar.onclick = async () => {
+      try { await navigator.clipboard.writeText(url); copiar.textContent = 'copiado ✓'; }
+      catch (e) { campo.select(); copiar.textContent = 'selecionei — copie'; }
+      setTimeout(() => { copiar.textContent = 'Copiar'; }, 2000);
+    };
+    linhaOverlay.appendChild(h('div', { cls: 'campo' }, [campo, copiar]));
+    linhaOverlay.appendChild(h('p', { cls: 'd', style: 'font-size:11.5px',
+      txt: 'Criando na mão, marque "Controlar áudio pelo OBS" na fonte — sem isso a voz sai no seu '
+         + 'alto-falante e não entra na live.' }));
+  }
+  pintaOverlay();
+
   caixa.append(
     h('h3', { txt: 'Falar no chat (TTS)' }),
     h('p', { cls: 'd', txt: 'O espectador gasta pontos do canal e o bot fala a mensagem dele. '
@@ -8262,6 +8307,7 @@ function caixaDoTts(caixa) {
     h('div', { cls: 'campo' }, [h('span', { cls: 'rotulo', txt: 'Prêmio de pontos' }), premio, criar]),
     h('p', { cls: 'd', style: 'margin:-6px 0 10px;font-size:11.5px' }, [dizPremio]),
     h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [salvar, diz]),
+    linhaOverlay,
   );
 
   /* A LISTA DOS PRÊMIOS, EM VEZ DE UM UUID DIGITADO.

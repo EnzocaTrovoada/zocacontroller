@@ -255,6 +255,12 @@
     <button id="btCalar" class="perigo">CALAR O BOT</button>
   </div>
 
+  <details class="secao" data-secao="overlays">
+  <summary>Overlays</summary>
+  <p class="dica">Põe a fonte no OBS sozinho, na cena que está no ar, já com os ajustes certos.</p>
+  <div id="ovLista"></div>
+  </details>
+
   <details class="secao" data-secao="raid">
   <summary>Raid <span id="raidQuantos" class="mini"></span></summary>
   <p class="dica">Quem você acompanha, e o pessoal do ZocaHub, ao vivo agora.</p>
@@ -957,6 +963,103 @@ async function talvezMostrarCalar() {
   }
 }
 
+/* ================== PÔR O OVERLAY NO OBS ==================
+
+   SEIS PASSOS VIRAM UM CLIQUE.
+
+   O tutorial pede pra criar uma Fonte de Navegador, colar o endereço, pôr
+   a largura e a altura, desmarcar "desligar quando não estiver visível" e,
+   no caso do TTS, marcar "controlar áudio pelo OBS". Cada um desses é um
+   lugar onde dá pra errar, e os três defeitos mais relatados do produto
+   são exatamente esses três ajustes.
+
+   Este painel já está dentro do OBS e já fala com ele. Então ele mesmo cria
+   a fonte, com os ajustes certos, e nenhum deles pode ser esquecido.
+
+   A fonte nasce na cena QUE ESTÁ NO AR: é onde a pessoa está olhando, e
+   uma fonte que aparece numa cena que ela não vê parece que não funcionou. */
+
+/* O TTS precisa do áudio passando pelo OBS, senão a voz sai no alto-falante
+   de quem transmite e não entra na live. Os outros não têm som. */
+const OV_TAMANHO = {
+  tts:      { w: 900, h: 220, audio: true },
+  chat:     { w: 520, h: 800 },
+  feed:     { w: 520, h: 600 },
+  alerta:   { w: 900, h: 500 },
+  musica:   { w: 620, h: 180 },
+  speedrun: { w: 520, h: 560 },
+};
+const OV_PADRAO = { w: 900, h: 260 };
+
+async function porNoObs(perfil, bt) {
+  const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+  const url = base + 'overlay.html?k=' + perfil.chave_publica;
+  const tam = OV_TAMANHO[perfil.tipo] || OV_PADRAO;
+
+  bt.disabled = true;
+  bt.textContent = 'criando…';
+  try {
+    const cena = await pedir('GetCurrentProgramScene');
+
+    await pedir('CreateInput', {
+      sceneName: cena.currentProgramSceneName || cena.sceneName,
+      inputName: 'ZocaHub — ' + (perfil.nome || perfil.tipo),
+      inputKind: 'browser_source',
+      inputSettings: {
+        url: url,
+        width: tam.w,
+        height: tam.h,
+        /* OS TRÊS AJUSTES QUE MAIS DÃO PROBLEMA, JÁ CERTOS.
+           shutdown ligado mata o overlay ao trocar de cena; restart faz
+           ele recomeçar do zero toda vez; e sem reroute_audio a voz do
+           TTS não entra na live. */
+        shutdown: false,
+        restart_when_active: false,
+        reroute_audio: !!tam.audio,
+      },
+      sceneItemEnabled: true,
+    });
+
+    bt.textContent = 'pronto ✓';
+    anotar('overlay criado na cena "' + (cena.currentProgramSceneName || '') + '"');
+  } catch (e) {
+    bt.disabled = false;
+    bt.textContent = 'Pôr no OBS';
+    /* Nome repetido é o erro esperado: a pessoa clica duas vezes. */
+    anotar(/exist/i.test(e.message || '') ? 'já existe uma fonte com esse nome' : 'não deu: ' + e.message);
+  }
+}
+
+async function lerOverlays() {
+  if (!chavePainel) return;
+  const cx = el('ovLista');
+  cx.innerHTML = '';
+
+  let d;
+  try { d = await api('/perfil.php'); }
+  catch (e) { cx.appendChild(raidTexto('p', 'dica', 'não deu pra ler seus overlays')); return; }
+
+  const lista = d.perfis || d || [];
+  if (!lista.length) {
+    cx.appendChild(raidTexto('p', 'dica', 'Você ainda não criou nenhum overlay. Crie no site, em Overlays.'));
+    return;
+  }
+
+  lista.forEach((perfil) => {
+    const linha = raidTexto('div', 'raid-um');
+    const quem = raidTexto('div', 'raid-quem');
+    quem.appendChild(raidTexto('b', '', perfil.nome || perfil.tipo));
+    quem.appendChild(raidTexto('span', 'raid-n', perfil.tipo));
+    linha.appendChild(quem);
+
+    const bt = raidTexto('button', 'mini', 'Pôr no OBS');
+    bt.onclick = () => porNoObs(perfil, bt);
+    linha.appendChild(bt);
+
+    cx.appendChild(linha);
+  });
+}
+
 /* ================== RAID ==================
 
    A JANELA DE 90 SEGUNDOS É DA TWITCH. O nosso pedido abre a contagem no
@@ -1083,7 +1186,7 @@ function ligarSecoes() {
   el('secaoCanal').classList.toggle('escondido', !tem);
   el('secaoPalpite').classList.toggle('escondido', !tem);
   el('secaoMomentos').classList.toggle('escondido', !tem);
-  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); ordemDasSecoes(); }
+  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); lerOverlays(); ordemDasSecoes(); }
   perfilPinta();
 }
 

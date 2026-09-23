@@ -20,25 +20,6 @@ cors();
 $quem = exige_painel();
 $uid  = (int) $quem['usuario_id'];
 
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
-    $c = tts_config($uid);
-    json_saida([
-        'ligado'     => (int) $c['ligado'],
-        'voz'        => (string) $c['voz'],
-        'vozes'      => preg_split('/[\s,]+/', (string) $c['vozes'], -1, PREG_SPLIT_NO_EMPTY),
-        'aleatorio'  => (int) $c['aleatorio'],
-        'prefixo'    => (int) $c['prefixo'],
-        'max_letras' => (int) $c['max_letras'],
-        'bloqueadas' => (string) ($c['bloqueadas'] ?? ''),
-        'premio_id'  => (string) $c['premio_id'],
-        'catalogo'   => TTS_VOZES,
-        /* O que este plano libera. A tela desliga o que não dá, em vez de
-           deixar clicar e levar erro. */
-        'varias'     => (bool) limite($uid, 'tts_varias_vozes', 1),
-        'pode'       => (bool) limite($uid, 'tts', 1),
-    ]);
-}
-
 /* ---------- os prêmios de pontos que o canal já tem ----------
 
    PEDIR UM UUID SERIA PEDIR DEMAIS. O público disto não sabe o que é id de
@@ -66,6 +47,25 @@ if (isset($_GET['premios'])) {
                     'custo' => (int) $p['cost']];
     }
     json_saida(['premios' => $lista]);
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+    $c = tts_config($uid);
+    json_saida([
+        'ligado'     => (int) $c['ligado'],
+        'voz'        => (string) $c['voz'],
+        'vozes'      => preg_split('/[\s,]+/', (string) $c['vozes'], -1, PREG_SPLIT_NO_EMPTY),
+        'aleatorio'  => (int) $c['aleatorio'],
+        'prefixo'    => (int) $c['prefixo'],
+        'max_letras' => (int) $c['max_letras'],
+        'bloqueadas' => (string) ($c['bloqueadas'] ?? ''),
+        'premio_id'  => (string) $c['premio_id'],
+        'catalogo'   => TTS_VOZES,
+        /* O que este plano libera. A tela desliga o que não dá, em vez de
+           deixar clicar e levar erro. */
+        'varias'     => (bool) limite($uid, 'tts_varias_vozes', 1),
+        'pode'       => (bool) limite($uid, 'tts', 1),
+    ]);
 }
 
 $d = corpo_json();

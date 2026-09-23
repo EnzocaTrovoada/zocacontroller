@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-23",
+      "titulo": "Pôr overlay no OBS com um clique",
+      "texto": "No painel dentro do OBS, a seção \"Overlays\" cria a fonte sozinha, na cena que está no ar e já com os ajustes certos — sem \"desligar quando não estiver visível\", e com o áudio passando pelo OBS quando é o TTS. São justamente os três ajustes que mais davam problema. O endereço continua à mão pra quem preferir criar na mão. E a escolha do prêmio de pontos do TTS, que não estava aparecendo, voltou."
+    },
+    {
+      "data": "2026-09-23",
       "titulo": "A aba Painel, e o histórico dos seus raids",
       "texto": "Agora dá pra escolher o que aparece dentro do OBS e em que ordem — desmarque o que você não usa e suba o que usa sempre. Vale em qualquer computador onde você abrir o painel. E em Bot → Raids tem \"Ver meus raids\", que mostra cada raid e, quando o ponto não contou, diz exatamente por quê."
     },
