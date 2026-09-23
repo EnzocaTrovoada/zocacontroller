@@ -248,6 +248,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     json_saida([
         'assinaturas'    => $tem,
         'falta_escopo'   => !in_array('moderator:read:followers', $escopos, true),
+        /* O QUE FALTA PRA CADA RECURSO NOVO.
+
+           Recurso que nasce depois da conta chega sem a permissão dele, e
+           fica quieto: o resgate não vira fala, o botão de raid recusa. Sem
+           dizer isso na tela, a pessoa conclui que o site quebrou. */
+        'falta_novo'     => array_values(array_diff([
+            'channel:read:redemptions',
+            'channel:manage:redemptions',
+            'channel:manage:raids',
+        ], $escopos)),
         'tipos'          => array_keys(TIPOS),
     ]);
 }

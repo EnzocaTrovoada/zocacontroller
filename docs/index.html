@@ -5027,6 +5027,33 @@ function avisaVencimento(c) {
   cx.classList.remove('escondido');
 }
 
+/* PERMISSÃO QUE FALTA É AVISO DE TELA CHEIA.
+
+   TTS e raids pedem permissões da Twitch que não existiam quando a maioria
+   entrou. Sem elas, os dois ficam quietos: o resgate não vira fala e o
+   botão de raid recusa. Quem não souber disso vai concluir que o site
+   quebrou — e reclamar do produto, não da permissão. */
+function avisaPermissao() {
+  if (!chave) return;
+  api('/eventsub.php').then((d) => {
+    const falta = d.falta_novo || [];
+    if (!falta.length) return;
+
+    const cx = el('avisoPlano');
+    if (!cx || !cx.classList.contains('escondido')) return;   /* já tem aviso na tela */
+
+    cx.innerHTML = '';
+    cx.appendChild(h('span', {}, [
+      h('b', { txt: 'Falta uma permissão. ' }),
+      document.createTextNode('O TTS e os raids são novos e pedem uma autorização que a sua conta '
+        + 'ainda não deu. Entrar de novo leva um clique e não desfaz nada.'),
+    ]));
+    const bt = h('a', { cls: 'bt mini', href: API + '/entrar.php', txt: 'Entrar de novo' });
+    cx.appendChild(bt);
+    cx.classList.remove('escondido');
+  }).catch(() => { /* servidor velho: não há o que avisar */ });
+}
+
 el('abaUpgrade').onclick = () => { fechaBandejas(null); vaiPara('#/planos'); };
 
 /* ---------------- a vitrine da inicial ---------------- */
@@ -10426,7 +10453,7 @@ function telaTutorial() {
   const tela = el('tela');
   tela.innerHTML = '';
   tela.appendChild(h('h1', { txt: 'Como instalar' }));
-  tela.appendChild(h('p', { cls: 'sub', txt: 'São seis passos pro primeiro overlay, e você só faz isso uma vez por overlay. Depois é só editar aqui que a live acompanha.' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'São seis passos pro primeiro overlay, e você só faz isso uma vez por overlay. Depois é só editar aqui que a live acompanha. Mais abaixo, o TTS e os raids, que têm passos próprios.' }));
 
   function lista(titulo, sub, passos) {
     const fatia = h('div', { cls: 'fatia' }, [h('h3', { txt: titulo }), h('p', { cls: 'd', txt: sub })]);
@@ -10454,6 +10481,27 @@ function telaTutorial() {
     ['Se quiser, libere os comandos', 'Comandos → o !musica, !pular, !like, !playlist, !adicionar e !fila. O !pular e o !fila precisam de Spotify Premium; os outros funcionam em conta grátis.'],
   ]);
 
+  /* O TTS É O ÚNICO RECURSO QUE PRECISA DE TRÊS LADOS: o prêmio na
+     Twitch, a config aqui e a fonte no OBS. Faltando um, ele fica calado
+     sem dizer qual — por isso os passos estão na ordem em que travam. */
+  lista('Fazer o chat mandar o bot falar', 'O espectador gasta pontos do canal e o bot fala a mensagem dele. Precisa ser afiliado da Twitch: pontos de canal só existem de afiliado pra cima.', [
+    ['Entre de novo com a Twitch', 'Meu ZocaHub → Entrar de novo na Twitch. Isto é obrigatório uma vez: o TTS pede uma permissão nova, e sem ela ele não recebe os resgates.'],
+    ['Ligue o TTS e escolha as vozes', 'Bot → Falar no chat. Marque "Ligado" e escolha as vozes; o ▶ ao lado de cada uma faz ela falar na sua fonte do OBS pra você ouvir antes.'],
+    ['Escolha ou crie o prêmio', 'Ainda em Bot → Falar no chat, no campo "Prêmio de pontos". Se você não tem nenhum, o botão "Criar o prêmio pra mim" faz um pronto, já pedindo a mensagem.'],
+    ['Crie a overlay de TTS', 'Overlays → TTS. Os mesmos seis passos do OBS de cima. É ELA que fala: o som sai da sua máquina, não do nosso servidor.'],
+    ['Marque "Controlar áudio pelo OBS"', 'Na fonte do TTS, botão direito → Propriedades. Sem isso a voz sai pelo seu alto-falante e não entra na live.'],
+    ['Teste resgatando você mesmo', 'Resgate o prêmio no seu próprio chat. A voz sai em até 3 segundos.'],
+  ]);
+
+  lista('Raidar pelo painel, e ganhar dias de Pro', 'Quem você acompanha aparece no painel dentro do OBS quando estiver ao vivo, junto do pessoal do ZocaHub.', [
+    ['Entre de novo com a Twitch', 'A mesma re-entrada do TTS resolve os dois. Sem ela o botão de raidar não funciona.'],
+    ['Ponha quem você costuma raidar', 'Bot → Raids, campo "Canal". No grátis são 3; no Pro, quantos quiser.'],
+    ['Abra o painel dentro do OBS', 'É o mesmo painel do pânico e do !mute. A seção "Raid" mostra quem está ao vivo agora, com quantos assistindo.'],
+    ['Clique em Raidar', 'Abre a contagem de 90 segundos no seu chat. Ela termina sozinha e o raid sai — você não precisa confirmar nada, mas também não é instantâneo.'],
+    ['Os pontos vêm sozinhos', 'Raid pra quem usa o ZocaHub vale 2 pontos, pra fora vale 1, e 14 pontos viram um dia de Pro. Não precisa raidar pelo painel: raid dado direto pela Twitch conta igual.'],
+    ['Use os dias como desconto', 'Bot → Raids, a chave "Usar os dias como desconto". Ligada, até 5 dias por mês saem da sua próxima cobrança. Desligada, o saldo só acumula.'],
+  ]);
+
   const fatiaAjuda = h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'Quando não funciona' }),
     h('p', { cls: 'd', txt: 'Na ordem em que costuma ser o problema:' }),
@@ -10467,6 +10515,13 @@ function telaTutorial() {
     ['O alerta aparece mas não toca som', 'Na fonte do alerta no OBS, marque "Controlar áudio pelo OBS". Sem isso o som existe, só não passa pelo OBS.'],
     ['O alerta de follow não dispara', 'Follow chega por fora do chat: ligue o EventSub em Meu ZocaHub. Sub e bits chegam pelo chat e funcionam sem isso.'],
     ['Tirei do VOD e mesmo assim deu strike', 'A trilha separada do VOD só existe no modo Avançado de saída do OBS. Em Configurações → Saída, troque para Avançado e marque "Trilha do VOD da Twitch". O painel avisa quando isso está errado.'],
+    ['O TTS não fala nada', 'Na ordem: a overlay de TTS está numa cena ativa? O prêmio escolhido é o mesmo que o espectador resgatou? Você entrou de novo com a Twitch depois que o TTS saiu? Qualquer um dos três faltando deixa ele calado.'],
+    ['O TTS fala, mas não entra na live', 'Falta "Controlar áudio pelo OBS" na fonte do TTS. A voz está saindo pelo seu alto-falante.'],
+    ['Não aparece voz nenhuma pra escolher no OBS', 'As vozes vêm do computador, e o Windows às vezes demora a carregá-las. Atualize a fonte no OBS uma vez.'],
+    ['Quero cortar o que o bot está falando', 'No painel dentro do OBS, o botão CALAR O BOT. Ele apaga a fila e corta a frase no meio, em até 3 segundos.'],
+    ['O botão de raidar diz que não deu', 'A Twitch recusa raid quando o alvo não está ao vivo, quando ele bloqueou você, ou quando já tem um raid seu a caminho. A mensagem diz qual dos três foi.'],
+    ['Raidei e o ponto não contou', 'Os pontos exigem: 2 horas de live, pelo menos 3 espectadores no raid, e revezar o alvo — o mesmo canal só conta de novo depois de outros dois diferentes. É o que impede duas contas de se raidarem pra sempre.'],
+    ['Não quero aparecer na lista do ZocaHub', 'Bot → Raids, a chave "Não aparecer na lista do ZocaHub".'],
   ].forEach((p) => {
     fatiaAjuda.appendChild(h('div', { cls: 'campo', style: 'align-items:flex-start' }, [
       h('div', { style: 'flex:1 1 240px' }, [
@@ -10749,6 +10804,7 @@ async function carrega() {
   ligaAvisos();
   ligaBusca();
   ligaUpgrade();
+  avisaPermissao();
   rota();
 })();
 </script>
