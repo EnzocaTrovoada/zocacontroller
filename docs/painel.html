@@ -1036,6 +1036,39 @@ async function lerRaid() {
   }
 }
 
+/* A ORDEM E O QUE APARECE, VINDO DO SERVIDOR.
+
+   O painel abre dentro do OBS e muita gente tem mais de uma máquina — se
+   isto morasse no navegador, a pessoa arrumaria tudo de novo em cada
+   computador. Lista vazia quer dizer "nunca mexeu", e aí fica o padrão:
+   assim uma seção que eu criar no futuro nasce visível, em vez de sumir
+   pra quem já tinha salvo. */
+async function ordemDasSecoes() {
+  if (!chavePainel) return;
+
+  let d;
+  try { d = await api('/painel-config.php'); }
+  catch (e) { return; }                       /* servidor velho: fica o padrão */
+
+  const querem = d.secoes || [];
+  if (!querem.length) return;
+
+  const todas = [...document.querySelectorAll('details.secao[data-secao]')];
+  const pai = todas[0] && todas[0].parentNode;
+  if (!pai) return;
+
+  todas.forEach((sec) => {
+    sec.classList.toggle('escondido', !querem.includes(sec.dataset.secao));
+  });
+
+  /* Reordena movendo pro fim na ordem pedida: o que não está na lista já
+     está escondido, então onde ele fica não importa. */
+  querem.forEach((apelido) => {
+    const sec = todas.find((x) => x.dataset.secao === apelido);
+    if (sec) pai.appendChild(sec);
+  });
+}
+
 async function corDoDock() {
   if (!chavePainel) return;
   try {
@@ -1050,7 +1083,7 @@ function ligarSecoes() {
   el('secaoCanal').classList.toggle('escondido', !tem);
   el('secaoPalpite').classList.toggle('escondido', !tem);
   el('secaoMomentos').classList.toggle('escondido', !tem);
-  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); }
+  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); ordemDasSecoes(); }
   perfilPinta();
 }
 

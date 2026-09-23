@@ -1579,6 +1579,37 @@ try {
     @keyframes sobe { from { transform: translate(-50%, 14px); opacity: 0 } }
   }
 
+  /* ---------- a aba painel ---------- */
+  .pn-lista { display: flex; flex-direction: column; gap: 2px; }
+  .pn-um {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 10px; border: 1px solid var(--linha);
+    border-radius: 7px; background: var(--caixa2);
+  }
+  .pn-um.pn-off { opacity: .55; }
+  .pn-quem { display: flex; align-items: center; gap: 9px; cursor: pointer; flex: 1 1 auto; }
+  .pn-quem input { accent-color: var(--verde); margin: 0; flex: none; }
+  .pn-quem b { display: block; font: 600 13.5px var(--disp); }
+  .pn-quem small { display: block; font-size: 11.5px; color: var(--apagado); }
+  .pn-setas { display: flex; gap: 3px; flex: none; }
+  .pn-seta {
+    border: 1px solid var(--linha); background: var(--caixa); color: var(--tinta);
+    border-radius: 5px; width: 26px; height: 24px; cursor: pointer; line-height: 1;
+  }
+  .pn-seta:disabled { opacity: .3; cursor: default; }
+  .pn-seta:not(:disabled):hover { border-color: var(--verde); color: var(--verde-forte); }
+
+  /* ---------- o histórico dos raids ---------- */
+  .raid-hist { margin-top: 12px; }
+  .raid-linha {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    padding: 6px 0; border-bottom: 1px solid var(--linha); font-size: 13px;
+  }
+  .raid-linha--nao { opacity: .6; }
+  .raid-linha .d { font-size: 11.5px; }
+  .raid-pts { margin-left: auto; font-size: 11.5px; color: var(--verde-forte); }
+  .raid-linha--nao .raid-pts { color: var(--apagado); }
+
   /* ---------- os raids ---------- */
   .raid-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
   .raid-chip {
@@ -1746,6 +1777,11 @@ try {
   <!-- O BOT TEM ABA, E NÃO UM BOTÃO ESCONDIDO EM COMANDOS.
        É metade do produto: quem chega precisa ver que existe sem procurar. -->
   <button class="aba" id="abaBot" type="button">Bot</button>
+
+  <!-- O PAINEL DO OBS TEM ABA PRÓPRIA.
+       Ele é a parte que fica aberta a live inteira, e o que aparece dentro
+       dele era a única coisa do produto que não dava pra escolher. -->
+  <button class="aba" id="abaPainel" type="button">Painel</button>
 
   <button class="aba" id="abaMeu" type="button">Meu ZocaHub</button>
   <!-- Fica visível pra quem não entrou: um artista que chega por um link de
@@ -4268,6 +4304,7 @@ const TELAS = [
   ['#/overlays',  'Meus overlays', 'a lista dos que você já tem'],
   ['#/meu',       'Meu ZocaHub',   'chave, conta e plano'],
   ['#/bot',       'Bot',           'o bot que responde no seu chat'],
+  ['#/painel',    'Painel',        'o que aparece dentro do OBS, e em que ordem'],
   ['#/comandos',  'Comandos',      'o que o chat pode fazer'],
   ['#/subathon',  'Subathon',      'cronômetro e o que soma tempo'],
   ['#/mods',      'Moderadores',   'links de quem te ajuda'],
@@ -5054,6 +5091,7 @@ function avisaPermissao() {
   }).catch(() => { /* servidor velho: não há o que avisar */ });
 }
 
+el('abaPainel').onclick = () => { fechaBandejas(null); vaiPara('#/painel'); };
 el('abaUpgrade').onclick = () => { fechaBandejas(null); vaiPara('#/planos'); };
 
 /* ---------------- a vitrine da inicial ---------------- */
@@ -7865,6 +7903,127 @@ function refazRecado(r) {
   }) }).then(avisaPonte);
 }
 
+/* ================== A ABA PAINEL ==================
+
+   O painel dentro do OBS tem onze seções e fica aberto a live inteira,
+   num espaço estreito. Quem não usa palpite nem momentos rolava por cima
+   deles o tempo todo, e quem usa raid o tempo todo o tinha no meio.
+
+   O apelido de cada seção vive aqui e no data-secao do painel.html, e a
+   lista de verdade está no api/painel-config.php. O conferir.js compara
+   os três. */
+const PAINEL_NOMES = {
+  raid:     ['Raid', 'quem está ao vivo agora, com botão de raidar'],
+  audio:    ['Áudio', 'mudo e volume das suas fontes'],
+  vod:      ['Fora do VOD', 'tirar uma fonte da gravação, contra strike'],
+  fontes:   ['Configurar OBS', 'o que o chat pode mexer'],
+  estado:   ['Estado', 'se está gravando, transmitindo, e a saúde da live'],
+  ajuste:   ['Ajuste fino', 'bitrate e codificação'],
+  cena:     ['Trocar de cena', 'as cenas do seu OBS, num clique'],
+  canal:    ['Título e categoria', 'muda na Twitch sem sair do OBS'],
+  momentos: ['Momentos', 'marca um instante pra achar depois na edição'],
+  palpite:  ['Palpite', 'abre e resolve enquete de pontos'],
+  log:      ['Últimas ações', 'o que o chat e os mods fizeram'],
+};
+
+function telaPainel() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Painel do OBS' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'O que aparece dentro do OBS, e em que ordem. '
+    + 'Vale em qualquer computador onde você abrir o painel.' }));
+
+  const fatia = h('div', { cls: 'fatia' });
+  const lista = h('div', { cls: 'pn-lista' });
+  const diz = h('span', { cls: 'd', style: 'font-size:12.5px' });
+  let ordem = [];
+  let catalogo = [];
+
+  async function grava() {
+    try {
+      await api('/painel-config.php', { method: 'POST', body: JSON.stringify({ secoes: ordem }) });
+      diz.textContent = 'Salvo. Atualize a fonte do painel no OBS pra ver.';
+      diz.style.color = 'var(--verde-forte)';
+    } catch (e) {
+      diz.textContent = e.message;
+      diz.style.color = 'var(--perigo)';
+    }
+  }
+
+  function pinta() {
+    lista.innerHTML = '';
+
+    /* As ligadas primeiro, na ordem escolhida; as desligadas embaixo. Uma
+       lista misturada faria a pessoa procurar o que ela acabou de mexer. */
+    const fora = catalogo.filter((k) => !ordem.includes(k));
+
+    ordem.forEach((k, i) => lista.appendChild(linha(k, true, i)));
+    if (fora.length) {
+      lista.appendChild(h('p', { cls: 'd', style: 'margin:14px 0 6px;font-size:11.5px',
+        txt: 'Escondidas' }));
+      fora.forEach((k) => lista.appendChild(linha(k, false, -1)));
+    }
+  }
+
+  function linha(k, ligada, i) {
+    const [nome, detalhe] = PAINEL_NOMES[k] || [k, ''];
+
+    const marca = h('input', { type: 'checkbox' });
+    marca.checked = ligada;
+    marca.onchange = () => {
+      if (marca.checked) ordem.push(k);
+      else ordem = ordem.filter((x) => x !== k);
+      pinta();
+      grava();
+    };
+
+    const sobe = h('button', { cls: 'pn-seta', type: 'button', txt: '↑', title: 'subir' });
+    const desce = h('button', { cls: 'pn-seta', type: 'button', txt: '↓', title: 'descer' });
+    sobe.disabled = !ligada || i === 0;
+    desce.disabled = !ligada || i === ordem.length - 1;
+    sobe.onclick = () => { [ordem[i - 1], ordem[i]] = [ordem[i], ordem[i - 1]]; pinta(); grava(); };
+    desce.onclick = () => { [ordem[i + 1], ordem[i]] = [ordem[i], ordem[i + 1]]; pinta(); grava(); };
+
+    return h('div', { cls: 'pn-um' + (ligada ? '' : ' pn-off') }, [
+      h('label', { cls: 'pn-quem' }, [marca, h('div', {}, [
+        h('b', { txt: nome }),
+        h('small', { txt: detalhe }),
+      ])]),
+      h('span', { cls: 'pn-setas' }, [sobe, desce]),
+    ]);
+  }
+
+  fatia.append(
+    h('h3', { txt: 'As seções' }),
+    h('p', { cls: 'd', txt: 'Desmarque o que você não usa. Salva sozinho.' }),
+    lista,
+    h('p', { style: 'margin:10px 0 0' }, [diz]),
+  );
+  tela.appendChild(fatia);
+
+  api('/painel-config.php').then((d) => {
+    catalogo = d.catalogo || [];
+    /* Vazio quer dizer "nunca mexeu": mostra tudo ligado, que é o que a
+       pessoa vê hoje no OBS. */
+    ordem = (d.secoes || []).length ? d.secoes : catalogo.slice();
+    pinta();
+  }).catch(() => {
+    diz.textContent = 'Este servidor ainda não tem isto. Suba a pasta api e rode o SQL 064.';
+    diz.style.color = 'var(--dourado)';
+  });
+
+  /* ----- como abrir o painel ----- */
+  const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+  tela.appendChild(h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'Onde ele fica' }),
+    h('p', { cls: 'd', txt: 'No OBS: Docas → Docas personalizadas do navegador. '
+      + 'Dê um nome, cole o endereço e clique em Aplicar.' }),
+    h('div', { cls: 'campo campo--inteiro' }, [
+      h('input', { type: 'text', value: base + 'painel.html', readonly: 'readonly' }),
+    ]),
+  ]));
+}
+
 /* ================== OS RAIDS ==================
 
    A CONTA DOS PONTOS MORA NO SERVIDOR, e esta tela só mostra. O prêmio é
@@ -7938,6 +8097,55 @@ function caixaDosRaids(caixa) {
     catch (e) { oculto.checked = !oculto.checked; recado(e.message, 'ruim'); }
   };
 
+  /* O HISTÓRICO É A RESPOSTA PRO "MEU PONTO NÃO CONTOU".
+
+     São seis motivos de recusa, e sem dizer qual foi a pessoa só sabe que
+     não somou — o que vira uma conversa de suporte por raid. */
+  const MOTIVOS = {
+    '':                     'contou',
+    'poucos-espectadores':  'poucos espectadores (mínimo 3)',
+    'live-curta':           'a live não tinha 2 horas',
+    'sem-live':             'você não estava ao vivo',
+    'sem-revezar':          'raid repetido — reveze o alvo',
+    'desligado':            'estava desligado',
+    'sem-tabela':           'o servidor não tem os raids',
+  };
+
+  const hist = h('div', { cls: 'raid-hist' });
+  const verHist = h('button', { cls: 'bt fraco', type: 'button', txt: 'Ver meus raids' });
+  let histAberto = false;
+
+  verHist.onclick = async () => {
+    if (histAberto) {
+      hist.innerHTML = '';
+      histAberto = false;
+      verHist.textContent = 'Ver meus raids';
+      return;
+    }
+    verHist.textContent = 'procurando…';
+    try {
+      const d = await api('/raid.php?historico=1');
+      hist.innerHTML = '';
+      if (!(d.historico || []).length) {
+        hist.appendChild(h('p', { cls: 'd', txt: 'Nenhum raid ainda.' }));
+      }
+      (d.historico || []).forEach((r) => {
+        const quando = new Date(String(r.criado_em).replace(' ', 'T'));
+        hist.appendChild(h('div', { cls: 'raid-linha' + (r.pontos > 0 ? '' : ' raid-linha--nao') }, [
+          h('b', { txt: r.alvo_login }),
+          h('span', { cls: 'd', txt: r.espectadores + ' foram · ' + quando.toLocaleDateString('pt-BR') }),
+          h('span', { cls: 'raid-pts',
+            txt: r.pontos > 0 ? '+' + r.pontos : MOTIVOS[r.motivo] || 'não contou' }),
+        ]));
+      });
+      histAberto = true;
+      verHist.textContent = 'Esconder';
+    } catch (e) {
+      verHist.textContent = 'Ver meus raids';
+      recado(e.message, 'ruim');
+    }
+  };
+
   caixa.append(
     h('h3', { txt: 'Raids' }),
     h('p', { cls: 'd', txt: 'Quem você acompanha aparece no painel do OBS quando estiver ao vivo, '
@@ -7951,7 +8159,8 @@ function caixaDosRaids(caixa) {
       txt: 'Ligado, até 5 dias por mês viram desconto na sua próxima cobrança. '
          + 'Desligado, o saldo só acumula — dá pra guardar pra quando parar de pagar.' }),
     h('div', { cls: 'campo campo--chave' }, [h('span', { cls: 'rotulo', txt: 'Não aparecer na lista do ZocaHub' }), oculto]),
-    h('p', { style: 'margin:10px 0 0' }, [diz]),
+    h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [verHist, diz]),
+    hist,
   );
 
   recarrega();
@@ -10577,6 +10786,7 @@ function rota() {
 
   if (p[0] === 'inicio') return telaInicio();
   if (p[0] === 'meu') return telaControlador();
+  if (p[0] === 'painel') return telaPainel();
   if (p[0] === 'planos') return abrePlanos();
   if (p[0] === 'bot') return telaBot();
   if (p[0] === 'comandos') return telaComandos();
@@ -10628,6 +10838,7 @@ const PRECISA_CONTA = {
   comandos: 'criar comandos que o seu chat usa',
   bot:      'pôr o bot no seu chat',
   overlays: 'montar os seus overlays',
+  painel:   'escolher o que aparece no painel dentro do OBS',
   meu:      'ver a sua chave e a sua conta',
   luzes:    'deixar o chat mudar a cor das suas luzes',
   subathon: 'rodar um subathon',
@@ -10661,7 +10872,7 @@ function telaPrecisaEntrar(qual) {
 function ficaOlhando() {
   olhando = true;
   try { localStorage.setItem(OLHADINHA, '1'); } catch (e) {}
-  ['abaOverlays', 'abaFerramentas', 'abaBot', 'abaMeu', 'busca'].forEach((id) => {
+  ['abaOverlays', 'abaFerramentas', 'abaBot', 'abaPainel', 'abaMeu', 'busca'].forEach((id) => {
     const a = el(id);
     if (a) a.classList.add('escondido');
   });
@@ -10764,7 +10975,7 @@ async function carrega() {
     /* As abas do painel não servem pra quem não entrou: clicar em qualquer
        uma delas só levaria a uma tela que falha. Some com elas e o que resta
        é a vitrine e o botão de entrar. */
-    ['abaOverlays', 'abaFerramentas', 'abaBot', 'abaMeu', 'busca', 'abaAdmin'].forEach((id) => {
+    ['abaOverlays', 'abaFerramentas', 'abaBot', 'abaPainel', 'abaMeu', 'busca', 'abaAdmin'].forEach((id) => {
       const a = el(id);
       if (a) a.classList.add('escondido');
     });

@@ -58,6 +58,27 @@ function raid_da_casa(int $menos): array
     }
 }
 
+/* ---------- o histórico ----------
+
+   CADA RAID NUMA LINHA, COM O MOTIVO DE NÃO TER CONTADO.
+
+   Os pontos recusam por seis motivos diferentes, e sem mostrar qual foi a
+   pessoa só sabe que "não somou". Isso vira uma conversa de suporte por
+   raid — e a resposta já estava no banco o tempo todo. */
+if (isset($_GET['historico'])) {
+    try {
+        $st = db()->prepare(
+            'SELECT alvo_login, espectadores, pontos, motivo, criado_em
+               FROM raid_feitos WHERE usuario_id = ?
+              ORDER BY id DESC LIMIT 40'
+        );
+        $st->execute([$uid]);
+        json_saida(['historico' => $st->fetchAll(PDO::FETCH_ASSOC)]);
+    } catch (Throwable $e) {
+        json_saida(['historico' => []]);
+    }
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $minha = raid_lista($uid);
     $casa  = raid_da_casa($uid);

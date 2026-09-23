@@ -83,6 +83,18 @@ compara('vozes do TTS', {
   desenhista: strings(clock.match(/tvoz:\s*\{[^}]*v:\s*\[([^\]]*)\]/s)?.[1] || ''),
 });
 
+/* ---- as seções do painel do OBS ----
+
+   Esconder uma seção que o servidor não conhece não faz nada; e um nome
+   que só existe no servidor vira uma linha na tela que não mexe em nada. */
+const painelCfg = ler('api/painel-config.php');
+const dock = ler('docs/painel.html');
+compara('seções do painel', {
+  servidor: strings(bloco(painelCfg, 'PAINEL_SECOES = [', '];') || ''),
+  dock:     [...dock.matchAll(/data-secao="(\w+)"/g)].map((m) => m[1]),
+  tela:     [...(bloco(hub, 'const PAINEL_NOMES = {', '};') || '').matchAll(/^  (\w+):/gm)].map((m) => m[1]),
+});
+
 /* ---- ações que o chat pode disparar ---- */
 const naPonte = [];
 ponte.split('\n').forEach((linha, i, todas) => {
