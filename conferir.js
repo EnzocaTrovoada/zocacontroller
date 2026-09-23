@@ -70,6 +70,19 @@ compara('tipos de overlay', {
   tela:       [...hub.matchAll(/^  (\w+):\s+\{ nome: '/gm)].map((m) => m[1]),
 });
 
+/* ---- as vozes do TTS ----
+
+   Quatro lugares, e somar voz num só é o defeito silencioso: a voz aparece
+   na tela, o servidor recusa ela, e ninguém liga uma coisa na outra. */
+const ttsLib = ler('api/lib/tts.php');
+const ttsMotor = ler('docs/tts.js');
+compara('vozes do TTS', {
+  servidor:  strings(bloco(ttsLib, 'TTS_VOZES = [', '];') || ''),
+  motor:     [...ttsMotor.matchAll(/^    (\w+):\s+\{ nome:/gm)].map((m) => m[1]),
+  tela:      [...(bloco(hub, 'const TTS_NOMES = {', '};') || '').matchAll(/(\w+):\s*'/g)].map((m) => m[1]),
+  desenhista: strings(clock.match(/tvoz:\s*\{[^}]*v:\s*\[([^\]]*)\]/s)?.[1] || ''),
+});
+
 /* ---- ações que o chat pode disparar ---- */
 const naPonte = [];
 ponte.split('\n').forEach((linha, i, todas) => {

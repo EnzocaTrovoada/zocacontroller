@@ -1579,6 +1579,17 @@ try {
     @keyframes sobe { from { transform: translate(-50%, 14px); opacity: 0 } }
   }
 
+  /* ---------- as vozes do TTS ---------- */
+  .tts-vozes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tts-voz {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    padding: 5px 8px; border: 1px solid var(--linha); border-radius: 6px;
+    background: var(--caixa2); font-size: 12.5px;
+  }
+  .tts-voz.on { border-color: var(--verde); background: var(--verde-fraco); color: var(--verde-forte); }
+  .tts-voz input { accent-color: var(--verde); margin: 0; }
+  .tts-voz .bt.mini { padding: 1px 6px; }
+
   /* ---------- a tela do bot ---------- */
   .bot-lista { display: flex; flex-wrap: wrap; gap: 6px; }
   .bot-cmd {
@@ -7772,6 +7783,123 @@ function refazRecado(r) {
   }) }).then(avisaPonte);
 }
 
+/* ================== O TTS ==================
+
+   O nome de cada voz vive aqui e no api/lib/tts.php. As duas listas têm de
+   bater — o conferir.js compara e reclama se alguém somar voz num lado só. */
+const TTS_NOMES = {
+  padrao: 'Padrão', grave: 'Grave', agudo: 'Agudo', crianca: 'Criança',
+  narrador: 'Narrador', apressado: 'Apressado', arrastado: 'Arrastado',
+  robo: 'Robô', gigante: 'Gigante',
+};
+
+function caixaDoTts(caixa) {
+  const liga = h('input', { type: 'checkbox' });
+  const listaVozes = h('div', { cls: 'tts-vozes' });
+  const sorteia = h('input', { type: 'checkbox' });
+  const prefixo = h('input', { type: 'checkbox' });
+  const letras = h('input', { type: 'number', min: '20', max: '400', style: 'flex:0 0 90px' });
+  const barradas = h('textarea', { rows: '2', placeholder: 'palavras que o bot não fala, separadas por espaço' });
+  const premio = h('input', { type: 'text', placeholder: 'id do prêmio de pontos (opcional)' });
+  const salvar = h('button', { cls: 'bt principal', type: 'button', txt: 'Salvar' });
+  const diz = h('span', { cls: 'd', style: 'font-size:12.5px' });
+
+  let escolhidas = new Set();
+  let podeVarias = true;
+
+  function pintaVozes(catalogo, padrao) {
+    listaVozes.innerHTML = '';
+    (catalogo || []).forEach((v) => {
+      const marca = h('input', { type: 'checkbox' });
+      marca.checked = escolhidas.has(v);
+
+      const ouvir = h('button', { cls: 'bt mini', type: 'button', txt: '▶' , title: 'ouvir' });
+      ouvir.onclick = async (e) => {
+        e.preventDefault();
+        ouvir.disabled = true;
+        try { await api('/tts.php', { method: 'POST', body: JSON.stringify({ testar: 1, voz: v }) }); }
+        catch (err) { recado(err.message, 'ruim'); }
+        ouvir.disabled = false;
+      };
+
+      marca.onchange = () => {
+        if (marca.checked) {
+          /* Sem Pro é UMA voz: marcar outra troca, em vez de recusar. Um
+             checkbox que não marca parece quebrado. */
+          if (!podeVarias) { escolhidas.clear(); }
+          escolhidas.add(v);
+        } else escolhidas.delete(v);
+        pintaVozes(catalogo, padrao);
+      };
+
+      listaVozes.appendChild(h('label', { cls: 'tts-voz' + (escolhidas.has(v) ? ' on' : '') },
+        [marca, h('span', { txt: TTS_NOMES[v] || v }), ouvir]));
+    });
+    sorteia.disabled = escolhidas.size < 2;
+    if (sorteia.disabled) sorteia.checked = false;
+  }
+
+  salvar.onclick = async () => {
+    salvar.disabled = true;
+    try {
+      await api('/tts.php', { method: 'POST', body: JSON.stringify({
+        ligado: liga.checked ? 1 : 0,
+        voz: [...escolhidas][0] || 'padrao',
+        vozes: [...escolhidas],
+        aleatorio: sorteia.checked ? 1 : 0,
+        prefixo: prefixo.checked ? 1 : 0,
+        max_letras: parseInt(letras.value, 10) || 200,
+        bloqueadas: barradas.value,
+        premio_id: premio.value.trim(),
+      }) });
+      diz.textContent = 'Salvo.';
+      diz.style.color = 'var(--verde-forte)';
+    } catch (e) {
+      diz.textContent = e.message;
+      diz.style.color = 'var(--perigo)';
+    }
+    salvar.disabled = false;
+  };
+
+  caixa.append(
+    h('h3', { txt: 'Falar no chat (TTS)' }),
+    h('p', { cls: 'd', txt: 'O espectador gasta pontos do canal e o bot fala a mensagem dele. '
+        + 'O som sai do overlay de TTS, que você põe no OBS.' }),
+    h('div', { cls: 'campo campo--chave' }, [h('span', { cls: 'rotulo', txt: 'Ligado' }), liga]),
+    h('div', { cls: 'campo campo--inteiro' }, [h('span', { cls: 'rotulo', txt: 'Vozes que valem' }), listaVozes]),
+    h('div', { cls: 'campo campo--chave' }, [h('span', { cls: 'rotulo', txt: 'Sortear entre elas' }), sorteia]),
+    h('div', { cls: 'campo campo--chave' }, [h('span', { cls: 'rotulo', txt: 'Deixar escolher no chat' }), prefixo]),
+    h('p', { cls: 'd', style: 'margin:-6px 0 10px;font-size:11.5px',
+      txt: 'Com isto ligado, quem resgatou escreve "grave: a mensagem" pra escolher a voz.' }),
+    h('div', { cls: 'campo' }, [h('span', { cls: 'rotulo', txt: 'Tamanho máximo' }), letras,
+      h('span', { cls: 'd', txt: 'letras' })]),
+    h('div', { cls: 'campo campo--inteiro' }, [h('span', { cls: 'rotulo', txt: 'Palavras barradas' }), barradas]),
+    h('div', { cls: 'campo campo--inteiro' }, [h('span', { cls: 'rotulo', txt: 'Prêmio de pontos' }), premio]),
+    h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [salvar, diz]),
+  );
+
+  api('/tts.php').then((d) => {
+    liga.checked = !!d.ligado;
+    escolhidas = new Set((d.vozes || []).length ? d.vozes : [d.voz || 'padrao']);
+    podeVarias = d.varias !== false;
+    letras.value = d.max_letras || 200;
+    barradas.value = d.bloqueadas || '';
+    premio.value = d.premio_id || '';
+    pintaVozes(d.catalogo, d.voz);
+    sorteia.checked = !!d.aleatorio;
+    prefixo.checked = !!d.prefixo;
+
+    if (!podeVarias) {
+      prefixo.disabled = true;
+      diz.textContent = 'No grátis é uma voz. O Pro solta o sorteio e a escolha pelo chat.';
+      diz.style.color = 'var(--dourado)';
+    }
+  }).catch(() => {
+    diz.textContent = 'Este servidor ainda não tem o TTS. Suba a pasta api e rode o SQL 062.';
+    diz.style.color = 'var(--dourado)';
+  });
+}
+
 /* ================== O BOT ==================
 
    Ele já existia, escondido como um botão no meio da tela de comandos. Um
@@ -7936,6 +8064,10 @@ function telaBot() {
     h('h3', { txt: 'O que ele responde' }),
     cxResponde,
   ]));
+
+  const cxTts = h('div', { cls: 'fatia' });
+  caixaDoTts(cxTts);
+  tela.appendChild(cxTts);
 
   tela.appendChild(h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'O que ele falou' }),
