@@ -195,6 +195,39 @@
     var d = e.data;
     if (!d) return;
     if (d.type === 'zc:config') desenha(d.config);
+
+    /* MOSTRAR COMO FICA, SEM MUDAR O QUE ESTÁ SALVO.
+
+       No editor o comportamento fica desligado de propósito — senão a
+       pessoa ajusta a cor e a tela some. Mas aí ela configura no escuro.
+       Isto roda o comportamento UMA VEZ, a pedido, e volta ao normal. */
+    if (d.type === 'zc:aparecer-demo') {
+      var c = d.config || {};
+      var modo = c.apmodo || 'sempre';
+      if (modo === 'sempre') return;
+
+      apLimpa();
+      raiz.style.transition = 'opacity .6s ease-in-out';
+
+      if (modo === 'muda') {
+        /* No "só quando mudar", o que se quer ver é: aparece e some. */
+        raiz.style.opacity = '0';
+        setTimeout(function () { raiz.style.opacity = '1'; }, 400);
+        setTimeout(function () { raiz.style.opacity = '0'; },
+                   400 + Math.max(1, +c.apfica || 8) * 1000);
+        setTimeout(function () { raiz.style.opacity = '1'; raiz.style.transition = ''; },
+                   1600 + Math.max(1, +c.apfica || 8) * 1000);
+        return;
+      }
+
+      /* No ciclo, um sumiço e uma volta bastam pra entender o ritmo. */
+      raiz.style.opacity = '1';
+      setTimeout(function () { raiz.style.opacity = '0'; }, Math.max(2, +c.apver || 15) * 1000);
+      setTimeout(function () { raiz.style.opacity = '1'; },
+                 (Math.max(2, +c.apver || 15) + Math.max(2, +c.apsumir || 45)) * 1000);
+      setTimeout(function () { raiz.style.transition = ''; },
+                 (Math.max(2, +c.apver || 15) + Math.max(2, +c.apsumir || 45)) * 1000 + 800);
+    }
     if (d.type === 'zc:editar') ligaEdicao(!!d.on);
     /* Sem isso o editor do chat abre vazio e a pessoa nao ve o que esta
        ajustando ate alguem falar no chat naquele instante. */

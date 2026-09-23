@@ -2316,6 +2316,11 @@ function padraoDe(tipo) {
        pediu nada não devia precisar escolher nada. */
     dsync: 0, dfont: 'Archivo', dweight: 500, dopacity: 85, dgap: 6, dpos: 'below',
     dcolor: verde, dsize: 24, dtrack: 6, dcaps: 1,
+    /* Quando aparecer. Tem de estar AQUI, e não só no esquema do clock.js:
+       o editor monta a tela a partir deste objeto, então chave que falta
+       vira "undefined" na faixa — e isso parece defeito mesmo com o padrão
+       existindo do outro lado. */
+    apmodo: 'sempre', apver: 15, apsumir: 45, apfica: 8,
   };
   if (tipo === 'meta') {
     return Object.assign(base, {
@@ -2654,6 +2659,17 @@ const GRUPOS = [
     { k: 'apfica', l: 'Fica visível', c: 'faixa', min: 1, max: 60, u: 's',
       se: (c) => c.apmodo === 'muda',
       dica: 'aparece quando o número muda — um follow, um ponto, uma música nova' },
+    /* SEM ISTO A PESSOA CONFIGURA NO ESCURO. Na prévia o comportamento
+       fica desligado (senão a tela some enquanto ela ajusta), então o
+       único jeito de saber como ficou seria pôr na live e esperar. */
+    { k: '__apdemo', l: '', c: 'botao', txt: 'Ver como fica',
+      se: (c) => c.apmodo && c.apmodo !== 'sempre',
+      faz: () => {
+        if (!quadro || !quadro.contentWindow) return;
+        try {
+          quadro.contentWindow.postMessage({ type: 'zc:aparecer-demo', config: cfg }, location.origin);
+        } catch (e) {}
+      } },
   ] },
 
   { t: 'A voz', se: so('tts'), itens: [
@@ -3481,6 +3497,20 @@ const FABRICA = {
      e o Testar dispara SÓ este aviso na prévia. Antes era um botão só, que
      passava todos em fila: pra conferir a frase do follow, a pessoa via
      dois subs e um bits primeiro. */
+  /* UM BOTÃO QUE NÃO GUARDA NADA.
+
+     Os outros controles existem pra mudar um valor da config. Este só
+     dispara uma ação — "ver como fica", "testar" — e por isso não tem
+     chave nem sincronização. */
+  botao(it) {
+    const bt = h('button', { cls: 'bt mini', type: 'button', txt: it.txt || 'Testar' });
+    bt.onclick = () => it.faz && it.faz();
+    const cx = h('div', {}, [bt]);
+    cx.__inteiro = true;
+    cx.__sincroniza = () => {};
+    return cx;
+  },
+
   frase(it) {
     const i = h('textarea', { rows: '2', spellcheck: 'true' });
     i.value = cfg[it.k] || '';
