@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-23",
+      "titulo": "Contagem regressiva pra live começar",
+      "texto": "No painel do OBS, a seção \"Contagem\": marque 5, 10, 15 ou 30 minutos, ou uma hora do dia. O seu overlay de relógio passa a mostrar quanto falta em vez da hora, com a mesma fonte e cor que você já escolheu. Quando zerar, o OBS troca pra cena que você marcar — uma vez só, então depois você anda à vontade."
+    },
+    {
+      "data": "2026-09-23",
       "titulo": "Escolher quando o overlay aparece",
       "texto": "No editor de qualquer overlay, a seção \"Quando aparecer\". Ele pode ficar sempre na tela, aparecer de vez em quando (X segundos sim, Y não) ou só quando mudar — a barra de seguidores aparece quando alguém segue e some depois. Entra e sai com esmaecimento. Tela limpa chama mais atenção que tela cheia."
     },

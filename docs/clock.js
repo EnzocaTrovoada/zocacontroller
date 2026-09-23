@@ -82,6 +82,10 @@
       'Asia/Dubai', 'Australia/Sydney', 'Pacific/Auckland', 'UTC'
     ] },
     tipo:     { t: 'e', d: 'relogio', v: ['relogio', 'contador', 'placar', 'subathon', 'meta', 'chat', 'feed', 'musica', 'alerta', 'speedrun', 'tts'] },
+    /* ---- contagem regressiva (dentro do relógio) ---- */
+    crligada: { t: 'b', d: 0 },
+    crfmt:    { t: 'e', d: 'auto', v: ['auto', 'ms', 'hms'] },
+
     /* ---- quando aparecer ---- */
     apmodo:   { t: 'e', d: 'sempre', v: ['sempre', 'ciclo', 'muda'] },
     apver:    { t: 'n', d: 15, min: 2, max: 600 },
@@ -1046,6 +1050,29 @@
 
     var box = root.querySelector('.rl__box');
     var camposHora = root.querySelectorAll('.rl__time .rl__layer');
+
+    /* A contagem regressiva, quando o overlay a entrega. */
+    var crAte = null, crFaltam = null, crTexto = '';
+
+    function crHTML() {
+      var falta = Math.max(0, Math.round((crAte - Date.now()) / 1000));
+      if (falta <= 0) return '<span class="rl__n">' + esc(crTexto) + '</span>';
+
+      var hh = Math.floor(falta / 3600);
+      var mm = Math.floor((falta % 3600) / 60);
+      var ss = falta % 60;
+      var d2 = function (x) { return (x < 10 ? '0' : '') + x; };
+
+      /* Acima de uma hora mostra a hora; abaixo, não. "00:12:43" pesa mais
+         na tela e diz o mesmo que "12:43". */
+      var partes = hh > 0 ? [d2(hh), d2(mm), d2(ss)] : [d2(mm), d2(ss)];
+      var out = '';
+      for (var i = 0; i < partes.length; i++) {
+        if (i) out += '<span class="rl__sep">:</span>';
+        out += '<span class="rl__n">' + partes[i] + '</span>';
+      }
+      return out;
+    }
     var camposData = root.querySelectorAll('.rl__date .rl__layer');
 
     var cfg = normaliza(sanitize(cfgInicial));
@@ -1087,7 +1114,13 @@
         if (cVis.modo === 'rodando') cVis.fim = Math.round(cVis.fim + atraso);
         else cVis.restante = Math.max(0, Math.round(cVis.restante + atraso));
       }
-      var h = conteudo.principal(cVis, agora);
+      /* A CONTAGEM ENTRA NO LUGAR DA HORA.
+
+         Quem ligou a regressiva quer ver quanto falta, e não que horas
+         são. Aqui, e não no overlay.html, porque é aqui que o número é
+         desenhado — e é assim que ele herda a fonte, a cor e o contorno
+         que a pessoa escolheu, de graça. */
+      var h = crFaltam !== null ? crHTML() : conteudo.principal(cVis, agora);
       if (!forcar && h === ultimaHora) return;
 
       ultimaHora = h;
@@ -1287,6 +1320,15 @@
     return {
       update: update,
       config: function () { return assign({}, cfg); },
+
+      /* O overlay.html entrega quanto falta, contado pelo servidor. Passar
+         null desliga e a hora volta. */
+      contagem: function (faltam, texto) {
+        if (faltam === null || faltam === undefined) { crAte = crFaltam = null; return; }
+        crFaltam = faltam;
+        crAte = Date.now() + faltam * 1000;
+        crTexto = texto || '';
+      },
       /* pega carona na batida — sobrevive ao OBS esconder a fonte */
       aoTique: function (fn) { ouvintes.push(fn); },
       temBatida: function () { return !!batida; },

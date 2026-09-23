@@ -86,6 +86,16 @@
     quandoAparece(config);
   }
 
+  /* A contagem regressiva: o servidor diz quanto falta, o relógio desenha.
+
+     Quem desconta o tempo que passa é o clock.js, que já redesenha a cada
+     segundo — pedir ao servidor de segundo em segundo seria uma chamada
+     por segundo por fonte aberta. A cada leitura o número se corrige. */
+  function contaRegressiva(c) {
+    if (!relogio || !relogio.contagem) return;
+    relogio.contagem(c ? c.faltam : null, c ? c.texto : '');
+  }
+
   /* ================== QUANDO O OVERLAY APARECE ==================
 
      Tela limpa vale mais que tela cheia. Uma barra de meta parada a live
@@ -439,6 +449,7 @@
         /* A fila do TTS vem na mesma leitura da config: não vale abrir um
            segundo canal só pra isso. */
         if (j.fala && relogio && relogio.falar) relogio.falar(j.fala);
+        if (j.contagem) contaRegressiva(j.contagem);
         /* CALAR VEM ANTES DE FALAR NÃO: vem depois, de propósito. Se a
            pessoa mandou calar, o que chegou nesta mesma resposta também
            morre — senão a última leva ainda sairia. */

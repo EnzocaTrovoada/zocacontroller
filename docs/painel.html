@@ -308,6 +308,20 @@
     <button id="btCalar" class="perigo">PULAR A FALA</button>
   </div>
 
+  <details class="secao" data-secao="contagem">
+  <summary>Contagem <span id="crQuanto" class="mini"></span></summary>
+  <p class="dica">Mostra quanto falta no overlay de relógio e troca de cena quando zerar.</p>
+  <div class="grade">
+    <button class="mini" data-cr="5">5 min</button>
+    <button class="mini" data-cr="10">10 min</button>
+    <button class="mini" data-cr="15">15 min</button>
+    <button class="mini" data-cr="30">30 min</button>
+  </div>
+  <div class="fila"><b>Ou às</b><input id="crHora" type="time" style="flex:0 0 110px"><button id="crPorHora" class="mini">Marcar</button></div>
+  <div class="fila"><b>Depois vai pra</b><select id="crCena"></select></div>
+  <div class="grade um"><button id="crParar" class="mini">Cancelar</button></div>
+  </details>
+
   <details class="secao" data-secao="overlays">
   <summary>Overlays</summary>
   <p class="dica">Cria a fonte na cena que está no ar, já ajustada.</p>
@@ -1096,6 +1110,64 @@ async function mexeChave(qual, marca, caixa) {
   marca.disabled = false;
 }
 
+/* ================== A CONTAGEM REGRESSIVA ==================
+
+   Daqui, e não do site: quem liga isso está montando a live, com o OBS
+   aberto na frente. E a lista de cenas vem do OBS de verdade — digitar o
+   nome da cena à mão é onde se erra, e o erro só aparece quando a
+   contagem zera e nada acontece. */
+let crTic = null;
+
+async function crPinta() {
+  const alvo = el('crQuanto');
+  if (!alvo) return;
+  try {
+    const d = await api('/contagem-regressiva.php');
+    crMostra(d.faltam);
+    clearInterval(crTic);
+    if (d.faltam !== null && d.faltam > 0) {
+      let resta = d.faltam;
+      crTic = setInterval(() => { resta = Math.max(0, resta - 1); crMostra(resta); }, 1000);
+    }
+  } catch (e) { alvo.textContent = ''; }
+}
+
+function crMostra(seg) {
+  const alvo = el('crQuanto');
+  if (seg === null || seg === undefined) { alvo.textContent = ''; return; }
+  if (seg <= 0) { alvo.textContent = 'zerou'; return; }
+  const m = Math.floor(seg / 60), s = seg % 60;
+  alvo.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+async function crMarca(corpo) {
+  try {
+    corpo.cena = el('crCena').value || '';
+    await api('/contagem-regressiva.php', { method: 'POST', body: JSON.stringify(corpo) });
+    crPinta();
+    anotar(corpo.parar ? 'contagem cancelada' : 'contagem marcada');
+  } catch (e) { anotar('não deu: ' + e.message); }
+}
+
+/* As cenas do OBS, pra não ter que digitar o nome. */
+async function crCenas() {
+  const sel = el('crCena');
+  if (!sel) return;
+  sel.innerHTML = '';
+  sel.appendChild(criarOpcao('', '— ficar onde está —'));
+  try {
+    const d = await pedir('GetSceneList');
+    (d.scenes || []).forEach((c) => sel.appendChild(criarOpcao(c.sceneName, c.sceneName)));
+  } catch (e) { /* OBS fechado: fica só a opção de não trocar */ }
+}
+
+function criarOpcao(valor, texto) {
+  const o = document.createElement('option');
+  o.value = valor;
+  o.textContent = texto;
+  return o;
+}
+
 /* ================== PÔR O OVERLAY NO OBS ==================
 
    SEIS PASSOS VIRAM UM CLIQUE.
@@ -1319,7 +1391,7 @@ function ligarSecoes() {
   el('secaoCanal').classList.toggle('escondido', !tem);
   el('secaoPalpite').classList.toggle('escondido', !tem);
   el('secaoMomentos').classList.toggle('escondido', !tem);
-  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); lerOverlays(); lerChaves(); ordemDasSecoes(); }
+  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); lerOverlays(); lerChaves(); crPinta(); crCenas(); ordemDasSecoes(); }
   vendoAoVivo();
   perfilPinta();
 }
@@ -2531,6 +2603,13 @@ el('senha').addEventListener('keydown', (e) => { if (e.key === 'Enter') el('btEn
 
 el('btPanico').addEventListener('click', () => { mandar('panico'); anotar('pânico pedido'); });
 el('btCalar').addEventListener('click', calarBot);
+document.querySelectorAll('[data-cr]').forEach((b) => {
+  b.addEventListener('click', () => crMarca({ minutos: +b.dataset.cr }));
+});
+el('crPorHora').addEventListener('click', () => {
+  if (el('crHora').value) crMarca({ hora: el('crHora').value });
+});
+el('crParar').addEventListener('click', () => crMarca({ parar: 1 }));
 el('chVoz').addEventListener('change', (e) => mexeChave('voz', e.target, el('chVozCaixa')));
 el('chAlertas').addEventListener('change', (e) => mexeChave('alertas', e.target, el('chAlertasCaixa')));
 el('btVoltar').addEventListener('click', () => { mandar('voltar'); anotar('saindo do pânico'); });

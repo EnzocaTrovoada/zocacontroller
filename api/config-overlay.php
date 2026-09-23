@@ -181,6 +181,25 @@ if ($perfil['tipo'] === 'feed') {
     if (!$ligados) $eventos = [];
 }
 
+/* A CONTAGEM REGRESSIVA.
+
+   Quanto falta é contado AQUI, e não na máquina de quem assiste: relógio
+   torto do espectador daria uma contagem que discorda da do streamer, e
+   duas contagens diferentes na mesma live é pior que nenhuma. */
+$contagem = null;
+if ($perfil['tipo'] === 'relogio' && !empty($config['crligada'])) {
+    try {
+        $cr = db()->prepare('SELECT alvo, fim_texto FROM contagem_regressiva WHERE usuario_id = ?');
+        $cr->execute([(int) $perfil['usuario_id']]);
+        if ($l = $cr->fetch()) {
+            $contagem = [
+                'faltam' => $l['alvo'] ? max(0, strtotime((string) $l['alvo']) - time()) : null,
+                'texto'  => (string) $l['fim_texto'],
+            ];
+        }
+    } catch (Throwable $e) { /* sem o SQL 066: relógio normal */ }
+}
+
 /* A FILA DO TTS.
 
    Pega aqui, e não num endereço próprio: a fonte já bate neste a cada
@@ -238,6 +257,9 @@ $etag = '"' . md5($perfil['atualizado_em'] . '|' . json_encode($recursos)
                   . '|' . ($musica === null ? '' : md5(json_encode($musica)))
                   . '|' . ($fala ? md5(json_encode($fala)) : '')
                   . '|' . (string) $calar
+                  /* Sem isto o 304 devolveria sempre o mesmo "faltam", e a
+                     contagem ficaria parada no número da primeira leitura. */
+                  . '|' . ($contagem === null ? '' : (string) $contagem['faltam'])
                   . '|' . (string) $som) . '"';
 header('ETag: ' . $etag);
 header('Cache-Control: no-cache, must-revalidate');
@@ -279,6 +301,7 @@ json_saida([
     'eventos'  => $eventos,
     'fala'     => $fala,
     'calar'    => $calar,
+    'contagem' => $contagem,
     'musica'   => $musica,
     'som'      => $som,
     'recursos' => $recursos,

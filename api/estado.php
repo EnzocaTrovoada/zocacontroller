@@ -108,6 +108,26 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $ultimo->execute([$quem['usuario_id']]);
     $volta['eventos_ate'] = (int) $ultimo->fetchColumn();
 
+    /* A CENA DA CONTAGEM REGRESSIVA.
+
+       Quem troca é a ponte: só ela fala com o OBS. O servidor apenas
+       avisa, e marca que já avisou — sem o trocada_em, ele mandaria trocar
+       a cada leitura depois do prazo, e o streamer não conseguiria sair da
+       cena de "já vai começar". */
+    try {
+        $cr = db()->prepare(
+            'SELECT cena FROM contagem_regressiva
+              WHERE usuario_id = ? AND alvo IS NOT NULL AND alvo <= NOW()
+                AND LENGTH(cena) > 0 AND trocada_em IS NULL'
+        );
+        $cr->execute([$quem['usuario_id']]);
+        if ($cena = $cr->fetchColumn()) {
+            db()->prepare('UPDATE contagem_regressiva SET trocada_em = NOW() WHERE usuario_id = ?')
+                ->execute([$quem['usuario_id']]);
+            $volta['trocar_cena'] = (string) $cena;
+        }
+    } catch (Throwable $e) { /* sem o SQL 066: nada a trocar */ }
+
     json_saida($volta);
 }
 

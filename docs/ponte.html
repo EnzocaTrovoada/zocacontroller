@@ -1798,6 +1798,16 @@ async function subirEstado(forcar) {
                            { quem: e.quem, quantidade: e.quantidade });
         }
         if (typeof d.eventos_ate === 'number') eventosDesde = d.eventos_ate;
+
+        /* A CENA DA CONTAGEM REGRESSIVA ZEROU.
+           O servidor só manda uma vez — depois disso o streamer pode
+           trocar de cena à vontade sem ser puxado de volta. */
+        if (d.trocar_cena) {
+          try {
+            await pedir('SetCurrentProgramScene', { sceneName: d.trocar_cena });
+            recado('contagem zerou — fui pra cena "' + d.trocar_cena + '"');
+          } catch (e) { recado('não achei a cena "' + d.trocar_cena + '"'); }
+        }
       }
     }
   } catch (e) {
