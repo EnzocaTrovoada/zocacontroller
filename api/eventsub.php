@@ -111,6 +111,46 @@ if ($tipoMsg !== '') {
  */
 function tratar_evento(int $usuario_id, string $tipo, array $ev): void
 {
+    /* O RESGATE DE PONTOS, QUE VIRA FALA.
+
+       O texto vem de um espectador, então ele NÃO é usado pra mais nada
+       além de virar fala: não vira endereço, não vira comando, não vira
+       HTML. O tts_enfileira() limpa antes de guardar, e quem lê escreve
+       com textContent. A regra não tem exceção. */
+    if ($tipo === 'channel.channel_points_custom_reward_redemption.add') {
+        require_once __DIR__ . '/lib/tts.php';
+
+        $cfg = tts_config($usuario_id);
+        $premio = (string) ($ev['reward']['id'] ?? '');
+
+        /* Prêmio amarrado: só ele fala. Sem amarrar, nenhum fala — senão
+           qualquer resgate do canal viraria voz, inclusive os que a pessoa
+           criou pra outra coisa. */
+        if ($cfg['premio_id'] === '' || $cfg['premio_id'] !== $premio) {
+            return;
+        }
+
+        $texto = (string) ($ev['user_input'] ?? '');
+        $quem  = (string) ($ev['user_name'] ?? '');
+
+        /* O PREFIXO ESCOLHE A VOZ, E SÓ CONTRA A LISTA FECHADA.
+
+           "grave: oi" fala em grave. O que não casa com uma voz do catálogo
+           NÃO é engolido: a mensagem inteira é lida na voz padrão. Engolir
+           viraria jeito de sumir com o que o outro escreveu. */
+        $voz = '';
+        if ((int) $cfg['prefixo'] && preg_match('/^\s*([a-z]{3,12})\s*:\s*(.+)$/isu', $texto, $m)) {
+            $tentou = mb_strtolower($m[1]);
+            if (in_array($tentou, tts_vozes_do_canal($cfg), true)) {
+                $voz = $tentou;
+                $texto = $m[2];
+            }
+        }
+
+        tts_enfileira($usuario_id, $texto, $quem, $voz);
+        return;
+    }
+
     if ($tipo !== 'channel.follow') {
         return;
     }
@@ -136,6 +176,9 @@ const TIPOS = [
     // channel.follow é versão 2 e pede um moderador na condição — o próprio
     // dono do canal serve, desde que ele tenha dado moderator:read:followers.
     'channel.follow' => ['versao' => '2', 'moderador' => true],
+    // O resgate de pontos: é ele que faz o TTS existir. Sem moderador na
+    // condição, e o escopo é channel:read:redemptions.
+    'channel.channel_points_custom_reward_redemption.add' => ['versao' => '1'],
 ];
 
 $bid = tw_broadcaster_id($quem['usuario_id']);

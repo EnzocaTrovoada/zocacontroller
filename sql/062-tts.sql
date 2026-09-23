@@ -42,3 +42,8 @@ CREATE TABLE IF NOT EXISTS tts_fila (
   falado_em   DATETIME     NULL,
   KEY ix_fila (usuario_id, falado_em, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* O instante do ultimo "calar o bot". O overlay compara com o que ele ja
+   obedeceu: assim um pedido cala uma vez, e nao a cada leitura. */
+ALTER TABLE tts_config
+  ADD COLUMN calar_em DATETIME NULL;

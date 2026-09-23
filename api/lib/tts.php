@@ -28,7 +28,8 @@ const TTS_VALE_SEG = 180;
 function tts_config(int $uid): array
 {
     $padrao = ['ligado' => 0, 'voz' => 'padrao', 'vozes' => '', 'aleatorio' => 0,
-               'prefixo' => 0, 'max_letras' => 200, 'bloqueadas' => '', 'premio_id' => ''];
+               'prefixo' => 0, 'max_letras' => 200, 'bloqueadas' => '', 'premio_id' => '',
+               'calar_em' => null];
     try {
         $st = db()->prepare('SELECT * FROM tts_config WHERE usuario_id = ?');
         $st->execute([$uid]);
@@ -142,12 +143,15 @@ function tts_pega(int $uid, int $quantas = 5): array
         } catch (Throwable $e) { /* falar é mais importante que marcar */ }
     }
 
-    /* Faxina na leitura, como no resto do site: uma vez por visita, e não
-       a cada mensagem que chega. */
-    try {
-        db()->prepare('DELETE FROM tts_fila WHERE usuario_id = ? AND criado_em < DATE_SUB(NOW(), INTERVAL 1 HOUR)')
-            ->execute([$uid]);
-    } catch (Throwable $e) { /* a fila já saiu */ }
+    /* Faxina de vez em quando, e não a cada leitura: o overlay de TTS
+       pergunta de 3 em 3 segundos, então "toda leitura" seriam vinte
+       DELETEs por minuto por fonte aberta, pra apagar o que já não há. */
+    if (random_int(1, 40) === 1) {
+        try {
+            db()->prepare('DELETE FROM tts_fila WHERE usuario_id = ? AND criado_em < DATE_SUB(NOW(), INTERVAL 1 HOUR)')
+                ->execute([$uid]);
+        } catch (Throwable $e) { /* a fila já saiu */ }
+    }
 
     return $linhas;
 }

@@ -24,6 +24,8 @@ const TW_ESCOPOS = [
     'channel:bot',                  // deixar o bot do ZocaController falar no canal
     'channel:edit:commercial',      // rodar anuncio sozinho, de tempo em tempo
     'channel:read:ads',             // quanto tempo sem pre-roll o canal ganhou
+    'channel:read:redemptions',     // resgate de pontos do canal, que dispara o TTS
+    'channel:manage:redemptions',   // criar o premio do TTS pela pessoa, em vez de pedir o id
 ];
 
 /**

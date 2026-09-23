@@ -308,6 +308,10 @@
         /* A fila do TTS vem na mesma leitura da config: não vale abrir um
            segundo canal só pra isso. */
         if (j.fala && relogio && relogio.falar) relogio.falar(j.fala);
+        /* CALAR VEM ANTES DE FALAR NÃO: vem depois, de propósito. Se a
+           pessoa mandou calar, o que chegou nesta mesma resposta também
+           morre — senão a última leva ainda sairia. */
+        if (j.calar && relogio && relogio.calar) relogio.calar(j.calar);
         /* undefined é "esta resposta não fala de música"; null é "não tem
            nada tocando". Só o segundo apaga a tela. */
         if (j.musica !== undefined && relogio && relogio.musica) relogio.musica(j.musica);
@@ -331,6 +335,13 @@
      cada dois segundos. Com o 304 funcionando isso custa poucos bytes por
      pedido, e para assim que a corrida para. */
   function intervaloDaBusca() {
+    /* O TTS PRECISA SER RÁPIDO POR DOIS MOTIVOS.
+
+       Quem resgatou espera a voz sair: quinze segundos de silêncio depois
+       de gastar ponto parece defeito. E o botão de calar do painel só vale
+       se ele calar de verdade — um "pare de falar" que demora quinze
+       segundos não serve pra nada, que é justo quando ele é preciso. */
+    if (ultimaConfig && ultimaConfig.tipo === 'tts') return 3000;
     if (!ultimaConfig || ultimaConfig.tipo !== 'speedrun') return 15000;
     var corr = ultimaConfig.spcor;
     return (corr && corr.e === 'correndo') ? 2000 : 15000;

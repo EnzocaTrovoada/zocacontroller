@@ -14,6 +14,11 @@
 
   "novidades": [
     {
+      "data": "2026-09-23",
+      "titulo": "O chat manda o bot falar (TTS)",
+      "texto": "O espectador gasta pontos do canal e o bot fala a mensagem dele, com nove jeitos de falar — grave, agudo, criança, robô e mais. O som sai do overlay de TTS, na sua máquina, então não custa nada por mensagem. Endereços não são lidos, palavras que você barrar não saem, e tem um CALAR O BOT no painel do OBS pra cortar uma frase no meio. No Pro dá pra usar várias vozes, sortear entre elas e deixar quem resgatou escolher escrevendo \"grave: a mensagem\"."
+    },
+    {
       "data": "2026-09-22",
       "titulo": "A cor do site, escolhida por você (Pro)",
       "texto": "Em Meu ZocaHub dá pra escolher a cor do site. Vale só pra você, em qualquer aparelho onde entrar, e não muda nada pra quem vê o seu canal. O site inteiro acompanha — fundo, cartões, botões e linhas — porque a cor entra pela matiz e a escala de claro e escuro continua sendo a mesma. Por isso dá pra escolher amarelo ou preto sem nada ficar ilegível."

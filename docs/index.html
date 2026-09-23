@@ -7800,7 +7800,9 @@ function caixaDoTts(caixa) {
   const prefixo = h('input', { type: 'checkbox' });
   const letras = h('input', { type: 'number', min: '20', max: '400', style: 'flex:0 0 90px' });
   const barradas = h('textarea', { rows: '2', placeholder: 'palavras que o bot não fala, separadas por espaço' });
-  const premio = h('input', { type: 'text', placeholder: 'id do prêmio de pontos (opcional)' });
+  const premio = h('select');
+  const criar = h('button', { cls: 'bt fraco', type: 'button', txt: 'Criar o prêmio pra mim' });
+  const dizPremio = h('span', { cls: 'd', style: 'font-size:11.5px' });
   const salvar = h('button', { cls: 'bt principal', type: 'button', txt: 'Salvar' });
   const diz = h('span', { cls: 'd', style: 'font-size:12.5px' });
 
@@ -7850,7 +7852,7 @@ function caixaDoTts(caixa) {
         prefixo: prefixo.checked ? 1 : 0,
         max_letras: parseInt(letras.value, 10) || 200,
         bloqueadas: barradas.value,
-        premio_id: premio.value.trim(),
+        premio_id: premio.value,
       }) });
       diz.textContent = 'Salvo.';
       diz.style.color = 'var(--verde-forte)';
@@ -7874,9 +7876,45 @@ function caixaDoTts(caixa) {
     h('div', { cls: 'campo' }, [h('span', { cls: 'rotulo', txt: 'Tamanho máximo' }), letras,
       h('span', { cls: 'd', txt: 'letras' })]),
     h('div', { cls: 'campo campo--inteiro' }, [h('span', { cls: 'rotulo', txt: 'Palavras barradas' }), barradas]),
-    h('div', { cls: 'campo campo--inteiro' }, [h('span', { cls: 'rotulo', txt: 'Prêmio de pontos' }), premio]),
+    h('div', { cls: 'campo' }, [h('span', { cls: 'rotulo', txt: 'Prêmio de pontos' }), premio, criar]),
+    h('p', { cls: 'd', style: 'margin:-6px 0 10px;font-size:11.5px' }, [dizPremio]),
     h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [salvar, diz]),
   );
+
+  /* A LISTA DOS PRÊMIOS, EM VEZ DE UM UUID DIGITADO.
+
+     Copiar id de prêmio da Twitch é onde o usuário leigo desiste. E quem
+     não tem prêmio nenhum não fica travado: o botão cria um pronto, já
+     pedindo a mensagem — prêmio sem mensagem resgataria vazio e o bot não
+     teria o que falar. */
+  async function pintaPremios(escolhido) {
+    premio.innerHTML = '';
+    premio.appendChild(h('option', { value: '', txt: '— nenhum (o TTS não dispara) —' }));
+    try {
+      const d = await api('/tts.php?premios=1');
+      (d.premios || []).forEach((p) => {
+        premio.appendChild(h('option', { value: p.id, txt: p.nome + ' (' + p.custo + ' pontos)' }));
+      });
+      premio.value = escolhido || '';
+      if (d.erro) dizPremio.textContent = d.erro;
+      else if ((d.premios || []).length) dizPremio.textContent = 'O bot fala quando alguém resgata este prêmio.';
+      else dizPremio.textContent = 'Você ainda não tem prêmio nenhum. O botão cria um.';
+      dizPremio.style.color = d.erro ? 'var(--dourado)' : 'var(--apagado)';
+    } catch (e) {
+      dizPremio.textContent = 'Não deu pra ler seus prêmios.';
+      dizPremio.style.color = 'var(--dourado)';
+    }
+  }
+
+  criar.onclick = async () => {
+    criar.disabled = true;
+    try {
+      const r = await api('/tts.php', { method: 'POST', body: JSON.stringify({ criar_premio: 1, custo: 500 }) });
+      await pintaPremios(r.premio_id);
+      recado('Prêmio criado no seu canal.', 'bom');
+    } catch (e) { recado(e.message, 'ruim'); }
+    criar.disabled = false;
+  };
 
   api('/tts.php').then((d) => {
     liga.checked = !!d.ligado;
@@ -7884,7 +7922,7 @@ function caixaDoTts(caixa) {
     podeVarias = d.varias !== false;
     letras.value = d.max_letras || 200;
     barradas.value = d.bloqueadas || '';
-    premio.value = d.premio_id || '';
+    pintaPremios(d.premio_id || '');
     pintaVozes(d.catalogo, d.voz);
     sorteia.checked = !!d.aleatorio;
     prefixo.checked = !!d.prefixo;

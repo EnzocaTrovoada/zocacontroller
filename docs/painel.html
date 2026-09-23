@@ -233,6 +233,12 @@
     <button id="btVoltar" disabled>Sair do pânico</button>
   </div>
 
+  <!-- Fica junto do pânico, e não dentro de uma seção fechada: quando
+       precisa, precisa agora. Nasce escondido pra quem não usa TTS. -->
+  <div class="grade escondido" id="grTts">
+    <button id="btCalar" class="perigo">CALAR O BOT</button>
+  </div>
+
   <details class="secao" data-secao="audio">
   <summary>Áudio <button id="btEditarSons" class="mini">editar</button></summary>
   <p class="dica escondido" id="dicaSons">Desmarque o que você não quer ver aqui nem no painel dos mods.
@@ -897,6 +903,37 @@ function aplicaCorDock(hex) {
 /* Do navegador primeiro (entra no primeiro quadro), do servidor depois. */
 try { aplicaCorDock(guardado('zc:cor')); } catch (e) {}
 
+/* CALAR O BOT.
+
+   O streamer é quem leva o banimento pelo que sai no som dele, então ele
+   precisa conseguir cortar uma frase no meio — e chegar lá em dois cliques
+   dentro de uma seção fechada não serve. Apaga a fila e manda a fonte
+   parar; ela obedece na leitura seguinte, que é de 3 em 3 segundos. */
+async function calarBot() {
+  const bt = el('btCalar');
+  bt.disabled = true;
+  try {
+    await api('/tts.php', { method: 'POST', body: JSON.stringify({ calar: 1 }) });
+    anotar('bot calado');
+  } catch (e) { anotar('não deu pra calar: ' + e.message); }
+  setTimeout(() => { bt.disabled = false; }, 600);
+}
+
+/* O botão só existe pra quem usa TTS: um "CALAR O BOT" vermelho num painel
+   de quem não tem TTS é só uma pergunta sem resposta. */
+async function talvezMostrarCalar() {
+  if (!chavePainel) return;
+  try {
+    const d = await api('/tts.php');
+    el('grTts').classList.toggle('escondido', !d.ligado);
+  } catch (e) {
+    /* Esconder na falha, e não só deixar como estava: se o TTS estava
+       ligado e o servidor voltou atrás, sobraria um botão vermelho que
+       não faz nada. */
+    el('grTts').classList.add('escondido');
+  }
+}
+
 async function corDoDock() {
   if (!chavePainel) return;
   try {
@@ -911,7 +948,7 @@ function ligarSecoes() {
   el('secaoCanal').classList.toggle('escondido', !tem);
   el('secaoPalpite').classList.toggle('escondido', !tem);
   el('secaoMomentos').classList.toggle('escondido', !tem);
-  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); }
+  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); }
   perfilPinta();
 }
 
@@ -2121,6 +2158,7 @@ el('btConfig').addEventListener('click', () => {
 el('senha').addEventListener('keydown', (e) => { if (e.key === 'Enter') el('btEntrar').click(); });
 
 el('btPanico').addEventListener('click', () => { mandar('panico'); anotar('pânico pedido'); });
+el('btCalar').addEventListener('click', calarBot);
 el('btVoltar').addEventListener('click', () => { mandar('voltar'); anotar('saindo do pânico'); });
 
 el('btCamera').addEventListener('click', () => {

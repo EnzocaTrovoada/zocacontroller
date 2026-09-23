@@ -49,6 +49,7 @@
     var fila = [];
     var falando = null;
     var vistos = {};          /* id já enfileirado: a config volta a cada leitura */
+    var calouEm = null;       /* o último "calar" que já foi obedecido */
 
     /* AS VOZES DO SISTEMA CHEGAM DEPOIS.
        No Chrome a lista vem vazia na primeira leitura e só enche num evento
@@ -149,7 +150,12 @@
         mostra(null);
         proxima();
       },
-      calar: function () {
+      /* O servidor manda o instante do último "calar". Obedecer só uma vez
+         por instante: sem isso, cada leitura cortaria a fala de novo e o
+         TTS nunca mais diria nada. */
+      calar: function (quando) {
+        if (quando && quando === calouEm) return;
+        calouEm = quando || 1;
         fila.length = 0;
         try { global.speechSynthesis.cancel(); } catch (e) {}
         falando = null;

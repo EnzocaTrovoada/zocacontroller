@@ -176,8 +176,13 @@ if ($perfil['tipo'] === 'feed') {
    SÓ O TIPO TTS. Um overlay de relógio não tem por que ler fila de fala,
    e cada leitura dessas é um UPDATE no banco. */
 $fala = null;
+$calar = null;
 if ($perfil['tipo'] === 'tts') {
     $fala = tts_pega((int) $perfil['usuario_id']);
+    /* O instante do último "calar o bot". Vai sempre, e não só quando é
+       novo: a fonte é quem sabe se já obedeceu esse — ela pode ter nascido
+       agora, ou ter ficado um tempo fora do ar. */
+    $calar = tts_config((int) $perfil['usuario_id'])['calar_em'] ?: null;
 }
 
 /* O ENDEREÇO DO SOM PRÓPRIO.
@@ -217,6 +222,7 @@ $etag = '"' . md5($perfil['atualizado_em'] . '|' . json_encode($recursos)
                   . '|' . ($eventos === null ? '' : md5(json_encode($eventos)))
                   . '|' . ($musica === null ? '' : md5(json_encode($musica)))
                   . '|' . ($fala ? md5(json_encode($fala)) : '')
+                  . '|' . (string) $calar
                   . '|' . (string) $som) . '"';
 header('ETag: ' . $etag);
 header('Cache-Control: no-cache, must-revalidate');
@@ -257,6 +263,7 @@ json_saida([
     'config'   => $config,
     'eventos'  => $eventos,
     'fala'     => $fala,
+    'calar'    => $calar,
     'musica'   => $musica,
     'som'      => $som,
     'recursos' => $recursos,
