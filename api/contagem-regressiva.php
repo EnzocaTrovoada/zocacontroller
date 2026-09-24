@@ -73,6 +73,21 @@ if (isset($d['minutos'])) {
     $alvo = date('Y-m-d H:i:s', time() + $seg);
 }
 
+/* JÁ TROQUEI, PODE ESQUECER.
+
+   O painel troca a cena sozinho quando a contagem zera — ele está dentro
+   do OBS e fala com ele direto. Avisar aqui impede que a ponte troque de
+   novo alguns segundos depois, puxando a pessoa de volta pra cena de
+   "já vai começar" se ela já tiver saído. */
+if (!empty($d['trocada'])) {
+    try {
+        db()->prepare('UPDATE contagem_regressiva SET trocada_em = NOW()
+                        WHERE usuario_id = ? AND trocada_em IS NULL')
+            ->execute([$uid]);
+    } catch (Throwable $e) { /* sem tabela: nada a marcar */ }
+    json_saida(['ok' => true]);
+}
+
 /* SÓ A CENA, SEM MEXER NO PRAZO.
 
    Escolher a cena DEPOIS de marcar o tempo é o caso normal: a pessoa

@@ -2379,7 +2379,7 @@ function padraoDe(tipo) {
       titulo: '', font: 'Archivo', size: 22, weight: 500, color: '#FFFFFF',
       sw: 0, glow: 0, shx: 0, shy: 2, shb: 8, sho: 60, shc: '#000000',
       align: 'left', valign: 'bottom',
-      tvoz: 'padrao', tvol: 100, tlingua: 'pt-BR', anome: '#7CE07C',
+      tvoz: 'padrao', tvol: 100, tlingua: 'pt-BR', anome: '#7CE07C', tintro: 1,
     });
   }
 
@@ -2706,6 +2706,8 @@ const GRUPOS = [
       ['pt-BR', 'Português do Brasil'], ['pt-PT', 'Português de Portugal'],
       ['en-US', 'Inglês'], ['es-ES', 'Espanhol']],
       dica: 'usa a voz que o computador tem instalada nesse idioma' },
+    { k: 'tintro', l: 'Dizer quem mandou', c: 'chave',
+      dica: 'fala "fulano resgatou uma mensagem de voz e falou:" antes da mensagem' },
     { k: 'tvol', l: 'Volume', c: 'faixa', min: 0, max: 100, u: '%' },
     { k: 'anome', l: 'Cor de quem mandou', c: 'cor' },
   ] },

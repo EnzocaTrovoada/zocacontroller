@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-24",
+      "titulo": "O TTS diz quem mandou, e a cena troca pelo próprio painel",
+      "texto": "Agora o bot fala \"fulano resgatou uma mensagem de voz e falou:\" antes da mensagem — dá pra desligar no editor da overlay. A frase no meio não é enfeite: ela impede que alguém escreva uma mensagem que se passa por outra pessoa. E a troca de cena da contagem passou a ser feita pelo painel dentro do OBS, que já fala com ele — a ponte agora só cobre quem estiver com o painel fechado."
+    },
+    {
+      "data": "2026-09-24",
       "titulo": "Testar a troca de cena em 5 segundos",
       "texto": "A seção Contagem passou a mostrar o que está GUARDADO no servidor — \"vai pra Começando\" ou \"fica onde está\" — em vez de só o que está selecionado na lista. E ganhou um \"Testar em 5s\", porque esperar quinze minutos pra descobrir que não funcionou é caro demais. Na tela do TTS, quando falta ligar os avisos da Twitch, o botão pra ligar está ali mesmo."
     },

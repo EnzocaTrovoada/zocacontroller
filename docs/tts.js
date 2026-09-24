@@ -109,9 +109,25 @@
       mostra(item);
 
       var v = VOZES[item.voz] || VOZES.padrao;
+
+      /* QUEM MANDOU, DITO ANTES — COM UMA FRASE FIXA NO MEIO.
+
+         A frase entre o nome e a mensagem não é enfeite: ela é o que
+         impede alguém de se passar por outra pessoa. Sem separador, uma
+         mensagem começando com "fulano disse que" sairia colada no nome
+         de quem resgatou e viraria a fala de dois. Com "resgatou uma
+         mensagem de voz e falou:" no meio, o chat ouve onde um acaba e o
+         outro começa.
+
+         O nome vem da Twitch, e não do que a pessoa digitou. */
+      var dizer = item.texto;
+      if (cfg.tintro !== 0 && item.quem) {
+        dizer = item.quem + ' resgatou uma mensagem de voz e falou: ' + item.texto;
+      }
+
       var fala;
       try {
-        fala = new global.SpeechSynthesisUtterance(item.texto);
+        fala = new global.SpeechSynthesisUtterance(dizer);
       } catch (e) { falando = null; return; }
 
       fala.pitch = v.tom;
@@ -137,7 +153,7 @@
       }
       fala.onend = acabou;
       fala.onerror = acabou;
-      var reserva = setTimeout(acabou, 4000 + item.texto.length * 120);
+      var reserva = setTimeout(acabou, 4000 + dizer.length * 120);
 
       try { global.speechSynthesis.speak(fala); } catch (e) { acabou(); }
     }

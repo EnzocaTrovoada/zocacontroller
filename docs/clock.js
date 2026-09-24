@@ -95,6 +95,7 @@
     /* ---- tts ---- */
     tvoz:     { t: 'e', d: 'padrao', v: ['padrao', 'grave', 'agudo', 'crianca', 'narrador', 'apressado', 'arrastado', 'gigante', 'sussurro'] },
     tvol:     { t: 'n', d: 100, min: 0, max: 100 },
+    tintro:   { t: 'b', d: 1 },
     tlingua:  { t: 'e', d: 'pt-BR', v: ['pt-BR', 'pt-PT', 'en-US', 'es-ES'] },
 
     /* ---------------- speedrun ----------------

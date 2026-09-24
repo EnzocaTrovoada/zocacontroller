@@ -1207,6 +1207,33 @@ async function raidSorte() {
    contagem zera e nada acontece. */
 let crTic = null;
 
+/* QUEM TROCA A CENA É ESTE PAINEL, e a ponte só cobre a ausência dele.
+
+   O caminho de antes era: servidor avisa a ponte, ponte troca. Dois
+   programas e três arquivos entre o relógio e a cena, e qualquer um deles
+   desatualizado quebrava tudo em silêncio.
+
+   Este painel está DENTRO do OBS, já fala com ele e já sabe quando a
+   contagem zera — ele mesmo troca. A ponte continua trocando pra quem
+   estiver com o painel fechado, e o aviso de "já troquei" impede que os
+   dois façam a mesma troca duas vezes. */
+let crJaTrocou = false;
+
+async function crZerou(cena) {
+  if (crJaTrocou || !cena) return;
+  crJaTrocou = true;
+  try {
+    await pedir('SetCurrentProgramScene', { sceneName: cena });
+    anotar('contagem zerou — fui pra "' + cena + '"');
+    /* Avisar depois de trocar, e não antes: se a troca falhar, a ponte
+       ainda tem a chance de fazer o que este painel não conseguiu. */
+    await api('/contagem-regressiva.php', { method: 'POST', body: JSON.stringify({ trocada: 1 }) });
+  } catch (e) {
+    crJaTrocou = false;
+    anotar('não achei a cena "' + cena + '" no OBS');
+  }
+}
+
 async function crPinta() {
   const alvo = el('crQuanto');
   if (!alvo) return;
@@ -1223,8 +1250,13 @@ async function crPinta() {
     el('crNoFim').textContent = d.cena ? ('vai pra "' + d.cena + '"') : 'fica onde está';
     clearInterval(crTic);
     if (d.faltam !== null && d.faltam > 0) {
+      crJaTrocou = false;           /* contagem nova, troca nova */
       let resta = d.faltam;
-      crTic = setInterval(() => { resta = Math.max(0, resta - 1); crMostra(resta); }, 1000);
+      crTic = setInterval(() => {
+        resta = Math.max(0, resta - 1);
+        crMostra(resta);
+        if (resta === 0) { clearInterval(crTic); crZerou(d.cena || ''); }
+      }, 1000);
     }
   } catch (e) { alvo.textContent = ''; }
 }
