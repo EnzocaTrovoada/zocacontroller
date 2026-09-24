@@ -1639,6 +1639,19 @@ try {
   }
   .raid-barra i { display: block; height: 100%; background: var(--verde); transition: width .3s ease-out; }
 
+  /* ---------- por que o TTS não fala ---------- */
+  .tts-checa {
+    display: flex; flex-direction: column; gap: 3px;
+    margin: 14px 0 0; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--linha); background: var(--caixa2);
+  }
+  .tts-checa b { font: 600 13px var(--disp); }
+  .tts-checa .d { font-size: 12px; }
+  .tts-checa--falta { border-color: var(--dourado); }
+  .tts-checa--falta b { color: var(--dourado); }
+  .tts-checa--ok { border-color: var(--verde); }
+  .tts-checa--ok b { color: var(--verde-forte); }
+
   /* ---------- as vozes do TTS ---------- */
   .tts-vozes { display: flex; flex-wrap: wrap; gap: 6px; }
   .tts-voz {
@@ -8323,6 +8336,7 @@ function caixaDoTts(caixa) {
       }) });
       diz.textContent = 'Salvo.';
       diz.style.color = 'var(--verde-forte)';
+      checaTts();
     } catch (e) {
       diz.textContent = e.message;
       diz.style.color = 'var(--perigo)';
@@ -8336,6 +8350,43 @@ function caixaDoTts(caixa) {
      som nenhum, porque a fonte que fala nunca foi criada. O endereço tem
      de estar nesta tela, ao lado da configuração. */
   const linhaOverlay = h('div', { cls: 'fatia', style: 'margin:16px 0 0' });
+
+  /* POR QUE O TTS NÃO FALA.
+
+     São cinco elos e quebrar um não dá erro: o espectador gasta os pontos
+     e o silêncio é a única resposta. Esta caixa diz qual elo quebrou, em
+     vez de deixar a pessoa procurando por eliminação. */
+  const caixaCheca = h('div', { cls: 'tts-checa escondido' });
+
+  function checaTts() {
+    api('/tts.php?checar=1').then((d) => {
+      caixaCheca.innerHTML = '';
+      if (d.tudo_certo) {
+        caixaCheca.className = 'tts-checa tts-checa--ok';
+        caixaCheca.append(
+          h('b', { txt: '✓ Está tudo no lugar.' }),
+          h('span', { cls: 'd', txt: 'Se mesmo assim não sair som: atualize a fonte do TTS no OBS '
+            + '(botão direito → Atualizar) e confira "Controlar áudio pelo OBS" nela.' }),
+        );
+        return;
+      }
+
+      caixaCheca.className = 'tts-checa tts-checa--falta';
+      caixaCheca.append(
+        h('b', { txt: 'Falta: ' + d.primeiro.o_que }),
+        h('span', { cls: 'd', txt: d.primeiro.como }),
+      );
+
+      /* O resto vem menor e depois: resolver o primeiro pode acender os
+         outros sozinho, e uma lista de cinco pendências desanima. */
+      const outros = (d.passos || []).filter((x) => !x.ok).slice(1);
+      if (outros.length) {
+        caixaCheca.appendChild(h('span', { cls: 'd', style: 'margin-top:6px;opacity:.75',
+          txt: 'Depois desse: ' + outros.map((x) => x.o_que.toLowerCase()).join('; ') + '.' }));
+      }
+    }).catch(() => { /* servidor velho: sem conferência */ });
+  }
+  checaTts();
 
   async function pintaOverlay() {
     linhaOverlay.innerHTML = '';
@@ -8388,6 +8439,7 @@ function caixaDoTts(caixa) {
     h('div', { cls: 'campo' }, [h('span', { cls: 'rotulo', txt: 'Prêmio de pontos' }), premio, criar]),
     h('p', { cls: 'd', style: 'margin:-6px 0 10px;font-size:11.5px' }, [dizPremio]),
     h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [salvar, diz]),
+    caixaCheca,
     linhaOverlay,
   );
 

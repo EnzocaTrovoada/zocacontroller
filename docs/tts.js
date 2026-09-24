@@ -58,7 +58,15 @@
     var fila = [];
     var falando = null;
     var vistos = {};          /* id já enfileirado: a config volta a cada leitura */
-    var calouEm = null;       /* o último "calar" que já foi obedecido */
+    /* O ÚLTIMO "calar" QUE JÁ FOI OBEDECIDO.
+
+       Começa como "ainda não vi nenhum". O PRIMEIRO que chegar é só
+       adotado, sem calar nada: ele é de antes desta fonte existir, e pode
+       ser de ontem. Obedecer ele apagava a primeira leva de falas depois
+       de toda recarga do overlay — quem atualizava a fonte pra testar
+       perdia exatamente a mensagem que estava testando. */
+    var calouEm = null;
+    var viOPrimeiroCalar = false;
 
     /* AS VOZES DO SISTEMA CHEGAM DEPOIS.
        No Chrome a lista vem vazia na primeira leitura e só enche num evento
@@ -168,6 +176,11 @@
          TTS nunca mais diria nada. */
       calar: function (quando) {
         if (quando && quando === calouEm) return;
+
+        /* O primeiro só é anotado. Daqui pra frente, um valor novo quer
+           dizer que a pessoa clicou agora — e aí sim cala. */
+        if (!viOPrimeiroCalar) { viOPrimeiroCalar = true; calouEm = quando || 1; return; }
+
         calouEm = quando || 1;
         fila.length = 0;
         try { global.speechSynthesis.cancel(); } catch (e) {}

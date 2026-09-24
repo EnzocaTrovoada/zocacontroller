@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-24",
+      "titulo": "O site diz por que o TTS não está falando",
+      "texto": "São cinco elos — ligado, prêmio, permissão, aviso da Twitch e a overlay no OBS — e quebrar um deles não dava erro nenhum: o espectador gastava os pontos e vinha silêncio. Agora a tela do TTS diz qual elo quebrou e o que fazer. Também: a cena da contagem regressiva passou a salvar quando você escolhe, e a lista de cenas se refaz ao abrir a seção — antes ela nascia vazia se o OBS ainda não tivesse conectado."
+    },
+    {
+      "data": "2026-09-24",
       "titulo": "As vozes do TTS que chiavam foram refeitas",
       "texto": "\"Robô\" e \"Gigante\" usavam um tom tão grave que o motor de voz devolvia chiado em vez de fala — era o som estranho que aparecia na live. Todas as vozes voltaram pra faixa que se entende. O Robô saiu, porque sem filtro de áudio ele só sairia chiando; no lugar entrou o Sussurro. Use o ▶ ao lado de cada voz pra ouvir antes de pôr na live."
     },

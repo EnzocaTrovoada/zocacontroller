@@ -49,6 +49,72 @@ if (isset($_GET['premios'])) {
     json_saida(['premios' => $lista]);
 }
 
+/* ---------- por que o TTS não fala ----------
+
+   SÃO SEIS ELOS, E QUEBRAR UM DELES NÃO DÁ ERRO NENHUM.
+
+   O resgate precisa: estar ligado aqui, ter um prêmio amarrado, ter a
+   permissão da Twitch, ter a assinatura do EventSub criada, ter a overlay
+   no OBS e a fonte não estar muda. Faltando qualquer um, o espectador
+   gasta os pontos e nada acontece — em silêncio.
+
+   Sem esta conferência, achar o elo quebrado é tentativa e erro. */
+if (isset($_GET['checar'])) {
+    $c = tts_config($uid);
+    $escopos = tw_escopos($uid);
+    $passos = [];
+
+    $passos[] = ['o_que' => 'O TTS está ligado',
+        'ok' => (bool) (int) $c['ligado'],
+        'como' => 'Marque "Ligado" aqui em cima e salve.'];
+
+    $passos[] = ['o_que' => 'Tem um prêmio de pontos escolhido',
+        'ok' => (string) $c['premio_id'] !== '',
+        'como' => 'Escolha um na lista, ou clique em "Criar o prêmio pra mim".'];
+
+    $passos[] = ['o_que' => 'A Twitch deixa a gente ver os resgates',
+        'ok' => in_array('channel:read:redemptions', $escopos, true),
+        'como' => 'Meu ZocaHub → Entrar de novo na Twitch.'];
+
+    /* A assinatura é o elo mais silencioso: ela só nasce quando a pessoa
+       liga o EventSub, e quem ligou ANTES do TTS existir não tem esta. */
+    $temAssinatura = false;
+    try {
+        $st = db()->prepare(
+            "SELECT estado FROM eventsub_assinaturas
+              WHERE usuario_id = ? AND tipo = 'channel.channel_points_custom_reward_redemption.add'"
+        );
+        $st->execute([$uid]);
+        $e = $st->fetchColumn();
+        $temAssinatura = $e !== false && $e !== 'revoked' && $e !== 'authorization_revoked';
+    } catch (Throwable $e) { /* sem tabela: conta como faltando */ }
+
+    $passos[] = ['o_que' => 'A Twitch está avisando a gente dos resgates',
+        'ok' => $temAssinatura,
+        'como' => 'Meu ZocaHub → Ligar os avisos da Twitch (EventSub).'];
+
+    $temOverlay = false;
+    try {
+        $st = db()->prepare("SELECT 1 FROM perfis WHERE usuario_id = ? AND tipo = 'tts' LIMIT 1");
+        $st->execute([$uid]);
+        $temOverlay = (bool) $st->fetchColumn();
+    } catch (Throwable $e) { /* idem */ }
+
+    $passos[] = ['o_que' => 'A overlay de TTS existe',
+        'ok' => $temOverlay,
+        'como' => 'Overlays → TTS. É ela que fala; sem ela não sai som.'];
+
+    $faltam = array_values(array_filter($passos, static fn($p) => !$p['ok']));
+
+    json_saida([
+        'tudo_certo' => !$faltam,
+        'passos'     => $passos,
+        /* O primeiro que falta é o que resolver: os de baixo podem depender
+           dele, e uma lista de cinco pendências desanima. */
+        'primeiro'   => $faltam[0] ?? null,
+    ]);
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $c = tts_config($uid);
     json_saida([

@@ -73,6 +73,23 @@ if (isset($d['minutos'])) {
     $alvo = date('Y-m-d H:i:s', time() + $seg);
 }
 
+/* SÓ A CENA, SEM MEXER NO PRAZO.
+
+   Escolher a cena DEPOIS de marcar o tempo é o caso normal: a pessoa
+   clica "15 min" e só então pensa em pra onde ir. Antes isso não salvava
+   nada, e a contagem zerava sem trocar de cena — sem erro nenhum. */
+if (!$alvo && array_key_exists('cena', $d)) {
+    $cena = mb_substr(trim((string) $d['cena']), 0, 100);
+    try {
+        db()->prepare('INSERT INTO contagem_regressiva (usuario_id, cena) VALUES (?, ?)
+                       ON DUPLICATE KEY UPDATE cena = VALUES(cena)')
+            ->execute([$uid, $cena]);
+    } catch (PDOException $e) {
+        json_saida(['erro' => erro_publico($e, 'Falta rodar o SQL 066 no banco.')], 500);
+    }
+    json_saida(['ok' => true, 'cena' => $cena]);
+}
+
 if (!$alvo) json_saida(['erro' => 'Diga quantos minutos, ou a hora.'], 400);
 
 $cena = mb_substr(trim((string) ($d['cena'] ?? '')), 0, 100);

@@ -330,6 +330,7 @@
   <div class="fila"><b>Ou às</b><input id="crHora" type="time" style="flex:0 0 110px"><button id="crPorHora" class="mini">Marcar</button></div>
   <div class="fila"><b>Ou daqui a</b><input id="crMin" type="number" min="1" max="1440" placeholder="min" style="flex:0 0 80px"><button id="crPorMin" class="mini">Marcar</button></div>
   <div class="fila"><b>Depois vai pra</b><select id="crCena"></select></div>
+  <p class="dica escondido" id="crCenaAviso"></p>
   <div class="grade um"><button id="crParar" class="mini">Cancelar</button></div>
   </details>
 
@@ -1204,6 +1205,7 @@ async function crPinta() {
   if (!alvo) return;
   try {
     const d = await api('/contagem-regressiva.php');
+    crCenas(d.cena || '');
     crMostra(d.faltam);
     clearInterval(crTic);
     if (d.faltam !== null && d.faltam > 0) {
@@ -1232,15 +1234,39 @@ async function crMarca(corpo) {
 }
 
 /* As cenas do OBS, pra não ter que digitar o nome. */
-async function crCenas() {
+/* A LISTA DE CENAS PRECISA SER REFEITA, E NÃO LIDA UMA VEZ SÓ.
+
+   Ela era montada na abertura do painel. Se o OBS ainda não tinha
+   conectado nesse instante — e no começo da sessão ele quase nunca
+   conectou —, a lista ficava só com "ficar onde está" e a pessoa não
+   TINHA como escolher cena nenhuma. A contagem zerava e nada acontecia.
+
+   Agora ela se refaz toda vez que a seção é aberta, e diz quando não
+   conseguiu falar com o OBS em vez de ficar calada. */
+async function crCenas(guardada) {
   const sel = el('crCena');
   if (!sel) return;
+
+  const escolhida = guardada != null ? guardada : sel.value;
   sel.innerHTML = '';
   sel.appendChild(criarOpcao('', '— ficar onde está —'));
+
   try {
     const d = await pedir('GetSceneList');
     (d.scenes || []).forEach((c) => sel.appendChild(criarOpcao(c.sceneName, c.sceneName)));
-  } catch (e) { /* OBS fechado: fica só a opção de não trocar */ }
+    el('crCenaAviso').classList.add('escondido');
+  } catch (e) {
+    el('crCenaAviso').textContent = 'Não consegui ler as cenas do OBS. A contagem funciona, mas não vai trocar de cena.';
+    el('crCenaAviso').classList.remove('escondido');
+  }
+
+  /* A cena guardada pode não estar mais na lista (renomeada, apagada).
+     Mostrar ela assim mesmo é melhor que trocar pra "ficar onde está"
+     sem avisar — a pessoa veria a escolha dela sumir sozinha. */
+  if (escolhida && ![...sel.options].some((o) => o.value === escolhida)) {
+    sel.appendChild(criarOpcao(escolhida, escolhida + ' (não achei no OBS)'));
+  }
+  sel.value = escolhida || '';
 }
 
 function criarOpcao(valor, texto) {
@@ -1477,7 +1503,7 @@ function ligarSecoes() {
   el('secaoCanal').classList.toggle('escondido', !tem);
   el('secaoPalpite').classList.toggle('escondido', !tem);
   el('secaoMomentos').classList.toggle('escondido', !tem);
-  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); lerOverlays(); lerChaves(); crPinta(); crCenas(); ordemDasSecoes(); }
+  if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); lerOverlays(); lerChaves(); crPinta(); ordemDasSecoes(); }
   vendoAoVivo();
   perfilPinta();
 }
@@ -2718,6 +2744,21 @@ el('crPorMin').addEventListener('click', () => {
   if (m > 0) crMarca({ minutos: m });
 });
 el('crParar').addEventListener('click', () => crMarca({ parar: 1 }));
+
+/* Escolher a cena guarda na hora, sem mexer no prazo. Antes ela só era
+   lida no clique dos minutos — quem marcasse o tempo primeiro e a cena
+   depois ficava sem troca de cena, e sem nada dizendo isso. */
+el('crCena').addEventListener('change', async () => {
+  try {
+    await api('/contagem-regressiva.php', { method: 'POST', body: JSON.stringify({ cena: el('crCena').value }) });
+    anotar(el('crCena').value ? ('no fim vai pra "' + el('crCena').value + '"') : 'no fim fica onde está');
+  } catch (e) { anotar('não deu pra guardar a cena: ' + e.message); }
+});
+
+/* Abrir a seção refaz a lista: é quando a pessoa vai usar, e a essa altura
+   o OBS já conectou. */
+document.querySelector('details.secao[data-secao="contagem"]')
+  ?.addEventListener('toggle', function () { if (this.open) crPinta(); });
 el('btSorte').addEventListener('click', raidSorte);
 el('chVoz').addEventListener('change', (e) => mexeChave('voz', e.target, el('chVozCaixa')));
 el('chAlertas').addEventListener('change', (e) => mexeChave('alertas', e.target, el('chAlertasCaixa')));
