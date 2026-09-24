@@ -155,6 +155,14 @@
   @media (prefers-reduced-motion: reduce) { .aovivo.no-ar i { animation: none; } }
 
   /* ---------- as chaves de silêncio ---------- */
+  /* Um título dentro de uma seção: separa dois assuntos sem criar uma
+     seção nova pra abrir e fechar. */
+  .sub-secao {
+    margin: 16px 0 6px; padding-top: 12px; border-top: 1px solid var(--linha);
+    font: 600 11px var(--disp); letter-spacing: .08em; text-transform: uppercase;
+    color: var(--fraco);
+  }
+
   .chaves { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
   .chave {
     display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
@@ -320,6 +328,7 @@
     <button class="mini" data-cr="30">30 min</button>
   </div>
   <div class="fila"><b>Ou às</b><input id="crHora" type="time" style="flex:0 0 110px"><button id="crPorHora" class="mini">Marcar</button></div>
+  <div class="fila"><b>Ou daqui a</b><input id="crMin" type="number" min="1" max="1440" placeholder="min" style="flex:0 0 80px"><button id="crPorMin" class="mini">Marcar</button></div>
   <div class="fila"><b>Depois vai pra</b><select id="crCena"></select></div>
   <div class="grade um"><button id="crParar" class="mini">Cancelar</button></div>
   </details>
@@ -339,14 +348,21 @@
   </details>
 
   <details class="secao" data-secao="audio">
-  <summary>Áudio <button id="btEditarSons" class="mini">editar</button></summary>
+  <summary>Áudio</summary>
+  <!-- O botão saiu do <summary>: ali ele aparecia mesmo com a seção
+       fechada, flutuando ao lado de um título recolhido, e clicar nele
+       abria e fechava a seção junto. -->
+  <div class="grade um"><button id="btEditarSons" class="mini">Escolher o que aparece</button></div>
   <p class="dica escondido" id="dicaSons">Desmarque o que você não quer ver aqui nem no painel dos mods.
      A fonte continua no OBS funcionando — isso não é o olhinho.</p>
   <div id="mixer"></div>
-  </details>
 
-  <details class="secao" data-secao="vod">
-  <summary>Fora do VOD</summary>
+  <!-- FORA DO VOD MORA AQUI, e não numa seção própria.
+
+       São a mesma coisa: as duas mexem no áudio das suas fontes. Separadas,
+       quem procurava "o Spotify no VOD" tinha que adivinhar que isso não
+       estava em "Áudio". -->
+  <h4 class="sub-secao">Fora do VOD</h4>
   <p class="dica">A Twitch grava o VOD numa trilha de áudio separada da que vai ao vivo.
      Tirando o Spotify dessa trilha, quem assiste ao vivo continua ouvindo e o vídeo
      gravado fica sem a música — que é o que evita o strike.</p>
@@ -366,6 +382,7 @@
   <p class="dica escondido" id="vodAviso"></p>
   <div class="fila"><b>Agora</b><span id="vVod">—</span></div>
   </details>
+
 
   <details id="secaoFontes" class="secao escondido" data-secao="fontes">
     <summary>Fontes da cena</summary>
@@ -1200,8 +1217,9 @@ function crMostra(seg) {
   const alvo = el('crQuanto');
   if (seg === null || seg === undefined) { alvo.textContent = ''; return; }
   if (seg <= 0) { alvo.textContent = 'zerou'; return; }
-  const m = Math.floor(seg / 60), s = seg % 60;
-  alvo.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+  /* Acima de uma hora precisa DIZER a hora: "1259:55" é tecnicamente
+     certo e ninguém lê isso como vinte e uma horas. */
+  alvo.textContent = crComoTempo(seg).replace(/^00:/, '');
 }
 
 async function crMarca(corpo) {
@@ -2674,8 +2692,30 @@ el('btCalar').addEventListener('click', calarBot);
 document.querySelectorAll('[data-cr]').forEach((b) => {
   b.addEventListener('click', () => crMarca({ minutos: +b.dataset.cr }));
 });
+/* "20:30" VIRA MINUTOS AQUI, e não no servidor.
+
+   O servidor vive em UTC. Ele recebia "00:14", comparava com o relógio
+   dele (03:14) e concluía que a hora já tinha passado — jogando a
+   contagem pra amanhã, vinte e uma horas à frente. Quem sabe que horas
+   são pra você é o SEU relógio, então a conta é feita aqui. */
 el('crPorHora').addEventListener('click', () => {
-  if (el('crHora').value) crMarca({ hora: el('crHora').value });
+  const v = el('crHora').value;
+  if (!v) return;
+  const [h, m] = v.split(':').map(Number);
+  if (isNaN(h) || isNaN(m)) return;
+
+  const alvo = new Date();
+  alvo.setHours(h, m, 0, 0);
+  /* Hora que já passou é amanhã: quem escreve 01:00 às 23h quer a
+     madrugada, e não um prazo vencido há vinte e duas horas. */
+  if (alvo <= new Date()) alvo.setDate(alvo.getDate() + 1);
+
+  crMarca({ minutos: (alvo - Date.now()) / 60000 });
+});
+
+el('crPorMin').addEventListener('click', () => {
+  const m = parseInt(el('crMin').value, 10);
+  if (m > 0) crMarca({ minutos: m });
 });
 el('crParar').addEventListener('click', () => crMarca({ parar: 1 }));
 el('btSorte').addEventListener('click', raidSorte);

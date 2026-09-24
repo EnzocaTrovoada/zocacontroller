@@ -99,17 +99,42 @@ compara('seções do painel', {
 const naPonte = [];
 ponte.split('\n').forEach((linha, i, todas) => {
   if (!/minimo:\s*'\w+',\s*espera:/.test(linha)) return;
+  const minimo = (linha.match(/minimo:\s*'(\w+)'/) || [])[1] || '?';
   for (let j = i - 1; j >= 0 && j > i - 8; j--) {
     const a = todas[j].match(/^\s*(\w+):\s*\{\s*$/);
     const b = todas[j].match(/^ACOES\.(\w+)\s*=\s*\{/);
-    if (a || b) { naPonte.push((a || b)[1]); return; }
+    if (a || b) { naPonte.push({ nome: (a || b)[1], minimo }); return; }
   }
 });
 compara('ações do chat', {
-  ponte:    naPonte,
+  ponte:    naPonte.map((x) => x.nome),
   servidor: strings(bloco(cmds, 'ACOES_VALIDAS = [', '];') || ''),
   tela:     [...(bloco(hub, 'const DE_FABRICA = [', '\n];') || '').matchAll(/\['(\w+)'/g)].map((m) => m[1]),
 });
+
+/* ---- E QUEM PODE USAR CADA UMA ----
+
+   Comparar só os nomes não bastava. Em 24/09 eu abri o !musica pro chat
+   inteiro na ponte e deixei 'mod' na tela: o site seguiu dizendo que era
+   de moderador, com etiqueta e tudo, enquanto qualquer um já podia usar.
+
+   Quem MANDA é a ponte, que é quem recusa. A tela só descreve — e
+   descrever errado é pior que não descrever, porque a pessoa nem tenta. */
+const cargoNaTela = {};
+const deFabrica = bloco(hub, 'const DE_FABRICA = [', '\n];') || '';
+for (const m of deFabrica.matchAll(/\['(\w+)',\s*'(\w+)'/g)) cargoNaTela[m[1]] = m[2];
+
+const cargoDivergente = naPonte
+  .filter((a) => cargoNaTela[a.nome] && cargoNaTela[a.nome] !== a.minimo)
+  .map((a) => `${a.nome}: a ponte deixa ${a.minimo} usar, a tela diz ${cargoNaTela[a.nome]}`);
+
+if (cargoDivergente.length) {
+  console.log(`\u2717 quem pode usar: ${cargoDivergente.length} com cargo diferente`);
+  cargoDivergente.forEach((d) => console.log('  ' + d));
+  falhas++;
+} else {
+  console.log(`\u2713 quem pode usar: ${Object.keys(cargoNaTela).length} ações com o mesmo cargo nos dois lugares`);
+}
 
 /* ---- a versão da ponte ----
 

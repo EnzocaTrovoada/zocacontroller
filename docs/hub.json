@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-24",
+      "titulo": "Contagem com a hora certa, e áudio num lugar só",
+      "texto": "A contagem marcada por horário dava o tempo errado: o servidor vive num fuso diferente do seu e achava que a hora já tinha passado. Agora a conta é feita pelo relógio do seu computador. Também dá pra digitar os minutos que quiser, o visor mostra horas quando passa de uma, e o \"Fora do VOD\" virou parte da seção Áudio — as duas mexem na mesma coisa."
+    },
+    {
+      "data": "2026-09-24",
       "titulo": "O !musica mostra a overlay, e ela some sozinha",
       "texto": "Antes ele ALTERNAVA a overlay: quem digitava !musica com ela já na tela a via desaparecer. Agora ela só aparece, e some sozinha depois de 15 segundos — ninguém precisa mandar tirar. E vale pro chat inteiro, não só pra mod: é uma pergunta, não um controle."
     },

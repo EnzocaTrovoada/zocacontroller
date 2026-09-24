@@ -4,7 +4,6 @@
  *
  * GET              → o alvo e a cena
  * POST {minutos}   → começa agora, acabando daqui a tantos minutos
- * POST {hora}      → acaba numa hora do dia ("20:30")
  * POST {parar: 1}  → cancela
  *
  * QUEM TROCA A CENA É A PONTE, e não este arquivo: só ela fala com o OBS.
@@ -54,21 +53,24 @@ if (!empty($d['parar'])) {
     json_saida(['ok' => true]);
 }
 
-/* Dois jeitos de dizer a mesma coisa, porque as duas cabeças existem:
-   "daqui a 15 minutos" e "às 20:30". */
+/* SÓ "DAQUI A TANTOS MINUTOS", E O RELÓGIO É O DA PESSOA.
+
+   A primeira versão aceitava uma hora do dia ("20:30") e resolvia ela
+   aqui. Só que este servidor vive em UTC: alguém marcou 00:14 às 00:13 e
+   recebeu uma contagem de vinte e uma horas, porque pro servidor eram
+   03:13 e 00:14 já tinha passado — então ele jogou pra amanhã.
+
+   Fuso é um jeito conhecido de errar. Quem sabe que horas são pra pessoa é
+   o relógio DELA, então o painel faz a conta e manda os minutos. Aqui só
+   entra "daqui a quanto", que não depende de fuso nenhum. */
 $alvo = null;
 
 if (isset($d['minutos'])) {
-    $m = max(1, min(600, (int) $d['minutos']));
-    $alvo = date('Y-m-d H:i:s', time() + $m * 60);
-}
-
-if (!empty($d['hora']) && preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/', (string) $d['hora'], $p)) {
-    $hoje = strtotime(date('Y-m-d ') . $p[1] . ':' . $p[2] . ':00');
-    /* Hora que já passou é amanhã: quem escreve 01:00 às 23h quer a
-       madrugada, e não um prazo vencido há 22 horas. */
-    if ($hoje <= time()) $hoje += 86400;
-    $alvo = date('Y-m-d H:i:s', $hoje);
+    /* Em segundos, e não em minutos inteiros: marcar "às 20:30" às 20:29:40
+       são 20 segundos, e arredondar isso pra zero ou pra um minuto erraria
+       justamente o caso que a pessoa está olhando. */
+    $seg = max(5, min(86400, (int) round((float) $d['minutos'] * 60)));
+    $alvo = date('Y-m-d H:i:s', time() + $seg);
 }
 
 if (!$alvo) json_saida(['erro' => 'Diga quantos minutos, ou a hora.'], 400);

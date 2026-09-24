@@ -23,7 +23,7 @@ $uid  = (int) $quem['usuario_id'];
  * docs/painel.html. O conferir.js compara os dois e reclama se divergirem.
  */
 const PAINEL_SECOES = [
-    'contagem', 'overlays', 'raid', 'audio', 'vod', 'fontes', 'estado',
+    'contagem', 'overlays', 'raid', 'audio', 'fontes', 'estado',
     'ajuste', 'cena', 'canal', 'momentos', 'palpite', 'log',
 ];
 
