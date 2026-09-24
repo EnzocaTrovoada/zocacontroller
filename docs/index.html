@@ -8377,6 +8377,30 @@ function caixaDoTts(caixa) {
         h('span', { cls: 'd', txt: d.primeiro.como }),
       );
 
+      /* RESOLVER AQUI, E NÃO NOUTRA TELA.
+
+         A caixa sabe o que falta e o pedido é de uma linha — mandar a
+         pessoa procurar um botão em Meu ZocaHub é pedir que ela faça o
+         que a tela já podia fazer por ela. */
+      if (/EventSub/i.test(d.primeiro.como || '')) {
+        const bt = h('button', { cls: 'bt mini', type: 'button', style: 'align-self:flex-start;margin-top:6px',
+          txt: 'Ligar os avisos agora' });
+        bt.onclick = async () => {
+          bt.disabled = true;
+          bt.textContent = 'ligando…';
+          try {
+            await api('/eventsub.php', { method: 'POST' });
+            recado('Avisos da Twitch ligados.', 'bom');
+            checaTts();
+          } catch (e) {
+            bt.disabled = false;
+            bt.textContent = 'Ligar os avisos agora';
+            recado(e.message, 'ruim');
+          }
+        };
+        caixaCheca.appendChild(bt);
+      }
+
       /* O resto vem menor e depois: resolver o primeiro pode acender os
          outros sozinho, e uma lista de cinco pendências desanima. */
       const outros = (d.passos || []).filter((x) => !x.ok).slice(1);

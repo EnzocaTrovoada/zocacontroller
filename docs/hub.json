@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-24",
+      "titulo": "Testar a troca de cena em 5 segundos",
+      "texto": "A seção Contagem passou a mostrar o que está GUARDADO no servidor — \"vai pra Começando\" ou \"fica onde está\" — em vez de só o que está selecionado na lista. E ganhou um \"Testar em 5s\", porque esperar quinze minutos pra descobrir que não funcionou é caro demais. Na tela do TTS, quando falta ligar os avisos da Twitch, o botão pra ligar está ali mesmo."
+    },
+    {
+      "data": "2026-09-24",
       "titulo": "O site diz por que o TTS não está falando",
       "texto": "São cinco elos — ligado, prêmio, permissão, aviso da Twitch e a overlay no OBS — e quebrar um deles não dava erro nenhum: o espectador gastava os pontos e vinha silêncio. Agora a tela do TTS diz qual elo quebrou e o que fazer. Também: a cena da contagem regressiva passou a salvar quando você escolhe, e a lista de cenas se refaz ao abrir a seção — antes ela nascia vazia se o OBS ainda não tivesse conectado."
     },

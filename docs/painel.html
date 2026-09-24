@@ -331,7 +331,14 @@
   <div class="fila"><b>Ou daqui a</b><input id="crMin" type="number" min="1" max="1440" placeholder="min" style="flex:0 0 80px"><button id="crPorMin" class="mini">Marcar</button></div>
   <div class="fila"><b>Depois vai pra</b><select id="crCena"></select></div>
   <p class="dica escondido" id="crCenaAviso"></p>
-  <div class="grade um"><button id="crParar" class="mini">Cancelar</button></div>
+  <div class="fila"><b>No fim</b><span id="crNoFim">—</span></div>
+  <div class="grade">
+    <!-- ESPERAR QUINZE MINUTOS PRA DESCOBRIR QUE NÃO FUNCIONA É CARO.
+         Cinco segundos mostram a corrente inteira: o prazo, o aviso do
+         servidor, a ponte obedecendo e a cena entrando. -->
+    <button id="crTeste" class="mini">Testar em 5s</button>
+    <button id="crParar" class="mini">Cancelar</button>
+  </div>
   </details>
 
   <details class="secao" data-secao="overlays">
@@ -1207,6 +1214,13 @@ async function crPinta() {
     const d = await api('/contagem-regressiva.php');
     crCenas(d.cena || '');
     crMostra(d.faltam);
+
+    /* O QUE ESTÁ GUARDADO, E NÃO O QUE ESTÁ SELECIONADO.
+
+       A lista mostrava uma cena que o servidor nunca recebeu — escolher
+       não salvava. Esta linha vem do servidor, então ela é a verdade: se
+       disser "fica onde está", a contagem não vai trocar de cena. */
+    el('crNoFim').textContent = d.cena ? ('vai pra "' + d.cena + '"') : 'fica onde está';
     clearInterval(crTic);
     if (d.faltam !== null && d.faltam > 0) {
       let resta = d.faltam;
@@ -2744,6 +2758,10 @@ el('crPorMin').addEventListener('click', () => {
   if (m > 0) crMarca({ minutos: m });
 });
 el('crParar').addEventListener('click', () => crMarca({ parar: 1 }));
+el('crTeste').addEventListener('click', () => {
+  if (!el('crCena').value) return anotar('escolha antes pra onde ir no fim');
+  crMarca({ minutos: 5 / 60 });
+});
 
 /* Escolher a cena guarda na hora, sem mexer no prazo. Antes ela só era
    lida no clique dos minutos — quem marcasse o tempo primeiro e a cena
