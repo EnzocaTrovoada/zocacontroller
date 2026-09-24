@@ -100,7 +100,7 @@ $uid  = (int) $quem['usuario_id'];
 
 function luz_cenas(int $uid): array
 {
-    $st = db()->prepare('SELECT id, palavra, cor, brilho, ms, cargo FROM luzes_cenas WHERE usuario_id = ? ORDER BY palavra');
+    $st = db()->prepare('SELECT id, palavra, nome, cor, brilho, ms, cargo FROM luzes_cenas WHERE usuario_id = ? ORDER BY palavra');
     $st->execute([$uid]);
     return array_map(fn($c) => [
         'id'      => (int) $c['id'],
@@ -240,10 +240,17 @@ if ($acao === 'cena_salvar') {
     $brilho = $d['brilho'] === null || $d['brilho'] === '' ? null : max(1, min(100, (int) $d['brilho']));
     $cargo  = in_array((string) ($d['cargo'] ?? ''), LUZ_CARGOS, true) ? (string) $d['cargo'] : 'mod';
 
+    /* Sem nome, a própria palavra serve: é melhor que uma linha em branco
+       na lista, e quem quiser um nome bonito preenche depois. */
+    $nome = mb_substr(trim((string) ($d['nome'] ?? '')), 0, 40) ?: $palavra;
+
     db()->prepare(
-        'INSERT INTO luzes_cenas (usuario_id, palavra, cor, brilho, ms, cargo) VALUES (?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE cor = VALUES(cor), brilho = VALUES(brilho), ms = VALUES(ms), cargo = VALUES(cargo)'
-    )->execute([$uid, $palavra, $cor ?: null, $brilho, max(0, min(60000, (int) ($d['ms'] ?? 0))), $cargo]);
+        'INSERT INTO luzes_cenas (usuario_id, palavra, nome, cor, brilho, ms, cargo)
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE nome = VALUES(nome), cor = VALUES(cor),
+             brilho = VALUES(brilho), ms = VALUES(ms), cargo = VALUES(cargo)'
+    )->execute([$uid, $palavra, $nome, $cor ?: null, $brilho,
+                max(0, min(60000, (int) ($d['ms'] ?? 0))), $cargo]);
 
     json_saida(['ok' => true, 'cenas' => luz_cenas($uid)]);
 }

@@ -1667,6 +1667,30 @@ try {
   }
   .raid-barra i { display: block; height: 100%; background: var(--verde); transition: width .3s ease-out; }
 
+  /* ---------- campo com rótulo em cima ---------- */
+  .rot-linha { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-top: 14px; }
+  .rot { display: flex; flex-direction: column; gap: 5px; }
+  .rot > span { font: 600 11.5px var(--disp); letter-spacing: .03em; color: var(--fraco); }
+  .rot > small { font-size: 11px; color: var(--apagado); }
+  /* Os campos soltos pela tela não estavam dentro de .campo, e por isso
+     ficaram de fora do visual novo — moldura vazia de canto vivo no meio
+     de campos redondos. Estes seguem os outros. */
+  .rot input[type=text], .rot input[type=number], .rot select,
+  .fatia > input[type=text], .fatia > input[type=password], .fatia > input[type=number] {
+    font: 13.5px var(--mono); color: var(--tinta);
+    background: var(--caixa2); border: 1px solid transparent;
+    padding: 9px 11px; border-radius: 10px;
+    transition: border-color .12s, background .12s;
+  }
+  .rot input[type=color] {
+    width: 46px; height: 38px; padding: 2px; background: var(--caixa2);
+    border: 1px solid transparent; border-radius: 10px; cursor: pointer;
+  }
+  .rot input:hover, .rot select:hover,
+  .fatia > input:hover { border-color: var(--linha); }
+  .rot input:focus, .rot select:focus,
+  .fatia > input:focus { outline: none; border-color: var(--verde); background: var(--fundo); }
+
   /* ---------- por que o TTS não fala ---------- */
   .tts-checa {
     display: flex; flex-direction: column; gap: 3px;
@@ -5442,38 +5466,77 @@ function telaLuzes() {
 
       cenasCx.appendChild(h('div', { cls: 'luz-cena' }, [
         amostra,
+        /* O NOME NA FRENTE, O COMANDO DEPOIS. Quem lê a lista está
+           procurando "aquela cena roxa", e não a palavra que o chat
+           digita — essa só importa na hora de contar pro chat. */
+        h('b', { style: 'font:600 13.5px var(--disp)', txt: c.nome || c.palavra }),
         h('code', { txt: '!luz ' + c.palavra }),
         h('span', { cls: 'd', style: 'flex:1',
-          txt: (c.cor || 'só acende') + (c.brilho !== null ? '  ·  ' + c.brilho + '%' : '')
-             + (c.ms ? '  ·  volta em ' + (c.ms / 1000) + 's' : '') + '  ·  ' + c.cargo }),
+          txt: (c.cor || 'só acende')
+             + (c.brilho !== null ? '  ·  ' + c.brilho + '% de brilho' : '')
+             + (c.ms ? '  ·  volta em ' + (c.ms / 1000) + 's' : '  ·  permanece')
+             + '  ·  ' + c.cargo }),
         apagar,
       ]));
     });
     if (!(d.cenas || []).length) cenasCx.appendChild(h('p', { cls: 'd', txt: 'Nenhuma cena ainda.' }));
 
-    const nPalavra = h('input', { type: 'text', maxlength: '32', placeholder: 'palavra', style: 'flex:0 0 130px' });
-    const nCor = h('input', { type: 'color', value: '#12A150', style: 'flex:0 0 46px;padding:2px' });
-    const nBrilho = h('input', { type: 'number', min: '1', max: '100', placeholder: '%', style: 'flex:0 0 70px' });
-    const nMs = h('input', { type: 'number', min: '0', max: '60000', step: '500', placeholder: 'volta em (ms)', style: 'flex:0 0 130px' });
-    const nCargo = h('select', { style: 'flex:0 0 120px' });
+    /* UM RÓTULO EM CIMA DE CADA CAMPO.
+
+       Antes eram cinco caixas em fila com o texto dentro delas, que some
+       assim que se digita. "%" sozinho não diz brilho, e "palavra" não
+       diz que é o que o chat escreve. Rótulo em cima fica. */
+    const nPalavra = h('input', { type: 'text', maxlength: '32', placeholder: 'roxo', style: 'width:120px' });
+    const nNome = h('input', { type: 'text', maxlength: '40', placeholder: 'Modo terror', style: 'width:150px' });
+    const nCor = h('input', { type: 'color', value: '#12A150' });
+    const nBrilho = h('input', { type: 'number', min: '1', max: '100', placeholder: '100', style: 'width:80px' });
+
+    /* "VOLTA EM" PRECISA DE UM JEITO DE NÃO VOLTAR.
+
+       O campo aceitava zero e zero queria dizer "fica assim", mas nada
+       na tela dizia isso — a pessoa digitava um número porque parecia
+       obrigatório, e a luz voltava sozinha quando ela não queria. */
+    const nMs = h('select', { style: 'width:150px' });
+    [['0', 'Permanecer assim'], ['3000', 'Voltar em 3s'], ['5000', 'Voltar em 5s'],
+     ['10000', 'Voltar em 10s'], ['30000', 'Voltar em 30s'], ['60000', 'Voltar em 1 min']]
+      .forEach(([v, r]) => nMs.appendChild(h('option', { value: v, txt: r })));
+
+    const nCargo = h('select', { style: 'width:130px' });
     [['chat', 'Todo mundo'], ['sub', 'Subs'], ['vip', 'VIPs'], ['mod', 'Mods'],
      ['supermod', 'Supermods'], ['dono', 'Só você']].forEach(([v, r]) =>
       nCargo.appendChild(h('option', { value: v, txt: r })));
     nCargo.value = 'mod';
+    nMs.value = '0';
 
     const nAdd = h('button', { cls: 'bt mini', type: 'button', txt: '+ Cena' });
     nAdd.onclick = async () => {
       if (!nPalavra.value.trim()) return recado('A cena precisa de uma palavra.', 'ruim');
       try {
-        const r = await manda({ acao: 'cena_salvar', palavra: nPalavra.value, cor: nCor.value,
-          brilho: nBrilho.value, ms: parseInt(nMs.value, 10) || 0, cargo: nCargo.value });
-        nPalavra.value = ''; nBrilho.value = ''; nMs.value = '';
+        const r = await manda({ acao: 'cena_salvar', palavra: nPalavra.value, nome: nNome.value,
+          cor: nCor.value, brilho: nBrilho.value, ms: parseInt(nMs.value, 10) || 0,
+          cargo: nCargo.value });
+        nPalavra.value = ''; nNome.value = ''; nBrilho.value = ''; nMs.value = '0';
         pinta(Object.assign({}, d, { cenas: r.cenas }));
       } catch (e) { recado(e.message, 'ruim'); }
     };
 
-    cenasCx.appendChild(h('div', { cls: 'campo', style: 'gap:8px;flex-wrap:wrap;margin-top:12px' },
-      [nPalavra, nCor, nBrilho, nMs, nCargo, nAdd]));
+    function comRotulo(texto, campo, dica) {
+      return h('label', { cls: 'rot' }, [
+        h('span', { txt: texto }),
+        campo,
+        dica ? h('small', { txt: dica }) : null,
+      ].filter(Boolean));
+    }
+
+    cenasCx.appendChild(h('div', { cls: 'rot-linha' }, [
+      comRotulo('Comando', nPalavra, 'o chat digita !luz ' + (nPalavra.value || 'roxo')),
+      comRotulo('Nome da cena', nNome, 'só pra você achar na lista'),
+      comRotulo('Cor', nCor),
+      comRotulo('Brilho', nBrilho, 'de 1 a 100%'),
+      comRotulo('Depois', nMs),
+      comRotulo('Quem pode usar', nCargo),
+      h('label', { cls: 'rot' }, [h('span', { txt: '\u00a0' }), nAdd]),
+    ]));
   }
 
   function carregaLuzes() {

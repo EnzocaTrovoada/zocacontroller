@@ -33,6 +33,7 @@ const BANCO_PRECISA = [
     ['painel',    'usuarios',             'painel_secoes', '064-painel-secoes.sql',     'Escolher o que aparece no OBS'],
     ['alertas',   'usuarios',             'alertas_ligados', '065-alertas-chave.sql',   'Desligar todos os alertas'],
     ['contagem',  'contagem_regressiva',  null,            '066-contagem-regressiva.sql', 'A contagem regressiva e a troca de cena'],
+    ['luzes',     'luzes_cenas',          'nome',          '068-luz-cena-nome.sql',       'Dar nome às suas cenas de luz'],
 ];
 
 /* O NOME DO EVENTO CABE NA COLUNA?

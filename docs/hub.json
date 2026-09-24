@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-24",
+      "titulo": "As cenas de luz com nome, e o brilho dizendo que é brilho",
+      "texto": "Cada cena agora tem nome próprio (\"Modo terror\") além da palavra que o chat digita (\"!luz roxo\") — antes os dois eram a mesma coisa e você tinha que escolher entre uma lista legível e um comando fácil. O \"%\" virou \"Brilho, de 1 a 100%\", e o \"volta em\" virou uma lista com \"Permanecer assim\" — antes zero queria dizer isso e nada dizia. Todos os campos soltos ganharam rótulo em cima e o visual dos outros."
+    },
+    {
+      "data": "2026-09-24",
       "titulo": "O nome de quem resgatou, agora de verdade",
       "texto": "A frase \"fulano resgatou uma mensagem de voz e falou:\" ia num campo novo, e uma fonte do OBS com código antigo em cache ignorava esse campo — falava só a mensagem. Agora ela vai no campo que a fonte já fala desde sempre, então funciona com a fonte que estiver aberta. Na tela continua aparecendo só a mensagem, porque o nome já tem linha própria. E os tetos subiram: 10 mensagens por pessoa por minuto em vez de 3, com a voz saindo em até 2s."
     },
