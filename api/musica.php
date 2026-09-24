@@ -70,6 +70,33 @@ if ($acao === 'curtir') {
 
 /* Só lê, não muda nada — por isso o chat inteiro pode. Quem segura o volume
    de chamadas é a espera do comando na ponte e a trava geral acima. */
+/* ---------- o que está tocando, dito no chat ----------
+
+   O !musica FAZIA OUTRA COISA: ele ligava e desligava a fonte do overlay
+   no OBS. Só que em qualquer bot de live "!musica" quer dizer "que música
+   é essa?", e quem digita espera uma resposta no chat — não um overlay
+   sumindo. Esconder a fonte continua existindo, no !fonte.
+
+   A RESPOSTA VAI PRO CHAT, e não pra tela da live: quem perguntou pode
+   estar lendo o chat no celular, e uma resposta que só aparece por cima do
+   vídeo não chega pra ele. */
+if ($acao === 'agora') {
+    require_once __DIR__ . '/lib/chat.php';
+
+    $t = sp_tocando($uid, 5);
+    if (!$t || empty($t['nome'])) {
+        chat_enviar($uid, 'Não está tocando nada agora.');
+        json_saida(['ok' => true, 'nada' => true]);
+    }
+
+    $texto = '🎵 ' . $t['nome'];
+    if (!empty($t['artista'])) $texto .= ' — ' . $t['artista'];
+
+    $r = chat_enviar($uid, $texto);
+    json_saida(['ok' => !empty($r['ok']), 'erro' => $r['erro'] ?? null,
+                'nome' => $t['nome'], 'artista' => $t['artista'] ?? '']);
+}
+
 if ($acao === 'playlist') {
     json_saida(sp_playlist_atual($uid));
 }

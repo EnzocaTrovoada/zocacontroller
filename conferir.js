@@ -124,6 +124,22 @@ if (versaoPonte && versaoPonte === versaoHub) {
   falhas++;
 }
 
+/* A VERSÃO TEM DE SUBIR QUANDO A PONTE MUDA.
+
+   Conferir que os dois lugares batem não basta: em 23/09 eu mexi na ponte
+   e deixei a versão velha nos DOIS. Os números batiam, o site não avisou
+   ninguém, e o OBS de todo mundo seguiu rodando o código antigo — a troca
+   de cena da contagem simplesmente não acontecia, sem erro nenhum. */
+try {
+  const mudou = require('child_process')
+    .execSync('git log -1 --format=%cs -- docs/ponte.html', { encoding: 'utf8' }).trim();
+  if (mudou && versaoPonte && mudou > versaoPonte) {
+    console.log(`✗ a ponte mudou em ${mudou} e a versão ainda é ${versaoPonte}`);
+    console.log('  suba o PONTE_VERSAO no docs/ponte.html E no docs/index.html');
+    falhas++;
+  }
+} catch (e) { /* sem git: não dá pra conferir, e não é motivo pra falhar */ }
+
 /* ---- cargos, e na MESMA ordem: aqui a ordem é a regra ---- */
 const cargosPonte = Object.keys(JSON.parse(
   '{' + (ponte.match(/const CARGOS = \{([^}]*)\}/)?.[1] || '').replace(/(\w+):/g, '"$1":') + '}'

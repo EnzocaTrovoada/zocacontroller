@@ -187,7 +187,7 @@ if (cfg.hud) el('hud').classList.remove('oculto');
    código velho enquanto o site já mudou — e de fora ninguém vê. A ponte
    conta a versão dela junto do estado, e o painel avisa quando está
    atrasada. Sobe junto com qualquer mudança nesta página. */
-const PONTE_VERSAO = '2026-09-21';
+const PONTE_VERSAO = '2026-09-24';
 
 const estado = {
   obs: false, chat: false,
@@ -1029,19 +1029,18 @@ ACOES.playlist = {
   },
 };
 
-/* Mostra e esconde a overlay de música na cena atual. É o !fonte com um nome
-   que a pessoa lembra — e o nome da fonte vem da URL, não do chat. */
+/* QUE MÚSICA É ESSA. Responde NO CHAT, porque é lá que perguntaram.
+
+   Antes isto ligava e desligava a fonte do overlay no OBS — o que ninguém
+   espera de um "!musica", e era mod-only ainda por cima. Esconder a fonte
+   continua existindo: é o !fonte, com o nome da overlay. */
 ACOES.musica = {
-  minimo: 'mod', espera: 4000,
-  async fazer(quem, arg) {
-    /* Argumento manda; depois o endereço, se alguém o usou; e por último o
-       que a ponte achou sozinha, que é o caso normal. */
-    const nome = (arg || '').trim() || cfg.fonteMusica || overlaysDoObs.musica;
-    if (!nome) {
-      return recado('Não achei a overlay de música nas suas fontes do OBS. '
-        + 'Se ela existe com outro nome, use: ' + cfg.prefixo + 'musica NOME DA FONTE', 15000);
-    }
-    return ACOES.fonte.fazer(quem, nome);
+  minimo: 'chat', espera: 8000,
+  async fazer(quem, arg, cargo) {
+    const d = await pedirMusica({ acao: 'agora' }, quem, cargo);
+    /* A resposta já foi pro chat pelo servidor. Aqui só sobra avisar
+       quando nem isso deu certo — senão o chat pergunta e nada acontece. */
+    if (!d.ok && d.erro) recado('Música: ' + d.erro, 12000);
   },
 };
 
