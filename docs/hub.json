@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-24",
+      "titulo": "O aviso de \"ligar os avisos\" que não sumia",
+      "texto": "A coluna que guarda o nome do evento da Twitch tinha 48 caracteres e o nome do evento de resgate de pontos tem 51 — ele entrava cortado, sem erro nenhum. A assinatura existia e funcionava, mas a tela nunca achava ela e pedia pra ligar de novo, o que não mudava nada. Rode o sql/067 e passa. As caixas de texto também ganharam o visual dos outros campos."
+    },
+    {
+      "data": "2026-09-24",
       "titulo": "Escolher a voz do seu computador, e o site mais redondo",
       "texto": "No editor da overlay de TTS dá pra escolher a voz instalada no seu computador — as nove vozes são tom e velocidade sobre ela, então trocar ali muda todas de uma vez. A frase \"fulano resgatou uma mensagem de voz e falou:\" passou a ser montada no servidor, pra funcionar sem depender da fonte do OBS estar atualizada. E o site ganhou cantos mais redondos, campos preenchidos e títulos maiores."
     },

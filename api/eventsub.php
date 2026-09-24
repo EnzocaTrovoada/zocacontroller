@@ -283,7 +283,14 @@ $erros  = [];
 foreach (TIPOS as $tipo => $spec) {
     // Já existe? A Twitch aceita no máximo 3 iguais, e um cron que recria às
     // cegas passaria a contar cada evento três vezes.
-    $st = $pdo->prepare('SELECT twitch_id FROM eventsub_assinaturas WHERE usuario_id = ? AND tipo = ?');
+    /* Compara pelos 48 primeiros: quem assinou antes do SQL 067 tem o
+       nome cortado nesse tamanho, e comparar o nome inteiro faria a gente
+       tentar criar de novo uma assinatura que já existe — a Twitch aceita
+       três iguais, e aí cada resgate contaria três vezes. */
+    $st = $pdo->prepare(
+        'SELECT twitch_id FROM eventsub_assinaturas
+          WHERE usuario_id = ? AND LEFT(tipo, 48) = LEFT(?, 48)'
+    );
     $st->execute([$quem['usuario_id'], $tipo]);
     if ($st->fetchColumn()) {
         $feitas[] = $tipo . ' (já estava)';

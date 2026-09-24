@@ -1484,6 +1484,20 @@ try {
     width: 44px; height: 36px; padding: 2px; background: var(--caixa2);
     border: 1px solid transparent; border-radius: 10px; cursor: pointer;
   }
+  /* A CAIXA DE TEXTO SEGUE OS CAMPOS. Ela ficou de fora da primeira
+     passada e destoava: canto vivo e moldura vazia no meio de campos
+     redondos e preenchidos. */
+  .campo textarea, textarea {
+    font: 13.5px/1.5 var(--mono); color: var(--tinta);
+    background: var(--caixa2); border: 1px solid transparent;
+    padding: 10px 12px; border-radius: 10px; width: 100%;
+    resize: vertical; transition: border-color .12s, background .12s;
+  }
+  .campo textarea:hover, textarea:hover { border-color: var(--linha); }
+  .campo textarea:focus, textarea:focus {
+    outline: none; border-color: var(--verde); background: var(--fundo);
+  }
+  textarea::placeholder, input::placeholder { color: var(--apagado); }
   .campo input[type=range] { width: 130px; accent-color: var(--verde); }
   .campo .valor { width: 44px; text-align: right; font-size: 12px; color: var(--apagado); }
   .chave { position: relative; display: inline-block; width: 40px; height: 22px; flex: none; vertical-align: middle; }
@@ -8449,7 +8463,22 @@ function caixaDoTts(caixa) {
           btCheca.disabled = true;
           btCheca.textContent = 'ligando…';
           try {
-            await api('/eventsub.php', { method: 'POST' });
+            const r = await api('/eventsub.php', { method: 'POST' });
+
+            /* A RESPOSTA DIZ O QUE A TWITCH RECUSOU, E EU IGNORAVA ISSO.
+
+               O endereço devolve 'erros' com o motivo de cada assinatura
+               que não nasceu. Sem ler, o botão dizia "pronto" e a tela
+               continuava pedindo pra ligar — sem nada explicando, porque
+               o motivo tinha chegado e sido jogado fora. */
+            if ((r.erros || []).length) {
+              btCheca.disabled = false;
+              btCheca.textContent = 'Tentar de novo';
+              checaDiz.textContent = 'A Twitch recusou: ' + r.erros.join(' · ');
+              checaDiz.style.color = 'var(--perigo)';
+              return;
+            }
+
             btCheca.onclick = () => checaTts();
             checaTts();
           } catch (e) {

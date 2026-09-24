@@ -35,6 +35,25 @@ const BANCO_PRECISA = [
     ['contagem',  'contagem_regressiva',  null,            '066-contagem-regressiva.sql', 'A contagem regressiva e a troca de cena'],
 ];
 
+/* O NOME DO EVENTO CABE NA COLUNA?
+
+   Isto não é tabela nem coluna faltando: é uma coluna CURTA demais, que
+   cortava o nome do evento de resgate de pontos e fazia o TTS parecer
+   desligado mesmo ligado. Conferir tamanho é diferente de conferir
+   existência, então vai numa função própria. */
+function banco_tipo_cabe(): bool
+{
+    try {
+        $st = db()->query("SHOW COLUMNS FROM eventsub_assinaturas LIKE 'tipo'");
+        $c = $st->fetch();
+        if (!$c) return true;
+        preg_match('/\((\d+)\)/', (string) $c['Type'], $m);
+        return !isset($m[1]) || (int) $m[1] >= 60;
+    } catch (Throwable $e) {
+        return true;                 /* sem a tabela, não é este o problema */
+    }
+}
+
 /** A tabela existe? */
 function banco_tem_tabela(string $t): bool
 {
@@ -73,6 +92,14 @@ foreach (BANCO_PRECISA as [$grupo, $tabela, $coluna, $arquivo, $oQue]) {
 
 /* Os arquivos a rodar, sem repetir: um arquivo pode explicar várias
    faltas, e listar ele três vezes faria parecer mais trabalho do que é. */
+if (!banco_tipo_cabe()) {
+    $faltam[] = [
+        'oque'    => 'O TTS saber que os avisos estão ligados',
+        'arquivo' => '067-eventsub-tipo-maior.sql',
+        'onde'    => 'a coluna eventsub_assinaturas.tipo é curta e corta o nome do evento',
+    ];
+}
+
 $arquivos = array_values(array_unique(array_column($faltam, 'arquivo')));
 sort($arquivos);
 

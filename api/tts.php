@@ -78,11 +78,20 @@ if (isset($_GET['checar'])) {
 
     /* A assinatura é o elo mais silencioso: ela só nasce quando a pessoa
        liga o EventSub, e quem ligou ANTES do TTS existir não tem esta. */
+    /* PROCURA POR PREFIXO, E NÃO PELO NOME INTEIRO.
+
+       A coluna era VARCHAR(48) e este nome tem 51 caracteres: quem
+       assinou antes do SQL 067 tem a linha com o nome cortado. Procurar
+       pelo nome completo não acha ela, e a tela pede pra ligar uma coisa
+       que já está ligada — e ligar de novo não muda nada, porque o nome
+       cortado colide com o UNIQUE.
+
+       O prefixo acha os dois casos, o cortado e o inteiro. */
     $temAssinatura = false;
     try {
         $st = db()->prepare(
             "SELECT estado FROM eventsub_assinaturas
-              WHERE usuario_id = ? AND tipo = 'channel.channel_points_custom_reward_redemption.add'"
+              WHERE usuario_id = ? AND tipo LIKE 'channel.channel_points_custom_reward_redem%'"
         );
         $st->execute([$uid]);
         $e = $st->fetchColumn();
