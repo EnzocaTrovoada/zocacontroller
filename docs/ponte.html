@@ -1029,18 +1029,57 @@ ACOES.playlist = {
   },
 };
 
-/* QUE MÚSICA É ESSA. Responde NO CHAT, porque é lá que perguntaram.
+/* MOSTRA A OVERLAY DE MÚSICA, E ELA SOME SOZINHA DEPOIS.
 
-   Antes isto ligava e desligava a fonte do overlay no OBS — o que ninguém
-   espera de um "!musica", e era mod-only ainda por cima. Esconder a fonte
-   continua existindo: é o !fonte, com o nome da overlay. */
+   Antes isto era o !fonte com outro nome, e o !fonte ALTERNA: quem pedia
+   !musica com a overlay já na tela a via desaparecer. Ninguém digita
+   "musica" querendo esconder a música.
+
+   Então aqui só APARECE. E some sozinha passados alguns segundos, porque
+   o que a pessoa quer é ver qual é a música — não ganhar um painel fixo
+   que ela vai ter que mandar tirar depois.
+
+   Vale pro chat inteiro, e não só pra mod: é uma pergunta, não um
+   controle. */
+const MUSICA_SEGUNDOS = 15;
+let musicaRelogio = null;
+
 ACOES.musica = {
   minimo: 'chat', espera: 8000,
-  async fazer(quem, arg, cargo) {
-    const d = await pedirMusica({ acao: 'agora' }, quem, cargo);
-    /* A resposta já foi pro chat pelo servidor. Aqui só sobra avisar
-       quando nem isso deu certo — senão o chat pergunta e nada acontece. */
-    if (!d.ok && d.erro) recado('Música: ' + d.erro, 12000);
+  async fazer(quem, arg) {
+    /* Argumento manda; depois o endereço, se alguém o usou; e por último o
+       que a ponte achou sozinha, que é o caso normal. */
+    const nome = (arg || '').trim() || cfg.fonteMusica || overlaysDoObs.musica;
+    if (!nome) {
+      return recado('Não achei a overlay de música nas suas fontes do OBS. '
+        + 'Se ela existe com outro nome, use: ' + cfg.prefixo + 'musica NOME DA FONTE', 15000);
+    }
+
+    const alvo = estado.fontes.find(f => f.nome.toLowerCase() === nome.toLowerCase())
+              || estado.fontes.find(f => f.nome.toLowerCase().includes(nome.toLowerCase()));
+    if (!alvo) return recado('Não achei "' + nome + '" na cena ' + estado.cena + '.', 12000);
+
+    const cena = estado.cena;
+    try {
+      await pedir('SetSceneItemEnabled', {
+        sceneName: cena, sceneItemId: alvo.id, sceneItemEnabled: true,
+      });
+      alvo.visivel = true;
+    } catch (e) { return recado('Não consegui mostrar a overlay de música.', 12000); }
+
+    recado('Música na tela — ' + quem, 8000);
+
+    /* Um pedido novo estica o tempo em vez de criar um segundo relógio:
+       senão o primeiro esconderia a overlay no meio do segundo pedido. */
+    clearTimeout(musicaRelogio);
+    musicaRelogio = setTimeout(async () => {
+      try {
+        await pedir('SetSceneItemEnabled', {
+          sceneName: cena, sceneItemId: alvo.id, sceneItemEnabled: false,
+        });
+        alvo.visivel = false;
+      } catch (e) { /* trocou de cena, ou a fonte saiu: nada a esconder */ }
+    }, MUSICA_SEGUNDOS * 1000);
   },
 };
 

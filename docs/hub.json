@@ -15,8 +15,8 @@
   "novidades": [
     {
       "data": "2026-09-24",
-      "titulo": "O !musica responde que música está tocando",
-      "texto": "Antes ele ligava e desligava a overlay de música no OBS, o que ninguém espera de um \"!musica\" — e só mod podia usar. Agora qualquer um no chat digita !musica e o bot responde no chat com a música e o artista. Esconder a overlay continua existindo, no !fonte."
+      "titulo": "O !musica mostra a overlay, e ela some sozinha",
+      "texto": "Antes ele ALTERNAVA a overlay: quem digitava !musica com ela já na tela a via desaparecer. Agora ela só aparece, e some sozinha depois de 15 segundos — ninguém precisa mandar tirar. E vale pro chat inteiro, não só pra mod: é uma pergunta, não um controle."
     },
     {
       "data": "2026-09-23",
