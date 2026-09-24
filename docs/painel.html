@@ -1044,6 +1044,42 @@ async function talvezMostrarCalar() {
    Vem do OBS, e não do servidor: o OBS sabe na hora, e o servidor só
    saberia depois que a Twitch avisasse. Aqui o atraso seria justamente na
    informação que não pode atrasar. */
+/* "01:23:45.678" vira 5025 segundos. */
+function crSegundosDe(tc) {
+  const p = String(tc).split('.')[0].split(':').map(Number);
+  if (p.length !== 3 || p.some(isNaN)) return null;
+  return p[0] * 3600 + p[1] * 60 + p[2];
+}
+
+function crComoTempo(seg) {
+  if (seg === null) return '';
+  const d2 = (x) => (x < 10 ? '0' : '') + x;
+  return d2(Math.floor(seg / 3600)) + ':' + d2(Math.floor((seg % 3600) / 60)) + ':' + d2(seg % 60);
+}
+
+let aoVivoSegundos = null;
+
+/* QUEM MANDA NO VISOR É O TIQUE LOCAL; O OBS SÓ CORRIGE DESVIO.
+
+   Escrever o que o OBS responde a cada leitura fazia o relógio andar e
+   voltar — a resposta chega de 3 em 3 segundos e nunca cai no mesmo
+   instante em que o tique local virou. Então: aceita o valor do OBS só
+   quando ele discorda em mais de dois segundos, que é desvio de verdade
+   (a live recomeçou, o OBS reconectou), e não arredondamento. */
+function aoVivoSincroniza(tc) {
+  const novo = crSegundosDe(tc);
+  if (novo === null) { aoVivoSegundos = null; return; }
+  if (aoVivoSegundos === null || Math.abs(novo - aoVivoSegundos) > 2) aoVivoSegundos = novo;
+}
+
+/* Um tique por segundo, entre as perguntas ao OBS. */
+setInterval(() => {
+  if (aoVivoSegundos === null) return;
+  aoVivoSegundos++;
+  const t = el('aoVivoTempo');
+  if (t) t.textContent = crComoTempo(aoVivoSegundos);
+}, 1000);
+
 async function vendoAoVivo() {
   const caixa = el('aoVivo');
   if (!caixa) return;
@@ -1057,7 +1093,13 @@ async function vendoAoVivo() {
   if (live && live.outputActive) {
     caixa.classList.add('no-ar');
     el('aoVivoTxt').textContent = 'no ar';
-    el('aoVivoTempo').textContent = (live.outputTimecode || '').split('.')[0];
+    /* O TEMPO CORRE AQUI ENTRE UMA PERGUNTA E OUTRA.
+
+       Perguntar ao OBS de 3 em 3 segundos e só escrever o que ele
+       responde fazia o relógio pular de três em três. A hora certa vem
+       dele; os segundos entre uma resposta e a próxima a gente conta. */
+    aoVivoSincroniza(live.outputTimecode || '');
+    el('aoVivoTempo').textContent = crComoTempo(aoVivoSegundos);
     caixa.title = 'Transmitindo. Tudo o que sair daqui está indo pra live.';
     return;
   }
@@ -1065,12 +1107,14 @@ async function vendoAoVivo() {
   if (rec && rec.outputActive) {
     caixa.classList.add('gravando');
     el('aoVivoTxt').textContent = 'gravando';
-    el('aoVivoTempo').textContent = (rec.outputTimecode || '').split('.')[0];
+    aoVivoSincroniza(rec.outputTimecode || '');
+    el('aoVivoTempo').textContent = crComoTempo(aoVivoSegundos);
     caixa.title = 'Gravando, mas não transmitindo.';
     return;
   }
 
   el('aoVivoTxt').textContent = live ? 'fora do ar' : 'sem o OBS';
+  aoVivoSegundos = null;
   el('aoVivoTempo').textContent = '';
   caixa.title = live ? 'Não está transmitindo nem gravando.' : 'O painel não está falando com o OBS.';
 }

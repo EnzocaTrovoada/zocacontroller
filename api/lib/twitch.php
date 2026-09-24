@@ -167,7 +167,7 @@ function tw_ao_vivo(array $logins): array
  * mesma pergunta pra qualquer pessoa que aperte o botao, e sem isso cada
  * clique custaria a caminhada inteira.
  */
-function tw_pequenos_pt(int $teto = 150, int $quero = 60): array
+function tw_pequenos_pt(int $piso = 4, int $teto = 20, int $quero = 40): array
 {
     try {
         $st = db()->prepare('SELECT valor FROM ajustes WHERE chave = ?');
@@ -181,18 +181,27 @@ function tw_pequenos_pt(int $teto = 150, int $quero = 60): array
     $lista = [];
     $cursor = '';
 
-    /* Teto de paginas: sem ele, um dia de pouca gente ao vivo faria isto
-       andar ate o fim da Twitch. */
-    for ($pagina = 0; $pagina < 8 && count($lista) < $quero; $pagina++) {
+    /* PRECISA ANDAR FUNDO, E ESSE E O CUSTO DO RECURSO.
+
+       Portugues tem milhares de canais ao vivo, ordenados do maior pro
+       menor. Um canal com 10 pessoas nao esta na pagina 3 - esta la pelo
+       milesimo lugar. Por isso ate 30 paginas: e o que separa "achei um
+       streamer pequeno" de "achei mais um canal grande".
+
+       A caminhada acontece UMA VEZ a cada quinze minutos e o resultado
+       vale pra todo mundo, entao o custo nao cresce com os cliques. */
+    for ($pagina = 0; $pagina < 30; $pagina++) {
         $q = 'language=pt&first=100' . ($cursor !== '' ? '&after=' . rawurlencode($cursor) : '');
         [$http, $r] = tw_helix_app('GET', '/streams?' . $q);
         if ($http !== 200) break;
 
-        foreach ((array) ($r['data'] ?? []) as $s) {
+        $dados = (array) ($r['data'] ?? []);
+        if (!$dados) break;
+
+        foreach ($dados as $s) {
             $espect = (int) ($s['viewer_count'] ?? 0);
-            /* Abaixo de 2 costuma ser canal esquecido ligado; acima do teto
-               nao precisa do seu raid. */
-            if ($espect < 2 || $espect > $teto) continue;
+            if ($espect > $teto) continue;          /* ainda nos grandes */
+            if ($espect < $piso) continue;          /* canal ligado sozinho */
             $lista[] = [
                 'id'           => (string) ($s['user_id'] ?? ''),
                 'login'        => (string) $s['user_login'],
@@ -202,6 +211,13 @@ function tw_pequenos_pt(int $teto = 150, int $quero = 60): array
             ];
         }
 
+        /* A lista vem em ordem decrescente: quando o ULTIMO da pagina ja
+           esta abaixo do piso, as proximas so terao numeros menores ainda.
+           Parar aqui evita varrer o fim da Twitch a toa. */
+        $ultimo = (int) ($dados[count($dados) - 1]['viewer_count'] ?? 0);
+        if ($ultimo < $piso) break;
+        if (count($lista) >= $quero) break;
+
         $cursor = (string) ($r['pagination']['cursor'] ?? '');
         if ($cursor === '') break;
     }
@@ -209,7 +225,7 @@ function tw_pequenos_pt(int $teto = 150, int $quero = 60): array
     try {
         db()->prepare('INSERT INTO ajustes (chave, valor) VALUES (?, ?)
                        ON DUPLICATE KEY UPDATE valor = VALUES(valor)')
-            ->execute(['raid_pt', json_encode(['ate' => time() + 600, 'lista' => $lista])]);
+            ->execute(['raid_pt', json_encode(['ate' => time() + 900, 'lista' => $lista])]);
     } catch (Throwable $e) { /* sem guardar, so custa mais na proxima */ }
 
     return $lista;

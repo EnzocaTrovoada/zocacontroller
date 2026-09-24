@@ -71,6 +71,10 @@ function raid_da_casa(int $menos): array
    Serve pra quem não tem lista e não conhece ninguém: dá uma pessoa de
    verdade pra raidar em vez de uma tela vazia. */
 if (isset($_GET['aleatorio'])) {
+    /* A primeira caminhada do quarto de hora demora: são várias páginas
+       da Twitch. Daí a trava ser por pessoa e não por clique. */
+    trava('raid-sorte', 20, 300);
+
     $pool = tw_pequenos_pt();
     if (!$pool) {
         json_saida(['erro' => 'Não achei ninguém pequeno ao vivo agora. Tente daqui a pouco.'], 404);
