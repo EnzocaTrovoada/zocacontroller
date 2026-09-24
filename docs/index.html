@@ -1461,14 +1461,28 @@ try {
   .campo--chave { cursor: pointer; border-radius: 5px; margin-left: -6px; padding: 3px 6px; }
   .campo--chave:hover { background: var(--verde-fraco); }
   .campo--chave:hover > .rotulo { color: var(--verde-forte); }
+  /* O CAMPO É UMA SUPERFÍCIE, E NÃO UMA MOLDURA.
+
+     A borda fina sobre o fundo da página desenhava um retângulo vazio que
+     a pessoa precisava mirar. Preenchido e mais alto, ele se oferece — é
+     o que os formulários que dão certo fazem. A borda fica pro foco, que
+     é quando ela tem função. */
   .campo input[type=text], .campo input[type=number], .campo select {
-    width: 130px; font: 13px var(--mono); color: var(--tinta);
-    background: var(--fundo); border: 1px solid var(--linha); padding: 7px 8px; border-radius: 4px;
+    width: 150px; font: 13.5px var(--mono); color: var(--tinta);
+    background: var(--caixa2); border: 1px solid transparent;
+    padding: 9px 11px; border-radius: 10px;
+    transition: border-color .12s, background .12s;
   }
-  .campo select { width: 150px; }
+  .campo select { width: 170px; }
+  .campo input[type=text]:hover, .campo input[type=number]:hover, .campo select:hover {
+    border-color: var(--linha);
+  }
+  .campo input[type=text]:focus, .campo input[type=number]:focus, .campo select:focus {
+    outline: none; border-color: var(--verde); background: var(--fundo);
+  }
   .campo input[type=color] {
-    width: 40px; height: 32px; padding: 2px; background: var(--fundo);
-    border: 1px solid var(--linha); border-radius: 4px; cursor: pointer;
+    width: 44px; height: 36px; padding: 2px; background: var(--caixa2);
+    border: 1px solid transparent; border-radius: 10px; cursor: pointer;
   }
   .campo input[type=range] { width: 130px; accent-color: var(--verde); }
   .campo .valor { width: 44px; text-align: right; font-size: 12px; color: var(--apagado); }
@@ -1736,9 +1750,20 @@ try {
   }
   .olho:hover { background: var(--verde-fraco); }
 
-  .fatia { border: 1px solid var(--linha); border-radius: 6px; background: var(--caixa); padding: 16px; margin-bottom: 12px; }
-  .fatia h3 { font: 600 15px var(--disp); margin: 0 0 4px; }
-  .fatia p.d { margin: 0 0 12px; font-size: 13.5px; line-height: 1.5; color: var(--fraco); max-width: 62ch; }
+  /* CANTO REDONDO E RESPIRO, como num formulário de suporte bem feito.
+
+     Seis pixels de canto numa caixa de dezesseis de respiro parecem um
+     erro de arredondamento; catorze leem como escolha. E o cartão ganhou
+     ar: o que separa uma tela densa de uma tela apertada quase nunca é a
+     quantidade de coisa, é o espaço entre elas. */
+  .fatia {
+    border: 1px solid var(--linha); border-radius: 14px;
+    background: var(--caixa); padding: 20px 22px; margin-bottom: 14px;
+  }
+  /* O TÍTULO PRECISA GANHAR DO CORPO. Quinze contra treze e meio é quase
+     empate, e a tela vira um bloco só de texto do mesmo tamanho. */
+  .fatia h3 { font: 600 17px var(--disp); margin: 0 0 5px; letter-spacing: -.01em; }
+  .fatia p.d { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: var(--fraco); max-width: 62ch; }
   .aviso {
     border-left: 3px solid var(--perigo); background: var(--caixa2);
     padding: 10px 12px; font-size: 12.5px; color: var(--fraco); margin: 10px 0 0; border-radius: 0 4px 4px 0;
@@ -2379,7 +2404,7 @@ function padraoDe(tipo) {
       titulo: '', font: 'Archivo', size: 22, weight: 500, color: '#FFFFFF',
       sw: 0, glow: 0, shx: 0, shy: 2, shb: 8, sho: 60, shc: '#000000',
       align: 'left', valign: 'bottom',
-      tvoz: 'padrao', tvol: 100, tlingua: 'pt-BR', anome: '#7CE07C', tintro: 1,
+      tvoz: 'padrao', tvol: 100, tlingua: 'pt-BR', anome: '#7CE07C', tintro: 1, tsis: '',
     });
   }
 
@@ -2706,6 +2731,8 @@ const GRUPOS = [
       ['pt-BR', 'Português do Brasil'], ['pt-PT', 'Português de Portugal'],
       ['en-US', 'Inglês'], ['es-ES', 'Espanhol']],
       dica: 'usa a voz que o computador tem instalada nesse idioma' },
+    { k: 'tsis', l: 'Voz do computador', c: 'vozsis',
+      dica: 'as nove vozes acima são tom e velocidade sobre esta — trocar aqui muda todas' },
     { k: 'tintro', l: 'Dizer quem mandou', c: 'chave',
       dica: 'fala "fulano resgatou uma mensagem de voz e falou:" antes da mensagem' },
     { k: 'tvol', l: 'Volume', c: 'faixa', min: 0, max: 100, u: '%' },
@@ -3535,6 +3562,44 @@ const FABRICA = {
     cx.__inteiro = true;
     cx.__sincroniza = () => {};
     return cx;
+  },
+
+  /* AS VOZES INSTALADAS NESTE COMPUTADOR.
+
+     A lista não pode ser fixa: ela depende de quais vozes o Windows tem,
+     e isso muda de máquina pra máquina. Quem responde é o próprio
+     navegador — e por isso este controle existe em vez de um 'lista'
+     comum com opções escritas à mão. */
+  vozsis(it) {
+    const sel = h('select', { style: 'width:220px' });
+
+    function enche() {
+      const antes = cfg[it.k] || '';
+      sel.innerHTML = '';
+      const nenhuma = h('option', { value: '', txt: '— a primeira do idioma —' });
+      sel.appendChild(nenhuma);
+
+      let vozes = [];
+      try { vozes = window.speechSynthesis.getVoices() || []; } catch (e) {}
+      vozes.forEach((v) => sel.appendChild(h('option', { value: v.name, txt: v.name + ' · ' + v.lang })));
+
+      /* A voz guardada pode não existir AQUI: quem edita pelo celular não
+         tem as vozes do PC do OBS. Some-la seria apagar a escolha sem
+         avisar. */
+      if (antes && !vozes.some((v) => v.name === antes)) {
+        sel.appendChild(h('option', { value: antes, txt: antes + ' (não está neste aparelho)' }));
+      }
+      sel.value = antes;
+    }
+
+    enche();
+    /* No Chrome a lista chega depois; sem isto ela nasce vazia e só enche
+       se a pessoa recarregar a página. */
+    try { window.speechSynthesis.addEventListener('voiceschanged', enche); } catch (e) {}
+
+    sel.onchange = () => mudou(it.k, sel.value);
+    sel.__sincroniza = () => { sel.value = cfg[it.k] || ''; };
+    return sel;
   },
 
   frase(it) {
@@ -8338,7 +8403,6 @@ function caixaDoTts(caixa) {
       }) });
       diz.textContent = 'Salvo.';
       diz.style.color = 'var(--verde-forte)';
-      checaTts();
     } catch (e) {
       diz.textContent = e.message;
       diz.style.color = 'var(--perigo)';
@@ -8356,63 +8420,59 @@ function caixaDoTts(caixa) {
   /* POR QUE O TTS NÃO FALA.
 
      São cinco elos e quebrar um não dá erro: o espectador gasta os pontos
-     e o silêncio é a única resposta. Esta caixa diz qual elo quebrou, em
-     vez de deixar a pessoa procurando por eliminação. */
-  const caixaCheca = h('div', { cls: 'tts-checa escondido' });
+     e o silêncio é a única resposta. */
+  /* UM BOTÃO, E A RESPOSTA NELE MESMO.
 
-  function checaTts() {
-    api('/tts.php?checar=1').then((d) => {
-      caixaCheca.innerHTML = '';
+     Antes isto era uma caixa amarela de aviso, aberta o tempo todo, com o
+     problema escrito em duas linhas. Só que na maioria das vezes está
+     tudo certo — e uma caixa de alerta permanente numa tela que está bem
+     é sujeira. Agora é um botão: clicou, ele confere e responde ali. */
+  const btCheca = h('button', { cls: 'bt fraco', type: 'button', txt: 'Conferir se vai funcionar' });
+  const checaDiz = h('span', { cls: 'd', style: 'font-size:12.5px' });
+
+  async function checaTts(sozinho) {
+    if (!sozinho) { btCheca.disabled = true; btCheca.textContent = 'conferindo…'; }
+    try {
+      const d = await api('/tts.php?checar=1');
+
       if (d.tudo_certo) {
-        caixaCheca.className = 'tts-checa tts-checa--ok';
-        caixaCheca.append(
-          h('b', { txt: '✓ Está tudo no lugar.' }),
-          h('span', { cls: 'd', txt: 'Se mesmo assim não sair som: atualize a fonte do TTS no OBS '
-            + '(botão direito → Atualizar) e confira "Controlar áudio pelo OBS" nela.' }),
-        );
-        return;
-      }
-
-      caixaCheca.className = 'tts-checa tts-checa--falta';
-      caixaCheca.append(
-        h('b', { txt: 'Falta: ' + d.primeiro.o_que }),
-        h('span', { cls: 'd', txt: d.primeiro.como }),
-      );
-
-      /* RESOLVER AQUI, E NÃO NOUTRA TELA.
-
-         A caixa sabe o que falta e o pedido é de uma linha — mandar a
-         pessoa procurar um botão em Meu ZocaHub é pedir que ela faça o
-         que a tela já podia fazer por ela. */
-      if (/EventSub/i.test(d.primeiro.como || '')) {
-        const bt = h('button', { cls: 'bt mini', type: 'button', style: 'align-self:flex-start;margin-top:6px',
-          txt: 'Ligar os avisos agora' });
-        bt.onclick = async () => {
-          bt.disabled = true;
-          bt.textContent = 'ligando…';
+        checaDiz.textContent = 'Tudo ligado. Resgate o prêmio no seu chat pra ouvir.';
+        checaDiz.style.color = 'var(--verde-forte)';
+      } else if (/EventSub/i.test(d.primeiro.como || '')) {
+        /* O único que dá pra resolver daqui vira o próprio botão: ler o
+           que fazer e ter que ir fazer noutro lugar é trabalho à toa. */
+        checaDiz.textContent = 'Falta a Twitch avisar a gente dos resgates.';
+        checaDiz.style.color = 'var(--dourado)';
+        btCheca.textContent = 'Ligar os avisos da Twitch';
+        btCheca.disabled = false;
+        btCheca.onclick = async () => {
+          btCheca.disabled = true;
+          btCheca.textContent = 'ligando…';
           try {
             await api('/eventsub.php', { method: 'POST' });
-            recado('Avisos da Twitch ligados.', 'bom');
+            btCheca.onclick = () => checaTts();
             checaTts();
           } catch (e) {
-            bt.disabled = false;
-            bt.textContent = 'Ligar os avisos agora';
-            recado(e.message, 'ruim');
+            btCheca.disabled = false;
+            btCheca.textContent = 'Ligar os avisos da Twitch';
+            checaDiz.textContent = e.message;
+            checaDiz.style.color = 'var(--perigo)';
           }
         };
-        caixaCheca.appendChild(bt);
+        return;
+      } else {
+        checaDiz.textContent = d.primeiro.o_que + ' — ' + d.primeiro.como;
+        checaDiz.style.color = 'var(--dourado)';
       }
-
-      /* O resto vem menor e depois: resolver o primeiro pode acender os
-         outros sozinho, e uma lista de cinco pendências desanima. */
-      const outros = (d.passos || []).filter((x) => !x.ok).slice(1);
-      if (outros.length) {
-        caixaCheca.appendChild(h('span', { cls: 'd', style: 'margin-top:6px;opacity:.75',
-          txt: 'Depois desse: ' + outros.map((x) => x.o_que.toLowerCase()).join('; ') + '.' }));
-      }
-    }).catch(() => { /* servidor velho: sem conferência */ });
+    } catch (e) {
+      checaDiz.textContent = 'Não deu pra conferir agora.';
+      checaDiz.style.color = 'var(--dourado)';
+    }
+    btCheca.disabled = false;
+    btCheca.textContent = 'Conferir se vai funcionar';
+    btCheca.onclick = () => checaTts();
   }
-  checaTts();
+  btCheca.onclick = () => checaTts();
 
   async function pintaOverlay() {
     linhaOverlay.innerHTML = '';
@@ -8464,8 +8524,8 @@ function caixaDoTts(caixa) {
     h('div', { cls: 'campo campo--inteiro' }, [h('span', { cls: 'rotulo', txt: 'Palavras barradas' }), barradas]),
     h('div', { cls: 'campo' }, [h('span', { cls: 'rotulo', txt: 'Prêmio de pontos' }), premio, criar]),
     h('p', { cls: 'd', style: 'margin:-6px 0 10px;font-size:11.5px' }, [dizPremio]),
-    h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [salvar, diz]),
-    caixaCheca,
+    h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' },
+      [salvar, btCheca, diz, checaDiz]),
     linhaOverlay,
   );
 

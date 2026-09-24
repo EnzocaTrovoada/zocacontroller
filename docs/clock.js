@@ -96,6 +96,8 @@
     tvoz:     { t: 'e', d: 'padrao', v: ['padrao', 'grave', 'agudo', 'crianca', 'narrador', 'apressado', 'arrastado', 'gigante', 'sussurro'] },
     tvol:     { t: 'n', d: 100, min: 0, max: 100 },
     tintro:   { t: 'b', d: 1 },
+    /* O nome da voz instalada no computador. Vazio = a primeira do idioma. */
+    tsis:     { t: 't', d: '', max: 80 },
     tlingua:  { t: 'e', d: 'pt-BR', v: ['pt-BR', 'pt-PT', 'en-US', 'es-ES'] },
 
     /* ---------------- speedrun ----------------

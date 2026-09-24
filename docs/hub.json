@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-24",
+      "titulo": "Escolher a voz do seu computador, e o site mais redondo",
+      "texto": "No editor da overlay de TTS dá pra escolher a voz instalada no seu computador — as nove vozes são tom e velocidade sobre ela, então trocar ali muda todas de uma vez. A frase \"fulano resgatou uma mensagem de voz e falou:\" passou a ser montada no servidor, pra funcionar sem depender da fonte do OBS estar atualizada. E o site ganhou cantos mais redondos, campos preenchidos e títulos maiores."
+    },
+    {
+      "data": "2026-09-24",
       "titulo": "O TTS diz quem mandou, e a cena troca pelo próprio painel",
       "texto": "Agora o bot fala \"fulano resgatou uma mensagem de voz e falou:\" antes da mensagem — dá pra desligar no editor da overlay. A frase no meio não é enfeite: ela impede que alguém escreva uma mensagem que se passa por outra pessoa. E a troca de cena da contagem passou a ser feita pelo painel dentro do OBS, que já fala com ele — a ponte agora só cobre quem estiver com o painel fechado."
     },

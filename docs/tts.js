@@ -82,6 +82,21 @@
     /* A voz do idioma de quem assiste, se houver. Sem ela o navegador usa
        a dele, que costuma ler português com sotaque de inglês. */
     function vozBase() {
+      /* A VOZ ESCOLHIDA À MÃO GANHA DE TUDO.
+
+         As nove daqui são tom e velocidade sobre UMA voz do sistema. Trocar
+         essa voz base troca o caráter das nove de uma vez — é o jeito de
+         verdade de "mudar as vozes", e é a única coisa que o navegador
+         oferece além dos três números. */
+      var escolhida = String(cfg.tsis || '');
+      if (escolhida) {
+        for (var e = 0; e < doSistema.length; e++) {
+          if (doSistema[e].name === escolhida) return doSistema[e];
+        }
+        /* A escolhida sumiu (outro computador, voz desinstalada): cai no
+           idioma em vez de ficar muda. */
+      }
+
       var quer = (cfg.tlingua || 'pt-BR').toLowerCase();
       for (var i = 0; i < doSistema.length; i++) {
         var l = String(doSistema[i].lang || '').toLowerCase().replace('_', '-');
@@ -121,8 +136,9 @@
 
          O nome vem da Twitch, e não do que a pessoa digitou. */
       var dizer = item.texto;
-      if (cfg.tintro !== 0 && item.quem) {
-        dizer = item.quem + ' resgatou uma mensagem de voz e falou: ' + item.texto;
+      if (cfg.tintro !== 0) {
+        if (item.dizer) dizer = item.dizer;
+        else if (item.quem) dizer = item.quem + ' resgatou uma mensagem de voz e falou: ' + item.texto;
       }
 
       var fala;
@@ -170,7 +186,10 @@
           if (!it || !it.texto || vistos[it.id]) continue;
           vistos[it.id] = 1;
           fila.push({ id: it.id, texto: String(it.texto), voz: String(it.voz || 'padrao'),
-                      quem: String(it.quem || '') });
+                      quem: String(it.quem || ''),
+                      /* O servidor manda a frase pronta. Sem ela (servidor
+                         antigo), o overlay monta como fazia antes. */
+                      dizer: it.dizer ? String(it.dizer) : '' });
         }
         proxima();
       },

@@ -135,6 +135,25 @@ function tts_pega(int $uid, int $quantas = 5): array
         return [];
     }
 
+    /* A FRASE INTEIRA VEM MONTADA DAQUI.
+
+       Ela já foi montada no overlay, e isso dependia da fonte do OBS
+       estar com o código do dia — o OBS guarda o arquivo em cache e a
+       pessoa não tem como saber qual versão está rodando. Montando aqui,
+       funciona na hora, com a fonte que já estiver aberta.
+
+       A frase fixa entre o nome e a mensagem é o que impede alguém de se
+       passar por outra pessoa: sem ela, uma mensagem que começa com
+       "fulano disse que" sairia colada no nome de quem resgatou.
+
+       O 'texto' continua indo limpo, porque é ele que aparece escrito na
+       tela — lá o nome já tem linha própria e repetir seria ruído. */
+    foreach ($linhas as $i => $l) {
+        $linhas[$i]['dizer'] = $l['quem'] !== ''
+            ? $l['quem'] . ' resgatou uma mensagem de voz e falou: ' . $l['texto']
+            : $l['texto'];
+    }
+
     if ($linhas) {
         $ids = array_column($linhas, 'id');
         $em = implode(',', array_map('intval', $ids));
