@@ -96,9 +96,15 @@ function tts_enfileira(int $uid, string $texto, string $quem, string $vozPedida 
     $limpo = tts_limpa($texto, $cfg);
     if ($limpo === '') return 'vazio';
 
-    /* Um canal não vira megafone, e uma pessoa não ocupa a fila. */
-    if (!limite_ok('tts:' . $uid, 20, 60)) return 'canal-cheio';
-    if ($quem !== '' && !limite_ok('ttsp:' . $uid . ':' . $quem, 3, 60)) return 'pessoa-cheia';
+    /* Um canal não vira megafone, e uma pessoa não ocupa a fila.
+
+       Os números de antes (20 no canal, 3 por pessoa por minuto) eram
+       apertados demais: quem estava testando batia no teto em três
+       resgates e via o TTS "parar de funcionar" sem nada explicando.
+       Quem paga com pontos do canal já tem o freio do próprio preço do
+       prêmio — isto aqui é só contra enxurrada. */
+    if (!limite_ok('tts:' . $uid, 40, 60)) return 'canal-cheio';
+    if ($quem !== '' && !limite_ok('ttsp:' . $uid . ':' . $quem, 10, 60)) return 'pessoa-cheia';
 
     $vozes = tts_vozes_do_canal($cfg);
     $voz = in_array($vozPedida, $vozes, true)
@@ -135,23 +141,27 @@ function tts_pega(int $uid, int $quantas = 5): array
         return [];
     }
 
-    /* A FRASE INTEIRA VEM MONTADA DAQUI.
+    /* A FRASE MONTADA VAI NO 'texto', E NÃO NUM CAMPO NOVO.
 
-       Ela já foi montada no overlay, e isso dependia da fonte do OBS
-       estar com o código do dia — o OBS guarda o arquivo em cache e a
-       pessoa não tem como saber qual versão está rodando. Montando aqui,
-       funciona na hora, com a fonte que já estiver aberta.
+       Eu tinha mandado ela num campo 'dizer' pra não mexer no que já
+       existia — e um campo novo é justamente o que uma fonte com o código
+       antigo em cache não conhece. Ela ignorava o campo e falava só a
+       mensagem, que era o defeito que eu estava tentando consertar.
 
-       A frase fixa entre o nome e a mensagem é o que impede alguém de se
-       passar por outra pessoa: sem ela, uma mensagem que começa com
-       "fulano disse que" sairia colada no nome de quem resgatou.
+       No 'texto' funciona com qualquer versão da fonte, porque é o campo
+       que ela já fala desde o primeiro dia.
 
-       O 'texto' continua indo limpo, porque é ele que aparece escrito na
-       tela — lá o nome já tem linha própria e repetir seria ruído. */
+       A frase fixa entre o nome e a mensagem não é enfeite: sem ela, uma
+       mensagem que começa com "fulano disse que" sairia colada no nome de
+       quem resgatou e viraria a fala de dois.
+
+       O texto limpo vai junto, em 'so_texto', pra tela escrever só a
+       mensagem — lá o nome já tem linha própria e repetir seria ruído. */
     foreach ($linhas as $i => $l) {
-        $linhas[$i]['dizer'] = $l['quem'] !== ''
-            ? $l['quem'] . ' resgatou uma mensagem de voz e falou: ' . $l['texto']
-            : $l['texto'];
+        $linhas[$i]['so_texto'] = $l['texto'];
+        if ($l['quem'] !== '') {
+            $linhas[$i]['texto'] = $l['quem'] . ' resgatou uma mensagem de voz e falou: ' . $l['texto'];
+        }
     }
 
     if ($linhas) {

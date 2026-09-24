@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-24",
+      "titulo": "O nome de quem resgatou, agora de verdade",
+      "texto": "A frase \"fulano resgatou uma mensagem de voz e falou:\" ia num campo novo, e uma fonte do OBS com código antigo em cache ignorava esse campo — falava só a mensagem. Agora ela vai no campo que a fonte já fala desde sempre, então funciona com a fonte que estiver aberta. Na tela continua aparecendo só a mensagem, porque o nome já tem linha própria. E os tetos subiram: 10 mensagens por pessoa por minuto em vez de 3, com a voz saindo em até 2s."
+    },
+    {
+      "data": "2026-09-24",
       "titulo": "O aviso de \"ligar os avisos\" que não sumia",
       "texto": "A coluna que guarda o nome do evento da Twitch tinha 48 caracteres e o nome do evento de resgate de pontos tem 51 — ele entrava cortado, sem erro nenhum. A assinatura existia e funcionava, mas a tela nunca achava ela e pedia pra ligar de novo, o que não mudava nada. Rode o sql/067 e passa. As caixas de texto também ganharam o visual dos outros campos."
     },

@@ -13,12 +13,12 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="clock.css?v=38">
-<link rel="stylesheet" href="chat.css?v=38">
-<link rel="stylesheet" href="musica.css?v=38">
-<link rel="stylesheet" href="alerta.css?v=38">
-<link rel="stylesheet" href="tts.css?v=38">
-<link rel="stylesheet" href="spd.css?v=38">
+<link rel="stylesheet" href="clock.css?v=39">
+<link rel="stylesheet" href="chat.css?v=39">
+<link rel="stylesheet" href="musica.css?v=39">
+<link rel="stylesheet" href="alerta.css?v=39">
+<link rel="stylesheet" href="tts.css?v=39">
+<link rel="stylesheet" href="spd.css?v=39">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
@@ -32,12 +32,12 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=38"></script>
-<script src="chat.js?v=38"></script>
-<script src="musica.js?v=38"></script>
-<script src="alerta.js?v=38"></script>
-<script src="tts.js?v=38"></script>
-<script src="spd.js?v=38"></script>
+<script src="clock.js?v=39"></script>
+<script src="chat.js?v=39"></script>
+<script src="musica.js?v=39"></script>
+<script src="alerta.js?v=39"></script>
+<script src="tts.js?v=39"></script>
+<script src="spd.js?v=39"></script>
 <script>
 (function () {
   'use strict';
@@ -483,7 +483,7 @@
        de gastar ponto parece defeito. E o botão de calar do painel só vale
        se ele calar de verdade — um "pare de falar" que demora quinze
        segundos não serve pra nada, que é justo quando ele é preciso. */
-    if (ultimaConfig && ultimaConfig.tipo === 'tts') return 3000;
+    if (ultimaConfig && ultimaConfig.tipo === 'tts') return 2000;
     if (!ultimaConfig || ultimaConfig.tipo !== 'speedrun') return 15000;
     var corr = ultimaConfig.spcor;
     return (corr && corr.e === 'correndo') ? 2000 : 15000;

@@ -112,7 +112,7 @@
       /* TEXTO DE ESTRANHO É TEXTO. textContent, nunca innerHTML: quem
          escreveu isso foi um espectador, e a regra não tem exceção. */
       quemEl.textContent = item && item.quem ? item.quem : '';
-      textoEl.textContent = item ? item.texto : '';
+      textoEl.textContent = item ? (item.naTela || item.texto) : '';
       caixa.classList.toggle('tts--vazio', !item);
     }
 
@@ -135,11 +135,10 @@
          outro começa.
 
          O nome vem da Twitch, e não do que a pessoa digitou. */
+      /* Desligar o "dizer quem mandou" tira o nome da frase que já veio
+         montada: é mais simples que pedir as duas versões ao servidor. */
       var dizer = item.texto;
-      if (cfg.tintro !== 0) {
-        if (item.dizer) dizer = item.dizer;
-        else if (item.quem) dizer = item.quem + ' resgatou uma mensagem de voz e falou: ' + item.texto;
-      }
+      if (cfg.tintro === 0) dizer = item.naTela;
 
       var fala;
       try {
@@ -185,11 +184,14 @@
           var it = lista[i];
           if (!it || !it.texto || vistos[it.id]) continue;
           vistos[it.id] = 1;
-          fila.push({ id: it.id, texto: String(it.texto), voz: String(it.voz || 'padrao'),
-                      quem: String(it.quem || ''),
-                      /* O servidor manda a frase pronta. Sem ela (servidor
-                         antigo), o overlay monta como fazia antes. */
-                      dizer: it.dizer ? String(it.dizer) : '' });
+          fila.push({ id: it.id,
+                      /* O que se fala já vem montado, com o nome de quem
+                         resgatou. O so_texto é a mensagem limpa, que é o
+                         que a tela escreve. */
+                      texto: String(it.texto),
+                      naTela: String(it.so_texto || it.texto),
+                      voz: String(it.voz || 'padrao'),
+                      quem: String(it.quem || '') });
         }
         proxima();
       },
