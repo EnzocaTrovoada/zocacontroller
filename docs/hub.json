@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-24",
+      "titulo": "As vozes do TTS que chiavam foram refeitas",
+      "texto": "\"Robô\" e \"Gigante\" usavam um tom tão grave que o motor de voz devolvia chiado em vez de fala — era o som estranho que aparecia na live. Todas as vozes voltaram pra faixa que se entende. O Robô saiu, porque sem filtro de áudio ele só sairia chiando; no lugar entrou o Sussurro. Use o ▶ ao lado de cada voz pra ouvir antes de pôr na live."
+    },
+    {
+      "data": "2026-09-24",
       "titulo": "Contagem com a hora certa, e áudio num lugar só",
       "texto": "A contagem marcada por horário dava o tempo errado: o servidor vive num fuso diferente do seu e achava que a hora já tinha passado. Agora a conta é feita pelo relógio do seu computador. Também dá pra digitar os minutos que quiser, o visor mostra horas quando passa de uma, e o \"Fora do VOD\" virou parte da seção Áudio — as duas mexem na mesma coisa."
     },

@@ -18,7 +18,7 @@
  */
 const TTS_VOZES = [
     'padrao', 'grave', 'agudo', 'crianca', 'narrador',
-    'apressado', 'arrastado', 'robo', 'gigante',
+    'apressado', 'arrastado', 'gigante', 'sussurro',
 ];
 
 /** Quanto tempo uma mensagem esperada na fila ainda vale. */

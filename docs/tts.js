@@ -5,11 +5,18 @@
  * caractere numa hospedagem compartilhada seria conta aberta, e um canal
  * movimentado sozinho estouraria ela.
  *
- * AS VOZES SÃO JEITOS DE FALAR. Cada uma é a voz do sistema com outro tom
- * e outra velocidade. O navegador NÃO deixa passar a fala por um filtro de
- * áudio — o som do speechSynthesis vai direto pra saída e não dá pra
- * capturar —, então "robô" aqui é tom muito grave e fala arrastada, e não
- * um efeito por cima. É honesto chamar de jeito de falar, não de filtro.
+ * AS VOZES SÃO TOM, VELOCIDADE E VOLUME. É o que o navegador dá: o som do
+ * speechSynthesis vai direto pra saída e não dá pra passar por filtro.
+ *
+ * TOM ABAIXO DE 0.6 NÃO É VOZ, É RUÍDO. A primeira versão tinha "robô" em
+ * 0.2 e "gigante" em 0.1 — o navegador aceita esses números sem reclamar,
+ * e o motor de voz devolve um chiado que ninguém entende. Era o "som
+ * maluco" que apareceu na live. A faixa que se entende é 0.6 a 1.8, e
+ * nada aqui sai dela.
+ *
+ * Por isso não há "robô": sem filtro de áudio, ele só sairia com um tom
+ * que estraga a fala. No lugar entrou o sussurro, que usa o volume — uma
+ * terceira manopla, e essa funciona.
  *
  * PRA SOMAR UMA VOZ: uma linha em VOZES e a mesma em TTS_VOZES, no
  * api/lib/tts.php. O conferir.js compara as duas e reclama se divergirem.
@@ -19,17 +26,19 @@
 
   var R = global.Relogio;
 
-  /* tom 0.1–2.0 (grave embaixo) · vel 0.5–2.0 (devagar embaixo) */
+  /* tom 0.6–1.8 · vel 0.6–1.6 · vol 0–1 (multiplica o volume do overlay) */
   var VOZES = {
-    padrao:    { nome: 'Padrão',    tom: 1.0, vel: 1.0 },
-    grave:     { nome: 'Grave',     tom: 0.5, vel: 0.95 },
-    agudo:     { nome: 'Agudo',     tom: 1.7, vel: 1.05 },
-    crianca:   { nome: 'Criança',   tom: 1.9, vel: 1.15 },
-    narrador:  { nome: 'Narrador',  tom: 0.85, vel: 0.85 },
-    apressado: { nome: 'Apressado', tom: 1.1, vel: 1.6 },
-    arrastado: { nome: 'Arrastado', tom: 0.9, vel: 0.65 },
-    robo:      { nome: 'Robô',      tom: 0.2, vel: 0.8 },
-    gigante:   { nome: 'Gigante',   tom: 0.1, vel: 0.7 },
+    padrao:    { nome: 'Padrão',    tom: 1.00, vel: 1.00 },
+    grave:     { nome: 'Grave',     tom: 0.72, vel: 0.95 },
+    agudo:     { nome: 'Agudo',     tom: 1.45, vel: 1.05 },
+    crianca:   { nome: 'Criança',   tom: 1.70, vel: 1.15 },
+    narrador:  { nome: 'Narrador',  tom: 0.86, vel: 0.85 },
+    apressado: { nome: 'Apressado', tom: 1.10, vel: 1.50 },
+    arrastado: { nome: 'Arrastado', tom: 0.95, vel: 0.68 },
+    /* Grave E devagar: é o que separa o gigante do grave, sem sair da
+       faixa onde a fala continua sendo fala. */
+    gigante:   { nome: 'Gigante',   tom: 0.62, vel: 0.78 },
+    sussurro:  { nome: 'Sussurro',  tom: 1.05, vel: 0.92, vol: 0.40 },
   };
 
   var MOLDE =
@@ -99,9 +108,13 @@
 
       fala.pitch = v.tom;
       fala.rate = v.vel;
-      fala.volume = Math.max(0, Math.min(1, (cfg.tvol == null ? 100 : cfg.tvol) / 100));
-      var base = vozBase();
-      if (base) { fala.voice = base; fala.lang = base.lang; }
+      /* O volume do overlay vezes o da voz: o sussurro sai mais baixo que
+         o resto, mas continua obedecendo o volume que a pessoa escolheu. */
+      var vol = (cfg.tvol == null ? 100 : cfg.tvol) / 100;
+      fala.volume = Math.max(0, Math.min(1, vol * (v.vol == null ? 1 : v.vol)));
+
+      var doIdioma = vozBase();
+      if (doIdioma) { fala.voice = doIdioma; fala.lang = doIdioma.lang; }
       else fala.lang = cfg.tlingua || 'pt-BR';
 
       /* Se a fala morrer no meio (erro, voz sumiu, aba dormindo), a fila

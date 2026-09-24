@@ -165,6 +165,33 @@ try {
   }
 } catch (e) { /* sem git: não dá pra conferir, e não é motivo pra falhar */ }
 
+/* ---- o ?v= dos overlays subiu junto com os arquivos? ----
+
+   Mesma armadilha da ponte, noutro arquivo. O OBS guarda clock.js, tts.js
+   e companhia em cache, e quem manda buscar de novo é o ?v= do
+   overlay.html. Mexer num desenhista sem subir o número deixa o OBS de
+   todo mundo rodando o código velho — foi assim que as vozes de tom 0.2
+   continuaram chiando depois de eu já ter corrigido. */
+const vOverlay = Number((ler('docs/overlay.html').match(/\?v=(\d+)/) || [])[1] || 0);
+try {
+  const gitData = (arq) => require('child_process')
+    .execSync(`git log -1 --format=%ct -- ${arq}`, { encoding: 'utf8' }).trim();
+
+  const desenhistas = ['docs/clock.js', 'docs/chat.js', 'docs/musica.js',
+                       'docs/alerta.js', 'docs/tts.js', 'docs/spd.js'];
+  const quandoOverlay = Number(gitData('docs/overlay.html') || 0);
+
+  const maisNovos = desenhistas.filter((d) => Number(gitData(d) || 0) > quandoOverlay);
+
+  if (maisNovos.length) {
+    console.log(`\u2717 ?v= dos overlays: ${maisNovos.join(', ')} mudou depois do overlay.html`);
+    console.log(`  suba o ?v=${vOverlay} pra ${vOverlay + 1} no docs/overlay.html`);
+    falhas++;
+  } else {
+    console.log(`\u2713 ?v= dos overlays: v=${vOverlay}, mais novo que os desenhistas`);
+  }
+} catch (e) { /* sem git: n\u00e3o d\u00e1 pra conferir */ }
+
 /* ---- cargos, e na MESMA ordem: aqui a ordem é a regra ---- */
 const cargosPonte = Object.keys(JSON.parse(
   '{' + (ponte.match(/const CARGOS = \{([^}]*)\}/)?.[1] || '').replace(/(\w+):/g, '"$1":') + '}'

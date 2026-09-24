@@ -93,7 +93,7 @@
     apfica:   { t: 'n', d: 8, min: 1, max: 120 },
 
     /* ---- tts ---- */
-    tvoz:     { t: 'e', d: 'padrao', v: ['padrao', 'grave', 'agudo', 'crianca', 'narrador', 'apressado', 'arrastado', 'robo', 'gigante'] },
+    tvoz:     { t: 'e', d: 'padrao', v: ['padrao', 'grave', 'agudo', 'crianca', 'narrador', 'apressado', 'arrastado', 'gigante', 'sussurro'] },
     tvol:     { t: 'n', d: 100, min: 0, max: 100 },
     tlingua:  { t: 'e', d: 'pt-BR', v: ['pt-BR', 'pt-PT', 'en-US', 'es-ES'] },
 
