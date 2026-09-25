@@ -18,6 +18,7 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/uso.php';
 require_once __DIR__ . '/lib/assinatura.php';
 
 cors();
@@ -60,5 +61,7 @@ try {
 } catch (PDOException $e) {
     json_saida(['erro' => erro_publico($e, 'Falta rodar o SQL 061 no banco.')], 500);
 }
+
+uso_marca($uid, 'cor');
 
 json_saida(['ok' => true, 'cor' => $cor]);

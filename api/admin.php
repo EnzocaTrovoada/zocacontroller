@@ -21,6 +21,32 @@ if (!(int) $st->fetchColumn()) {
     json_saida(['erro' => 'Não encontrado.'], 404);
 }
 
+/* ---------- as estatísticas de uso ----------
+
+   ANTES DO GET GERAL, e não depois: o ramo de baixo responde e encerra,
+   então qualquer coisa colocada depois dele nunca é alcançada. Já perdi
+   uma tarde com isso no tts.php e outra no raid.php.
+
+   A PERGUNTA NÃO É "QUANTOS CLIQUES". É quantas contas DIFERENTES usam
+   cada coisa — é isso que diz o que construir e o que aposentar. */
+if (isset($_GET['uso'])) {
+    require_once __DIR__ . '/lib/uso.php';
+
+    $dias = max(1, min(365, (int) ($_GET['dias'] ?? 30)));
+    $lista = uso_por_recurso($dias);
+
+    /* Do mais usado pro menos. O fim da lista é a parte valiosa: recurso
+       que ninguém usa é decisão esperando pra ser tomada. */
+    uasort($lista, static fn($a, $b) => $b['contas'] <=> $a['contas']);
+
+    json_saida([
+        'dias'     => $dias,
+        'recursos' => $lista,
+        'voltaram' => uso_voltaram(),
+        'do_pro'   => uso_do_pro($dias),
+    ]);
+}
+
 /* ---------- a lista ---------- */
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $st = db()->query(

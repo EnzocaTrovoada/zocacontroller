@@ -1667,6 +1667,25 @@ try {
   }
   .raid-barra i { display: block; height: 100%; background: var(--verde); transition: width .3s ease-out; }
 
+  /* ---------- está tudo funcionando ---------- */
+  .sa-lista { display: flex; flex-direction: column; }
+  .sa-um {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0; border-top: 1px solid var(--linha);
+  }
+  .sa-um b { display: block; font: 600 13.5px var(--disp); }
+  .sa-um small { display: block; font-size: 12px; color: var(--apagado); line-height: 1.45; }
+  .sa-sinal { flex: none; width: 18px; text-align: center; font: 700 15px var(--disp); }
+
+  /* ---------- as estatísticas ---------- */
+  .st-linha { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+  .st-nome { flex: 0 0 210px; font-size: 13px; }
+  .st-barra { flex: 1; height: 8px; border-radius: 4px; background: var(--caixa2); overflow: hidden; }
+  .st-barra i { display: block; height: 100%; background: var(--verde); }
+  .st-num { flex: 0 0 52px; text-align: right; font: 600 13px var(--mono); }
+  .st-zero .st-nome, .st-zero .st-num { color: var(--apagado); }
+  .st-zero .st-barra i { background: var(--linha2); }
+
   /* ---------- campo com rótulo em cima ---------- */
   .rot-linha { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-top: 14px; }
   .rot { display: flex; flex-direction: column; gap: 5px; }
@@ -7288,6 +7307,9 @@ function telaControlador() {
      Recurso que não faz nada não dá erro — ele só não acontece. Sem esta
      caixa, a única pista é "não funciona", e a causa (um SQL que não foi
      rodado) é invisível de dentro do site. */
+  const cxSaude = h('div', { cls: 'fatia' });
+  caixaDaSaude(cxSaude);
+
   const cxBanco = h('div', { cls: 'fatia escondido' });
   api('/banco.php').then((d) => {
     if (d.tudo_certo) return;
@@ -7518,6 +7540,7 @@ function telaControlador() {
     });
   }
   tela.appendChild(fatiaOv);
+  tela.appendChild(cxSaude);
   tela.appendChild(cxBanco);
   tela.appendChild(cxCor);
 }
@@ -8144,6 +8167,93 @@ function refazRecado(r) {
     acao: 'recado', id: 0, nome: r.nome, mensagens: r.mensagens, minutos: r.minutos,
     linhas: r.linhas, no_ar: r.no_ar, fora_do_ar: r.fora_do_ar, ligado: r.ligado,
   }) }).then(avisaPonte);
+}
+
+/* ================== ESTÁ TUDO FUNCIONANDO? ==================
+
+   Quase todo problema deste produto é invisível de dentro dele: um SQL
+   que não rodou, uma permissão que a conta nunca deu, a fonte do OBS com
+   código velho em cache. Nenhum dá erro — o recurso só não acontece.
+
+   Esta caixa responde antes de a pessoa escrever pedindo socorro. */
+const SAUDE_CORES = {
+  ok:      ['var(--verde)', '✓'],
+  aviso:   ['var(--dourado)', '!'],
+  parado:  ['var(--perigo)', '×'],
+  nao_usa: ['var(--apagado)', '–'],
+};
+
+function caixaDaSaude(caixa) {
+  const lista = h('div', { cls: 'sa-lista' });
+  const resumo = h('p', { cls: 'd' });
+  const rever = h('button', { cls: 'bt fraco', type: 'button', txt: 'Conferir de novo' });
+
+  async function confere() {
+    rever.disabled = true;
+    rever.textContent = 'conferindo…';
+    try {
+      const d = await api('/saude.php');
+      lista.innerHTML = '';
+
+      /* A VERSÃO DA PONTE É COMPARADA AQUI, e não no servidor: quem sabe
+         qual é a esperada é esta página, que carrega o PONTE_VERSAO. */
+      const itens = (d.itens || []).slice();
+      if (d.versao_ponte && d.versao_ponte !== PONTE_VERSAO) {
+        itens.push({ o_que: 'Código da fonte do OBS', estado: 'aviso', onde: '#/tutorial',
+          recado: 'Está rodando ' + d.versao_ponte + ' e o atual é ' + PONTE_VERSAO
+                + '. No OBS: botão direito na fonte da ponte → Atualizar.' });
+      }
+
+      /* Problema primeiro. Quem abre isto quer saber o que está quebrado,
+         não ler a lista inteira até achar. */
+      const peso = { parado: 0, aviso: 1, ok: 2, nao_usa: 3 };
+      itens.sort((a, b) => peso[a.estado] - peso[b.estado]);
+
+      itens.forEach((it) => {
+        const [cor, sinal] = SAUDE_CORES[it.estado] || SAUDE_CORES.nao_usa;
+        const linha = h('div', { cls: 'sa-um' }, [
+          h('span', { cls: 'sa-sinal', style: 'color:' + cor, txt: sinal }),
+          h('div', { style: 'flex:1' }, [
+            h('b', { txt: it.o_que }),
+            h('small', { txt: it.recado }),
+          ]),
+        ]);
+        if (it.onde && it.estado !== 'ok') {
+          const ir = h('button', { cls: 'bt mini', type: 'button', txt: 'Arrumar' });
+          ir.onclick = () => vaiPara(it.onde);
+          linha.appendChild(ir);
+        }
+        lista.appendChild(linha);
+      });
+
+      const quebrados = itens.filter((x) => x.estado === 'parado').length;
+      const avisados = itens.filter((x) => x.estado === 'aviso').length;
+      if (!quebrados && !avisados) {
+        resumo.textContent = 'Está tudo funcionando.';
+        resumo.style.color = 'var(--verde-forte)';
+      } else {
+        resumo.textContent = [
+          quebrados ? quebrados + ' parado' + (quebrados > 1 ? 's' : '') : '',
+          avisados ? avisados + ' pra olhar' : '',
+        ].filter(Boolean).join(' e ') + '.';
+        resumo.style.color = quebrados ? 'var(--perigo)' : 'var(--dourado)';
+      }
+    } catch (e) {
+      resumo.textContent = 'Este servidor ainda não tem a conferência. Suba a pasta api.';
+      resumo.style.color = 'var(--dourado)';
+    }
+    rever.disabled = false;
+    rever.textContent = 'Conferir de novo';
+  }
+
+  rever.onclick = confere;
+  caixa.append(
+    h('h3', { txt: 'Está tudo funcionando?' }),
+    resumo,
+    lista,
+    h('p', { style: 'margin:12px 0 0' }, [rever]),
+  );
+  confere();
 }
 
 /* ================== A ABA PAINEL ==================

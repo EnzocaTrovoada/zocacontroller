@@ -65,6 +65,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         'erro'   => mb_substr((string) ($estado['erro'] ?? ''), 0, 200),
     ];
 
+    /* A ponte publicando estado prova que o painel está aberto no OBS.
+       É o único jeito de medir isso: o painel não tem tela própria aqui. */
+    require_once __DIR__ . '/lib/uso.php';
+    uso_marca((int) $quem['usuario_id'], 'painel');
+
     db()->prepare(
         'INSERT INTO estado_ao_vivo (usuario_id, estado) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE estado = VALUES(estado), atualizado_em = NOW()'

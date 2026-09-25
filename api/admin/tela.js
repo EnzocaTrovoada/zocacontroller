@@ -671,12 +671,84 @@ function blocoEstilo() {
   ]);
 }
 
+/* ================== O QUE AS PESSOAS USAM ==================
+
+   A PERGUNTA NÃO É "QUANTOS CLIQUES", É QUANTAS CONTAS.
+
+   Um canal grande usando o TTS mil vezes por dia não diz mais que mil
+   canais usando uma vez. O que decide o que construir e o que aposentar é
+   quantas pessoas DIFERENTES encostam em cada coisa.
+
+   E o fim da lista vale mais que o começo: recurso com zero é uma decisão
+   esperando pra ser tomada. Por isso os zeros aparecem, em vez de sumirem
+   por não terem linha no banco. */
+function blocoUso() {
+  const cx = h('div', { cls: 'fatia' });
+  const lista = h('div');
+  const resumo = h('p', { cls: 'd' });
+
+  const periodo = h('select', { style: 'width:140px' });
+  [['7', 'últimos 7 dias'], ['30', 'últimos 30 dias'], ['90', 'últimos 90 dias']]
+    .forEach(([v, r]) => periodo.appendChild(h('option', { value: v, txt: r })));
+  periodo.value = '30';
+
+  async function carrega() {
+    lista.innerHTML = '';
+    let d;
+    try { d = await api('/admin.php?uso=1&dias=' + periodo.value); }
+    catch (e) {
+      resumo.textContent = 'Este servidor ainda não mede uso. Suba a pasta api e rode o SQL 069.';
+      return;
+    }
+
+    const recursos = Object.values(d.recursos || {});
+    const maior = Math.max(1, ...recursos.map((r) => r.contas));
+
+    recursos.forEach((r) => {
+      lista.appendChild(h('div', { cls: 'st-linha' + (r.contas ? '' : ' st-zero') }, [
+        h('span', { cls: 'st-nome', txt: r.nome }),
+        h('div', { cls: 'st-barra' }, [
+          h('i', { style: 'width:' + Math.round((r.contas / maior) * 100) + '%' }),
+        ]),
+        h('span', { cls: 'st-num', txt: String(r.contas) }),
+      ]));
+    });
+
+    const v = d.voltaram || {};
+    /* Quantos voltaram diz se o produto gruda. Um pico de gente nova com
+       pouca volta quer dizer que alguém divulgou, e não que ficou melhor. */
+    const taxa = v.passada ? Math.round((v.voltaram / v.passada) * 100) : 0;
+    resumo.textContent = (v.semana || 0) + ' contas ativas nesta semana · '
+      + (v.voltaram || 0) + ' voltaram da semana passada'
+      + (v.passada ? ' (' + taxa + '%)' : '');
+
+    const semUso = recursos.filter((r) => !r.contas).map((r) => r.nome);
+    if (semUso.length) {
+      lista.appendChild(h('p', { cls: 'd', style: 'margin-top:14px',
+        txt: 'Ninguém usou no período: ' + semUso.join(', ') + '.' }));
+    }
+  }
+
+  periodo.onchange = carrega;
+  cx.append(
+    h('h3', { txt: 'O que as pessoas usam' }),
+    h('p', { cls: 'd', txt: 'Quantas contas diferentes encostaram em cada recurso. '
+      + 'Não conta cliques: um canal usando mil vezes conta como um.' }),
+    h('div', { cls: 'campo' }, [h('span', { cls: 'rotulo', txt: 'Período' }), periodo]),
+    resumo,
+    lista,
+  );
+  carrega();
+  return cx;
+}
+
 function telaAdmin() {
   const tela = el('tela');
   tela.innerHTML = '';
   tela.appendChild(h('h1', { txt: 'Administração' }));
   tela.appendChild(h('p', { cls: 'sub', txt: 'Quem entrou e o que cada um pode. Campo vazio usa o valor do plano.' }));
 
+  tela.appendChild(blocoUso());
   tela.appendChild(blocoVitrine());
   tela.appendChild(blocoParceiros());
   tela.appendChild(blocoSuporte());

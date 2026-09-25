@@ -13,6 +13,7 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/uso.php';
 require_once __DIR__ . '/lib/assinatura.php';
 
 cors();
@@ -117,6 +118,7 @@ if ($acao === 'criar') {
        o de outra gente, e ninguém quer batizar um link. */
     $chave = bin2hex(random_bytes(9));
     db()->prepare(
+        /* Criar um overlay é o uso; listar os que já existem não é. */
         'INSERT INTO perfis (usuario_id, tipo, nome, config, chave_publica) VALUES (?, ?, ?, ?, ?)'
     )->execute([$quem['usuario_id'], $tipo, perfil_nome($d), perfil_config($d), $chave]);
     $novo = (int) db()->lastInsertId();
@@ -158,6 +160,8 @@ if ($acao === 'criar') {
    pessoa. */
 $id = (int) ($d['id'] ?? 0);
 if ($id <= 0) json_saida(['erro' => 'Qual overlay?'], 400);
+
+uso_marca((int) $quem['usuario_id'], 'overlay');
 
 if ($acao === 'salvar') {
     $st = db()->prepare('UPDATE perfis SET nome = ?, config = ? WHERE id = ? AND usuario_id = ?');

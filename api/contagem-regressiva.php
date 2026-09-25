@@ -11,6 +11,7 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/uso.php';
 
 cors();
 $quem = exige_painel();
@@ -120,5 +121,7 @@ try {
 } catch (PDOException $e) {
     json_saida(['erro' => erro_publico($e, 'Falta rodar o SQL 066 no banco.')], 500);
 }
+
+uso_marca($uid, 'contagem');
 
 json_saida(['ok' => true, 'alvo' => $alvo, 'faltam' => strtotime($alvo) - time()]);

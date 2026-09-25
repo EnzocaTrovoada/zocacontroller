@@ -17,6 +17,7 @@ require_once __DIR__ . '/lib/acesso.php';
 require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/seguranca.php';
 require_once __DIR__ . '/lib/luzes.php';
+require_once __DIR__ . '/lib/uso.php';
 
 /* ---------- a volta de quem foi autorizar ----------
 
@@ -126,6 +127,11 @@ $acao = (string) ($d['acao'] ?? '');
 
 /* ---------- o chat pediu ---------- */
 if ($acao === 'chat') {
+    /* O chat mandando a cor É o recurso. Conectar a marca e nunca usar
+       não conta — e contar isso faria as luzes parecerem mais usadas do
+       que são, justo o erro que estas contas existem pra evitar. */
+    uso_marca($uid, 'luzes');
+
     $ordem = luz_entender($uid, (string) ($d['texto'] ?? ''));
     if (!$ordem) json_saida(['ok' => false, 'erro' => 'não conheço essa cor nem essa cena'], 200);
 

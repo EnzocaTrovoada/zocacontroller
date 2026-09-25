@@ -114,6 +114,11 @@ function tts_enfileira(int $uid, string $texto, string $quem, string $vozPedida 
     try {
         db()->prepare('INSERT INTO tts_fila (usuario_id, texto, voz, quem) VALUES (?, ?, ?, ?)')
             ->execute([$uid, $limpo, $voz, mb_substr($quem, 0, 40)]);
+        /* Aqui, e não ao abrir a tela: quem configurou e desistiu não usou
+           o recurso, e contar isso inflaria o número justo do jeito que
+           faria a gente manter uma coisa que ninguém usa. */
+        require_once __DIR__ . '/uso.php';
+        uso_marca($uid, 'tts');
     } catch (Throwable $e) {
         return 'sem-tabela';
     }

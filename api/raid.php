@@ -17,6 +17,7 @@ require_once __DIR__ . '/lib/seguranca.php';
 require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/twitch.php';
 require_once __DIR__ . '/lib/raid-pontos.php';
+require_once __DIR__ . '/lib/uso.php';
 
 cors();
 $quem = exige_painel();
@@ -231,6 +232,8 @@ if (!empty($d['raidar'])) {
         json_saida(['erro' => (string) ($r['message'] ?? 'A Twitch recusou esse raid.')], 400);
     }
     if ($http !== 200) json_saida(['erro' => 'A Twitch não respondeu agora.'], 502);
+
+    uso_marca($uid, 'raid');
 
     json_saida([
         'ok' => true,
