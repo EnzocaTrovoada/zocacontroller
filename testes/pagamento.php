@@ -108,6 +108,83 @@ $usados = 0;
 confere('quem nunca raidou paga o cheio', mp_menos_dias(1, ['periodo' => 'mensal'], 1399, $usados), 1399);
 
 /* ------------------------------------------------------------------ *
+ *  O desconto da ASSINATURA anda em dias, e não em reais
+ * ------------------------------------------------------------------ */
+echo "\n--- os dias grátis da assinatura ---\n";
+
+/* O que mp_dias_gratis() usa e mora em outros arquivos. O cupom de mentira
+   é percentual porque é o caso que converte errado com mais facilidade. */
+const MP_DIAS = ['mensal' => 30, 'anual' => 365];
+
+$CUPOM = null;
+function cupom_limpa(string $c): string { return strtoupper(trim($c)); }
+function cupom_valida(string $c): array
+{
+    global $CUPOM;
+    return $CUPOM === null ? ['ok' => false] : ['ok' => true, 'cupom' => $CUPOM];
+}
+function cupom_aplica(array $c, int $centavos): array
+{
+    return ['por' => (int) round($centavos * (100 - $c['pct']) / 100)];
+}
+
+preg_match('/function mp_dias_gratis.*?\n}/s', $fonte, $m2);
+eval($m2[0]);
+preg_match('/function mp_pode_assinar.*?\n}/s', $fonte, $m3);
+eval('const MP_RECORRENCIA = ' . var_export(['mensal' => [1, 'months'], 'anual' => [12, 'months']], true) . ';' . $m3[0]);
+
+$MENSAL = ['periodo' => 'mensal', 'preco_centavos' => 1399];
+$ANUAL  = ['periodo' => 'anual',  'preco_centavos' => 13990];
+
+/* ---- o caso normal: dia de raid vira dia grátis, sem conversão ---- */
+$CUPOM = null;
+$DB->d = ['saldo' => ['dias' => 3, 'desconto' => 1]];
+$dr = 0; $cp = '';
+confere('3 dias de raid viram 3 dias grátis', mp_dias_gratis(1, $MENSAL, '', $dr, $cp), 3);
+confere('  e consome os 3', $dr, 3);
+
+/* ---- O TETO. Metade do período, igual ao caminho avulso. ---- */
+$DB->d = ['saldo' => ['dias' => 40, 'desconto' => 1]];
+$dr = 0;
+confere('40 dias no saldo gastam no máximo 5', mp_dias_gratis(1, $MENSAL, '', $dr, $cp), 5);
+confere('  e gasta 5', $dr, 5);
+
+/* ---- A CHAVE DESLIGADA ---- */
+$DB->d = ['saldo' => ['dias' => 10, 'desconto' => 0]];
+$dr = 0;
+confere('desconto desligado não dá dia nenhum', mp_dias_gratis(1, $MENSAL, '', $dr, $cp), 0);
+confere('  e não gasta dia nenhum', $dr, 0);
+
+/* ---- O CUPOM VIRA DIAS.
+
+       É AQUI QUE ASSINATURA DIFERE DE COMPRA AVULSA: baixar o valor mensal
+       daria o desconto do cupom TODO MÊS, pra sempre. Virando dias, ele
+       acontece uma vez, que é o que um cupom é. ---- */
+$CUPOM = ['pct' => 50];
+$DB->d = ['saldo' => false];
+$dr = 0; $cp = '';
+confere('cupom de 50% no mensal vira metade do mês', mp_dias_gratis(1, $MENSAL, 'META50', $dr, $cp), 14);
+confere('  e guarda o código do cupom', $cp, 'META50');
+
+/* ---- CUPOM E RAID JUNTOS param no teto, e o que sobra fica no saldo ---- */
+$CUPOM = ['pct' => 50];
+$DB->d = ['saldo' => ['dias' => 5, 'desconto' => 1]];
+$dr = 0;
+confere('cupom + raid param na metade do período', mp_dias_gratis(1, $MENSAL, 'META50', $dr, $cp), 15);
+confere('  e só gasta o dia de raid que coube', $dr, 1);
+
+/* ---- O ANUAL: o dia de raid continua valendo um dia ---- */
+$CUPOM = null;
+$DB->d = ['saldo' => ['dias' => 5, 'desconto' => 1]];
+$dr = 0;
+confere('5 dias de raid no anual valem 5 dias', mp_dias_gratis(1, $ANUAL, '', $dr, $cp), 5);
+
+/* ---- QUEM PODE SER ASSINATURA ---- */
+confere('mensal é assinatura', mp_pode_assinar($MENSAL), true);
+confere('anual é assinatura', mp_pode_assinar($ANUAL), true);
+confere('vitalício não renova', mp_pode_assinar(['periodo' => 'vitalicio']), false);
+
+/* ------------------------------------------------------------------ *
  *  O estorno devolve os dias
  * ------------------------------------------------------------------ */
 echo "\n--- o estorno ---\n";

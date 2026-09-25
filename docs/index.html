@@ -4898,6 +4898,9 @@ function abrePro(estado) {
       ? 'Você está no plano grátis. Veja o que muda.'
     : estado.plano === 'vitalicio'
       ? 'Você é Vitalício. Já tem tudo, pra sempre.'
+    : estado.renova
+      ? 'Você já é Pro. Renova sozinho'
+        + (ate ? ' em ' + ate.toLocaleDateString('pt-BR') : '') + ', e dá pra desligar aqui embaixo.'
       : 'Você já é Pro' + (ate ? ', até ' + ate.toLocaleDateString('pt-BR') : '') + '. Pode renovar quando quiser.' }));
 
   const lista = h('ul', { cls: 'pop__lista' });
@@ -5097,6 +5100,16 @@ function abrePro(estado) {
     precos.forEach((x, k) => x.botao.classList.toggle('on', k === i));
     pagar.disabled = !escolhido;
     pagar.textContent = escolhido ? 'Seja Pro — ' + reaisDe(escolhido.preco_centavos) : 'Seja Pro';
+
+    /* O vitalício é compra avulsa: não renova, e então não precisa do
+       e-mail nem do aviso de renovação. Pedir mesmo assim seria um campo
+       obrigatório sem motivo bem na hora de pagar. */
+    const renova = !!escolhido && escolhido.periodo !== 'vitalicio';
+    linhaEmail.style.display = renova ? '' : 'none';
+    aviso.textContent = renova
+      ? 'Pix, cartão ou saldo, no site do Mercado Pago. Renova sozinho '
+        + (escolhido.periodo === 'anual' ? 'todo ano' : 'todo mês') + ' e dá pra cancelar aqui quando quiser.'
+      : 'Pix, cartão ou saldo. O pagamento acontece no site do Mercado Pago.';
   }
 
   /* Mostra "de R$ 13,99 por R$ 11,19" no plano i, ou volta ao preço cheio. */
@@ -5115,6 +5128,24 @@ function abrePro(estado) {
     }
   }
 
+  /* ----- o e-mail do Mercado Pago -----
+
+     NÃO DÁ PRA ADIVINHAR ESTE CAMPO, e por isso ele existe.
+
+     Em assinatura o Mercado Pago confere, na hora de pagar, se o e-mail que
+     mandamos é o mesmo da conta que está pagando — e não batendo, RECUSA.
+     O e-mail da Twitch não serve: é outro cadastro, e na maior parte das
+     pessoas é outro endereço. Sem perguntar, quase toda assinatura seria
+     recusada lá no checkout deles, sem dizer por quê. */
+  const email = h('input', { type: 'email', cls: 'campo', placeholder: 'voce@email.com',
+    autocomplete: 'email', style: 'width:100%' });
+  const linhaEmail = h('div', { cls: 'rot', style: 'margin:10px 0 0' }, [
+    h('label', { txt: 'E-mail da sua conta do Mercado Pago' }),
+    email,
+    h('p', { cls: 'd', style: 'margin:4px 0 0',
+      txt: 'Tem que ser o mesmo da conta que vai pagar, senão eles recusam.' }),
+  ]);
+
   /* ----- o botão que paga ----- */
   const pagar = h('button', { cls: 'bt principal', type: 'button',
     txt: 'Seja Pro', style: 'width:100%' });
@@ -5125,14 +5156,23 @@ function abrePro(estado) {
     const antes = pagar.textContent;
     pagar.textContent = 'abrindo…';
     try {
+      /* POST, e o e-mail no CORPO: endereço de e-mail em query string fica
+         no registro do servidor, no histórico e no Referer. */
       const r = await api('/checkout.php?plano=' + encodeURIComponent(escolhido.slug)
-        + (cupomAtivo ? '&cupom=' + encodeURIComponent(cupomAtivo) : ''));
+        + (cupomAtivo ? '&cupom=' + encodeURIComponent(cupomAtivo) : ''),
+        { method: 'POST', body: JSON.stringify({ email: email.value.trim() }) });
 
       /* Aba nova, e não redirecionamento: quem sai do painel pro Mercado
          Pago e volta numa página deles perde o caminho de volta. */
       window.open(r.url, '_blank', 'noopener');
       fechaPop();
-      recado('Abri o pagamento numa aba nova. Depois de pagar, volte e recarregue.', 'bom');
+      recado(r.gratis > 0
+        ? 'Abri a assinatura numa aba nova. Os seus ' + r.gratis
+          + (r.gratis === 1 ? ' dia de desconto entra' : ' dias de desconto entram')
+          + ' antes da primeira cobrança.'
+        : (r.assina
+            ? 'Abri a assinatura numa aba nova. Depois de confirmar, volte e recarregue.'
+            : 'Abri o pagamento numa aba nova. Depois de pagar, volte e recarregue.'), 'bom');
     } catch (e) {
       recado(e.message, 'ruim');
     }
@@ -5149,11 +5189,43 @@ function abrePro(estado) {
 
      E o anual já vem marcado: sem nada escolhido, a pessoa decide do zero;
      com o anual marcado, a decisão vira "confirmo ou mudo". */
+  const aviso = h('p', { cls: 'd', style: 'margin:12px 0 0;text-align:center',
+    txt: 'Pix, cartão ou saldo. O pagamento acontece no site do Mercado Pago.' });
+
   const acao = h('div', { cls: 'pop__acao' }, [
-    temCupom, listaCupons, linhaCupom, cupomDiz, pagar,
-    h('p', { cls: 'd', style: 'margin:12px 0 0;text-align:center',
-      txt: 'Pix, cartão ou saldo. O pagamento acontece no site do Mercado Pago.' }),
+    temCupom, listaCupons, linhaCupom, cupomDiz, linhaEmail, pagar, aviso,
   ]);
+
+  /* DESLIGAR A RENOVAÇÃO PRECISA ESTAR AQUI, NA MESMA TELA DE ASSINAR.
+
+     Assinatura que só se cancela falando com alguém é assinatura que se
+     cancela pelo banco — e contestação tira o acesso, custa taxa e ainda
+     queima a reputação da conta. Quem quer sair sai num clique, e o que já
+     foi pago continua valendo até o fim. */
+  if (estado.renova) {
+    const desligar = h('button', { cls: 'bt mini', type: 'button', style: 'width:100%;margin-top:10px',
+      txt: 'Cancelar a renovação' });
+    const diz = h('p', { cls: 'd', style: 'margin:6px 0 0;text-align:center' });
+
+    desligar.onclick = async () => {
+      if (!confirm('Desligar a renovação automática? O Pro continua valendo até o fim do período que você já pagou.')) return;
+      desligar.disabled = true;
+      try {
+        const r = await api('/checkout.php?cancelar=1', { method: 'POST' });
+        diz.textContent = r.recado;
+        diz.style.color = 'var(--sinal)';
+        desligar.remove();
+        if (proEstado) proEstado.renova = false;
+      } catch (e) {
+        diz.textContent = e.message;
+        diz.style.color = 'var(--perigo)';
+        desligar.disabled = false;
+      }
+    };
+
+    acao.appendChild(desligar);
+    acao.appendChild(diz);
+  }
   caixa.appendChild(acao);
 
   const iAnual = precos.findIndex((x) => x.plano.periodo === 'anual');
@@ -5191,6 +5263,15 @@ async function abrePlanos() {
   }
 
   tela.appendChild(h('p', { cls: 'sub', txt: 'Os três dão exatamente o mesmo. O que muda é de quanto em quanto tempo você paga.' }));
+
+  /* DIZER QUE RENOVA SOZINHO, ANTES DE COBRAR.
+
+     Mensal e anual são assinatura de verdade: o Mercado Pago cobra de novo
+     na data, sem perguntar. Quem descobre isso pela fatura pede estorno —
+     e com razão. Está escrito aqui, na primeira tela de preço, e não
+     enterrado num termo que ninguém abre. */
+  tela.appendChild(h('p', { cls: 'sub', style: 'margin-top:-6px',
+    txt: 'O mensal e o anual renovam sozinhos, e dá pra cancelar a qualquer momento aqui no painel. O vitalício é pago uma vez só.' }));
 
   const PERIODO = { mensal: 'por mês', anual: 'por ano', vitalicio: 'uma vez só' };
   const ETIQUETA = { anual: 'mais escolhido', vitalicio: 'melhor a longo prazo' };

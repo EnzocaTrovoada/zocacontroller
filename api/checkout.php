@@ -165,6 +165,38 @@ if (isset($_GET['conferir'])) {
     ]);
 }
 
+/* DESLIGAR A RENOVAÇÃO.
+
+   Só por POST: isto muda o estado da cobrança, e link que cancela assinatura
+   sendo aberto num GET é assinatura cancelada por um preview de link.
+
+   NÃO tira o acesso. O que já foi pago vale até o fim — a resposta devolve
+   a data justamente pra tela poder dizer isso. */
+if (isset($_GET['cancelar'])) {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        json_saida(['erro' => 'Use POST pra cancelar.'], 405);
+    }
+    if (!$mp['ligado']) json_saida(['erro' => 'A cobrança ainda não abriu.'], 503);
+
+    trava('cancelar', 6, 300);
+
+    try {
+        $r = mp_cancelar_assinatura((int) $quem['usuario_id']);
+    } catch (Throwable $e) {
+        json_saida(['erro' => erro_publico($e)], 502);
+    }
+
+    if (empty($r['ok'])) json_saida(['erro' => $r['erro']], 400);
+
+    json_saida([
+        'ok'     => true,
+        'ate'    => $r['ate'],
+        'recado' => $r['ate']
+            ? 'Assinatura cancelada. O Pro continua até ' . date('d/m/Y', strtotime($r['ate'])) . '.'
+            : 'Assinatura cancelada. Não vai mais ser cobrada.',
+    ]);
+}
+
 /* O DIAGNÓSTICO DA CREDENCIAL. Só admin, porque conta de qual conta do
    Mercado Pago o site está falando. */
 if (isset($_GET['diagnostico'])) {
@@ -207,6 +239,21 @@ if (isset($_GET['estado'])) {
        quem tem tudo liberado — e a pessoa iria pagar por engano. */
     $beta = usuario_beta((int) $quem['usuario_id']);
 
+    /* SE RENOVA SOZINHA, A TELA PRECISA DIZER.
+
+       Cobrança que volta todo mês sem avisar é o que gera contestação no
+       cartão. Quem assinou tem que ver, no painel, que renova e onde
+       desligar — antes de ir procurar o banco. */
+    $renova = 0;
+    try {
+        $rn = db()->prepare(
+            "SELECT 1 FROM assinaturas
+              WHERE usuario_id = ? AND renova = 1 AND assinatura_externa IS NOT NULL LIMIT 1"
+        );
+        $rn->execute([(int) $quem['usuario_id']]);
+        $renova = $rn->fetchColumn() ? 1 : 0;
+    } catch (Throwable $e) { /* sem o SQL 073: ninguém assina ainda */ }
+
     json_saida([
         'ligado'     => $mp['ligado'],
         'modo'       => $mp['modo'],
@@ -215,6 +262,7 @@ if (isset($_GET['estado'])) {
         'valido_ate' => $ate,
         'dias'       => $dias,
         'cortesia'   => !empty($acesso['cortesia']),
+        'renova'     => (bool) $renova,
         'planos'     => $st->fetchAll(PDO::FETCH_ASSOC),
     ]);
 }
@@ -241,8 +289,28 @@ if (!$plano || (int) $plano['preco_centavos'] <= 0) {
 
 $codigo = (string) ($_GET['cupom'] ?? '');
 
+/* O E-MAIL VEM NO CORPO, NUNCA NA URL.
+
+   Endereço de e-mail é dado pessoal, e query string fica no registro do
+   servidor, no histórico do navegador e no Referer que vaza pro próximo
+   site. O corpo do POST não fica em nenhum dos três. */
+$email = '';
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    $corpo = json_decode((string) file_get_contents('php://input'), true);
+    if (is_array($corpo)) $email = (string) ($corpo['email'] ?? '');
+}
+
+/* ASSINATURA SEMPRE QUE O PLANO PERMITIR.
+
+   Cobrança avulsa vende trinta dias e some. Quem comprou precisa lembrar
+   de voltar, e a maior parte não volta — não por não gostar, por esquecer.
+   Só o vitalício continua avulso: não existe renovar o que não vence. */
+$assina = mp_pode_assinar($plano);
+
 try {
-    $r = mp_criar_cobranca((int) $quem['usuario_id'], $plano, $codigo);
+    $r = $assina
+        ? mp_criar_assinatura((int) $quem['usuario_id'], $plano, $codigo, $email)
+        : mp_criar_cobranca((int) $quem['usuario_id'], $plano, $codigo);
 } catch (Throwable $e) {
     json_saida(['erro' => erro_publico($e)], 502);
 }
@@ -252,10 +320,14 @@ if (($r['url'] ?? '') === '') {
 }
 
 json_saida([
-    'url'   => $r['url'],
-    'modo'  => $mp['modo'],
-    'cupom' => $r['cupom'],
-    'plano' => [
+    'url'    => $r['url'],
+    'modo'   => $mp['modo'],
+    'cupom'  => $r['cupom'],
+    'assina' => $assina,
+    /* Dias de desconto viram dias sem cobrança no começo, e a tela precisa
+       do número pra explicar por que o primeiro débito não é hoje. */
+    'gratis' => (int) ($r['gratis'] ?? 0),
+    'plano'  => [
         'nome'     => $plano['nome'],
         'centavos' => (int) $plano['preco_centavos'],
         'cobrado'  => (int) $r['centavos'],

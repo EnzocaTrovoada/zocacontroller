@@ -19,6 +19,20 @@ $data_id    = (string) ($dados['data']['id'] ?? ($_GET['data.id'] ?? ''));
 
 // 1. Autenticidade antes de qualquer coisa.
 if ($data_id === '' || !mp_webhook_valido($sig, $request_id, $data_id)) {
+    /* RECUSAR CALADO ERA O PIOR DOS DOIS MUNDOS.
+
+       Nada daqui é processado — aviso sem assinatura válida não libera nada,
+       e o conteýdo dele é texto de terceiro, nunca instrução. Mas sumir sem
+       deixar rastro esconde justamente o caso que dói: se a assinatura de
+       alguém parar de renovar porque as notificações começaram a chegar sem
+       assinatura válida, isso tem que APARECER na tela de erros, e não ser
+       descoberto pelo cliente reclamando que perdeu o Pro.
+
+       Só o motivo é anotado. A tabela de erros junta por arquivo e linha, então
+       quem insistir vira uma linha só com o contador subindo. */
+    erro_anota(new RuntimeException(
+        'webhook recusado: ' . ($data_id === '' ? 'sem id' : 'assinatura inválida')
+    ));
     http_response_code(401);
     exit;
 }
@@ -51,13 +65,100 @@ responder_e_continuar();
 /* O aviso trouxe um id. Agora perguntamos ao Mercado Pago o que esse id é de
    verdade — e é ESTA resposta que decide, não o corpo que chegou. Um webhook
    diz que algo mudou; ele não diz a verdade do que mudou. */
+/**
+ * De qual plano é uma referência nossa.
+ *
+ * Quem manda é a linha que o checkout gravou — ela é nossa e ninguém de fora
+ * escreve nela. O slug dentro da referência só serve de reserva, pro caso da
+ * linha ter sumido.
+ */
+function zc_plano_da_referencia(string $ref): array
+{
+    $st = db()->prepare('SELECT plano_id FROM assinaturas WHERE referencia = ? LIMIT 1');
+    $st->execute([$ref]);
+    $plano_id = (int) $st->fetchColumn();
+
+    $plano = $plano_id ? mp_plano_por_id($plano_id) : null;
+    if (!$plano && preg_match('/^zc-\d+-([a-z0-9_]+)-/', $ref, $m)) {
+        $plano = mp_plano_por_slug($m[1]);
+    }
+    if (!$plano) throw new RuntimeException('não achei o plano da referência ' . $ref);
+
+    return $plano;
+}
+
 $falha = null;
 
 try {
     $tipo = (string) ($dados['type'] ?? ($_GET['type'] ?? ''));
 
-    /* Só pagamento interessa. Os outros avisos (merchant_order e afins)
-       chegam pelo mesmo canal, e tratar todos daria trabalho para nada. */
+    /* ---------- a assinatura mudou de estado ----------
+
+       Chega quando alguém autoriza, pausa ou cancela. NÃO libera acesso: quem
+       libera é a cobrança. O que acontece aqui é anotar se ainda renova, e
+       entregar o período grátis quando ele existe. */
+    if ($tipo === 'subscription_preapproval') {
+        $as = mp_ler_assinatura($data_id);
+        if ($as === null) {
+            throw new RuntimeException('o Mercado Pago não respondeu sobre a assinatura ' . $data_id);
+        }
+
+        $sit = (string) ($as['status'] ?? '');
+        mp_assinatura_estado($data_id, $sit);
+
+        if ($sit === 'authorized') {
+            mp_assinatura_comeco($data_id, (string) ($as['next_payment_date'] ?? ''));
+        }
+
+        throw new RuntimeException('tratado: assinatura ' . ($sit ?: 'sem status'));
+    }
+
+    /* ---------- a cobrança do mês ----------
+
+       É ISTO QUE FAZ A RENOVAÇÃO ACONTECER. Todo mês o Mercado Pago gera uma
+       fatura da assinatura, tenta cobrar, e avisa aqui. A fatura é quem sabe de
+       qual assinatura ela é — o pagamento sozinho não diz. */
+    if ($tipo === 'subscription_authorized_payment') {
+        $fat = mp_ler_fatura($data_id);
+        if ($fat === null) {
+            throw new RuntimeException('o Mercado Pago não respondeu sobre a fatura ' . $data_id);
+        }
+
+        $sitPag = (string) ($fat['payment']['status'] ?? '');
+        if ($sitPag !== 'approved') {
+            /* Cobrança que falhou não é erro nosso: eles tentam de novo
+               sozinhos por alguns dias, e cada tentativa avisa aqui. O acesso
+               continua valendo até a data que já foi paga. */
+            throw new RuntimeException('ignorado: cobrança ' . ($sitPag ?: 'sem status'));
+        }
+
+        /* A referência pode vir na fatura ou só na assinatura. Tentar as duas é
+           o que impede uma renovação de se perder por um campo vazio. */
+        $ref = (string) ($fat['external_reference'] ?? '');
+        if ($ref === '') {
+            $as = mp_ler_assinatura((string) ($fat['preapproval_id'] ?? ''));
+            $ref = (string) ($as['external_reference'] ?? '');
+        }
+
+        $usuario_id = mp_referencia_usuario($ref);
+        if (!$usuario_id) throw new RuntimeException('referência sem dono: ' . $ref);
+
+        $centavos = (int) round(((float) ($fat['transaction_amount'] ?? 0)) * 100);
+
+        mp_liberar(
+            $usuario_id,
+            zc_plano_da_referencia($ref),
+            $ref,
+            (string) ($fat['payment']['id'] ?? $data_id),
+            $centavos
+        );
+
+        throw new RuntimeException('tratado: renovação de ' . $ref);
+    }
+
+    /* Dos avisos que sobram, só pagamento interessa. Os outros
+       (merchant_order e afins) chegam pelo mesmo canal e não dizem nada que
+       a gente já não saiba pelos de cima. */
     if ($tipo !== '' && $tipo !== 'payment') {
         throw new RuntimeException('ignorado: tipo ' . $tipo);
     }
@@ -92,20 +193,7 @@ try {
         throw new RuntimeException('referência sem dono: ' . $ref);
     }
 
-    /* De qual plano era. A referência carrega o slug, mas quem manda é a
-       linha que o checkout gravou — ela é nossa e ninguém de fora escreve
-       nela. A referência só serve de reserva. */
-    $st = db()->prepare('SELECT plano_id FROM assinaturas WHERE referencia = ? LIMIT 1');
-    $st->execute([$ref]);
-    $plano_id = (int) $st->fetchColumn();
-
-    $plano = $plano_id ? mp_plano_por_id($plano_id) : null;
-    if (!$plano && preg_match('/^zc-\d+-([a-z0-9_]+)-/', $ref, $m)) {
-        $plano = mp_plano_por_slug($m[1]);
-    }
-    if (!$plano) {
-        throw new RuntimeException('não achei o plano da referência ' . $ref);
-    }
+    $plano = zc_plano_da_referencia($ref);
 
     $centavos = (int) round(((float) ($pag['transaction_amount'] ?? 0)) * 100);
     mp_liberar($usuario_id, $plano, $ref, (string) ($pag['id'] ?? $data_id), $centavos);

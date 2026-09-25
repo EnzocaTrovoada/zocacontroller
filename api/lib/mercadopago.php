@@ -273,6 +273,303 @@ function mp_criar_cobranca(int $usuario_id, array $plano, string $codigo = ''): 
             'cupom' => $cupom, 'centavos' => $centavos];
 }
 
+/* ==================== ASSINATURA QUE SE RENOVA SOZINHA ====================
+
+   A cobrança avulsa acima vende TRINTA DIAS. Quando eles acabam, o acesso
+   cai e a pessoa precisa lembrar de voltar e comprar de novo — e quase
+   ninguém volta. Assinatura é o mesmo produto cobrado sozinho todo mês.
+
+   O CARTÃO CONTINUA FORA DAQUI. O Mercado Pago tem dois jeitos de criar
+   assinatura: com o cartão tokenizado pelo nosso site (status 'authorized',
+   que exige formulário de cartão em página nossa) ou pendente, mandando a
+   pessoa pro checkout HOSPEDADO deles (status 'pending'). Usamos o segundo:
+   o primeiro tiraria o site do SAQ A do PCI, que é justamente o que o
+   comentário no topo do checkout.php manda nunca fazer. */
+
+/** De quanto em quanto tempo o Mercado Pago cobra, por plano nosso. */
+const MP_RECORRENCIA = [
+    'mensal' => [1,  'months'],
+    'anual'  => [12, 'months'],
+];
+
+/** Plano que pode virar assinatura. O vitalício não pode: não há o que renovar. */
+function mp_pode_assinar(array $plano): bool
+{
+    return isset(MP_RECORRENCIA[(string) ($plano['periodo'] ?? '')]);
+}
+
+/**
+ * O desconto vira DIAS GRÁTIS antes da primeira cobrança.
+ *
+ * Na compra avulsa o desconto sai do preço. Em assinatura isso não serve: o
+ * valor combinado é cobrado igual todo mês, e baixar o valor daria desconto
+ * pra sempre — o cupom de 30% viraria 30% eterno, de graça, todo mês.
+ *
+ * Então o desconto anda no TEMPO. Quem tem 5 dias de raid e um cupom de
+ * metade do mensal começa a pagar 20 dias depois. O valor mensal fica
+ * intacto e o desconto acontece uma vez só, que é o que ele sempre foi.
+ */
+function mp_dias_gratis(int $usuario_id, array $plano, string $codigo, int &$diasRaid, string &$cupom): int
+{
+    $diasRaid = 0;
+    $cupom = '';
+
+    $cheio = (int) $plano['preco_centavos'];
+    $doPeriodo = MP_DIAS[(string) $plano['periodo']] ?? 30;
+    if ($cheio < 1 || $doPeriodo < 1) return 0;
+
+    /* Quanto vale um dia DESTE plano. É a régua que converte qualquer
+       desconto em centavos para dias. */
+    $porDia = $cheio / $doPeriodo;
+    $dias = 0;
+
+    if ($codigo !== '') {
+        $v = cupom_valida($codigo);
+        if (!empty($v['ok'])) {
+            $conta = cupom_aplica($v['cupom'], $cheio);
+            $tira = max(0, $cheio - (int) $conta['por']);
+            $dias += (int) floor($tira / $porDia);
+            $cupom = cupom_limpa($codigo);
+        }
+    }
+
+    /* Os dias de raid entram como dias, sem conversão: é a unidade em que
+       eles já foram ganhos. O teto de 5 por mês e o modo desconto valem
+       igual aqui, e a conta sai do servidor — nunca do navegador. */
+    try {
+        $st = db()->prepare('SELECT dias, desconto FROM raid_saldo WHERE usuario_id = ?');
+        $st->execute([$usuario_id]);
+        $s = $st->fetch();
+        if ($s && (int) $s['desconto'] && (int) $s['dias'] > 0) {
+            $diasRaid = min(MP_DIAS_MES, (int) $s['dias']);
+            $dias += $diasRaid;
+        }
+    } catch (Throwable $e) { /* sem o SQL 063: ninguém tem dias */ }
+
+    /* NO MÁXIMO METADE DO PERÍODO, pelo mesmo motivo do caminho avulso: o
+       desconto é empurrão, não o produto. O que não coube fica no saldo. */
+    $teto = intdiv($doPeriodo, 2);
+    if ($dias > $teto) {
+        $sobrou = $dias - $teto;
+        $dias = $teto;
+        $diasRaid = max(0, $diasRaid - $sobrou);
+    }
+
+    return $dias;
+}
+
+/**
+ * Abre a assinatura e devolve o link do checkout hospedado.
+ *
+ * O E-MAIL É PEDIDO PORQUE O MERCADO PAGO EXIGE QUE ELE BATA.
+ *
+ * Em assinatura sem plano associado eles conferem, na hora do pagamento, se
+ * o e-mail que mandamos é o mesmo da conta que está pagando; não batendo,
+ * RECUSAM. Não dá pra usar o e-mail da Twitch: é outro cadastro, e na maior
+ * parte das pessoas é outro endereço. Ou a pessoa digita o e-mail da conta
+ * do Mercado Pago dela, ou a cobrança é recusada sem dizer por quê.
+ */
+function mp_criar_assinatura(int $usuario_id, array $plano, string $codigo, string $email): array
+{
+    $mp = mp_cfg();
+
+    $email = trim($email);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException('Preciso do e-mail da sua conta do Mercado Pago pra abrir a assinatura.');
+    }
+
+    $rec = MP_RECORRENCIA[(string) $plano['periodo']] ?? null;
+    if ($rec === null) throw new RuntimeException('Esse plano não é de assinatura.');
+
+    $ref = mp_referencia($usuario_id, (string) $plano['slug']);
+
+    $diasRaid = 0;
+    $cupom = '';
+    $gratis = mp_dias_gratis($usuario_id, $plano, $codigo, $diasRaid, $cupom);
+
+    $centavos = (int) $plano['preco_centavos'];
+
+    $corpo = [
+        'reason'             => 'ZocaController — ' . $plano['nome'],
+        'external_reference' => $ref,
+        'payer_email'        => $email,
+        'back_url'           => $mp['url_retorno'] !== '' ? $mp['url_retorno'] . '?r=ok' : api_base(),
+        /* 'pending' é o que devolve init_point. Com 'authorized' eles
+           esperariam o card_token_id, que só existe com formulário de
+           cartão em página nossa. */
+        'status'             => 'pending',
+        'auto_recurring'     => [
+            'frequency'          => $rec[0],
+            'frequency_type'     => $rec[1],
+            'transaction_amount' => $centavos / 100,
+            'currency_id'        => 'BRL',
+        ],
+        /* Assinatura NÃO aceita a configuração de webhook do painel "Suas
+           integrações" — a documentação deles manda configurar na criação.
+           Sem esta linha, a renovação do mês que vem não avisa ninguém. */
+        'notification_url'   => api_base() . '/webhook-mercadopago.php',
+    ];
+
+    /* Os dias grátis viram a data da primeira cobrança. O end_date vai junto
+       porque O start_date SOZINHO É IGNORADO — está escrito na referência
+       deles, e sem o par a primeira cobrança sairia hoje, cheia, justamente
+       pra quem tinha desconto. A data de fim é longe: assinatura acaba
+       quando alguém cancela, não numa data marcada. */
+    if ($gratis > 0) {
+        $corpo['auto_recurring']['start_date'] = gmdate('Y-m-d\TH:i:s.000\Z', time() + $gratis * 86400);
+        $corpo['auto_recurring']['end_date']   = gmdate('Y-m-d\TH:i:s.000\Z', strtotime('+10 years'));
+    }
+
+    [$http, $r] = mp_http('POST', '/preapproval', $corpo);
+    if ($http !== 201 && $http !== 200) {
+        error_log('[zc] Mercado Pago recusou a assinatura (' . $http . '): '
+            . (is_array($r) ? json_encode($r, JSON_UNESCAPED_UNICODE) : 'resposta vazia'));
+        throw new RuntimeException('O Mercado Pago recusou a assinatura agora. Tente de novo em alguns minutos.');
+    }
+
+    $id = (string) ($r['id'] ?? '');
+
+    db()->prepare(
+        'INSERT INTO assinaturas
+             (usuario_id, plano_id, provedor, provedor_id, assinatura_externa, referencia,
+              status, renova, teste, cupom, dias_raid)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)'
+    )->execute([
+        $usuario_id, (int) $plano['id'], 'mercadopago', $id, $id, $ref,
+        'pendente', $mp['modo'] === 'teste' ? 1 : 0,
+        $cupom !== '' ? $cupom : null,
+        $diasRaid,
+    ]);
+
+    return [
+        'url'        => (string) ($r['init_point'] ?? ''),
+        'referencia' => $ref,
+        'assinatura' => $id,
+        'cupom'      => $cupom,
+        'centavos'   => $centavos,
+        'gratis'     => $gratis,
+    ];
+}
+
+/** O que o Mercado Pago diz sobre uma assinatura. */
+function mp_ler_assinatura(string $id): ?array
+{
+    [$http, $r] = mp_http('GET', '/preapproval/' . rawurlencode($id));
+    return ($http === 200 && is_array($r)) ? $r : null;
+}
+
+/** O que o Mercado Pago diz sobre UMA cobrança mensal da assinatura. */
+function mp_ler_fatura(string $id): ?array
+{
+    [$http, $r] = mp_http('GET', '/authorized_payments/' . rawurlencode($id));
+    return ($http === 200 && is_array($r)) ? $r : null;
+}
+
+/**
+ * Anota o que mudou numa assinatura. NÃO tira acesso.
+ *
+ * Cancelar é parar de cobrar, e não tomar de volta o mês que já foi pago.
+ * Quem cancela no dia 3 fica com o Pro até o dia 30 — é o que toda
+ * assinatura faz, e tirar na hora seria vender trinta dias e entregar três.
+ */
+function mp_assinatura_estado(string $assinatura_id, string $situacao): void
+{
+    $renova = $situacao === 'authorized' ? 1 : 0;
+
+    db()->prepare(
+        'UPDATE assinaturas
+            SET renova = ?,
+                cancelada_em = CASE WHEN ? = 0 AND cancelada_em IS NULL THEN NOW()
+                                    ELSE cancelada_em END
+          WHERE assinatura_externa = ?'
+    )->execute([$renova, $renova, $assinatura_id]);
+}
+
+/**
+ * O Pro dos DIAS GRÁTIS, entregue quando a assinatura é autorizada.
+ *
+ * Sem isto o desconto viraria castigo. Os dias grátis adiam a primeira
+ * cobrança, e quem entrou com 5 dias de raid só seria cobrado dali a cinco
+ * dias — mas também só teria Pro dali a cinco dias, porque quem libera o
+ * acesso é o pagamento. A pessoa ganharia desconto e ficaria sem o produto
+ * justamente no período que ela ganhou.
+ *
+ * Então o acesso começa aqui, valendo até a data da primeira cobrança. Dali
+ * em diante cada cobrança aprovada estende a partir do que já existe, que é
+ * como mp_liberar() sempre trabalhou.
+ *
+ * Roda uma vez: a linha só está 'pendente' antes da primeira cobrança.
+ */
+function mp_assinatura_comeco(string $assinatura_id, string $primeira_cobranca): void
+{
+    $st = db()->prepare(
+        "SELECT id, usuario_id, dias_raid FROM assinaturas
+          WHERE assinatura_externa = ? AND status = 'pendente' LIMIT 1"
+    );
+    $st->execute([$assinatura_id]);
+    $linha = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$linha) return;
+
+    $ate = strtotime($primeira_cobranca);
+    /* Sem data de cobrança futura não há período grátis nenhum: a cobrança
+       sai agora e é ela que vai liberar. Nada a fazer aqui. */
+    if (!$ate || $ate <= time()) return;
+
+    db()->prepare("UPDATE assinaturas SET status = 'ativa', valido_ate = ? WHERE id = ?")
+        ->execute([date('Y-m-d H:i:s', $ate), (int) $linha['id']]);
+
+    /* Os dias de raid foram entregues AGORA, então saem do saldo agora. Não
+       podem sair de novo na primeira cobrança — e não saem: mp_liberar() só
+       gasta quando a linha ainda não está 'ativa', e acabou de ficar. */
+    try {
+        $gastar = (int) $linha['dias_raid'];
+        if ($gastar > 0) {
+            db()->prepare('UPDATE raid_saldo SET dias = GREATEST(0, dias - ?) WHERE usuario_id = ?')
+                ->execute([$gastar, (int) $linha['usuario_id']]);
+        }
+    } catch (Throwable $e) { /* sem o SQL 063: não havia desconto mesmo */ }
+}
+
+/**
+ * Desligar a renovação, a pedido de quem assinou.
+ *
+ * Tem que existir e tem que ser fácil de achar: cobrança que se renova
+ * sozinha e não se desliga sozinha é o que faz alguém pedir estorno pelo
+ * banco — e estorno tira o acesso, custa taxa e ainda queima a reputação
+ * da conta no Mercado Pago.
+ */
+function mp_cancelar_assinatura(int $usuario_id): array
+{
+    $st = db()->prepare(
+        "SELECT assinatura_externa FROM assinaturas
+          WHERE usuario_id = ? AND provedor = 'mercadopago'
+            AND assinatura_externa IS NOT NULL AND renova = 1
+          ORDER BY id DESC LIMIT 1"
+    );
+    $st->execute([$usuario_id]);
+    $id = (string) $st->fetchColumn();
+
+    if ($id === '') return ['ok' => false, 'erro' => 'Você não tem assinatura que se renove.'];
+
+    [$http, $r] = mp_http('PUT', '/preapproval/' . rawurlencode($id), ['status' => 'cancelled']);
+    if ($http !== 200) {
+        error_log('[zc] Mercado Pago recusou o cancelamento (' . $http . '): '
+            . (is_array($r) ? json_encode($r, JSON_UNESCAPED_UNICODE) : ''));
+        return ['ok' => false, 'erro' => 'O Mercado Pago não aceitou o cancelamento agora. Tente de novo em alguns minutos.'];
+    }
+
+    mp_assinatura_estado($id, 'cancelled');
+
+    /* Até quando o que já foi pago vale. A tela precisa disto pra pessoa não
+       achar que perdeu o mês no instante em que clicou. */
+    $ate = db()->prepare(
+        "SELECT MAX(valido_ate) FROM assinaturas WHERE usuario_id = ? AND status = 'ativa'"
+    );
+    $ate->execute([$usuario_id]);
+
+    return ['ok' => true, 'ate' => $ate->fetchColumn() ?: null];
+}
+
 /** O que o Mercado Pago diz sobre um pagamento. Esta é a única verdade. */
 function mp_ler_pagamento(string $pagamento_id): ?array
 {
@@ -310,20 +607,36 @@ function mp_liberar(int $usuario_id, array $plano, string $referencia, string $p
     $ja->execute([$pagamento_id]);
     if ($ja->fetchColumn()) return;
 
+    /* A PRIMEIRA COBRANÇA DESTA LINHA, OU UMA RENOVAÇÃO?
+
+       Assinatura reusa a MESMA linha todo mês: a referência é a mesma, e só
+       o id do pagamento muda. Tudo que é "de uma venda" — gastar os dias de
+       raid, pagar comissão de cupom — precisa saber disso, ou aconteceria
+       de novo todo mês: o saldo de raid seria descontado doze vezes por um
+       desconto que só foi dado uma. */
+    $antes = db()->prepare(
+        'SELECT id, status, dias_raid, cupom FROM assinaturas
+          WHERE referencia = ? AND usuario_id = ? LIMIT 1'
+    );
+    $antes->execute([$referencia, $usuario_id]);
+    $linhaAntes = $antes->fetch(PDO::FETCH_ASSOC) ?: null;
+    $primeira = !$linhaAntes || (string) $linhaAntes['status'] !== 'ativa';
+
     /* OS DIAS DE RAID SAEM DO SALDO AGORA, E SÓ AGORA.
 
-       Este ponto roda uma vez por pagamento — a trava logo acima garante.
-       O UPDATE tira no máximo o que existe, então um saldo que encolheu
-       entre o checkout e a aprovação não vira saldo negativo. */
-    try {
-        $dr = db()->prepare('SELECT dias_raid FROM assinaturas WHERE referencia = ? LIMIT 1');
-        $dr->execute([$referencia]);
-        $gastar = (int) $dr->fetchColumn();
-        if ($gastar > 0) {
-            db()->prepare('UPDATE raid_saldo SET dias = GREATEST(0, dias - ?) WHERE usuario_id = ?')
-                ->execute([$gastar, $usuario_id]);
-        }
-    } catch (Throwable $e) { /* sem o SQL 063: não havia desconto mesmo */ }
+       Este ponto roda uma vez por venda — a trava do pagamento acima e o
+       $primeira aqui garantem. O UPDATE tira no máximo o que existe, então
+       um saldo que encolheu entre o checkout e a aprovação não vira saldo
+       negativo. */
+    if ($primeira) {
+        try {
+            $gastar = (int) ($linhaAntes['dias_raid'] ?? 0);
+            if ($gastar > 0) {
+                db()->prepare('UPDATE raid_saldo SET dias = GREATEST(0, dias - ?) WHERE usuario_id = ?')
+                    ->execute([$gastar, $usuario_id]);
+            }
+        } catch (Throwable $e) { /* sem o SQL 063: não havia desconto mesmo */ }
+    }
 
     if (($plano['periodo'] ?? '') === 'vitalicio') {
         $ate = MP_VITALICIO_ATE;
@@ -357,7 +670,10 @@ function mp_liberar(int $usuario_id, array $plano, string $referencia, string $p
     $ln->execute([$referencia, $usuario_id]);
     $linha = $ln->fetch();
 
-    if ($linha && !empty($linha['cupom'])) {
+    /* A comissão é pela VENDA. Numa assinatura o cupom fica gravado na linha
+       pra sempre, e sem o $primeira o parceiro receberia de novo a cada
+       renovação, por uma indicação que ele fez uma vez só. */
+    if ($primeira && $linha && !empty($linha['cupom'])) {
         cupom_registra_venda((string) $linha['cupom'], (int) $linha['id'], $centavos);
     }
 
@@ -536,7 +852,7 @@ function mp_estornar(string $referencia, string $situacao): bool
 function mp_reconciliar(int $usuario_id): array
 {
     $st = db()->prepare(
-        "SELECT referencia, plano_id FROM assinaturas
+        "SELECT referencia, plano_id, assinatura_externa FROM assinaturas
           WHERE usuario_id = ? AND status = 'pendente'
             AND criado_em > DATE_SUB(NOW(), INTERVAL 30 DAY)"
     );
@@ -553,7 +869,26 @@ function mp_reconciliar(int $usuario_id): array
         /* Pergunta ao Mercado Pago o que existe com esta referência. É a
            mesma verdade que o webhook usaria, só que puxada por nós. */
         [$http, $r] = mp_http('GET', '/v1/payments/search?external_reference=' . rawurlencode($ref));
-        if ($http !== 200 || empty($r['results'])) continue;
+
+        /* ASSINATURA NÃO APARECE NA BUSCA DE PAGAMENTOS QUANDO AINDA NÃO FOI
+           COBRADA — e ela pode estar autorizada e válida assim mesmo, porque
+           os dias grátis empurram a primeira cobrança pra frente.
+
+           Sem este ramo, quem assinou com desconto e clicou em "já paguei e
+           não liberou" ouviria que não existe cobrança nenhuma — sendo que a
+           assinatura está de pé do outro lado. */
+        if ($http !== 200 || empty($r['results'])) {
+            $ass = (string) ($linha['assinatura_externa'] ?? '');
+            if ($ass !== '') {
+                $as = mp_ler_assinatura($ass);
+                if ($as && (string) ($as['status'] ?? '') === 'authorized') {
+                    mp_assinatura_estado($ass, 'authorized');
+                    mp_assinatura_comeco($ass, (string) ($as['next_payment_date'] ?? ''));
+                    $liberados++;
+                }
+            }
+            continue;
+        }
 
         foreach ($r['results'] as $pag) {
             if (($pag['status'] ?? '') !== 'approved') continue;

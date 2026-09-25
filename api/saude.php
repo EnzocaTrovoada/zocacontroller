@@ -190,6 +190,11 @@ foreach ([
     ['contagem_regressiva', null, 'Contagem regressiva', '066-contagem-regressiva.sql'],
     ['luzes_cenas', 'nome', 'Nome das cenas de luz', '068-luz-cena-nome.sql'],
     ['uso', null, 'Estatísticas de uso', '069-uso.sql'],
+    ['erros', null, 'A tela de erros', '070-erros.sql'],
+    ['usuarios', 'cor_nick', 'Cor do nome no feed', '071-cor-do-nick.sql'],
+    ['sons', 'da_casa', 'Sons da casa', '072-sons-da-casa.sql'],
+    ['assinaturas', 'assinatura_externa', 'Assinatura que renova sozinha', '073-assinatura-recorrente.sql'],
+    ['assinaturas', 'renova', 'Saber quem ainda renova', '073-assinatura-recorrente.sql'],
 ] as [$tabela, $coluna, $oQue, $arquivo]) {
     try {
         db()->query('SELECT ' . ($coluna ? '`' . $coluna . '`' : '1') . ' FROM `' . $tabela . '` LIMIT 0');
