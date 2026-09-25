@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-25",
+      "titulo": "Pro pode escolher a cor do próprio nome no feed",
+      "texto": "Em Meu ZocaHub, junto da cor do site. A diferença: a do site só você vê, esta o feed inteiro vê. Por isso o servidor clareia a cor quando ela sumiria no fundo escuro — e o campo passa a mostrar a cor clareada, pra ele não mentir sobre o que os outros enxergam."
+    },
+    {
+      "data": "2026-09-25",
       "titulo": "Todos os comandos numa tela, com os conflitos marcados",
       "texto": "Em Comandos, a lista inteira: os de fábrica e os seus, com quem pode usar e o que fazem. E o que importa — ela marca os que NUNCA RODAM. Um comando seu com nome de embutido é descartado em silêncio pela fonte do OBS, e não havia nada em lugar nenhum dizendo isso: a pessoa criava \"!cena\", o embutido respondia, e ela achava que tinha escrito errado. São quatro jeitos silenciosos de um comando não rodar, e os quatro aparecem agora."
     },

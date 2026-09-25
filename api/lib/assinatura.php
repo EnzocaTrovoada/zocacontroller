@@ -199,6 +199,7 @@ function recursos_do_plano(string $plano): array
             'oque_streamar'   => true,
             'selo_pro'        => true,
             'cor_propria'     => true,
+            'cor_nick'        => true,
             'tts'             => true,
             'tts_varias_vozes' => true,
             'tts_prefixo'     => true,
@@ -255,6 +256,9 @@ function recursos_do_plano(string $plano): array
            ganha estorno e print no Twitter. */
         'selo_pro'        => false,
         'cor_propria'     => false,
+        /* A do site só a pessoa vê; esta o feed inteiro vê. Por isso é a
+           que vale como sinal de quem apoia. */
+        'cor_nick'        => false,
         /* O TTS em si é grátis: é o recurso que faz o espectador querer
            gastar ponto, e fechar ele seria fechar a porta de entrada. O
            que o Pro compra é variedade — várias vozes, sorteio entre elas

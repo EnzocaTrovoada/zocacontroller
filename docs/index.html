@@ -5849,6 +5849,9 @@ function blocoFeed() {
 
   function cabecaDe(u, quando) {
     const nome = h('b', { cls: 'vai', txt: u.nome || u.login });
+    /* A cor de quem é Pro. Vem do servidor já clareada o bastante pra se
+       ler aqui — quem escolheu não estava olhando este fundo. */
+    if (u.cor) nome.style.color = u.cor;
     nome.title = 'Abrir na Twitch';
     nome.onclick = () => naTwitch(u.login);
 
@@ -7241,6 +7244,8 @@ function telaEditor(perfil, tipoNovo) {
    preferência da pessoa. */
 function caixaDaCor(caixa) {
   const campo = h('input', { type: 'color' });
+  const nick = h('input', { type: 'color' });
+  const nickDiz = h('span', { cls: 'd', style: 'font-size:11.5px' });
   const salvar = h('button', { cls: 'bt principal', type: 'button', txt: 'Usar esta cor' });
   const padrao = h('button', { cls: 'bt fraco', type: 'button', txt: 'Voltar ao verde' });
   const diz = h('span', { cls: 'd', style: 'font-size:12.5px' });
@@ -7285,6 +7290,26 @@ function caixaDaCor(caixa) {
     salvar.disabled = padrao.disabled = false;
   }
 
+  nick.onchange = async () => {
+    try {
+      const r = await api('/tema.php', { method: 'POST', body: JSON.stringify({ nick: nick.value }) });
+      /* O servidor pode clarear a cor pra ela se ler no feed. Mostrar o
+         que ele devolveu, e não o que foi pedido: senão o quadradinho
+         mente sobre o que os outros veem. */
+      if (r.nick && r.nick !== nick.value) {
+        nick.value = r.nick;
+        nickDiz.textContent = 'Clareei um pouco pra ela se ler no feed escuro.';
+        nickDiz.style.color = 'var(--apagado)';
+      } else {
+        nickDiz.textContent = 'Pronto.';
+        nickDiz.style.color = 'var(--verde-forte)';
+      }
+    } catch (e) {
+      nickDiz.textContent = e.message;
+      nickDiz.style.color = 'var(--perigo)';
+    }
+  };
+
   salvar.onclick = () => manda(campo.value);
   padrao.onclick = () => { campo.value = '#12a150'; pintaAmostra(campo.value); manda(''); };
 
@@ -7292,12 +7317,23 @@ function caixaDaCor(caixa) {
     h('h3', { txt: 'A cor do site' }),
     h('p', { cls: 'd', txt: 'Só você vê. Vale em qualquer aparelho.' }),
     h('div', { cls: 'campo' }, [h('label', { txt: 'Cor' }), campo, amostra]),
+
+    /* JUNTO, PORQUE PRA QUEM USA É A MESMA DECISÃO: "as minhas cores".
+       Mas a regra é outra, e a dica diz: a de cima só você vê, esta o
+       feed inteiro vê. */
+    h('div', { cls: 'campo' }, [
+      h('label', { txt: 'Seu nome no feed' }), nick,
+      h('span', { cls: 'd', style: 'font-size:11.5px', txt: 'esta todo mundo vê' }),
+    ]),
+    h('p', { style: 'margin:-6px 0 8px' }, [nickDiz]),
     h('p', { style: 'margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap' },
       [salvar, padrao, diz]),
   );
 
   api('/tema.php').then((d) => {
     campo.value = d.cor || '#12a150';
+    nick.value = d.nick || '#12a150';
+    nick.disabled = d.pode === false;
     pintaAmostra(campo.value);
     if (!d.pode) {
       campo.disabled = salvar.disabled = padrao.disabled = true;

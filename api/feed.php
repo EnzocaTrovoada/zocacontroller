@@ -117,6 +117,10 @@ function feed_autor(array $u, array $selos = []): array
     return [
         'login' => (string) $u['login'],
         'nome'  => (string) ($u['nome_exibicao'] ?: $u['login']),
+        /* A cor do nome de quem é Pro. Vai vazia pra quem não escolheu, e
+           a tela usa a cor normal — nunca um valor cru vindo do banco. */
+        'cor'   => preg_match('/^#[0-9A-Fa-f]{6}$/', (string) ($u['cor_nick'] ?? ''))
+            ? strtoupper((string) $u['cor_nick']) : '',
         'foto'  => $foto,
         'selos' => $selos[(int) ($u['usuario_id'] ?? $u['id'] ?? 0)] ?? [],
         /* Quem está no ar agora. A pergunta à Twitch é uma por minuto pro
@@ -161,7 +165,8 @@ function feed_comentarios(int $post): array
 {
     $st = db()->prepare(
         'SELECT c.id, c.texto, c.usuario_id, ' . sprintf(FEED_HA, 'c') . ' AS ha,
-                u.login, u.nome_exibicao, u.foto, u.foto_propria, u.selo_artista, u.selo_streamer
+                u.login, u.nome_exibicao, u.foto, u.foto_propria, u.selo_artista, u.selo_streamer,
+                u.cor_nick
            FROM post_comentarios c JOIN usuarios u ON u.id = c.usuario_id
           WHERE c.post_id = ? AND c.escondido = 0
           ORDER BY c.id LIMIT 100'
