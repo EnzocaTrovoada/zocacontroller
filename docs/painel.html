@@ -341,6 +341,19 @@
   </div>
   </details>
 
+  <details class="secao" data-secao="montar">
+  <summary>Montar as cenas</summary>
+  <p class="dica">Cria as quatro cenas que toda live usa, reaproveitando a sua câmera e a sua
+     captura de tela. Cena que já existe não é tocada.</p>
+  <div class="grade um"><button id="btMontar" class="mini">Criar as cenas que faltam</button></div>
+  <p class="dica" id="montarDiz"></p>
+
+  <label class="chave" id="chBlurCaixa" style="width:auto;height:auto;display:flex">
+    <input type="checkbox" id="chBlur"><span style="position:static;background:none">Borrar a câmera</span>
+  </label>
+  <p class="dica" id="blurDiz"></p>
+  </details>
+
   <details class="secao" data-secao="overlays">
   <summary>Overlays</summary>
   <p class="dica">Cria a fonte na cena que está no ar, já ajustada.</p>
@@ -1322,6 +1335,206 @@ function criarOpcao(valor, texto) {
   return o;
 }
 
+/* ================== AS CENAS QUE TODA LIVE PRECISA ==================
+
+   TRÊS CENAS E UM FILTRO RESOLVEM O DIA DE QUEM ESTÁ COMEÇANDO.
+
+   Quem monta OBS pela primeira vez trava aqui: sabe que precisa de uma
+   tela de "já volto", não sabe que isso é uma cena, nem que a câmera
+   pode estar em duas cenas ao mesmo tempo, nem que dá pra reaproveitar a
+   fonte em vez de criar outra.
+
+   REAPROVEITAR É O PONTO. O OBS deixa a MESMA fonte aparecer em várias
+   cenas — e é isso que faz a câmera continuar funcionando quando você
+   troca. Criar uma câmera nova por cena é o erro que trava a webcam com
+   "dispositivo em uso", e é o que acontece quando alguém monta sozinho.
+
+   Por isso aqui a gente PROCURA o que já existe antes de criar. */
+
+/* O que cada cena leva. A ordem importa: o que vem depois fica por cima. */
+const CENAS_MODELO = [
+  {
+    nome: 'Live começando',
+    oQue: 'a tela de espera, com a contagem regressiva',
+    leva: ['contagem'],
+  },
+  {
+    nome: 'Já volto',
+    oQue: 'pra sair da frente sem cortar a transmissão',
+    leva: [],
+  },
+  {
+    nome: 'Câmera completa',
+    oQue: 'só você, em tela cheia',
+    leva: ['camera'],
+  },
+  {
+    nome: 'Mostrando tela',
+    oQue: 'a tela do computador com a câmera num canto',
+    leva: ['tela', 'camera'],
+  },
+];
+
+/* As fontes que a gente reaproveita, e como reconhecer cada uma. O OBS
+   nomeia por tipo, e o nome que a pessoa deu é imprevisível — então a
+   busca é pelo TIPO, que não muda. */
+const FONTE_TIPO = {
+  camera: ['dshow_input', 'av_capture_input', 'v4l2_input'],
+  tela:   ['monitor_capture', 'display_capture', 'screen_capture',
+           'window_capture', 'xshm_input'],
+};
+
+async function cenasQueExistem() {
+  try {
+    const d = await pedir('GetSceneList');
+    return (d.scenes || []).map((s) => s.sceneName);
+  } catch (e) { return null; }
+}
+
+/** A primeira fonte de um tipo, se já houver uma. */
+async function achaFonte(qual) {
+  const tipos = FONTE_TIPO[qual] || [];
+  try {
+    const d = await pedir('GetInputList');
+    const achou = (d.inputs || []).find((i) => tipos.includes(i.inputKind));
+    return achou ? achou.inputName : null;
+  } catch (e) { return null; }
+}
+
+/** A overlay de contagem, que é a de relógio com a contagem ligada. */
+async function achaContagem() {
+  try {
+    const d = await api('/perfil.php');
+    const p = (d.perfis || []).find((x) => x.tipo === 'relogio');
+    if (!p) return null;
+    const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+    return { url: base + 'overlay.html?k=' + p.chave_publica, nome: 'ZocaHub — ' + (p.nome || 'relógio') };
+  } catch (e) { return null; }
+}
+
+async function montarCenas(bt, diz) {
+  bt.disabled = true;
+  diz.textContent = 'olhando o seu OBS…';
+  diz.style.color = 'var(--fraco)';
+
+  const jaTem = await cenasQueExistem();
+  if (jaTem === null) {
+    bt.disabled = false;
+    diz.textContent = 'não consegui falar com o OBS.';
+    diz.style.color = 'var(--perigo)';
+    return;
+  }
+
+  const camera = await achaFonte('camera');
+  const tela = await achaFonte('tela');
+  const contagem = await achaContagem();
+
+  const feitas = [];
+  const pulei = [];
+
+  for (const modelo of CENAS_MODELO) {
+    /* Cena que já existe não é tocada. Recriar apagaria o que a pessoa
+       montou, e o nome dela é o que mais provavelmente já está em uso. */
+    if (jaTem.includes(modelo.nome)) { pulei.push(modelo.nome); continue; }
+
+    try {
+      await pedir('CreateScene', { sceneName: modelo.nome });
+    } catch (e) { pulei.push(modelo.nome); continue; }
+
+    for (const parte of modelo.leva) {
+      try {
+        if (parte === 'camera' && camera) {
+          /* A MESMA fonte, e não uma cópia: é o que deixa a câmera viva
+             nas duas cenas em vez de dar "dispositivo em uso". */
+          await pedir('CreateSceneItem', { sceneName: modelo.nome, sourceName: camera });
+        } else if (parte === 'tela' && tela) {
+          await pedir('CreateSceneItem', { sceneName: modelo.nome, sourceName: tela });
+        } else if (parte === 'contagem' && contagem) {
+          await pedir('CreateInput', {
+            sceneName: modelo.nome,
+            inputName: contagem.nome,
+            inputKind: 'browser_source',
+            inputSettings: { url: contagem.url, width: 900, height: 260,
+                             shutdown: false, restart_when_active: false },
+          });
+        }
+      } catch (e) { /* a parte não entrou; a cena fica e a pessoa completa */ }
+    }
+    feitas.push(modelo.nome);
+  }
+
+  bt.disabled = false;
+  if (!feitas.length) {
+    diz.textContent = 'Todas as cenas já existiam. Não mexi em nenhuma.';
+    diz.style.color = 'var(--fraco)';
+    return;
+  }
+
+  const faltou = [];
+  if (!camera) faltou.push('câmera');
+  if (!tela) faltou.push('captura de tela');
+  if (!contagem) faltou.push('overlay de relógio');
+
+  diz.textContent = 'Criei: ' + feitas.join(', ') + '.'
+    + (pulei.length ? ' Já existiam: ' + pulei.join(', ') + '.' : '')
+    + (faltou.length ? ' Sem ' + faltou.join(' nem ') + ' no seu OBS — essas partes ficaram vazias.' : '');
+  diz.style.color = 'var(--sinal)';
+  anotar('cenas criadas: ' + feitas.join(', '));
+}
+
+/* ---------- o blur na câmera ----------
+
+   O filtro fica na FONTE, e não na cena: assim ele vale em toda cena onde
+   a câmera aparece. Blurrar em uma e esquecer da outra é exatamente o
+   acidente que este botão existe pra evitar. */
+const BLUR_NOME = 'ZocaHub — borrar';
+
+async function blurLigado() {
+  const cam = await achaFonte('camera');
+  if (!cam) return null;
+  try {
+    const d = await pedir('GetSourceFilterList', { sourceName: cam });
+    const f = (d.filters || []).find((x) => x.filterName === BLUR_NOME);
+    return f ? !!f.filterEnabled : false;
+  } catch (e) { return null; }
+}
+
+async function mexeBlur(liga, diz) {
+  const cam = await achaFonte('camera');
+  if (!cam) {
+    diz.textContent = 'Não achei uma câmera no seu OBS.';
+    diz.style.color = 'var(--perigo)';
+    return;
+  }
+
+  try {
+    const d = await pedir('GetSourceFilterList', { sourceName: cam });
+    const tem = (d.filters || []).some((x) => x.filterName === BLUR_NOME);
+
+    if (!tem) {
+      /* O OBS traz o blur no plugin de efeitos, que nem toda instalação
+         tem. Se não der, a gente diz o que fazer em vez de falhar calado. */
+      await pedir('CreateSourceFilter', {
+        sourceName: cam,
+        filterName: BLUR_NOME,
+        filterKind: 'blur_filter',
+        filterSettings: { type: 1, size: 24 },
+      });
+    }
+
+    await pedir('SetSourceFilterEnabled', {
+      sourceName: cam, filterName: BLUR_NOME, filterEnabled: !!liga,
+    });
+
+    diz.textContent = liga ? 'Câmera borrada.' : 'Câmera normal.';
+    diz.style.color = liga ? 'var(--ambar)' : 'var(--fraco)';
+  } catch (e) {
+    diz.textContent = 'O seu OBS não tem o filtro de desfoque. '
+      + 'Ele vem no OBS 30 pra cima; em versões antigas precisa de plugin.';
+    diz.style.color = 'var(--perigo)';
+  }
+}
+
 /* ================== PÔR O OVERLAY NO OBS ==================
 
    SEIS PASSOS VIRAM UM CLIQUE.
@@ -1550,6 +1763,8 @@ function ligarSecoes() {
   el('secaoPalpite').classList.toggle('escondido', !tem);
   el('secaoMomentos').classList.toggle('escondido', !tem);
   if (tem) { lerCanal(); lerPalpite(); lerMomentos(); corDoDock(); talvezMostrarCalar(); lerRaid(); lerOverlays(); lerChaves(); crPinta(); ordemDasSecoes(); }
+  /* O blur vive na fonte, então o estado dele vem do OBS e não daqui. */
+  blurLigado().then((b) => { if (b !== null) el('chBlur').checked = b; });
   vendoAoVivo();
   perfilPinta();
 }
@@ -2810,6 +3025,8 @@ el('crCena').addEventListener('change', async () => {
 document.querySelector('details.secao[data-secao="contagem"]')
   ?.addEventListener('toggle', function () { if (this.open) crPinta(); });
 el('btSorte').addEventListener('click', raidSorte);
+el('btMontar').addEventListener('click', () => montarCenas(el('btMontar'), el('montarDiz')));
+el('chBlur').addEventListener('change', (e) => mexeBlur(e.target.checked, el('blurDiz')));
 el('chVoz').addEventListener('change', (e) => mexeChave('voz', e.target, el('chVozCaixa')));
 el('chAlertas').addEventListener('change', (e) => mexeChave('alertas', e.target, el('chAlertasCaixa')));
 el('btVoltar').addEventListener('click', () => { mandar('voltar'); anotar('saindo do pânico'); });
