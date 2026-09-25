@@ -474,6 +474,29 @@ function mp_estornar(string $referencia, string $situacao): bool
     $a = $st->fetch();
     if (!$a || $a['valido_ate'] === null) return false;
 
+    /* OS DIAS GANHOS RAIDANDO VOLTAM PRO SALDO.
+
+       Sem isto, quem usou dias como desconto e teve o pagamento estornado
+       perdia as duas coisas: o acesso E os dias, que ele levou semanas
+       raidando pra juntar. O dinheiro voltou pra ele, então o desconto
+       não foi usado — e o que paga o desconto tem que voltar também.
+
+       O zerar do dias_raid é o que impede devolver duas vezes: um segundo
+       aviso de estorno do mesmo pagamento encontra zero e não soma nada. */
+    try {
+        $dr = db()->prepare('SELECT dias_raid FROM assinaturas WHERE id = ?');
+        $dr->execute([(int) $a['id']]);
+        $volta_dias = (int) $dr->fetchColumn();
+
+        if ($volta_dias > 0) {
+            db()->prepare('INSERT INTO raid_saldo (usuario_id, dias) VALUES (?, ?)
+                           ON DUPLICATE KEY UPDATE dias = dias + VALUES(dias)')
+                ->execute([(int) $a['usuario_id'], $volta_dias]);
+            db()->prepare('UPDATE assinaturas SET dias_raid = 0 WHERE id = ?')
+                ->execute([(int) $a['id']]);
+        }
+    } catch (Throwable $e) { /* sem o SQL 063: não houve desconto pra devolver */ }
+
     $plano = mp_plano_por_id((int) $a['plano_id']);
     $periodo = $plano['periodo'] ?? 'mensal';
 

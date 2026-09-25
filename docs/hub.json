@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-25",
+      "titulo": "Estorno devolve os dias de raid",
+      "texto": "Quem usou dias ganhos raidando como desconto e teve o pagamento estornado perdia as duas coisas: o acesso e os dias, que levou semanas pra juntar. Agora os dias voltam pro saldo — o dinheiro voltou pra pessoa, então o desconto não foi usado."
+    },
+    {
+      "data": "2026-09-25",
       "titulo": "Em Meu ZocaHub: \"está tudo funcionando?\"",
       "texto": "Uma caixa que confere tudo de uma vez — conta da Twitch, avisos, a fonte no OBS, os overlays, o TTS e o banco — e diz o que está parado e o que fazer, com um botão que leva direto. Quase todo problema daqui era invisível de dentro do site: um SQL que não rodou, uma permissão que faltou, a fonte do OBS com código antigo em cache. Nenhum dava erro, o recurso só não acontecia."
     },

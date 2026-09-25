@@ -192,6 +192,26 @@ try {
   }
 } catch (e) { /* sem git: n\u00e3o d\u00e1 pra conferir */ }
 
+/* ---- o caminho do dinheiro ----
+
+   O desconto por dias de raid mexe em dinheiro e a cobrança já está em
+   produção. O ensaio prova as regras que quebram em silêncio: o teto de
+   cinco dias por mês, o cupom por cima sem zerar a fatura, e o estorno
+   devolvendo os dias uma vez só. */
+try {
+  /* path.join, e não barras à mão: escapar barra invertida dentro de
+     string é onde se erra, e o erro vira "o ensaio falhou" quando o que
+     falhou foi achar o PHP. */
+  const php = process.env.LOCALAPPDATA
+    ? require('path').join(process.env.LOCALAPPDATA, 'php', 'php.exe')
+    : 'php';
+  require('child_process').execSync('"' + php + '" testes/pagamento.php', { stdio: 'pipe' });
+  console.log('✓ caminho do dinheiro: o ensaio passou');
+} catch (e) {
+  console.log('✗ caminho do dinheiro: o ensaio FALHOU — rode testes/pagamento.php');
+  falhas++;
+}
+
 /* ---- cargos, e na MESMA ordem: aqui a ordem é a regra ---- */
 const cargosPonte = Object.keys(JSON.parse(
   '{' + (ponte.match(/const CARGOS = \{([^}]*)\}/)?.[1] || '').replace(/(\w+):/g, '"$1":') + '}'
