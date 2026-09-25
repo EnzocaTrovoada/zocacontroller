@@ -274,6 +274,48 @@ async function confereTextos() {
   }
 }
 
+/* ---------- a tela de saúde aponta pro SQL certo ----------
+
+   A tela diz "falta rodar o 071-cor-nick.sql" e a pessoa vai procurar um
+   arquivo com esse nome. Se o nome estiver errado — e já esteve — o aviso
+   vira uma caça ao tesouro pior que nenhum aviso.
+
+   Não dá pra exigir que toda migração esteja citada: são sessenta e poucas,
+   e a tela só lista as que valem checar. Dá pra exigir que o que está
+   citado exista, e que a coluna prometida esteja mesmo naquele arquivo. */
+(function confereSql() {
+  const saude = ler('api/saude.php');
+  const lista = saude.match(/\[\s*'[a-z_]+',\s*(?:null|'[a-z_]+'),\s*'[^']*',\s*'[^']*\.sql'\s*\]/g) || [];
+  if (!lista.length) {
+    console.log('? SQL da tela de saúde: não achei a lista');
+    return;
+  }
+
+  const ruins = [];
+  lista.forEach((linha) => {
+    const partes = linha.match(/'([^']*)'|null/g).map((x) => x.replace(/'/g, ''));
+    const coluna = partes[1] === 'null' ? '' : partes[1];
+    const arquivo = partes[3];
+
+    if (!fs.existsSync('sql/' + arquivo)) {
+      ruins.push(arquivo + ' não existe em sql/');
+      return;
+    }
+    if (coluna && !ler('sql/' + arquivo).includes(coluna)) {
+      ruins.push(arquivo + ' não mexe na coluna ' + coluna);
+    }
+  });
+
+  if (ruins.length) {
+    console.log('✗ a tela de saúde manda rodar SQL que não confere:');
+    ruins.forEach((r) => console.log('   ' + r));
+    console.log('   → em api/saude.php, na lista SEM_BANCO');
+    falhas++;
+  } else {
+    console.log(`✓ SQL da tela de saúde: ${lista.length} avisos, todos apontando certo`);
+  }
+})();
+
 confereTextos().then(() => {
   console.log(falhas ? `\n${falhas} lista(s) fora de sincronia.` : '\nTudo batendo.');
   process.exit(falhas ? 1 : 0);

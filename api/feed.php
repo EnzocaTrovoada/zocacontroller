@@ -114,6 +114,14 @@ function feed_autor(array $u, array $selos = []): array
         ? api_base() . '/feed.php?a=foto&login=' . rawurlencode((string) $u['login'])
         : (string) ($u['foto'] ?: '');
 
+    /* A COLUNA FALTANDO É DEFEITO DE QUERY, E NÃO CONTA SEM COR.
+       São três consultas diferentes que montam autor, e esquecer cor_nick em
+       uma delas some com a cor sem quebrar nada — foi exatamente o que
+       aconteceu. Sem chave nenhuma, anota; vazia, segue. */
+    if (!array_key_exists('cor_nick', $u)) {
+        erro_anota(new RuntimeException('feed_autor recebeu linha sem cor_nick'));
+    }
+
     return [
         'login' => (string) $u['login'],
         'nome'  => (string) ($u['nome_exibicao'] ?: $u['login']),
@@ -273,7 +281,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
         $antes = (int) ($_GET['antes'] ?? 0);
         $sql = 'SELECT p.id, p.texto, p.arquivo, p.criado_em, p.usuario_id,
                        u.login, u.nome_exibicao, u.foto, u.foto_propria,
-                       u.selo_artista, u.selo_streamer,
+                       u.selo_artista, u.selo_streamer, u.cor_nick,
                        (SELECT COUNT(*) FROM post_curtidas k WHERE k.post_id = p.id) AS curtidas,
                        (SELECT COUNT(*) FROM post_comentarios c
                          WHERE c.post_id = p.id AND c.escondido = 0) AS comentarios,
@@ -333,7 +341,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     }
     if ($sem) {
         feed_completa($sem);
-        $st2 = db()->prepare('SELECT id AS usuario_id, login, nome_exibicao, foto, foto_propria
+        $st2 = db()->prepare('SELECT id AS usuario_id, login, nome_exibicao, foto, foto_propria, cor_nick
                                 FROM usuarios WHERE login = ?');
         foreach ($lista as &$p) {
             if ($p['autor']['foto'] !== '') continue;
