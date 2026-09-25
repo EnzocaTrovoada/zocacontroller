@@ -7302,35 +7302,9 @@ function telaControlador() {
 
   const base = location.origin + location.pathname.replace(/[^/]*$/, '');
 
-  /* O QUE FALTA NO BANCO.
-
-     Recurso que não faz nada não dá erro — ele só não acontece. Sem esta
-     caixa, a única pista é "não funciona", e a causa (um SQL que não foi
-     rodado) é invisível de dentro do site. */
   const cxSaude = h('div', { cls: 'fatia' });
   caixaDaSaude(cxSaude);
 
-  const cxBanco = h('div', { cls: 'fatia escondido' });
-  api('/banco.php').then((d) => {
-    if (d.tudo_certo) return;
-    cxBanco.classList.remove('escondido');
-    cxBanco.append(
-      h('h3', { txt: 'Falta rodar no banco' }),
-      h('p', { cls: 'd', txt: 'Estes recursos estão no site mas não têm onde guardar os dados. '
-        + 'Rode estes arquivos da pasta sql no phpMyAdmin, na ordem:' }),
-    );
-    (d.arquivos || []).forEach((a) => {
-      cxBanco.appendChild(h('p', { cls: 'banco-arq' }, [h('code', { txt: 'sql/' + a })]));
-    });
-    const lista = h('ul', { cls: 'banco-lista' });
-    (d.faltam || []).forEach((f) => {
-      lista.appendChild(h('li', {}, [
-        h('b', { txt: f.oque }),
-        h('small', { txt: f.onde + ' — ' + f.arquivo }),
-      ]));
-    });
-    cxBanco.appendChild(lista);
-  }).catch(() => { /* servidor velho: não há o que conferir */ });
 
   const cxCor = h('div', { cls: 'fatia' });
   caixaDaCor(cxCor);
@@ -7541,7 +7515,6 @@ function telaControlador() {
   }
   tela.appendChild(fatiaOv);
   tela.appendChild(cxSaude);
-  tela.appendChild(cxBanco);
   tela.appendChild(cxCor);
 }
 

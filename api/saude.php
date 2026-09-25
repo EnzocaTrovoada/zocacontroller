@@ -169,31 +169,50 @@ try {
     }
 } catch (Throwable $e) { /* sem tabela: o banco abaixo acusa */ }
 
-/* ---------- o que falta no banco ---------- */
+/* ---------- o que falta no banco ----------
+
+   COM O NOME DO ARQUIVO, e não só "falta uma tabela". Saber que falta não
+   adianta se a pessoa não souber qual dos setenta SQL rodar — e procurar
+   isso na pasta é onde ela desiste e escreve pedindo ajuda. */
 $semBanco = [];
 foreach ([
-    ['tts_config', null, 'TTS'],
-    ['tts_config', 'calar_em', 'Pular a fala'],
-    ['raid_lista', null, 'Raids'],
-    ['raid_saldo', null, 'Pontos de raid'],
-    ['contagem_regressiva', null, 'Contagem regressiva'],
-    ['uso', null, 'Estatísticas de uso'],
-    ['usuarios', 'cor_acento', 'Cor do site'],
-    ['usuarios', 'painel_secoes', 'Seções do painel'],
-    ['usuarios', 'alertas_ligados', 'Desligar alertas'],
-    ['luzes_cenas', 'nome', 'Nome das cenas de luz'],
-    ['assinaturas', 'dias_raid', 'Desconto por raid'],
-] as [$tabela, $coluna, $oQue]) {
+    ['tts_config', null, 'TTS', '062-tts.sql'],
+    ['tts_config', 'calar_em', 'Pular a fala', '062-tts.sql'],
+    ['tts_fila', null, 'A fila do TTS', '062-tts.sql'],
+    ['raid_lista', null, 'Raids', '063-raids.sql'],
+    ['raid_saldo', null, 'Pontos de raid', '063-raids.sql'],
+    ['raid_feitos', null, 'Histórico dos raids', '063-raids.sql'],
+    ['usuarios', 'raid_oculto', 'Não aparecer na lista', '063-raids.sql'],
+    ['assinaturas', 'dias_raid', 'Desconto por raid', '063-raids.sql'],
+    ['usuarios', 'cor_acento', 'Cor do site', '061-cor-do-usuario.sql'],
+    ['usuarios', 'painel_secoes', 'Seções do painel', '064-painel-secoes.sql'],
+    ['usuarios', 'alertas_ligados', 'Desligar alertas', '065-alertas-chave.sql'],
+    ['contagem_regressiva', null, 'Contagem regressiva', '066-contagem-regressiva.sql'],
+    ['luzes_cenas', 'nome', 'Nome das cenas de luz', '068-luz-cena-nome.sql'],
+    ['uso', null, 'Estatísticas de uso', '069-uso.sql'],
+] as [$tabela, $coluna, $oQue, $arquivo]) {
     try {
         db()->query('SELECT ' . ($coluna ? '`' . $coluna . '`' : '1') . ' FROM `' . $tabela . '` LIMIT 0');
     } catch (Throwable $e) {
-        $semBanco[] = $oQue;
+        $semBanco[$arquivo] = true;
     }
 }
 
+/* A COLUNA CURTA É OUTRO CASO: ela existe, só não cabe o que precisa. Isso
+   fez o TTS parecer desligado estando ligado, e conferir existência nunca
+   teria achado. */
+try {
+    $c = db()->query("SHOW COLUMNS FROM eventsub_assinaturas LIKE 'tipo'")->fetch();
+    if ($c && preg_match('/\((\d+)\)/', (string) $c['Type'], $m) && (int) $m[1] < 60) {
+        $semBanco['067-eventsub-tipo-maior.sql'] = true;
+    }
+} catch (Throwable $e) { /* sem a tabela, o de cima já acusou */ }
+
 if ($semBanco) {
+    $arquivos = array_keys($semBanco);
+    sort($arquivos);
     saude_poe($itens, 'Banco de dados', 'parado',
-        count($semBanco) . ' sem onde guardar: ' . implode(', ', $semBanco) . '.', '#/meu');
+        'Rode no phpMyAdmin, nesta ordem: ' . implode(', ', $arquivos) . '.', '#/meu');
 } else {
     saude_poe($itens, 'Banco de dados', 'ok', 'Todas as tabelas no lugar.');
 }
