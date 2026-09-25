@@ -952,6 +952,16 @@ try {
   }
 
   /* Sobe um fio ao passar o mouse, igual aos cartões. */
+  /* O "prefiro pagar uma vez": segunda opção de verdade, e não um segundo
+     botão. Com cara de botão ela disputaria atenção com o de pagar, e a
+     escolha certa pra maioria é assinar. */
+  .pop__troca {
+    background: none; border: 0; padding: 4px; cursor: pointer;
+    color: var(--fraco); font: 400 12.5px var(--disp); text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .pop__troca:hover { color: var(--tinta); }
+
   .pop__acao .bt.principal { transition: transform .14s ease-out, background .14s, border-color .14s; }
   .pop__acao .bt.principal:hover:not(:disabled) { transform: translateY(-2px); }
   .pop__acao .bt.principal:active:not(:disabled) { transform: translateY(0); }
@@ -5104,12 +5114,17 @@ function abrePro(estado) {
     /* O vitalício é compra avulsa: não renova, e então não precisa do
        e-mail nem do aviso de renovação. Pedir mesmo assim seria um campo
        obrigatório sem motivo bem na hora de pagar. */
-    const renova = !!escolhido && escolhido.periodo !== 'vitalicio';
-    linhaEmail.style.display = renova ? '' : 'none';
+    const podeRenovar = !!escolhido && escolhido.periodo !== 'vitalicio';
+    const renova = podeRenovar && !semRenovar;
+    trocaModo.style.display = podeRenovar ? '' : 'none';
+    pintaModo();
     aviso.textContent = renova
       ? 'Pix, cartão ou saldo, no site do Mercado Pago. Renova sozinho '
         + (escolhido.periodo === 'anual' ? 'todo ano' : 'todo mês') + ' e dá pra cancelar aqui quando quiser.'
-      : 'Pix, cartão ou saldo. O pagamento acontece no site do Mercado Pago.';
+      : podeRenovar
+        ? 'Pix, cartão ou saldo, no site do Mercado Pago. Paga uma vez, vale '
+          + (escolhido.periodo === 'anual' ? 'um ano' : 'trinta dias') + ' e não renova sozinho.'
+        : 'Pix, cartão ou saldo. O pagamento acontece no site do Mercado Pago.';
   }
 
   /* Mostra "de R$ 13,99 por R$ 11,19" no plano i, ou volta ao preço cheio. */
@@ -5150,6 +5165,9 @@ function abrePro(estado) {
   const pagar = h('button', { cls: 'bt principal', type: 'button',
     txt: 'Seja Pro', style: 'width:100%' });
 
+  /* Fica ligado enquanto a pessoa escolher "uma vez só" naquele plano. */
+  let semRenovar = false;
+
   pagar.onclick = async () => {
     if (!escolhido) return;
     pagar.disabled = true;
@@ -5159,7 +5177,8 @@ function abrePro(estado) {
       /* POST, e o e-mail no CORPO: endereço de e-mail em query string fica
          no registro do servidor, no histórico e no Referer. */
       const r = await api('/checkout.php?plano=' + encodeURIComponent(escolhido.slug)
-        + (cupomAtivo ? '&cupom=' + encodeURIComponent(cupomAtivo) : ''),
+        + (cupomAtivo ? '&cupom=' + encodeURIComponent(cupomAtivo) : '')
+        + (semRenovar ? '&avulso=1' : ''),
         { method: 'POST', body: JSON.stringify({ email: email.value.trim() }) });
 
       /* Aba nova, e não redirecionamento: quem sai do painel pro Mercado
@@ -5192,8 +5211,27 @@ function abrePro(estado) {
   const aviso = h('p', { cls: 'd', style: 'margin:12px 0 0;text-align:center',
     txt: 'Pix, cartão ou saldo. O pagamento acontece no site do Mercado Pago.' });
 
+  /* A SAÍDA PRA QUEM NÃO PODE (OU NÃO QUER) ASSINAR.
+
+     Assinatura precisa de meio de pagamento que aceite débito automático, e
+     nem todo mundo tem cartão. Sem esta linha, trocar a compra avulsa por
+     assinatura teria calado uma venda que funcionava — e do pior jeito, com
+     a pessoa achando que o site não aceita o dinheiro dela. */
+  const trocaModo = h('button', { cls: 'pop__troca', type: 'button',
+    style: 'display:block;margin:8px auto 0' });
+
+  function pintaModo() {
+    trocaModo.textContent = semRenovar
+      ? 'prefiro assinar e não precisar lembrar'
+      : 'prefiro pagar uma vez, sem renovar';
+    linhaEmail.style.display =
+      (!semRenovar && escolhido && escolhido.periodo !== 'vitalicio') ? '' : 'none';
+  }
+
+  trocaModo.onclick = () => { semRenovar = !semRenovar; marca(precos.findIndex((x) => x.plano === escolhido)); };
+
   const acao = h('div', { cls: 'pop__acao' }, [
-    temCupom, listaCupons, linhaCupom, cupomDiz, linhaEmail, pagar, aviso,
+    temCupom, listaCupons, linhaCupom, cupomDiz, linhaEmail, pagar, aviso, trocaModo,
   ]);
 
   /* DESLIGAR A RENOVAÇÃO PRECISA ESTAR AQUI, NA MESMA TELA DE ASSINAR.

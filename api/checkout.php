@@ -305,7 +305,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
    Cobrança avulsa vende trinta dias e some. Quem comprou precisa lembrar
    de voltar, e a maior parte não volta — não por não gostar, por esquecer.
    Só o vitalício continua avulso: não existe renovar o que não vence. */
-$assina = mp_pode_assinar($plano);
+/* E SEMPRE DÁ PRA PAGAR UMA VEZ SÓ.
+
+   Assinatura precisa de um meio de pagamento que aceite débito automático.
+   Quem paga por Pix comum, ou não tem cartão, ou simplesmente não quer
+   cobrança automática, não pode ficar sem poder comprar — essa venda
+   existia antes e não pode sumir porque a assinatura chegou. A escolha é
+   da pessoa e vem da tela. */
+$assina = mp_pode_assinar($plano) && !isset($_GET['avulso']);
 
 try {
     $r = $assina
