@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-25",
+      "titulo": "Sons da casa, e selos que dá pra desligar",
+      "texto": "Agora existem sons que valem pra todo mundo, subidos aqui — eles aparecem na sua lista junto dos seus e não contam no seu limite. E os selos ganharam uma chave de ligar e desligar: desligado, o selo some do feed mas continua na ficha de quem tem, e religar traz todo mundo de volta. É diferente de apagar, que leva junto quem ganhou."
+    },
+    {
+      "data": "2026-09-25",
       "titulo": "Chat e Atividades como docas do OBS",
       "texto": "Duas páginas novas pra você pôr como doca no OBS, ao lado do painel: o chat, só pra ler, e as atividades — quem seguiu, assinou, mandou bits ou raidou, com a hora e uma cor por tipo. São docas à parte e não seções do painel porque o OBS deixa arrastar e encaixar cada uma onde você quiser. Os três endereços estão na aba Painel, com botão de copiar. E os alertas agora entram em TODAS as cenas que o painel monta."
     },

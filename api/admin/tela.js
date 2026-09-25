@@ -1337,6 +1337,21 @@ function blocoSelos() {
         catch (e) { recado(e.message, 'ruim'); }
       };
 
+      /* LIGAR E DESLIGAR, QUE NÃO É O MESMO QUE APAGAR.
+
+         Desligado, o selo some do feed mas continua na ficha de quem o
+         tem — religar traz todo mundo de volta. Apagar leva junto quem
+         ganhou, e isso não se desfaz. Ter os dois é o que deixa tentar
+         "menos selos" sem medo de perder o histórico. */
+      const liga = h('input', { type: 'checkbox', title: 'aparece no feed' });
+      liga.checked = s.ligado !== 0;
+      liga.onchange = async () => {
+        try {
+          const r = await manda({ acao: 'ligado', id: s.id, ligado: liga.checked ? 1 : 0 });
+          pinta(r.selos || []);
+        } catch (e) { liga.checked = !liga.checked; recado(e.message, 'ruim'); }
+      };
+
       const apagar = h('button', { cls: 'bt mini perigo', type: 'button', txt: '×' });
       apagar.onclick = async () => {
         if (!confirm('Apagar o selo "' + s.nome + '"? Ele some de quem já tem.')) return;
@@ -1344,7 +1359,10 @@ function blocoSelos() {
         catch (e) { recado(e.message, 'ruim'); }
       };
 
-      lista.appendChild(h('div', { cls: 'selo-linha', style: 'padding:10px 0;border-top:1px solid var(--linha)' }, [
+      lista.appendChild(h('div', { cls: 'selo-linha',
+        style: 'padding:10px 0;border-top:1px solid var(--linha)'
+             + (s.ligado === 0 ? ';opacity:.45' : '') }, [
+        liga,
         previa,
         h('code', { style: 'flex:0 0 90px;font-size:12px', txt: s.slug }),
         nome, cor, dica, desenho, arq, semDesenho, salvar, apagar,

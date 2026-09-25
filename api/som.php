@@ -66,12 +66,21 @@ if (($_GET['a'] ?? '') === 'tocar') {
         http_response_code(400); exit;
     }
 
+    /* O SOM DA CASA TOCA PRA QUALQUER OVERLAY.
+
+       O de usuário continua preso ao dono — a chave pública tem que ser
+       de um overlay DELE. O da casa não tem dono nesse sentido: ele foi
+       subido pra todo mundo usar, e exigir que a chave batesse com a do
+       admin faria ele só tocar na live do próprio admin. */
     $st = db()->prepare(
         'SELECT s.arquivo, s.tipo FROM sons s
-           JOIN perfis p ON p.usuario_id = s.usuario_id
-          WHERE p.chave_publica = ? AND s.id = ? LIMIT 1'
+          WHERE s.id = ?
+            AND (s.da_casa = 1
+                 OR EXISTS (SELECT 1 FROM perfis p
+                             WHERE p.usuario_id = s.usuario_id AND p.chave_publica = ?))
+          LIMIT 1'
     );
-    $st->execute([$chave, $id]);
+    $st->execute([$id, $chave]);
     $s = $st->fetch();
     if (!$s) { http_response_code(404); exit; }
 
@@ -97,7 +106,13 @@ $uid  = (int) $quem['usuario_id'];
 
 function som_lista(int $uid): array
 {
-    $st = db()->prepare('SELECT id, nome, bytes FROM sons WHERE usuario_id = ? ORDER BY id');
+    /* Os meus e os da casa, na mesma lista: quem escolhe um som pro
+       alerta não quer decidir antes de que pasta ele vem. */
+    $st = db()->prepare(
+        'SELECT id, nome, bytes, da_casa FROM sons
+          WHERE usuario_id = ? OR da_casa = 1
+          ORDER BY da_casa, id'
+    );
     $st->execute([$uid]);
     return array_map(fn($s) => [
         'id'    => (int) $s['id'],
@@ -115,7 +130,9 @@ if (empty($_FILES['som'])) {
     $d = corpo_json();
     if (($d['acao'] ?? '') !== 'apagar') json_saida(['erro' => 'Ação desconhecida.'], 400);
 
-    $st = db()->prepare('SELECT arquivo FROM sons WHERE id = ? AND usuario_id = ?');
+    /* Só o dono apaga. Som da casa não entra aqui: ele não é de quem
+       está pedindo, e apagar levaria embora o som de todo mundo. */
+    $st = db()->prepare('SELECT arquivo FROM sons WHERE id = ? AND usuario_id = ? AND da_casa = 0');
     $st->execute([(int) ($d['id'] ?? 0), $uid]);
     $arq = $st->fetchColumn();
     if ($arq) {
@@ -179,7 +196,19 @@ $nome = trim((string) ($_POST['nome'] ?? ''));
 if ($nome === '') $nome = pathinfo((string) $f['name'], PATHINFO_FILENAME);
 $nome = mb_substr(preg_replace('/[\x00-\x1f\x7f]/u', '', $nome), 0, 60) ?: 'som';
 
-db()->prepare('INSERT INTO sons (usuario_id, nome, arquivo, bytes, tipo) VALUES (?, ?, ?, ?, ?)')
-    ->execute([$uid, $nome, $arquivo, (int) $f['size'], $mime]);
+/* SÓ O ADMIN SOBE SOM DA CASA, e só quando pede.
+
+   Marcar sozinho seria pior dos dois lados: o admin subindo um som de
+   teste o espalharia pra todo mundo, e um usuário comum nunca deveria
+   conseguir pôr som na biblioteca dos outros. */
+$daCasa = 0;
+if (!empty($_POST['da_casa'])) {
+    $ad = db()->prepare('SELECT admin FROM usuarios WHERE id = ?');
+    $ad->execute([$uid]);
+    $daCasa = (int) $ad->fetchColumn() ? 1 : 0;
+}
+
+db()->prepare('INSERT INTO sons (usuario_id, nome, arquivo, bytes, tipo, da_casa) VALUES (?, ?, ?, ?, ?, ?)')
+    ->execute([$uid, $nome, $arquivo, (int) $f['size'], $mime, $daCasa]);
 
 json_saida(['ok' => true, 'sons' => som_lista($uid)]);

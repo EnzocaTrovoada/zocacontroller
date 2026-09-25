@@ -134,6 +134,26 @@ if ($acao === 'apagar') {
     json_saida(['ok' => true, 'selos' => selo_lista()]);
 }
 
+/* ---------- ligar e desligar um selo ----------
+
+   A COLUNA 'ligado' EXISTIA DESDE O COMEÇO, E NADA A MUDAVA.
+
+   A leitura já respeitava (WHERE s.ligado = 1), mas não havia ação pra
+   escrever nela — então todos os dez apareciam sempre, e a única forma
+   de tirar um da frente era APAGAR, o que leva junto quem já o tinha.
+
+   Desligar guarda tudo: quem ganhou continua com ele na ficha, e religar
+   traz todo mundo de volta. É a diferença entre guardar e destruir. */
+if ($acao === 'ligado') {
+    $id = (int) ($d['id'] ?? 0);
+    if ($id <= 0) json_saida(['erro' => 'Falta dizer qual selo.'], 400);
+
+    db()->prepare('UPDATE selos SET ligado = ? WHERE id = ?')
+        ->execute([empty($d['ligado']) ? 0 : 1, $id]);
+
+    json_saida(['ok' => true, 'selos' => selo_lista()]);
+}
+
 /* ---------- o acerto fino do tamanho ---------- */
 if ($acao === 'ajuste') {
     $id = (int) ($d['id'] ?? 0);
