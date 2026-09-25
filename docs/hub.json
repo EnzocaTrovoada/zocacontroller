@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-25",
+      "titulo": "O painel monta o OBS inteiro",
+      "texto": "Ele procura a sua webcam, a placa de captura e os seus monitores, pergunta qual é qual — webcam e placa são o mesmo tipo de fonte pro OBS, e adivinhar poria o jogo no lugar do rosto — e monta cinco cenas com alertas, chat e contagem já posicionados. Tudo numa COLEÇÃO DE CENAS NOVA: o que você já tinha fica intacto, a um clique no menu do OBS."
+    },
+    {
+      "data": "2026-09-25",
       "titulo": "O painel monta as cenas do OBS pra você",
       "texto": "\"Live começando\", \"Já volto\", \"Câmera completa\" e \"Mostrando tela\", com um clique. Ele procura a sua câmera e a sua captura de tela e REAPROVEITA as mesmas fontes em várias cenas — criar uma câmera nova por cena é o que trava a webcam com \"dispositivo em uso\", e é o erro mais comum de quem monta sozinho. Cena que já existe não é tocada. E tem uma chave de borrar a câmera, que vale em todas as cenas de uma vez."
     },

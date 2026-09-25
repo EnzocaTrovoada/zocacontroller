@@ -342,10 +342,11 @@
   </details>
 
   <details class="secao" data-secao="montar">
-  <summary>Montar as cenas</summary>
-  <p class="dica">Cria as quatro cenas que toda live usa, reaproveitando a sua câmera e a sua
-     captura de tela. Cena que já existe não é tocada.</p>
-  <div class="grade um"><button id="btMontar" class="mini">Criar as cenas que faltam</button></div>
+  <summary>Montar o OBS</summary>
+  <p class="dica">Diga o que você tem e o painel monta tudo: as cenas, a webcam, a tela,
+     os alertas e o chat. Numa coleção nova — o que você já tem não é tocado.</p>
+  <div class="grade um"><button id="btMontar" class="mini">Começar</button></div>
+  <div id="montarPasso"></div>
   <p class="dica" id="montarDiz"></p>
 
   <label class="chave" id="chBlurCaixa" style="width:auto;height:auto;display:flex">
@@ -1335,151 +1336,385 @@ function criarOpcao(valor, texto) {
   return o;
 }
 
-/* ================== AS CENAS QUE TODA LIVE PRECISA ==================
+/* ================== MONTAR O OBS INTEIRO ==================
 
-   TRÊS CENAS E UM FILTRO RESOLVEM O DIA DE QUEM ESTÁ COMEÇANDO.
+   BAIXAR, CLICAR E COMEÇAR — sem aprender o que é fonte, cena ou filtro.
 
-   Quem monta OBS pela primeira vez trava aqui: sabe que precisa de uma
-   tela de "já volto", não sabe que isso é uma cena, nem que a câmera
-   pode estar em duas cenas ao mesmo tempo, nem que dá pra reaproveitar a
-   fonte em vez de criar outra.
+   Três coisas fazem este botão ser seguro de apertar:
 
-   REAPROVEITAR É O PONTO. O OBS deixa a MESMA fonte aparecer em várias
-   cenas — e é isso que faz a câmera continuar funcionando quando você
-   troca. Criar uma câmera nova por cena é o erro que trava a webcam com
-   "dispositivo em uso", e é o que acontece quando alguém monta sozinho.
+   1. COLEÇÃO DE CENAS NOVA. Quem já usa o OBS tem meses de trabalho lá
+      dentro. Criar uma coleção separada deixa tudo o que existe intacto e
+      a um clique de distância — o OBS troca entre coleções pelo menu, e
+      nada foi apagado. Sem isso, "montar as cenas" seria uma proposta
+      que ninguém com OBS montado deveria aceitar.
 
-   Por isso aqui a gente PROCURA o que já existe antes de criar. */
+   2. OS APARELHOS SÃO ESCOLHIDOS, E NÃO ADIVINHADOS. Webcam e placa de
+      captura são o MESMO tipo de fonte no OBS (dshow_input), e só o nome
+      do aparelho separa os dois. Adivinhar erra: quem tem placa de
+      captura quase sempre tem webcam também, e o jogo apareceria no
+      lugar do rosto.
 
-/* O que cada cena leva. A ordem importa: o que vem depois fica por cima. */
-const CENAS_MODELO = [
-  {
-    nome: 'Live começando',
-    oQue: 'a tela de espera, com a contagem regressiva',
-    leva: ['contagem'],
-  },
-  {
-    nome: 'Já volto',
-    oQue: 'pra sair da frente sem cortar a transmissão',
-    leva: [],
-  },
-  {
-    nome: 'Câmera completa',
-    oQue: 'só você, em tela cheia',
-    leva: ['camera'],
-  },
-  {
-    nome: 'Mostrando tela',
-    oQue: 'a tela do computador com a câmera num canto',
-    leva: ['tela', 'camera'],
-  },
+   3. CADA PEÇA ENTRA DO JEITO DELA. Overlay é fonte de navegador; webcam
+      e captura são dshow; a tela é captura de monitor. É por isso que
+      não dá pra ter uma função só que cria "uma fonte".
+
+   Pra somar uma peça: uma entrada em MONTAR_CENAS e, se for de um tipo
+   novo, um ramo em criaPeca(). */
+
+const COLECAO_NOVA = 'ZocaHub';
+
+/* As cenas, e o que entra em cada uma. A ordem dentro de 'leva' é a ordem
+   de empilhamento: o que vem depois fica por cima. */
+const MONTAR_CENAS = [
+  { nome: 'Live começando', leva: ['contagem', 'chat'] },
+  { nome: 'Já volto',       leva: [] },
+  { nome: 'Câmera completa', leva: ['camera', 'alerta', 'chat'] },
+  { nome: 'Mostrando tela',  leva: ['tela', 'camera', 'alerta', 'chat'] },
+  { nome: 'Jogando',         leva: ['captura', 'camera', 'alerta', 'chat'] },
 ];
 
-/* As fontes que a gente reaproveita, e como reconhecer cada uma. O OBS
-   nomeia por tipo, e o nome que a pessoa deu é imprevisível — então a
-   busca é pelo TIPO, que não muda. */
-const FONTE_TIPO = {
-  camera: ['dshow_input', 'av_capture_input', 'v4l2_input'],
-  tela:   ['monitor_capture', 'display_capture', 'screen_capture',
-           'window_capture', 'xshm_input'],
+/* Onde cada overlay vai parar na tela, em fração da largura e da altura.
+   Sem isto tudo nasce no canto superior esquerdo, empilhado. */
+const MONTAR_LUGAR = {
+  chat:     { x: 0.75, y: 0.08, larg: 0.24, alt: 0.62 },
+  alerta:   { x: 0.20, y: 0.10, larg: 0.60, alt: 0.40 },
+  contagem: { x: 0.33, y: 0.40, larg: 0.34, alt: 0.20 },
+  camera:   { x: 0.72, y: 0.72, larg: 0.26, alt: 0.26 },
 };
 
-async function cenasQueExistem() {
+/* ---------- achar os aparelhos ----------
+
+   O OBS só lista os aparelhos de vídeo quando existe uma fonte desse
+   tipo pra perguntar. Então a gente cria uma escondida, pergunta, e
+   apaga — a pessoa não vê nada disso acontecer. */
+async function aparelhosDeVideo() {
+  const TEMP = 'ZocaHub — procurando';
+  let criei = false;
+
   try {
-    const d = await pedir('GetSceneList');
-    return (d.scenes || []).map((s) => s.sceneName);
-  } catch (e) { return null; }
+    const lista = (await pedir('GetInputList')).inputs || [];
+    let fonte = lista.find((i) => i.inputKind === 'dshow_input');
+
+    if (!fonte) {
+      const cena = (await pedir('GetCurrentProgramScene')).currentProgramSceneName;
+      await pedir('CreateInput', {
+        sceneName: cena, inputName: TEMP, inputKind: 'dshow_input',
+        inputSettings: {}, sceneItemEnabled: false,
+      });
+      criei = true;
+      fonte = { inputName: TEMP };
+    }
+
+    const r = await pedir('GetInputPropertiesListPropertyItems', {
+      inputName: fonte.inputName, propertyName: 'video_device_id',
+    });
+
+    return (r.propertyItems || [])
+      .filter((x) => x.itemEnabled !== false && x.itemValue)
+      .map((x) => ({ nome: x.itemName, id: x.itemValue }));
+  } catch (e) {
+    return [];
+  } finally {
+    if (criei) { try { await pedir('RemoveInput', { inputName: TEMP }); } catch (e) {} }
+  }
 }
 
-/** A primeira fonte de um tipo, se já houver uma. */
-async function achaFonte(qual) {
-  const tipos = FONTE_TIPO[qual] || [];
+/** As telas que dá pra capturar. */
+async function telasDoPc() {
+  const TEMP = 'ZocaHub — procurando tela';
+  const tipos = ['monitor_capture', 'display_capture', 'xshm_input'];
+  let criei = false;
+
   try {
-    const d = await pedir('GetInputList');
-    const achou = (d.inputs || []).find((i) => tipos.includes(i.inputKind));
-    return achou ? achou.inputName : null;
-  } catch (e) { return null; }
+    const lista = (await pedir('GetInputList')).inputs || [];
+    let fonte = lista.find((i) => tipos.includes(i.inputKind));
+    let tipo = fonte ? fonte.inputKind : null;
+
+    if (!fonte) {
+      const kinds = (await pedir('GetInputKindList')).inputKinds || [];
+      tipo = tipos.find((t) => kinds.includes(t));
+      if (!tipo) return [];
+
+      const cena = (await pedir('GetCurrentProgramScene')).currentProgramSceneName;
+      await pedir('CreateInput', {
+        sceneName: cena, inputName: TEMP, inputKind: tipo,
+        inputSettings: {}, sceneItemEnabled: false,
+      });
+      criei = true;
+      fonte = { inputName: TEMP };
+    }
+
+    /* O nome da propriedade muda entre sistemas: no Windows é 'monitor',
+       no macOS 'display'. Tentar as duas é mais curto que detectar o
+       sistema, e não custa nada quando a primeira acerta. */
+    for (const prop of ['monitor_id', 'monitor', 'display']) {
+      try {
+        const r = await pedir('GetInputPropertiesListPropertyItems', {
+          inputName: fonte.inputName, propertyName: prop,
+        });
+        const itens = (r.propertyItems || []).filter((x) => x.itemValue !== undefined);
+        if (itens.length) {
+          return itens.map((x) => ({ nome: x.itemName, id: x.itemValue, prop, tipo }));
+        }
+      } catch (e) { /* essa propriedade não existe aqui */ }
+    }
+    return [{ nome: 'Tela principal', id: null, prop: null, tipo }];
+  } catch (e) {
+    return [];
+  } finally {
+    if (criei) { try { await pedir('RemoveInput', { inputName: TEMP }); } catch (e) {} }
+  }
 }
 
-/** A overlay de contagem, que é a de relógio com a contagem ligada. */
-async function achaContagem() {
+/* ---------- os overlays que a conta já tem ---------- */
+async function meusOverlays() {
   try {
     const d = await api('/perfil.php');
-    const p = (d.perfis || []).find((x) => x.tipo === 'relogio');
-    if (!p) return null;
     const base = location.origin + location.pathname.replace(/[^/]*$/, '');
-    return { url: base + 'overlay.html?k=' + p.chave_publica, nome: 'ZocaHub — ' + (p.nome || 'relógio') };
-  } catch (e) { return null; }
+    const por = {};
+    (d.perfis || []).forEach((p) => {
+      if (!por[p.tipo]) {
+        por[p.tipo] = { url: base + 'overlay.html?k=' + p.chave_publica,
+                        nome: 'ZocaHub — ' + (p.nome || p.tipo) };
+      }
+    });
+    return por;
+  } catch (e) { return {}; }
 }
 
-async function montarCenas(bt, diz) {
-  bt.disabled = true;
-  diz.textContent = 'olhando o seu OBS…';
-  diz.style.color = 'var(--fraco)';
+/* ---------- pôr uma peça numa cena ----------
 
-  const jaTem = await cenasQueExistem();
-  if (jaTem === null) {
-    bt.disabled = false;
-    diz.textContent = 'não consegui falar com o OBS.';
+   Cada tipo entra de um jeito, e é por isso que isto é um ramo e não uma
+   função genérica: navegador leva url e tamanho, dshow leva o id do
+   aparelho, captura de tela leva o monitor. */
+async function criaPeca(cena, qual, escolhas, video) {
+  const lugar = MONTAR_LUGAR[qual];
+  const tam = lugar
+    ? { w: Math.round(video.baseWidth * lugar.larg), h: Math.round(video.baseHeight * lugar.alt) }
+    : { w: video.baseWidth, h: video.baseHeight };
+
+  let nome = null;
+
+  if (qual === 'camera' || qual === 'captura') {
+    const id = escolhas[qual];
+    if (!id) return null;
+    nome = qual === 'camera' ? 'Câmera' : 'Captura de vídeo';
+
+    /* A MESMA fonte reaproveitada nas outras cenas: criar uma por cena
+       trava o aparelho com "em uso" e é o erro mais comum de quem monta
+       sozinho. */
+    const existe = ((await pedir('GetInputList')).inputs || []).some((i) => i.inputName === nome);
+    if (existe) {
+      await pedir('CreateSceneItem', { sceneName: cena, sourceName: nome });
+    } else {
+      await pedir('CreateInput', {
+        sceneName: cena, inputName: nome, inputKind: 'dshow_input',
+        inputSettings: { video_device_id: id },
+      });
+    }
+  } else if (qual === 'tela') {
+    const t = escolhas.tela;
+    if (!t) return null;
+    nome = 'Tela';
+    const existe = ((await pedir('GetInputList')).inputs || []).some((i) => i.inputName === nome);
+    if (existe) {
+      await pedir('CreateSceneItem', { sceneName: cena, sourceName: nome });
+    } else {
+      const ajustes = {};
+      if (t.prop && t.id !== null) ajustes[t.prop] = t.id;
+      await pedir('CreateInput', {
+        sceneName: cena, inputName: nome, inputKind: t.tipo, inputSettings: ajustes,
+      });
+    }
+  } else {
+    /* Os overlays: alerta, chat e contagem. */
+    const ov = escolhas.overlays[qual === 'contagem' ? 'relogio' : qual];
+    if (!ov) return null;
+    nome = ov.nome;
+
+    const existe = ((await pedir('GetInputList')).inputs || []).some((i) => i.inputName === nome);
+    if (existe) {
+      await pedir('CreateSceneItem', { sceneName: cena, sourceName: nome });
+    } else {
+      await pedir('CreateInput', {
+        sceneName: cena, inputName: nome, inputKind: 'browser_source',
+        inputSettings: {
+          url: ov.url, width: tam.w, height: tam.h,
+          /* Os três ajustes que mais dão problema, já certos. */
+          shutdown: false, restart_when_active: false,
+          reroute_audio: qual === 'alerta' || qual === 'tts',
+        },
+      });
+    }
+  }
+
+  /* Pôr no lugar. Sem isto tudo nasce empilhado no canto de cima. */
+  if (nome && lugar) {
+    try {
+      const it = await pedir('GetSceneItemId', { sceneName: cena, sourceName: nome });
+      await pedir('SetSceneItemTransform', {
+        sceneName: cena, sceneItemId: it.sceneItemId,
+        sceneItemTransform: {
+          positionX: Math.round(video.baseWidth * lugar.x),
+          positionY: Math.round(video.baseHeight * lugar.y),
+          boundsType: 'OBS_BOUNDS_SCALE_INNER',
+          boundsWidth: tam.w, boundsHeight: tam.h,
+        },
+      });
+    } catch (e) { /* ficou no canto; a pessoa arrasta */ }
+  }
+  return nome;
+}
+
+/* ---------- montar tudo ---------- */
+async function montarTudo(escolhas, diz) {
+  const passo = (t) => { diz.textContent = t; diz.style.color = 'var(--fraco)'; };
+
+  let video;
+  try { video = await pedir('GetVideoSettings'); }
+  catch (e) { video = { baseWidth: 1920, baseHeight: 1080 }; }
+
+  /* A COLEÇÃO NOVA É O QUE TORNA ISTO SEGURO. O que a pessoa já tinha
+     continua lá, a um clique no menu do OBS. */
+  passo('criando a coleção de cenas…');
+  try {
+    const col = await pedir('GetSceneCollectionList');
+    const nome = (col.sceneCollections || []).includes(COLECAO_NOVA)
+      ? COLECAO_NOVA + ' ' + new Date().toLocaleDateString('pt-BR')
+      : COLECAO_NOVA;
+
+    await pedir('CreateSceneCollection', { sceneCollectionName: nome });
+    /* O OBS troca pra coleção nova sozinho ao criar, e ela nasce com uma
+       cena vazia chamada "Cena". */
+  } catch (e) {
+    diz.textContent = 'Não consegui criar a coleção de cenas: ' + e.message;
     diz.style.color = 'var(--perigo)';
     return;
   }
 
-  const camera = await achaFonte('camera');
-  const tela = await achaFonte('tela');
-  const contagem = await achaContagem();
+  /* Dar um respiro: o OBS reabre tudo ao trocar de coleção, e pedir
+     durante a troca devolve erro. */
+  await new Promise((r) => setTimeout(r, 1200));
+
+  escolhas.overlays = await meusOverlays();
 
   const feitas = [];
-  const pulei = [];
+  for (const cena of MONTAR_CENAS) {
+    passo('montando "' + cena.nome + '"…');
+    try { await pedir('CreateScene', { sceneName: cena.nome }); }
+    catch (e) { continue; }
 
-  for (const modelo of CENAS_MODELO) {
-    /* Cena que já existe não é tocada. Recriar apagaria o que a pessoa
-       montou, e o nome dela é o que mais provavelmente já está em uso. */
-    if (jaTem.includes(modelo.nome)) { pulei.push(modelo.nome); continue; }
-
-    try {
-      await pedir('CreateScene', { sceneName: modelo.nome });
-    } catch (e) { pulei.push(modelo.nome); continue; }
-
-    for (const parte of modelo.leva) {
-      try {
-        if (parte === 'camera' && camera) {
-          /* A MESMA fonte, e não uma cópia: é o que deixa a câmera viva
-             nas duas cenas em vez de dar "dispositivo em uso". */
-          await pedir('CreateSceneItem', { sceneName: modelo.nome, sourceName: camera });
-        } else if (parte === 'tela' && tela) {
-          await pedir('CreateSceneItem', { sceneName: modelo.nome, sourceName: tela });
-        } else if (parte === 'contagem' && contagem) {
-          await pedir('CreateInput', {
-            sceneName: modelo.nome,
-            inputName: contagem.nome,
-            inputKind: 'browser_source',
-            inputSettings: { url: contagem.url, width: 900, height: 260,
-                             shutdown: false, restart_when_active: false },
-          });
-        }
-      } catch (e) { /* a parte não entrou; a cena fica e a pessoa completa */ }
+    for (const peca of cena.leva) {
+      try { await criaPeca(cena.nome, peca, escolhas, video); }
+      catch (e) { /* uma peça que falta não impede o resto da cena */ }
     }
-    feitas.push(modelo.nome);
+    feitas.push(cena.nome);
   }
 
-  bt.disabled = false;
-  if (!feitas.length) {
-    diz.textContent = 'Todas as cenas já existiam. Não mexi em nenhuma.';
-    diz.style.color = 'var(--fraco)';
-    return;
-  }
+  /* A cena vazia que o OBS cria junto com a coleção fica sobrando. */
+  try { await pedir('RemoveScene', { sceneName: 'Cena' }); } catch (e) {}
+  try { await pedir('RemoveScene', { sceneName: 'Scene' }); } catch (e) {}
+
+  try { await pedir('SetCurrentProgramScene', { sceneName: 'Live começando' }); } catch (e) {}
 
   const faltou = [];
-  if (!camera) faltou.push('câmera');
-  if (!tela) faltou.push('captura de tela');
-  if (!contagem) faltou.push('overlay de relógio');
+  if (!escolhas.overlays.alerta) faltou.push('alertas');
+  if (!escolhas.overlays.chat) faltou.push('chat');
+  if (!escolhas.overlays.relogio) faltou.push('relógio');
 
-  diz.textContent = 'Criei: ' + feitas.join(', ') + '.'
-    + (pulei.length ? ' Já existiam: ' + pulei.join(', ') + '.' : '')
-    + (faltou.length ? ' Sem ' + faltou.join(' nem ') + ' no seu OBS — essas partes ficaram vazias.' : '');
+  diz.textContent = 'Pronto: ' + feitas.length + ' cenas.'
+    + (faltou.length ? ' Faltou criar no site: ' + faltou.join(', ') + '.' : '')
+    + ' O que você tinha antes continua no menu Coleção de cenas.';
   diz.style.color = 'var(--sinal)';
-  anotar('cenas criadas: ' + feitas.join(', '));
+  anotar('OBS montado numa coleção nova');
+}
+
+/* ---------- a tela do assistente ----------
+
+   PERGUNTA ANTES, MONTA DEPOIS. Webcam e placa de captura são o mesmo
+   tipo de fonte pro OBS, e só o nome do aparelho separa. Adivinhar erra
+   justamente em quem tem os dois — e aí o jogo aparece no lugar do rosto. */
+async function assistenteObs() {
+  const cx = el('montarPasso');
+  cx.innerHTML = '';
+  const diz = el('montarDiz');
+  diz.textContent = 'procurando seus aparelhos…';
+
+  const [videos, telas] = await Promise.all([aparelhosDeVideo(), telasDoPc()]);
+
+  if (!videos.length && !telas.length) {
+    diz.textContent = 'Não consegui falar com o OBS.';
+    diz.style.color = 'var(--perigo)';
+    return;
+  }
+  diz.textContent = '';
+
+  const selCam = document.createElement('select');
+  const selCap = document.createElement('select');
+  const selTela = document.createElement('select');
+
+  const opcao = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; return o; };
+
+  selCam.appendChild(opcao('', '— não tenho —'));
+  selCap.appendChild(opcao('', '— não tenho —'));
+  videos.forEach((v) => { selCam.appendChild(opcao(v.id, v.nome)); selCap.appendChild(opcao(v.id, v.nome)); });
+
+  selTela.appendChild(opcao('', '— não capturar tela —'));
+  telas.forEach((t, i) => selTela.appendChild(opcao(String(i), t.nome)));
+
+  /* Palpites que a pessoa corrige: a primeira câmera costuma ser a
+     webcam, e placa de captura quase sempre tem "capture" no nome. */
+  if (videos.length) selCam.value = videos[0].id;
+  const placa = videos.find((v) => /capture|cam link|elgato|hdmi/i.test(v.nome));
+  if (placa) {
+    selCap.value = placa.id;
+    if (selCam.value === placa.id && videos.length > 1) {
+      selCam.value = videos.find((v) => v.id !== placa.id).id;
+    }
+  }
+  if (telas.length) selTela.value = '0';
+
+  const linha = (rot, sel, dica) => {
+    const l = document.createElement('div');
+    l.className = 'fila';
+    const b = document.createElement('b');
+    b.textContent = rot;
+    l.appendChild(b);
+    l.appendChild(sel);
+    cx.appendChild(l);
+    if (dica) {
+      const p = document.createElement('p');
+      p.className = 'dica';
+      p.style.margin = '-4px 0 8px';
+      p.textContent = dica;
+      cx.appendChild(p);
+    }
+  };
+
+  linha('Sua webcam', selCam, 'a câmera que mostra você');
+  linha('Placa de captura', selCap, 'só se você joga em console ou em outro PC');
+  linha('Tela', selTela, 'o monitor que aparece quando você mostra o jogo');
+
+  const bt = document.createElement('button');
+  bt.className = 'mini';
+  bt.textContent = 'Montar tudo numa coleção nova';
+  bt.onclick = async () => {
+    bt.disabled = true;
+    const iTela = selTela.value === '' ? null : telas[Number(selTela.value)];
+    await montarTudo({ camera: selCam.value, captura: selCap.value, tela: iTela }, diz);
+    bt.disabled = false;
+  };
+
+  const g = document.createElement('div');
+  g.className = 'grade um';
+  g.appendChild(bt);
+  cx.appendChild(g);
+
+  const aviso = document.createElement('p');
+  aviso.className = 'dica';
+  aviso.textContent = 'O que você já tem no OBS não é tocado: tudo vai pra uma coleção de cenas '
+    + 'nova, e a antiga continua no menu Coleção de cenas.';
+  cx.appendChild(aviso);
 }
 
 /* ---------- o blur na câmera ----------
@@ -3025,7 +3260,7 @@ el('crCena').addEventListener('change', async () => {
 document.querySelector('details.secao[data-secao="contagem"]')
   ?.addEventListener('toggle', function () { if (this.open) crPinta(); });
 el('btSorte').addEventListener('click', raidSorte);
-el('btMontar').addEventListener('click', () => montarCenas(el('btMontar'), el('montarDiz')));
+el('btMontar').addEventListener('click', assistenteObs);
 el('chBlur').addEventListener('change', (e) => mexeBlur(e.target.checked, el('blurDiz')));
 el('chVoz').addEventListener('change', (e) => mexeChave('voz', e.target, el('chVozCaixa')));
 el('chAlertas').addEventListener('change', (e) => mexeChave('alertas', e.target, el('chAlertasCaixa')));
