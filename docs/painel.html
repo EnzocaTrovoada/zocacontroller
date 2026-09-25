@@ -1363,24 +1363,77 @@ function criarOpcao(valor, texto) {
 
 const COLECAO_NOVA = 'ZocaHub';
 
-/* As cenas, e o que entra em cada uma. A ordem dentro de 'leva' é a ordem
-   de empilhamento: o que vem depois fica por cima. */
-const MONTAR_CENAS = [
-  { nome: 'Live começando', leva: ['contagem', 'chat'] },
-  { nome: 'Já volto',       leva: [] },
-  { nome: 'Câmera completa', leva: ['camera', 'alerta', 'chat'] },
-  { nome: 'Mostrando tela',  leva: ['tela', 'camera', 'alerta', 'chat'] },
-  { nome: 'Jogando',         leva: ['captura', 'camera', 'alerta', 'chat'] },
-];
+/* AS CENAS, E O LUGAR DE CADA PEÇA DENTRO DE CADA UMA.
 
-/* Onde cada overlay vai parar na tela, em fração da largura e da altura.
-   Sem isto tudo nasce no canto superior esquerdo, empilhado. */
-const MONTAR_LUGAR = {
-  chat:     { x: 0.75, y: 0.08, larg: 0.24, alt: 0.62 },
-  alerta:   { x: 0.20, y: 0.10, larg: 0.60, alt: 0.40 },
-  contagem: { x: 0.33, y: 0.40, larg: 0.34, alt: 0.20 },
-  camera:   { x: 0.72, y: 0.72, larg: 0.26, alt: 0.26 },
-};
+   O lugar é POR CENA, e não por peça. A webcam ocupa a tela inteira em
+   "Câmera completa" e vira um quadradinho em "Jogando" — é a mesma fonte
+   com dois enquadramentos, e uma tabela global de posições não conseguia
+   dizer isso.
+
+   Os números são fração da tela: 0.72 quer dizer "a 72% da largura". Assim
+   a montagem funciona igual em 1080p e em 1440p, sem conta nenhuma.
+
+   CHEIA é o caso especial que não cabe em fração: ocupar tudo, cobrindo a
+   tela inteira mesmo que a proporção do aparelho seja outra. */
+const CHEIA = { x: 0, y: 0, larg: 1, alt: 1 };
+
+/* O canto onde a webcam pequena e o chat vivem. Ficam em constantes porque
+   repetem em várias cenas, e três cenas com a webcam em lugares
+   ligeiramente diferentes parecem um erro de montagem. */
+const CANTO_CAM = { x: 0.735, y: 0.70, larg: 0.25, alt: 0.28 };
+const COLUNA_CHAT = { x: 0.755, y: 0.06, larg: 0.235, alt: 0.60 };
+const MEIO_ALERTA = { x: 0.22, y: 0.12, larg: 0.56, alt: 0.38 };
+
+const MONTAR_CENAS = [
+  {
+    nome: 'Live começando',
+    /* Sem webcam: é a tela de espera, e quase ninguém quer aparecer
+       enquanto arruma as coisas. O chat fica porque quem chegou cedo
+       conversa. */
+    leva: [
+      ['contagem', { x: 0.28, y: 0.38, larg: 0.44, alt: 0.24 }],
+      ['chat', COLUNA_CHAT],
+    ],
+  },
+  {
+    nome: 'Já volto',
+    /* Só o chat. Sem câmera nem alerta: a pessoa saiu da frente, e um
+       alerta tocando pra uma cadeira vazia é pior que nenhum. */
+    leva: [['chat', COLUNA_CHAT]],
+  },
+  {
+    nome: 'Câmera completa',
+    /* A webcam OCUPANDO TUDO. É a cena de conversar, e a câmera é o
+       conteúdo — não um quadradinho no canto. */
+    leva: [
+      ['camera', CHEIA],
+      ['alerta', MEIO_ALERTA],
+      ['chat', COLUNA_CHAT],
+    ],
+  },
+  {
+    nome: 'Jogando no PC',
+    /* O jogo é o conteúdo; a webcam vira canto. */
+    leva: [
+      ['tela', CHEIA],
+      ['camera', CANTO_CAM],
+      ['alerta', MEIO_ALERTA],
+      ['chat', COLUNA_CHAT],
+    ],
+  },
+  {
+    nome: 'Jogando no console',
+    /* A mesma ideia, com a placa de captura no lugar da tela. Só é criada
+       quando a pessoa disse ter uma placa — senão nasceria vazia. */
+    so_se: 'captura',
+    leva: [
+      ['captura', CHEIA],
+      ['camera', CANTO_CAM],
+      ['alerta', MEIO_ALERTA],
+      ['chat', COLUNA_CHAT],
+    ],
+  },
+];
 
 /* ---------- achar os aparelhos ----------
 
@@ -1487,11 +1540,11 @@ async function meusOverlays() {
    Cada tipo entra de um jeito, e é por isso que isto é um ramo e não uma
    função genérica: navegador leva url e tamanho, dshow leva o id do
    aparelho, captura de tela leva o monitor. */
-async function criaPeca(cena, qual, escolhas, video) {
-  const lugar = MONTAR_LUGAR[qual];
-  const tam = lugar
-    ? { w: Math.round(video.baseWidth * lugar.larg), h: Math.round(video.baseHeight * lugar.alt) }
-    : { w: video.baseWidth, h: video.baseHeight };
+async function criaPeca(cena, qual, lugar, escolhas, video) {
+  const tam = {
+    w: Math.round(video.baseWidth * lugar.larg),
+    h: Math.round(video.baseHeight * lugar.alt),
+  };
 
   let nome = null;
 
@@ -1549,7 +1602,7 @@ async function criaPeca(cena, qual, escolhas, video) {
   }
 
   /* Pôr no lugar. Sem isto tudo nasce empilhado no canto de cima. */
-  if (nome && lugar) {
+  if (nome) {
     try {
       const it = await pedir('GetSceneItemId', { sceneName: cena, sourceName: nome });
       await pedir('SetSceneItemTransform', {
@@ -1600,12 +1653,16 @@ async function montarTudo(escolhas, diz) {
 
   const feitas = [];
   for (const cena of MONTAR_CENAS) {
+    /* Cena que depende de um aparelho que a pessoa não tem nasceria
+       vazia, e uma cena vazia na lista é só confusão. */
+    if (cena.so_se && !escolhas[cena.so_se]) continue;
+
     passo('montando "' + cena.nome + '"…');
     try { await pedir('CreateScene', { sceneName: cena.nome }); }
     catch (e) { continue; }
 
-    for (const peca of cena.leva) {
-      try { await criaPeca(cena.nome, peca, escolhas, video); }
+    for (const [peca, lugar] of cena.leva) {
+      try { await criaPeca(cena.nome, peca, lugar, escolhas, video); }
       catch (e) { /* uma peça que falta não impede o resto da cena */ }
     }
     feitas.push(cena.nome);
@@ -1615,6 +1672,7 @@ async function montarTudo(escolhas, diz) {
   try { await pedir('RemoveScene', { sceneName: 'Cena' }); } catch (e) {}
   try { await pedir('RemoveScene', { sceneName: 'Scene' }); } catch (e) {}
 
+  /* Abre na tela de espera: é onde a pessoa vai estar quando ligar. */
   try { await pedir('SetCurrentProgramScene', { sceneName: 'Live começando' }); } catch (e) {}
 
   const faltou = [];
