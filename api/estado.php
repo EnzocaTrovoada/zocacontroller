@@ -151,9 +151,29 @@ if (!$linha) {
 // A ponte publica junto com o ciclo da espera longa, que é de 15 s.
 // O teto tem que caber isso mais folga, senão pisca "sem sinal" à toa.
 $idade = (int) $linha['idade'];
+$canal = '';
+$eventos = [];
+try {
+    $c = db()->prepare('SELECT login FROM usuarios WHERE id = ?');
+    $c->execute([(int) $quem['usuario_id']]);
+    $canal = (string) $c->fetchColumn();
+
+    require_once __DIR__ . '/lib/eventos.php';
+    $eventos = array_slice(evento_recentes((int) $quem['usuario_id'], 40), 0, 40);
+} catch (Throwable $e) { /* sem eventos, a doca mostra a lista vazia */ }
+
 json_saida([
     'ligada' => $idade <= 30,
     'idade'  => $idade,
     'estado' => json_decode($linha['estado'], true),
-    'eu'     => ['nome' => $quem['nome'], 'tipo' => $quem['tipo'], 'pode' => $quem['pode']],
+    'eu'     => ['nome' => $quem['nome'], 'tipo' => $quem['tipo'], 'pode' => $quem['pode'],
+                 /* O login é o nome do canal no chat. As docas de chat e
+                    de feed precisam dele e não têm como descobrir sozinhas. */
+                 'canal' => $canal],
+    /* OS ÚLTIMOS ACONTECIMENTOS, PRA DOCA DE ATIVIDADES.
+
+       Vão de carona nesta leitura, que a doca já faz: um endereço próprio
+       seria uma segunda consulta pelo mesmo dado, e ela roda a cada poucos
+       segundos o dia inteiro. */
+    'eventos' => $eventos,
 ]);

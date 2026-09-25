@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-25",
+      "titulo": "Chat e Atividades como docas do OBS",
+      "texto": "Duas páginas novas pra você pôr como doca no OBS, ao lado do painel: o chat, só pra ler, e as atividades — quem seguiu, assinou, mandou bits ou raidou, com a hora e uma cor por tipo. São docas à parte e não seções do painel porque o OBS deixa arrastar e encaixar cada uma onde você quiser. Os três endereços estão na aba Painel, com botão de copiar. E os alertas agora entram em TODAS as cenas que o painel monta."
+    },
+    {
+      "data": "2026-09-25",
       "titulo": "O painel monta o OBS inteiro",
       "texto": "Ele procura a sua webcam, a placa de captura e os monitores, pergunta qual é qual — webcam e placa são o mesmo tipo de fonte pro OBS, e adivinhar poria o jogo no lugar do rosto — e monta cada cena do jeito dela: em \"Câmera completa\" a webcam ocupa a tela toda, em \"Jogando\" ela vira um canto e o jogo é o conteúdo. A cena do console só nasce pra quem tem placa. Tudo numa COLEÇÃO DE CENAS NOVA: o que você já tinha fica intacto, a um clique no menu do OBS."
     },

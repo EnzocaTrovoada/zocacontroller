@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atividades — ZocaHub</title>
+
+<!--
+  O QUE ACONTECEU NA LIVE, NUMA DOCA DO OBS.
+
+  Follow, sub, presente, bits, doação e raid — em ordem, com a hora. É o
+  painel que o streamer olha de canto de olho pra saber quem chegou e
+  agradecer pelo nome.
+
+  DOCA À PARTE, E NÃO UMA SEÇÃO DO PAINEL: doca do OBS se arrasta e se
+  encaixa onde a pessoa quiser, e o que ela quer é isto numa coluna alta
+  do lado do chat. Espremido dentro do painel, junto de mais dez seções,
+  seria uma lista de três linhas que ninguém lê.
+
+  Os eventos vêm de carona na mesma leitura que a doca já faz — não há
+  endereço novo nem consulta a mais.
+-->
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    /* As MESMAS cores do painel e da doca de chat: as três ficam lado a
+       lado no OBS, e três paletas pareceriam três programas. */
+    --fundo:  #0E1411;
+    --caixa:  #161F1A;
+    --linha:  #2A3830;
+    --tinta:  #E4EDE7;
+    --fraco:  #93A69B;
+    --sinal:  #3DD47F;
+    --ambar:  #D3A244;
+    --rosa:   #E060A0;
+    --roxo:   #A78BFA;
+    --disp: "Archivo", system-ui, "Segoe UI", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--fundo); color: var(--tinta);
+    font: 14px/1.5 var(--disp);
+    display: flex; flex-direction: column;
+  }
+
+  .topo {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-bottom: 1px solid var(--linha);
+    font: 600 11px var(--disp); letter-spacing: .08em; text-transform: uppercase;
+    color: var(--fraco); flex: none;
+  }
+  .topo i { width: 7px; height: 7px; border-radius: 50%; background: var(--fraco); }
+  .topo.ligado i { background: var(--sinal); }
+
+  .lista { flex: 1; overflow-y: auto; padding: 4px 0; }
+
+  .ev {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 7px 12px; border-bottom: 1px solid var(--linha);
+  }
+  /* A bolinha colorida é o que deixa a lista legível de canto de olho:
+     a pessoa reconhece "chegou um sub" pela cor, sem ler. */
+  .ev i { flex: none; width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; }
+  .ev b { font: 600 13px var(--disp); }
+  .ev span { color: var(--fraco); font-size: 12.5px; }
+  .ev time { margin-left: auto; color: var(--fraco); font-size: 11px; flex: none; }
+
+  .ev--follow i   { background: var(--sinal); }
+  .ev--sub i, .ev--presente i { background: var(--roxo); }
+  .ev--bits i     { background: var(--ambar); }
+  .ev--real i     { background: var(--rosa); }
+  .ev--raid i     { background: var(--ambar); }
+
+  .vazio { margin: auto; padding: 24px; text-align: center; color: var(--fraco); font-size: 13px; }
+  .vazio code {
+    display: block; margin-top: 8px; padding: 6px 8px;
+    background: var(--caixa); border: 1px solid var(--linha);
+    border-radius: 6px; font-size: 11.5px; overflow-wrap: anywhere;
+  }
+</style>
+</head>
+<body>
+
+<div class="topo" id="topo"><i></i>Atividades</div>
+<div class="lista" id="lista"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var API = 'https://api.zocahop.com';
+  var chave = (new URLSearchParams(location.search).get('chave') || '').trim();
+  var lista = document.getElementById('lista');
+
+  /* Como cada acontecimento é escrito. O verbo no passado porque a lista
+     é histórico, não aviso: "seguiu" e não "está seguindo". */
+  var COMO = {
+    follow:   function (e) { return [e.quem, 'seguiu você']; },
+    sub:      function (e) { return [e.quem, 'assinou' + (e.quantidade > 1 ? ' por ' + e.quantidade + ' meses' : '')]; },
+    presente: function (e) { return [e.quem, 'presenteou ' + e.quantidade + (e.quantidade > 1 ? ' subs' : ' sub')]; },
+    bits:     function (e) { return [e.quem, 'mandou ' + e.quantidade + ' bits']; },
+    real:     function (e) { return [e.quem, 'doou R$ ' + e.quantidade]; },
+    raid:     function (e) { return [e.quem, 'raidou com ' + e.quantidade + (e.quantidade === 1 ? ' pessoa' : ' pessoas')]; },
+  };
+
+  function faz(seg) {
+    var d = Math.round(Date.now() / 1000) - seg;
+    if (d < 60) return 'agora';
+    if (d < 3600) return Math.round(d / 60) + 'min';
+    if (d < 86400) return Math.round(d / 3600) + 'h';
+    return Math.round(d / 86400) + 'd';
+  }
+
+  function vazio(texto, endereco) {
+    lista.innerHTML = '';
+    var p = document.createElement('div');
+    p.className = 'vazio';
+    p.textContent = texto;
+    if (endereco) {
+      var c = document.createElement('code');
+      c.textContent = endereco;
+      p.appendChild(c);
+    }
+    lista.appendChild(p);
+  }
+
+  var ultimoId = 0;
+
+  function pinta(eventos) {
+    if (!eventos.length) {
+      vazio('Nada ainda. O que acontecer na live aparece aqui.');
+      return;
+    }
+
+    /* Só redesenha quando chegou coisa nova: a leitura acontece a cada
+       poucos segundos, e refazer a lista toda vez faria a rolagem pular
+       no meio da leitura de quem está olhando. */
+    var topo = eventos[0] && eventos[0].id;
+    if (topo === ultimoId) return;
+    ultimoId = topo;
+
+    lista.innerHTML = '';
+    eventos.forEach(function (e) {
+      var como = COMO[e.tipo];
+      if (!como) return;
+      var partes = como(e);
+
+      var linha = document.createElement('div');
+      linha.className = 'ev ev--' + e.tipo;
+
+      var bolinha = document.createElement('i');
+      var quem = document.createElement('b');
+      /* TEXTO DE TERCEIRO É TEXTO: o nome vem da Twitch e nunca vira HTML. */
+      quem.textContent = partes[0] || 'alguém';
+      var oQue = document.createElement('span');
+      oQue.textContent = partes[1];
+      var quando = document.createElement('time');
+      quando.textContent = faz(e.quando);
+
+      linha.appendChild(bolinha);
+      linha.appendChild(quem);
+      linha.appendChild(oQue);
+      linha.appendChild(quando);
+      lista.appendChild(linha);
+    });
+  }
+
+  function ler() {
+    fetch(API + '/estado.php', { headers: { 'X-Chave': chave }, cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        document.getElementById('topo').classList.add('ligado');
+        pinta((d && d.eventos) || []);
+      })
+      .catch(function () {
+        document.getElementById('topo').classList.remove('ligado');
+      });
+  }
+
+  if (!chave) {
+    vazio('Falta a chave do painel no endereço:',
+          location.origin + location.pathname + '?chave=SUA_CHAVE');
+  } else {
+    ler();
+    /* De dez em dez segundos: follow e sub não chegam mais rápido que
+       isso na prática, e uma doca aberta a live inteira não precisa
+       perguntar de segundo em segundo. */
+    setInterval(ler, 10000);
+  }
+})();
+</script>
+</body>
+</html>

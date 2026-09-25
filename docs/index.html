@@ -8394,15 +8394,54 @@ function telaPainel() {
     diz.style.color = 'var(--dourado)';
   });
 
-  /* ----- como abrir o painel ----- */
+  /* ----- as docas ----- */
   const base = location.origin + location.pathname.replace(/[^/]*$/, '');
-  tela.appendChild(h('div', { cls: 'fatia' }, [
-    h('h3', { txt: 'Onde ele fica' }),
-    h('p', { cls: 'd', txt: 'No OBS: Docas → Docas personalizadas do navegador. Cole isto:' }),
-    h('div', { cls: 'campo campo--inteiro' }, [
-      h('input', { type: 'text', value: base + 'painel.html', readonly: 'readonly' }),
-    ]),
-  ]));
+
+  /* TRÊS DOCAS, E NÃO UMA TELA SÓ.
+
+     O OBS deixa arrastar e encaixar cada doca onde a pessoa quiser. O
+     chat quer uma coluna alta; as atividades, outra ao lado; o painel,
+     largura pra caber os botões. Tudo numa página só seria um deles
+     espremido e os outros ilegíveis. */
+  const DOCAS = [
+    ['Painel', 'painel.html?chave=' + (chave || 'SUA_CHAVE'),
+     'os controles: pânico, cenas, raid, contagem'],
+    ['Chat', 'chat-dock.html?chave=' + (chave || 'SUA_CHAVE'),
+     'as mensagens do seu chat, só pra ler'],
+    ['Atividades', 'feed-dock.html?chave=' + (chave || 'SUA_CHAVE'),
+     'quem seguiu, assinou, mandou bits ou raidou'],
+  ];
+
+  const cxDocas = h('div', { cls: 'fatia' }, [
+    h('h3', { txt: 'As docas no OBS' }),
+    h('p', { cls: 'd', txt: 'No OBS: Docas → Docas personalizadas do navegador. '
+      + 'Dê um nome, cole o endereço e clique em Aplicar. Depois é só arrastar cada uma pro lugar.' }),
+  ]);
+
+  DOCAS.forEach(([nome, caminho, oQue]) => {
+    const url = base + caminho;
+    const campo = h('input', { type: 'text', value: url, readonly: 'readonly' });
+    const copiar = h('button', { cls: 'bt', type: 'button', txt: 'Copiar' });
+    copiar.onclick = async () => {
+      try { await navigator.clipboard.writeText(url); copiar.textContent = 'copiado ✓'; }
+      catch (e) { campo.select(); copiar.textContent = 'selecionei'; }
+      setTimeout(() => { copiar.textContent = 'Copiar'; }, 2000);
+    };
+    cxDocas.append(
+      h('div', { cls: 'rot' }, [
+        h('span', { txt: nome }),
+        h('div', { cls: 'campo', style: 'margin:0' }, [campo, copiar]),
+        h('small', { txt: oQue }),
+      ]),
+    );
+  });
+
+  /* A chave está no endereço: quem vê a tela vê a senha do painel. */
+  cxDocas.appendChild(h('p', { cls: 'd', style: 'margin-top:14px;font-size:11.5px',
+    txt: 'Estes endereços levam a sua chave dentro. Trate como senha: não mostre na live '
+       + 'e não mande pra ninguém.' }));
+
+  tela.appendChild(cxDocas);
 }
 
 /* ================== OS RAIDS ==================

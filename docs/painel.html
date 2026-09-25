@@ -1388,18 +1388,22 @@ const MONTAR_CENAS = [
   {
     nome: 'Live começando',
     /* Sem webcam: é a tela de espera, e quase ninguém quer aparecer
-       enquanto arruma as coisas. O chat fica porque quem chegou cedo
-       conversa. */
+       enquanto arruma as coisas. Chat e alerta ficam — quem chegou cedo
+       conversa, e quem seguiu antes de começar tem que ser visto. */
     leva: [
       ['contagem', { x: 0.28, y: 0.38, larg: 0.44, alt: 0.24 }],
+      ['alerta', MEIO_ALERTA],
       ['chat', COLUNA_CHAT],
     ],
   },
   {
     nome: 'Já volto',
-    /* Só o chat. Sem câmera nem alerta: a pessoa saiu da frente, e um
-       alerta tocando pra uma cadeira vazia é pior que nenhum. */
-    leva: [['chat', COLUNA_CHAT]],
+    /* Sem câmera, mas COM alerta: quem seguiu enquanto você estava fora
+       merece aparecer do mesmo jeito, e o alerta é o agradecimento. */
+    leva: [
+      ['alerta', MEIO_ALERTA],
+      ['chat', COLUNA_CHAT],
+    ],
   },
   {
     nome: 'Câmera completa',

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat — ZocaHub</title>
+
+<!--
+  O CHAT COMO PAINEL, E NÃO COMO OVERLAY.
+
+  É o mesmo chat.js que desenha o overlay na live: mesma leitura do IRC,
+  mesmas cores de nick, mesmos emotes. O que muda é o destino — aqui ele
+  vive numa doca do OBS, do lado das cenas, pra VOCÊ ler.
+
+  Por isso é uma página à parte e não uma seção do painel: doca do OBS se
+  arrasta, se redimensiona e se encaixa onde a pessoa quiser. Enfiado
+  dentro do painel, o chat ficaria espremido numa coluna de 300px junto
+  com mais dez seções.
+
+  SÓ LEITURA. Não há campo de escrever: quem responde no chat é você pela
+  Twitch, e um campo aqui viraria mais uma caixa pra confundir — além de
+  exigir guardar um token de escrita numa página que fica aberta o dia
+  inteiro dentro do OBS.
+-->
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="chat.css?v=40">
+<style>
+  :root {
+    color-scheme: dark;
+    /* As MESMAS cores do painel: as duas docas ficam lado a lado no OBS,
+       e duas paletas diferentes ali parecem dois programas. */
+    --fundo:  #0E1411;
+    --caixa:  #161F1A;
+    --linha:  #2A3830;
+    --tinta:  #E4EDE7;
+    --fraco:  #93A69B;
+    --sinal:  #3DD47F;
+    --disp: "Archivo", system-ui, "Segoe UI", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--fundo); color: var(--tinta);
+    font: 14px/1.5 var(--disp);
+    display: flex; flex-direction: column;
+  }
+
+  .topo {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-bottom: 1px solid var(--linha);
+    font: 600 11px var(--disp); letter-spacing: .08em; text-transform: uppercase;
+    color: var(--fraco); flex: none;
+  }
+  .topo i {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--fraco);
+  }
+  .topo.ligado i { background: var(--sinal); }
+  .topo span { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+  /* O chat.js desenha dentro deste; ele rola sozinho. */
+  #chat { flex: 1; overflow: hidden; padding: 6px 4px; }
+
+  .aviso {
+    margin: auto; padding: 24px; text-align: center;
+    color: var(--fraco); font-size: 13px; max-width: 34ch;
+  }
+  .aviso code {
+    display: block; margin-top: 8px; padding: 6px 8px;
+    background: var(--caixa); border: 1px solid var(--linha);
+    border-radius: 6px; font-size: 11.5px; overflow-wrap: anywhere;
+  }
+</style>
+</head>
+<body>
+
+<div class="topo" id="topo"><i></i>Chat<span id="canal"></span></div>
+<div id="chat"></div>
+
+<script src="clock.js?v=40"></script>
+<script src="chat.js?v=40"></script>
+<script>
+(function () {
+  'use strict';
+
+  var API = 'https://api.zocahop.com';
+
+  var naUrl = new URLSearchParams(location.search);
+  var canal = (naUrl.get('canal') || '').replace(/[^A-Za-z0-9_]/g, '').toLowerCase();
+  var chave = (naUrl.get('chave') || '').trim();
+
+  var caixa = document.getElementById('chat');
+
+  function avisa(texto, endereco) {
+    caixa.innerHTML = '';
+    var p = document.createElement('div');
+    p.className = 'aviso';
+    p.textContent = texto;
+    if (endereco) {
+      var c = document.createElement('code');
+      c.textContent = endereco;
+      p.appendChild(c);
+    }
+    caixa.appendChild(p);
+  }
+
+  /* O CANAL PODE VIR DE DOIS JEITOS.
+
+     Colado na URL (?canal=fulano) resolve na hora e não precisa de chave
+     — é o caminho de quem só quer ver um chat. Com a chave do painel, a
+     gente descobre o canal sozinho, que é o que o botão do site usa. */
+  function comeca(oCanal) {
+    document.getElementById('canal').textContent = '#' + oCanal;
+    document.getElementById('topo').classList.add('ligado');
+
+    caixa.innerHTML = '';
+    Chat.mount(caixa, {
+      tipo: 'chat',
+      canal: oCanal,
+      /* Ajustes de leitura, e não de live: aqui a pessoa está LENDO, então
+         fonte menor, mais mensagens na tela e nada de sumir sozinho. */
+      size: 14,
+      cmax: 80,
+      csumir: 0,
+      cnickauto: 1,
+      color: '#E4EDE7',
+      bg: 'transparent',
+    });
+  }
+
+  if (canal) {
+    comeca(canal);
+  } else if (chave) {
+    fetch(API + '/estado.php', { headers: { 'X-Chave': chave } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var c = (d && d.eu && d.eu.canal) || '';
+        if (c) comeca(c);
+        else avisa('Não descobri o seu canal. Ponha ele no endereço:',
+                   location.origin + location.pathname + '?canal=SEU_CANAL');
+      })
+      .catch(function () {
+        avisa('Não consegui falar com o servidor. Ponha o canal no endereço:',
+              location.origin + location.pathname + '?canal=SEU_CANAL');
+      });
+  } else {
+    avisa('Diga de qual canal é o chat, pondo o nome no endereço:',
+          location.origin + location.pathname + '?canal=SEU_CANAL');
+  }
+})();
+</script>
+</body>
+</html>
