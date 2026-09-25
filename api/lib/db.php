@@ -72,6 +72,34 @@ function erro_publico(Throwable $e, string $generico = 'Algo deu errado aqui do 
 }
 
 /**
+ * Anota que esta conta usou este recurso hoje.
+ *
+ * MORA AQUI, E NÃO NUM ARQUIVO PRÓPRIO, POR UM MOTIVO APRENDIDO CARO.
+ *
+ * Ela nasceu no lib/uso.php e cada endereço que media passou a exigir
+ * esse arquivo. Num deploy ele não subiu junto — e um require_once de
+ * arquivo que falta é erro fatal: quatro endereços saíram do ar de uma
+ * vez, em produção, por causa da contabilidade.
+ *
+ * O db.php todo arquivo já carrega, senão não fala com o banco. Aqui não
+ * há arquivo novo pra esquecer de subir, e medir volta a ser incapaz de
+ * derrubar o que está sendo medido — que era o que o comentário do outro
+ * arquivo prometia e o desenho dele não cumpria.
+ *
+ * Os relatórios continuam no lib/uso.php: eles só o admin carrega, e se
+ * aquele arquivo faltar o que quebra é uma tela de administração.
+ */
+function uso_marca(int $uid, string $recurso): void
+{
+    if ($uid <= 0 || $recurso === '') return;
+
+    try {
+        db()->prepare('INSERT IGNORE INTO uso (usuario_id, recurso, dia) VALUES (?, ?, CURDATE())')
+            ->execute([$uid, mb_substr($recurso, 0, 30)]);
+    } catch (Throwable $e) { /* sem o SQL 069: não se mede, e tudo segue */ }
+}
+
+/**
  * Guarda o erro numa tabela, agrupado.
  *
  * O error_log continua sendo escrito acima: ele é a fonte completa. Isto

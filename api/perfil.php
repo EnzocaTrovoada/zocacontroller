@@ -13,7 +13,6 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
-require_once __DIR__ . '/lib/uso.php';
 require_once __DIR__ . '/lib/assinatura.php';
 
 cors();

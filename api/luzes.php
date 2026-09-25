@@ -17,7 +17,6 @@ require_once __DIR__ . '/lib/acesso.php';
 require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/seguranca.php';
 require_once __DIR__ . '/lib/luzes.php';
-require_once __DIR__ . '/lib/uso.php';
 
 /* ---------- a volta de quem foi autorizar ----------
 

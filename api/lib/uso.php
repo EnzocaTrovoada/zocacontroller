@@ -2,10 +2,10 @@
 /**
  * Quem usou o que, por dia.
  *
- * MARCAR É BARATO DE PROPÓSITO: um INSERT IGNORE numa tabela cuja chave
- * primária já é (conta, recurso, dia). Sem SELECT antes, sem contador pra
- * incrementar, sem corrida entre duas requisições. A segunda vez do dia
- * não faz nada, e não fazer nada é rápido.
+ * SÓ OS RELATÓRIOS MORAM AQUI. Quem marca é o uso_marca(), que fica no
+ * db.php — todo arquivo já carrega aquele, então não há arquivo novo pra
+ * esquecer de subir. Este aqui só o admin carrega: faltando ele, o que
+ * quebra é uma tela de administração, e não o produto.
  *
  * PRA SOMAR UM RECURSO: uma linha em USO_RECURSOS e uma chamada a
  * uso_marca() onde ele acontece. O nome vira coluna de relatório pra
@@ -36,23 +36,6 @@ const USO_RECURSOS = [
     'cor'        => 'Cor do site',
     'bot'        => 'Bot no chat',
 ];
-
-/**
- * Anota que esta conta usou este recurso hoje.
- *
- * Falha em silêncio de propósito: medir não pode derrubar o que está
- * sendo medido. Um relatório com um buraco é melhor que um recurso fora
- * do ar porque a tabela de estatística não existia.
- */
-function uso_marca(int $uid, string $recurso): void
-{
-    if ($uid <= 0 || !isset(USO_RECURSOS[$recurso])) return;
-
-    try {
-        db()->prepare('INSERT IGNORE INTO uso (usuario_id, recurso, dia) VALUES (?, ?, CURDATE())')
-            ->execute([$uid, $recurso]);
-    } catch (Throwable $e) { /* sem o SQL 069: não se mede, e tudo segue */ }
-}
 
 /**
  * Quantas contas diferentes usaram cada recurso, nos últimos N dias.

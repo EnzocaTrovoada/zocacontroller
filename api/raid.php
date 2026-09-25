@@ -17,7 +17,6 @@ require_once __DIR__ . '/lib/seguranca.php';
 require_once __DIR__ . '/lib/assinatura.php';
 require_once __DIR__ . '/lib/twitch.php';
 require_once __DIR__ . '/lib/raid-pontos.php';
-require_once __DIR__ . '/lib/uso.php';
 
 cors();
 $quem = exige_painel();
