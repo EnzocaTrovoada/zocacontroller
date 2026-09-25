@@ -15,6 +15,11 @@
   "novidades": [
     {
       "data": "2026-09-25",
+      "titulo": "Todos os comandos numa tela, com os conflitos marcados",
+      "texto": "Em Comandos, a lista inteira: os de fábrica e os seus, com quem pode usar e o que fazem. E o que importa — ela marca os que NUNCA RODAM. Um comando seu com nome de embutido é descartado em silêncio pela fonte do OBS, e não havia nada em lugar nenhum dizendo isso: a pessoa criava \"!cena\", o embutido respondia, e ela achava que tinha escrito errado. São quatro jeitos silenciosos de um comando não rodar, e os quatro aparecem agora."
+    },
+    {
+      "data": "2026-09-25",
       "titulo": "Estorno devolve os dias de raid",
       "texto": "Quem usou dias ganhos raidando como desconto e teve o pagamento estornado perdia as duas coisas: o acesso e os dias, que levou semanas pra juntar. Agora os dias voltam pro saldo — o dinheiro voltou pra pessoa, então o desconto não foi usado."
     },

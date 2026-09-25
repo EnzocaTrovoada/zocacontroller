@@ -1667,6 +1667,24 @@ try {
   }
   .raid-barra i { display: block; height: 100%; background: var(--verde); transition: width .3s ease-out; }
 
+  /* ---------- a extração dos comandos ---------- */
+  .ex-aviso {
+    padding: 12px 14px; margin: 0 0 16px; border-radius: 10px;
+    border: 1px solid var(--dourado); background: var(--caixa2);
+  }
+  .ex-aviso b { display: block; margin-bottom: 6px; color: var(--dourado); font: 600 13.5px var(--disp); }
+  .ex-aviso > div { padding: 3px 0; font-size: 12.5px; }
+  .ex-tab { display: flex; flex-direction: column; }
+  .ex-um {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    padding: 7px 0; border-top: 1px solid var(--linha); font-size: 12.5px;
+  }
+  .ex-um code { flex: 0 0 130px; }
+  .ex-cargo { flex: 0 0 70px; color: var(--apagado); font-size: 11.5px; }
+  .ex-oque { flex: 1 1 220px; color: var(--fraco); overflow-wrap: anywhere; }
+  .ex-fonte { flex: 0 0 70px; text-align: right; color: var(--apagado); font-size: 11px; }
+  .ex-ruim code { color: var(--dourado); }
+
   /* ---------- está tudo funcionando ---------- */
   .sa-lista { display: flex; flex-direction: column; }
   .sa-um {
@@ -4501,6 +4519,7 @@ const TELAS = [
   ['#/bot',       'Bot',           'o bot que responde no seu chat'],
   ['#/painel',    'Painel',        'o que aparece dentro do OBS, e em que ordem'],
   ['#/comandos',  'Comandos',      'o que o chat pode fazer'],
+  ['#/comandos/todos', 'Todos os comandos', 'a lista inteira, com os conflitos marcados'],
   ['#/subathon',  'Subathon',      'cronômetro e o que soma tempo'],
   ['#/mods',      'Moderadores',   'links de quem te ajuda'],
   ['#/tutorial',  'Tutorial',      'como colar no OBS'],
@@ -8490,6 +8509,117 @@ function caixaDosRaids(caixa) {
   recarrega();
 }
 
+/* ================== A EXTRAÇÃO DOS COMANDOS ==================
+
+   QUATRO JEITOS DE UM COMANDO NÃO RODAR, TODOS SILENCIOSOS.
+
+   A ponte, ao montar a lista, descarta sem avisar ninguém:
+
+     if (ACOES[c.nome]) continue;   — nome de embutido tem precedência
+     if (c.ligado === 0) continue;  — desligado no painel
+     if (!passos.length) continue;  — nenhum passo com ação conhecida
+     EMBUTIDOS_OFF                  — o embutido foi desligado
+
+   Nenhum deles aparece em lugar nenhum. A pessoa cria "!cena", digita no
+   chat, o embutido responde, e ela passa a tarde achando que o comando
+   dela está escrito errado.
+
+   Esta tela cruza as duas listas e marca quem perde. Não há endereço novo
+   nem tabela: o servidor já entregava tudo isso, só não estava cruzado. */
+function telaComandosExtrair() {
+  const tela = el('tela');
+  tela.innerHTML = '';
+  tela.appendChild(h('h1', { txt: 'Todos os comandos' }));
+  tela.appendChild(h('p', { cls: 'sub', txt: 'Tudo que o seu chat pode digitar, de onde vem e quem pode usar. '
+    + 'O que está em conflito aparece marcado em cima.' }));
+
+  const cx = h('div', { cls: 'fatia' });
+  tela.appendChild(cx);
+
+  api('/comandos.php').then((d) => {
+    const meus = d.comandos || [];
+    const desligados = new Set(d.embutidos_off || []);
+    const prefixo = d.prefixo || '!';
+
+    const deFabrica = new Set(DE_FABRICA.map((x) => x[0]));
+    const linhas = [];
+
+    DE_FABRICA.forEach(([nome, cargo, oQue]) => {
+      linhas.push({
+        nome, cargo, oQue, fonte: 'de fábrica',
+        problema: desligados.has(nome) ? 'Você desligou este embutido.' : '',
+      });
+    });
+
+    meus.forEach((c) => {
+      const passos = c.passos || [];
+      const ruins = passos.filter((x) => !deFabrica.has(x.acao)).map((x) => x.acao);
+
+      let problema = '';
+      if (deFabrica.has(c.nome)) {
+        problema = 'NUNCA RODA: "' + prefixo + c.nome + '" já é de fábrica, e o de fábrica ganha. Troque o nome.';
+      } else if (c.ligado === 0) {
+        problema = 'Desligado no painel.';
+      } else if (!passos.length) {
+        problema = 'NUNCA RODA: não tem passo nenhum.';
+      } else if (ruins.length === passos.length) {
+        problema = 'NUNCA RODA: nenhum passo tem ação conhecida (' + ruins.join(', ') + ').';
+      } else if (ruins.length) {
+        problema = 'Passos ignorados: ' + ruins.join(', ') + '.';
+      }
+
+      linhas.push({
+        nome: c.nome, cargo: c.quem || 'mod', fonte: 'seu', problema,
+        oQue: passos.map((x) => x.acao + (x.argumento ? ' ' + x.argumento : '')).join(' → ') || '—',
+      });
+    });
+
+    /* Os problemas em cima e destacados: quem abre isto quer saber o que
+       está errado, e não ler quarenta linhas certas até achar. */
+    const ruins = linhas.filter((l) => l.problema);
+    if (ruins.length) {
+      const aviso = h('div', { cls: 'ex-aviso' });
+      aviso.appendChild(h('b', { txt: ruins.length + ' com problema' }));
+      ruins.forEach((l) => {
+        aviso.appendChild(h('div', {}, [
+          h('code', { txt: prefixo + l.nome }),
+          h('span', { cls: 'd', txt: ' ' + l.problema }),
+        ]));
+      });
+      cx.appendChild(aviso);
+    } else {
+      cx.appendChild(h('p', { cls: 'd', style: 'color:var(--verde-forte)',
+        txt: 'Nenhum conflito: todos os seus comandos rodam.' }));
+    }
+
+    const tab = h('div', { cls: 'ex-tab' });
+    linhas.forEach((l) => {
+      tab.appendChild(h('div', { cls: 'ex-um' + (l.problema ? ' ex-ruim' : '') }, [
+        h('code', { txt: prefixo + l.nome }),
+        h('span', { cls: 'ex-cargo', txt: l.cargo }),
+        h('span', { cls: 'ex-oque', txt: l.oQue }),
+        h('span', { cls: 'ex-fonte', txt: l.fonte }),
+      ]));
+    });
+    cx.appendChild(tab);
+
+    /* Pra colar num bloco de notas e comparar depois de mexer. */
+    const texto = linhas.map((l) =>
+      [prefixo + l.nome, l.cargo, l.fonte, l.oQue, l.problema].filter(Boolean).join('\t')
+    ).join('\n');
+
+    const copiar = h('button', { cls: 'bt', type: 'button', txt: 'Copiar tudo' });
+    copiar.onclick = async () => {
+      try { await navigator.clipboard.writeText(texto); copiar.textContent = 'copiado ✓'; }
+      catch (e) { copiar.textContent = 'não consegui copiar'; }
+      setTimeout(() => { copiar.textContent = 'Copiar tudo'; }, 2000);
+    };
+    cx.appendChild(h('p', { style: 'margin-top:14px' }, [copiar]));
+  }).catch((e) => {
+    cx.appendChild(h('p', { cls: 'd', txt: 'Não deu pra ler os comandos: ' + e.message }));
+  });
+}
+
 /* ================== O TTS ==================
 
    O nome de cada voz vive aqui e no api/lib/tts.php. As duas listas têm de
@@ -11226,6 +11356,7 @@ function rota() {
 
   if (p[0] === 'inicio') return telaInicio();
   if (p[0] === 'meu') return telaControlador();
+  if (p[0] === 'comandos' && p[1] === 'todos') return telaComandosExtrair();
   if (p[0] === 'painel') return telaPainel();
   if (p[0] === 'planos') return abrePlanos();
   if (p[0] === 'bot') return telaBot();
