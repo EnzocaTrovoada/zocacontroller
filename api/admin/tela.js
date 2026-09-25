@@ -682,6 +682,93 @@ function blocoEstilo() {
    E o fim da lista vale mais que o começo: recurso com zero é uma decisão
    esperando pra ser tomada. Por isso os zeros aparecem, em vez de sumirem
    por não terem linha no banco. */
+/* ================== O QUE ESTÁ QUEBRADO ==================
+
+   Sem esta tela, o primeiro a saber que algo quebrou é quem escreve
+   reclamando — e aí já são vários, calados, achando que o site é ruim.
+
+   Duas fontes que nunca se encontravam: os erros do servidor, que iam pro
+   log inalcançável, e os erros da ponte, que ficavam guardados por conta
+   e só o dono via. */
+function blocoErros() {
+  const cx = h('div', { cls: 'fatia' });
+  const corpo = h('div');
+  const rever = h('button', { cls: 'bt fraco', type: 'button', txt: 'Ver de novo' });
+
+  const quando = (t) => {
+    const d = new Date(String(t).replace(' ', 'T'));
+    const min = Math.round((Date.now() - d) / 60000);
+    if (min < 60) return 'há ' + Math.max(1, min) + ' min';
+    if (min < 1440) return 'há ' + Math.round(min / 60) + 'h';
+    return 'há ' + Math.round(min / 1440) + ' dias';
+  };
+
+  async function carrega() {
+    rever.disabled = true;
+    corpo.innerHTML = '';
+    let d;
+    try { d = await api('/admin.php?erros=1'); }
+    catch (e) {
+      corpo.appendChild(h('p', { cls: 'd', txt: 'Este servidor ainda não guarda erros. Suba a pasta api e rode o SQL 070.' }));
+      rever.disabled = false;
+      return;
+    }
+
+    const pontes = d.pontes || [];
+    const servidor = d.servidor || [];
+
+    if (!pontes.length && !servidor.length) {
+      corpo.appendChild(h('p', { cls: 'd', style: 'color:var(--verde-forte)',
+        txt: 'Nenhum erro nos últimos dias.' }));
+      rever.disabled = false;
+      return;
+    }
+
+    /* A PONTE PRIMEIRO, E DE PROPÓSITO: erro de ponte é gente que está
+       tentando usar agora e não consegue. Erro de servidor pode ser uma
+       rotina de madrugada que ninguém viu. */
+    if (pontes.length) {
+      corpo.appendChild(h('h4', { cls: 'sub-secao', txt: 'Na fonte do OBS de quem usa' }));
+      pontes.forEach((p) => {
+        corpo.appendChild(h('div', { cls: 'er-um' }, [
+          h('span', { cls: 'er-quantos', txt: String(p.quantas) }),
+          h('div', { style: 'flex:1' }, [
+            h('b', { txt: p.mensagem }),
+            h('small', { txt: p.contas.join(', ')
+              + (p.quantas > p.contas.length ? ' e mais ' + (p.quantas - p.contas.length) : '')
+              + (p.versoes.length ? '  ·  ponte ' + p.versoes.join(', ') : '') }),
+          ]),
+        ]));
+      });
+    }
+
+    if (servidor.length) {
+      corpo.appendChild(h('h4', { cls: 'sub-secao', txt: 'No servidor' }));
+      servidor.forEach((e) => {
+        corpo.appendChild(h('div', { cls: 'er-um' }, [
+          h('span', { cls: 'er-quantos', txt: String(e.quantos) }),
+          h('div', { style: 'flex:1' }, [
+            h('b', { txt: e.mensagem }),
+            h('small', { txt: e.tipo + '  ·  ' + e.onde + '  ·  ' + quando(e.ultimo) }),
+          ]),
+        ]));
+      });
+    }
+    rever.disabled = false;
+  }
+
+  rever.onclick = carrega;
+  cx.append(
+    h('h3', { txt: 'O que está quebrado' }),
+    h('p', { cls: 'd', txt: 'Erros agrupados: o mesmo defeito acontecendo mil vezes é uma linha, '
+      + 'com o número de vezes ao lado. O da ponte é gente tentando usar agora e não conseguindo.' }),
+    corpo,
+    h('p', { style: 'margin:12px 0 0' }, [rever]),
+  );
+  carrega();
+  return cx;
+}
+
 function blocoUso() {
   const cx = h('div', { cls: 'fatia' });
   const lista = h('div');
@@ -748,6 +835,7 @@ function telaAdmin() {
   tela.appendChild(h('h1', { txt: 'Administração' }));
   tela.appendChild(h('p', { cls: 'sub', txt: 'Quem entrou e o que cada um pode. Campo vazio usa o valor do plano.' }));
 
+  tela.appendChild(blocoErros());
   tela.appendChild(blocoUso());
   tela.appendChild(blocoVitrine());
   tela.appendChild(blocoParceiros());

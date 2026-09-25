@@ -92,3 +92,23 @@ body.editando [data-edit-mudado] { outline-color: var(--dourado); }
 .cqa-form input[type=text], .cqa-form input[type=number], .cqa-form select { width: 100%; }
 .cqa-form .marca { display: flex; align-items: center; gap: 8px; }
 .cqa-aviso { font-size: 12.5px; color: var(--dourado); min-height: 1em; }
+
+/* ---------- o que está quebrado ---------- */
+.er-um {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 0; border-top: 1px solid var(--linha);
+}
+.er-um b { display: block; font: 500 13px var(--mono); line-height: 1.4; overflow-wrap: anywhere; }
+.er-um small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--apagado); }
+/* O número à esquerda: quantas vezes, ou quantas contas. É por ele que se
+   decide o que olhar primeiro, então ele vem antes do texto. */
+.er-quantos {
+  flex: none; min-width: 30px; text-align: center;
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--perigo2, var(--caixa2)); color: var(--perigo);
+  font: 700 12px var(--disp);
+}
+.sub-secao {
+  margin: 18px 0 2px; font: 600 11px var(--disp);
+  letter-spacing: .08em; text-transform: uppercase; color: var(--fraco);
+}

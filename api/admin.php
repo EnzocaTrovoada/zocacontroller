@@ -21,6 +21,70 @@ if (!(int) $st->fetchColumn()) {
     json_saida(['erro' => 'Não encontrado.'], 404);
 }
 
+/* ---------- os erros que ninguém viu ----------
+
+   ANTES DO GET GERAL: ele responde e encerra.
+
+   Duas fontes que nunca se encontravam. Os erros de servidor iam pro
+   error_log, inalcançável numa hospedagem compartilhada. Os erros da
+   ponte ficavam guardados por usuário, e só o dono via o dele.
+
+   Juntos aqui, eles respondem a pergunta que não tinha onde ser feita:
+   "está quebrado pra alguém agora?" */
+if (isset($_GET['erros'])) {
+    $doServidor = [];
+    try {
+        $st = db()->query(
+            'SELECT tipo, mensagem, onde, quantos, primeiro, ultimo
+               FROM erros
+              WHERE ultimo > DATE_SUB(NOW(), INTERVAL 30 DAY)
+              ORDER BY ultimo DESC LIMIT 40'
+        );
+        $doServidor = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { /* sem o SQL 070 */ }
+
+    /* Os erros da ponte vivem dentro do JSON de estado, um por conta.
+       Agrupar por mensagem transforma "vinte pessoas reclamando" em uma
+       linha dizendo que vinte pessoas têm o mesmo problema. */
+    $dasPontes = [];
+    try {
+        $st = db()->query(
+            "SELECT e.estado, u.login
+               FROM estado_ao_vivo e JOIN usuarios u ON u.id = e.usuario_id
+              WHERE e.atualizado_em > DATE_SUB(NOW(), INTERVAL 7 DAY)"
+        );
+        foreach ($st->fetchAll() as $l) {
+            $est = json_decode((string) $l['estado'], true) ?: [];
+            $msg = trim((string) ($est['erro'] ?? ''));
+            if ($msg === '') continue;
+
+            $k = md5($msg);
+            if (!isset($dasPontes[$k])) {
+                $dasPontes[$k] = ['mensagem' => mb_substr($msg, 0, 300), 'contas' => [],
+                                  'versoes' => []];
+            }
+            $dasPontes[$k]['contas'][] = (string) $l['login'];
+            $v = (string) ($est['versao'] ?? '');
+            if ($v !== '') $dasPontes[$k]['versoes'][$v] = true;
+        }
+    } catch (Throwable $e) { /* sem tabela */ }
+
+    $pontes = [];
+    foreach ($dasPontes as $d) {
+        $pontes[] = [
+            'mensagem' => $d['mensagem'],
+            'quantas'  => count($d['contas']),
+            /* Cinco nomes bastam pra reconhecer o padrão; a lista inteira
+               vira parede de texto e esconde os outros erros. */
+            'contas'   => array_slice(array_unique($d['contas']), 0, 5),
+            'versoes'  => array_keys($d['versoes']),
+        ];
+    }
+    usort($pontes, static fn($a, $b) => $b['quantas'] <=> $a['quantas']);
+
+    json_saida(['servidor' => $doServidor, 'pontes' => $pontes]);
+}
+
 /* ---------- as estatísticas de uso ----------
 
    ANTES DO GET GERAL, e não depois: o ramo de baixo responde e encerra,
