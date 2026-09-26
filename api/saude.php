@@ -186,6 +186,7 @@ foreach ([
     ['tts_config', 'segurar', 'Segurar a fala antes de sair', '074-tts-segurar.sql'],
     ['tts_fila', 'aprovado', 'Aprovar fala por fala', '074-tts-segurar.sql'],
     ['sons_premio', null, 'Som por prêmio de pontos', '075-som-premio.sql'],
+    ['sorteios', null, 'Sorteio no chat', '076-sorteio.sql'],
     ['raid_lista', null, 'Raids', '063-raids.sql'],
     ['raid_saldo', null, 'Pontos de raid', '063-raids.sql'],
     ['raid_feitos', null, 'Histórico dos raids', '063-raids.sql'],

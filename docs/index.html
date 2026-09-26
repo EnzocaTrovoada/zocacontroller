@@ -7711,6 +7711,7 @@ const DE_FABRICA = [
   ['marcar',    'mod',   'Marca um momento pra achar depois'],
   ['mais',      'mod',   'Sobe o contador — !mais, ou !mais 3'],
   ['menos',     'mod',   'Desce o contador — !menos, ou !menos 2'],
+  ['sorteio',   'mod',   'Sorteia alguém que falou no chat'],
   ['titulo',    'mod',   'Troca o título da live'],
   ['categoria', 'mod',   'Troca a categoria'],
   ['pular',     'mod',   'Pula a música — precisa de Spotify Premium'],
@@ -8174,7 +8175,7 @@ function ajudaVariaveis() {
 /* A versão que a fonte do OBS deveria estar rodando. Quando ela publica
    outra, é cache do OBS — e a tela diz isso em vez de deixar a pessoa
    adivinhando. Sobe junto com o PONTE_VERSAO do ponte.html. */
-const PONTE_VERSAO = '2026-09-26';
+const PONTE_VERSAO = '2026-09-26b';
 
 const resumoTexto = (s) => {
   const t = String(s || '').replace(/\s+/g, ' ').trim();
@@ -9222,6 +9223,39 @@ async function caixaSonsDePremio(cx) {
   }
 }
 
+/* ----- OS ÚLTIMOS SORTEIOS -----
+
+   Não é enfeite: é a prova. Sorteio que só aparece no chat some na rolagem,
+   e aí é a palavra do streamer contra a de quem reclama. Aqui fica quem
+   ganhou, quantos concorriam e quando.
+
+   SÓ APARECE SE EXISTIR. Um cartão vazio pra quem nunca sorteou é uma linha
+   a mais numa tela que já tem muita coisa. */
+async function caixaDosSorteios(cx) {
+  let d;
+  try { d = await api('/sorteio.php'); } catch (e) { return; }
+
+  const lista = (d && d.sorteios) || [];
+  if (!lista.length) return;
+
+  cx.appendChild(h('h3', { txt: 'Últimos sorteios' }));
+  cx.appendChild(h('p', { cls: 'd', txt: 'Quem o ' + '!sorteio' + ' tirou, e entre quantos.' }));
+
+  lista.forEach((s) => {
+    const quando = new Date(s.quando * 1000);
+    cx.appendChild(h('div', { cls: 'er-um' }, [
+      h('span', { cls: 'er-quantos', txt: String(s.quantos) }),
+      h('div', { style: 'flex:1' }, [
+        /* TEXTO DE TERCEIRO É TEXTO: o login veio do chat. */
+        h('b', { txt: s.ganhador }),
+        h('small', { txt: quando.toLocaleString('pt-BR')
+          + (s.quem ? '  ·  tirado por ' + s.quem : '') }),
+      ]),
+    ]));
+  });
+  cx.classList.remove('escondido');
+}
+
 function telaBot() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -9371,6 +9405,10 @@ function telaBot() {
   const cxSons = h('div', { cls: 'fatia' });
   caixaSonsDePremio(cxSons);
   tela.appendChild(cxSons);
+
+  const cxSorteios = h('div', { cls: 'fatia escondido' });
+  caixaDosSorteios(cxSorteios);
+  tela.appendChild(cxSorteios);
 
   tela.appendChild(h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'O que ele falou' }),

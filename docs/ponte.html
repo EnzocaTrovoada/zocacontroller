@@ -187,7 +187,7 @@ if (cfg.hud) el('hud').classList.remove('oculto');
    código velho enquanto o site já mudou — e de fora ninguém vê. A ponte
    conta a versão dela junto do estado, e o painel avisa quando está
    atrasada. Sobe junto com qualquer mudança nesta página. */
-const PONTE_VERSAO = '2026-09-26';
+const PONTE_VERSAO = '2026-09-26b';
 
 const estado = {
   obs: false, chat: false,
@@ -966,6 +966,30 @@ ACOES.menos = {
 };
 
 
+
+/* SORTEIO: A PONTE SÓ ENTREGA A LISTA.
+
+   Quem sorteia é o servidor, e por dois motivos. Sorteio vale prêmio, e
+   número escolhido no navegador é número que se escolhe. E o anúncio sai
+   pelo chat — texto que a ponte mandasse seria texto que qualquer um que
+   abrisse este endereço poderia mandar.
+
+   Aqui é só: quem falou nos últimos trinta minutos, e pronto. */
+ACOES.sorteio = {
+  minimo: 'mod', espera: 5000,
+  async fazer(quem) {
+    if (!cfg.chave) {
+      return recado('O sorteio precisa da chave do ZocaHub no link.', 15000);
+    }
+    try {
+      const d = await apiRele('/sorteio.php', { chatters: quemFalou(), quem });
+      recado(d.ganhador + ' ganhou! (entre ' + d.quantos + ')'
+             + (d.no_chat ? '' : ' — não consegui avisar no chat'), 15000);
+    } catch (e) { recado('Sorteio: ' + e.message, 12000); }
+  },
+};
+
+ACOES.sortear = ACOES.sorteio;
 
 /* RESPONDER NO CHAT: só existe como passo de um comando seu.
 
