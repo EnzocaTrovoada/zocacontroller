@@ -7757,9 +7757,53 @@ async function seLer(canal, jwt) {
   const id = conta && (conta._id || conta.id);
   if (!id) throw new Error('O StreamElements não disse qual é o canal.');
   const lista = await pede('/bot/commands/' + encodeURIComponent(id));
+
+  /* OS TIMERS VÊM JUNTO, E SÓ COM CHAVE.
+
+     Lá eles são "timers"; aqui são os recados — a mesma coisa com outro
+     nome: uma mensagem que o bot solta de tempo em tempo. Sem a JWT a rota
+     recusa, e aí a pessoa traz só os comandos, que é melhor que travar a
+     importação inteira por causa deles. */
+  let timers = [];
+  if (jwt) {
+    try {
+      const t = await pede('/bot/timers/' + encodeURIComponent(id));
+      timers = Array.isArray(t) ? t : ((t && (t.timers || t.docs)) || []);
+    } catch (e) { timers = []; }
+  }
+
   return {
     canal: (conta && (conta.displayName || conta.username)) || canal,
     comandos: Array.isArray(lista) ? lista : ((lista && (lista.commands || lista.docs)) || []),
+    recados: timers.map(seRecado).filter(Boolean),
+  };
+}
+
+/* Um timer de lá vira um recado daqui.
+
+   O intervalo deles é em SEGUNDOS e o nosso é em minutos — trocar isso de
+   lugar daria um recado de 15 segundos onde era pra ser 15 minutos, e o bot
+   viraria spam na primeira live. Menos de um minuto vira um minuto, que é o
+   nosso chão. */
+function seRecado(t) {
+  if (!t) return null;
+
+  /* Mensagem pode vir em 'message' (uma) ou 'messages' (várias), depende de
+     quando o timer foi criado lá. */
+  const msgs = Array.isArray(t.messages) ? t.messages
+    : (t.message ? [t.message] : []);
+  const limpas = msgs.map((m) => String(m || '').trim()).filter(Boolean);
+  if (!limpas.length) return null;
+
+  return {
+    nome: String(t.name || 'Recado').slice(0, 40),
+    mensagens: limpas.slice(0, 8),
+    minutos: Math.max(1, Math.round(Number(t.interval || 900) / 60)),
+    linhas: Math.max(0, Math.min(500, Number(t.chatLines || 0))),
+    /* Eles têm as duas chaves separadas, igual a gente. */
+    no_ar: t.enabledOnline !== false,
+    fora_do_ar: t.enabledOffline === true,
+    ligado: t.enabled !== false,
   };
 }
 
@@ -7983,22 +8027,40 @@ function abreImportar(fonte, aoTerminar) {
   const diz = h('p', { cls: 'd', style: 'min-height:1em;margin:10px 0 0' });
   const lista = h('div', { style: 'margin-top:6px' });
   const substituir = h('input', { type: 'checkbox' });
+
+  /* A chave dos recados nasce MARCADA: quem está trazendo o canal inteiro
+     quer o canal inteiro. Desmarcar é a exceção, e exceção é que dá
+     trabalho — nunca o caso comum. */
+  const chaveRecados = h('input', { type: 'checkbox', checked: 'checked' });
+  const rotuloRecados = h('span', { txt: 'Trazer também os recados' });
+  const linhaRecados = h('label', { cls: 'escondido',
+    style: 'display:flex;gap:6px;align-items:center;font-size:13px' }, [chaveRecados, rotuloRecados]);
+
   const importar = h('button', { cls: 'bt principal', type: 'button', txt: 'Nada marcado', disabled: '' });
   const rodape = h('div', { cls: 'escondido', style: 'flex:0 0 auto;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--linha);padding-top:12px' }, [
     h('label', { style: 'display:flex;gap:6px;align-items:center;font-size:13px' }, [
       substituir, document.createTextNode('trocar os que já existem com o mesmo nome'),
     ]),
+    linhaRecados,
     h('span', { style: 'flex:1' }),
     importar,
   ]);
 
   let lidos = [];
+  let recadosLidos = [];
 
   function conta() {
     const n = lidos.filter((l) => l.marcado && !l.problema).length;
-    importar.textContent = n ? 'Trazer ' + n + (n === 1 ? ' comando' : ' comandos') : 'Nada marcado';
-    importar.disabled = !n;
+    const r = (recadosLidos.length && chaveRecados.checked) ? recadosLidos.length : 0;
+
+    const partes = [];
+    if (n) partes.push(n + (n === 1 ? ' comando' : ' comandos'));
+    if (r) partes.push(r + (r === 1 ? ' recado' : ' recados'));
+
+    importar.textContent = partes.length ? 'Trazer ' + partes.join(' e ') : 'Nada marcado';
+    importar.disabled = !partes.length;
   }
+
 
   function pinta() {
     lista.innerHTML = '';
@@ -8062,8 +8124,28 @@ function abreImportar(fonte, aoTerminar) {
       (fonte.limpar || []).forEach((k) => { if (entradas[k]) entradas[k].value = ''; });
       lidos = (d.comandos || []).map((c) => Object.assign(fonte.converte(c, v), { marcado: true }));
       lidos.forEach((l) => { if (l.problema) l.marcado = false; });
-      diz.textContent = lidos.length
-        ? d.canal + ': ' + lidos.length + (lidos.length === 1 ? ' comando.' : ' comandos.') + ' Desmarque o que não quiser trazer.'
+
+      /* OS RECADOS VIAJAM JUNTO, sem lista própria pra marcar um a um.
+
+         São poucos (o teto é dez) e ninguém tem recado que não quer trazer
+         — diferente de comando, onde metade costuma ser lixo antigo. Uma
+         segunda lista pra marcar seria tela a mais pra decisão que ninguém
+         toma. Vem tudo ou vem nada, e a chave diz qual. */
+      recadosLidos = d.recados || [];
+      linhaRecados.classList.toggle('escondido', !recadosLidos.length);
+      chaveRecados.onchange = conta;
+      if (recadosLidos.length) {
+        rotuloRecados.textContent = 'Trazer também ' + recadosLidos.length
+          + (recadosLidos.length === 1 ? ' recado' : ' recados')
+          + ' (as mensagens automáticas)';
+      }
+
+      const partes = [];
+      if (lidos.length) partes.push(lidos.length + (lidos.length === 1 ? ' comando' : ' comandos'));
+      if (recadosLidos.length) partes.push(recadosLidos.length + (recadosLidos.length === 1 ? ' recado' : ' recados'));
+
+      diz.textContent = partes.length
+        ? d.canal + ': ' + partes.join(' e ') + '. Desmarque o que não quiser trazer.'
         : 'Esse canal não tem comandos próprios no ' + fonte.nome + '.';
       pinta();
     } catch (e) {
@@ -8074,17 +8156,39 @@ function abreImportar(fonte, aoTerminar) {
 
   importar.onclick = async () => {
     const itens = lidos.filter((l) => l.marcado && !l.problema).map((l) => l.item);
-    if (!itens.length) return;
+    const comRecados = recadosLidos.length && chaveRecados.checked;
+    if (!itens.length && !comRecados) return;
     importar.disabled = true;
     importar.textContent = 'trazendo…';
     try {
-      const r = await api('/comandos.php', { method: 'POST', body: JSON.stringify({
-        acao: 'importar', comandos: itens, substituir: substituir.checked,
-      }) });
+      /* Vazio não vai: quem desmarcou tudo e só quer os recados não
+         precisa de uma chamada que não faz nada. */
+      const r = itens.length
+        ? await api('/comandos.php', { method: 'POST', body: JSON.stringify({
+            acao: 'importar', comandos: itens, substituir: substituir.checked,
+          }) })
+        : { criados: [], trocados: [], pulados: [] };
+
+      /* DEPOIS DOS COMANDOS, e numa chamada separada: se os recados
+         falharem, os comandos já entraram — e o contrário também vale.
+         Uma chamada só faria um erro num canto desfazer o outro lado. */
+      let rr = { criados: [], pulados: [] };
+      if (comRecados) {
+        try {
+          rr = await api('/comandos.php', { method: 'POST', body: JSON.stringify({
+            acao: 'importar_recados', recados: recadosLidos,
+          }) });
+        } catch (e) {
+          rr = { criados: [], pulados: [{ nome: 'recados', motivo: e.message }] };
+        }
+      }
+
       const partes = [];
       if ((r.criados || []).length) partes.push(r.criados.length + (r.criados.length === 1 ? ' novo' : ' novos'));
       if ((r.trocados || []).length) partes.push(r.trocados.length + (r.trocados.length === 1 ? ' trocado' : ' trocados'));
-      if ((r.pulados || []).length) partes.push(r.pulados.length + (r.pulados.length === 1 ? ' ficou de fora' : ' ficaram de fora'));
+      if ((rr.criados || []).length) partes.push(rr.criados.length + (rr.criados.length === 1 ? ' recado' : ' recados'));
+      const foraTotal = (r.pulados || []).length + (rr.pulados || []).length;
+      if (foraTotal) partes.push(foraTotal + (foraTotal === 1 ? ' ficou de fora' : ' ficaram de fora'));
       diz.textContent = 'Pronto: ' + (partes.join(', ') || 'nada mudou')
         + '. A fonte do OBS pega em até 5 minutos, ou na hora se você recarregar ela.';
       lidos = [];
@@ -8092,6 +8196,13 @@ function abreImportar(fonte, aoTerminar) {
       (r.pulados || []).forEach((p) => lista.appendChild(h('div', { cls: 'imp-linha pulado' }, [
         h('div', { cls: 'imp-meio' }, [h('b', { txt: '!' + p.nome }), h('span', { cls: 'imp-erro', txt: p.motivo })]),
       ])));
+      /* Recado não leva "!" na frente: ele não é comando, e escrever !nome
+         faria a pessoa procurar um comando que não existe. */
+      (rr.pulados || []).forEach((p) => lista.appendChild(h('div', { cls: 'imp-linha pulado' }, [
+        h('div', { cls: 'imp-meio' }, [h('b', { txt: p.nome }), h('span', { cls: 'imp-erro', txt: p.motivo })]),
+      ])));
+      recadosLidos = [];
+      linhaRecados.classList.add('escondido');
       rodape.classList.add('escondido');
       if (aoTerminar) aoTerminar();
     } catch (e) {

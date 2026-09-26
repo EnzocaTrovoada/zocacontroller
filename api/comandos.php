@@ -575,6 +575,95 @@ if ($acao === 'importar') {
     json_saida(['ok' => true, 'criados' => $criados, 'trocados' => $trocados, 'pulados' => $pulados]);
 }
 
+/* ---------- trazer os recados do StreamElements ----------
+
+   Os timers de lá são os recados daqui: uma mensagem que o bot solta de
+   tempo em tempo. Chegam já convertidos pelo navegador, pelo mesmo motivo
+   dos comandos — a chave de quem importa não passa por este servidor.
+
+   Cada um passa pela MESMA conferência de quem cria um na mão. Importar não
+   é uma porta de entrada mais larga: é a mesma porta, com a fila vindo de
+   outro lugar. */
+if ($acao === 'importar_recados') {
+    $lista = array_slice((array) ($d['recados'] ?? []), 0, 50);
+
+    $criados = [];
+    $pulados = [];
+
+    try {
+        $st = db()->prepare('SELECT nome FROM recados WHERE usuario_id = ?');
+        $st->execute([$uid]);
+        $jaTem = array_map('mb_strtolower', $st->fetchAll(PDO::FETCH_COLUMN));
+
+        $c = db()->prepare('SELECT COUNT(*) FROM recados WHERE usuario_id = ?');
+        $c->execute([$uid]);
+        $quantos = (int) $c->fetchColumn();
+    } catch (Throwable $e) {
+        json_saida(['erro' => 'Falta rodar o SQL 054 no banco.'], 503);
+    }
+
+    $poe = db()->prepare(
+        'INSERT INTO recados (usuario_id, nome, mensagens, minutos, linhas, no_ar, fora_do_ar, ligado)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+
+    foreach ($lista as $item) {
+        if (!is_array($item)) continue;
+
+        $nome = mb_substr(trim((string) ($item['nome'] ?? '')), 0, 40);
+        if ($nome === '') $nome = 'Recado';
+
+        /* NOME REPETIDO NÃO TROCA O QUE JÁ EXISTE. Recado é texto que a
+           pessoa escreveu; sobrescrever apagaria trabalho dela sem pedir. */
+        if (in_array(mb_strtolower($nome), $jaTem, true)) {
+            $pulados[] = ['nome' => $nome, 'motivo' => 'você já tem um recado com esse nome'];
+            continue;
+        }
+
+        if ($quantos >= RECADOS_MAX) {
+            $pulados[] = ['nome' => $nome, 'motivo' => 'chegou no limite de ' . RECADOS_MAX . ' recados'];
+            continue;
+        }
+
+        $mensagens = [];
+        foreach ((array) ($item['mensagens'] ?? []) as $msg) {
+            $msg = mb_substr(trim((string) $msg), 0, 500);
+            if ($msg !== '') $mensagens[] = $msg;
+            if (count($mensagens) >= RECADO_MENSAGENS) break;
+        }
+        if (!$mensagens) {
+            $pulados[] = ['nome' => $nome, 'motivo' => 'esse recado não tem mensagem nenhuma'];
+            continue;
+        }
+
+        $noAr     = empty($item['no_ar']) ? 0 : 1;
+        $foraDoAr = empty($item['fora_do_ar']) ? 0 : 1;
+        /* Lá dá pra desligar nos dois; aqui isso seria um recado que nunca
+           acontece. Vale no ar, que é onde quase todo recado serve. */
+        if (!$noAr && !$foraDoAr) $noAr = 1;
+
+        try {
+            $poe->execute([
+                $uid, $nome,
+                json_encode($mensagens, JSON_UNESCAPED_UNICODE),
+                max(1, min(1440, (int) ($item['minutos'] ?? 15))),
+                max(0, min(500, (int) ($item['linhas'] ?? 3))),
+                $noAr, $foraDoAr,
+                empty($item['ligado']) ? 0 : 1,
+            ]);
+        } catch (PDOException $e) {
+            $pulados[] = ['nome' => $nome, 'motivo' => erro_publico($e, 'não consegui gravar')];
+            continue;
+        }
+
+        $jaTem[] = mb_strtolower($nome);
+        $quantos++;
+        $criados[] = $nome;
+    }
+
+    json_saida(['ok' => true, 'criados' => $criados, 'pulados' => $pulados]);
+}
+
 if ($acao !== 'salvar') {
     json_saida(['erro' => 'Ação desconhecida.'], 400);
 }
