@@ -148,6 +148,28 @@ function blocoCredencialMP() {
       if (d.conta) {
         linhas.push('O token é da conta: ' + (d.conta.apelido || '?')
           + '  (id ' + (d.conta.id || '?') + ', país ' + (d.conta.site || '?') + ')');
+
+        /* O NOME QUE O COMPRADOR VÊ, dito aqui em vez de descoberto pagando.
+
+           O checkout e o recibo mostram o nome da conta do Mercado Pago, e em
+           conta de pessoa física esse nome é o nome civil do dono. Quem vende
+           com marca própria precisa saber disso antes do primeiro cliente ver. */
+        if (d.conta.na_fatura === undefined) {
+          linhas.push('');
+          linhas.push('O seu api/lib/mercadopago.php ESTÁ DESATUALIZADO no servidor:');
+          linhas.push('esta tela deveria mostrar o nome que aparece pro comprador, e o');
+          linhas.push('servidor não mandou. Suba o arquivo de novo.');
+        } else {
+          linhas.push('');
+          linhas.push('O comprador vê: ' + (d.conta.fantasia || d.conta.nome || '?')
+            + (d.conta.fantasia ? '  (nome fantasia)' : '  (nome da conta)'));
+          if (d.conta.razao) linhas.push('Razão social: ' + d.conta.razao);
+          linhas.push('Na fatura do cartão: ' + d.conta.na_fatura);
+          if (!d.conta.fantasia) {
+            linhas.push('  Conta sem nome fantasia mostra o nome do titular no');
+            linhas.push('  checkout e no recibo. Nome fantasia é coisa de conta PJ.');
+          }
+        }
       } else {
         linhas.push('Não consegui saber de quem é o token: ' + (d.users_me_erro || d.users_me_http));
       }
