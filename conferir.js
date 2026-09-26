@@ -316,6 +316,46 @@ async function confereTextos() {
   }
 })();
 
+/* ---------- ramo que nunca é alcançado ----------
+
+   O ramo geral de GET responde e ENCERRA. Qualquer "if (isset($_GET[...]))"
+   escrito depois dele é código que nunca roda — e não dá erro, não dá aviso,
+   não dá nada: a tela só recebe a resposta errada.
+
+   Já aconteceu no tts.php, no raid.php e no checkout.php. Três vezes o mesmo
+   defeito, e as três descobertas na mão, procurando. */
+(function confereRamos() {
+  const arquivos = fs.readdirSync('api').filter((f) => f.endsWith('.php'));
+  const ruins = [];
+
+  arquivos.forEach((nome) => {
+    const linhas = ler('api/' + nome).split('\n');
+
+    /* SÓ o ramo GERAL de GET, e não qualquer menção a REQUEST_METHOD: o
+       "!== 'POST'" dentro de um ramo é guarda de método e encerra só aquele
+       ramo. Confundir os dois enche a saída de alarme falso — e alarme falso
+       é como um conferidor passa a ser ignorado. */
+    const geral = linhas.findIndex((l) =>
+      /^if \(\(\$_SERVER\['REQUEST_METHOD'\][^)]*\)\s*===\s*'GET'\)/.test(l.trim()));
+    if (geral === -1) return;
+
+    linhas.forEach((l, i) => {
+      if (i > geral && /^if \(isset\(\$_GET\[/.test(l.trim())) {
+        ruins.push(nome + ':' + (i + 1) + '  ' + l.trim().slice(0, 50));
+      }
+    });
+  });
+
+  if (ruins.length) {
+    console.log('✗ ramos de GET escritos DEPOIS do ramo geral (nunca rodam):');
+    ruins.forEach((r) => console.log('   ' + r));
+    console.log('   → mova o ramo pra ANTES do "if (REQUEST_METHOD === GET)"');
+    falhas++;
+  } else {
+    console.log('✓ ordem dos ramos: nenhum ramo de GET inalcançável');
+  }
+})();
+
 confereTextos().then(() => {
   console.log(falhas ? `\n${falhas} lista(s) fora de sincronia.` : '\nTudo batendo.');
   process.exit(falhas ? 1 : 0);

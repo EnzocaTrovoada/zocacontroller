@@ -712,18 +712,20 @@ function blocoEstilo() {
    Duas fontes que nunca se encontravam: os erros do servidor, que iam pro
    log inalcançável, e os erros da ponte, que ficavam guardados por conta
    e só o dono via. */
+/* Há quanto tempo, em palavra curta. Duas telas mostram hora de evento e
+   as duas querem "há 20 min", não um carimbo de data. */
+function haQuantoTempo(t) {
+  const d = new Date(String(t).replace(' ', 'T'));
+  const min = Math.round((Date.now() - d) / 60000);
+  if (min < 60) return 'há ' + Math.max(1, min) + ' min';
+  if (min < 1440) return 'há ' + Math.round(min / 60) + 'h';
+  return 'há ' + Math.round(min / 1440) + ' dias';
+}
+
 function blocoErros() {
   const cx = h('div', { cls: 'fatia' });
   const corpo = h('div');
   const rever = h('button', { cls: 'bt fraco', type: 'button', txt: 'Ver de novo' });
-
-  const quando = (t) => {
-    const d = new Date(String(t).replace(' ', 'T'));
-    const min = Math.round((Date.now() - d) / 60000);
-    if (min < 60) return 'há ' + Math.max(1, min) + ' min';
-    if (min < 1440) return 'há ' + Math.round(min / 60) + 'h';
-    return 'há ' + Math.round(min / 1440) + ' dias';
-  };
 
   async function carrega() {
     rever.disabled = true;
@@ -771,7 +773,7 @@ function blocoErros() {
           h('span', { cls: 'er-quantos', txt: String(e.quantos) }),
           h('div', { style: 'flex:1' }, [
             h('b', { txt: e.mensagem }),
-            h('small', { txt: e.tipo + '  ·  ' + e.onde + '  ·  ' + quando(e.ultimo) }),
+            h('small', { txt: e.tipo + '  ·  ' + e.onde + '  ·  ' + haQuantoTempo(e.ultimo) }),
           ]),
         ]));
       });
@@ -807,14 +809,6 @@ function blocoWebhooks() {
   const corpo = h('div');
   const rever = h('button', { cls: 'bt fraco', type: 'button', txt: 'Ver de novo' });
 
-  const quando = (t) => {
-    const d = new Date(String(t).replace(' ', 'T'));
-    const min = Math.round((Date.now() - d) / 60000);
-    if (min < 60) return 'há ' + Math.max(1, min) + ' min';
-    if (min < 1440) return 'há ' + Math.round(min / 60) + 'h';
-    return 'há ' + Math.round(min / 1440) + ' dias';
-  };
-
   function veredito(d) {
     const avisos = d.avisos || [];
     const falhos = avisos.filter((a) => a.erro && !/^tratado|^ignorado/.test(a.erro));
@@ -822,7 +816,7 @@ function blocoWebhooks() {
     if (!avisos.length && d.recusados > 0) {
       return ['ruim', 'O Mercado Pago está mandando, e o site está RECUSANDO.',
         d.recusados + ' aviso(s) barrados na conferência da assinatura, o último '
-        + quando(d.ultima_recusa) + '. Nada foi processado. Quase sempre é a '
+        + haQuantoTempo(d.ultima_recusa) + '. Nada foi processado. Quase sempre é a '
         + 'Assinatura secreta do webhook diferente da que está no config, ou a '
         + 'notificação de assinatura vindo sem assinatura nenhuma.'];
     }
@@ -866,7 +860,7 @@ function blocoWebhooks() {
         h('span', { cls: 'er-quantos', style: ok ? '' : 'color:var(--perigo)', txt: ok ? '✓' : '✗' }),
         h('div', { style: 'flex:1' }, [
           h('b', { txt: a.tipo }),
-          h('small', { txt: quando(a.recebido) + (a.erro ? '  ·  ' + a.erro : '  ·  processado') }),
+          h('small', { txt: haQuantoTempo(a.recebido) + (a.erro ? '  ·  ' + a.erro : '  ·  processado') }),
         ]),
       ]));
     });
@@ -925,7 +919,7 @@ function blocoWebhooks() {
             h('small', { txt: (a.assinatura ? 'assinatura' : 'avulso')
               + (a.vale_ate ? '  ·  vale até ' + String(a.vale_ate).slice(0, 10) : '')
               + (a.dias_raid ? '  ·  ' + a.dias_raid + ' dias de raid' : '')
-              + '  ·  ' + quando(a.quando) }),
+              + '  ·  ' + haQuantoTempo(a.quando) }),
           ]),
         ]);
 
