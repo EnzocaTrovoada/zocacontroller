@@ -85,6 +85,105 @@ if (isset($_GET['erros'])) {
     json_saida(['servidor' => $doServidor, 'pontes' => $pontes]);
 }
 
+/* ---------- o diário dos avisos do Mercado Pago ----------
+
+   ANTES DO GET GERAL: o ramo de baixo responde e encerra.
+
+   EXISTE PORQUE O PAGAMENTO FUNCIONOU E O SITE NÃO FICOU SABENDO.
+
+   Quem pagou teve que clicar em "já paguei e não liberou" pra receber o
+   que comprou. Isso é uma falha silenciosa clássica: o dinheiro entrou, o
+   acesso não saiu, e não havia onde perguntar por quê. A tabela guardava
+   a resposta desde sempre — só que nada nunca a leu.
+
+   O QUE CADA CASO QUER DIZER:
+
+   - lista vazia e nenhuma recusa → o aviso NUNCA CHEGOU. Ou o Mercado Pago
+     não está mandando, ou está mandando pra outro endereço.
+   - lista vazia e recusas no contador → chegou e foi barrado na assinatura
+     do webhook, antes de virar linha. É o caso que eu não conseguia
+     descartar: assinatura pode não ser assinada como o pagamento comum.
+   - linhas com 'erro' → chegou, foi aceito, e falhou processando. O texto
+     do erro diz onde.
+   - linhas sem 'erro' e com processado_em → funcionou, e o problema é
+     outro.
+
+   O PAYLOAD NÃO SAI DAQUI. Ele é texto de terceiro, e o que interessa pra
+   diagnosticar é o tipo e o resultado, não o corpo. */
+if (isset($_GET['webhooks'])) {
+    $avisos = [];
+    try {
+        $st = db()->query(
+            "SELECT tipo, evento_id, recebido_em, processado_em, erro
+               FROM eventos_pagamento
+              WHERE recebido_em > DATE_SUB(NOW(), INTERVAL 30 DAY)
+              ORDER BY id DESC LIMIT 40"
+        );
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $l) {
+            $avisos[] = [
+                'tipo'       => (string) $l['tipo'],
+                /* Só a ponta do id: ele identifica a linha sem despejar
+                   identificador de terceiro inteiro numa tela. */
+                'evento'     => mb_substr((string) $l['evento_id'], 0, 12),
+                'recebido'   => (string) $l['recebido_em'],
+                'processado' => $l['processado_em'] ? true : false,
+                'erro'       => $l['erro'] !== null ? mb_substr((string) $l['erro'], 0, 200) : null,
+            ];
+        }
+    } catch (Throwable $e) { /* sem tabela: a lista vazia já diz o que precisa */ }
+
+    /* As recusas não viram linha no diário — elas morrem antes, no portão
+       da assinatura. Quem as conta é a tabela de erros. */
+    $recusados = 0;
+    $ultimaRecusa = null;
+    try {
+        $st = db()->query(
+            "SELECT quantos, ultimo FROM erros
+              WHERE mensagem LIKE 'webhook recusado%' ORDER BY ultimo DESC LIMIT 5"
+        );
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $l) {
+            $recusados += (int) $l['quantos'];
+            if ($ultimaRecusa === null) $ultimaRecusa = (string) $l['ultimo'];
+        }
+    } catch (Throwable $e) { /* sem o SQL 070 */ }
+
+    /* As assinaturas que deviam renovar. Se uma cobrança entrou e a linha
+       continua 'pendente', o aviso da autorização não chegou. */
+    $assinaturas = [];
+    try {
+        $st = db()->query(
+            "SELECT u.login, a.status, a.renova, a.valido_ate, a.dias_raid,
+                    a.assinatura_externa IS NOT NULL AS tem_assinatura,
+                    a.criado_em
+               FROM assinaturas a JOIN usuarios u ON u.id = a.usuario_id
+              WHERE a.criado_em > DATE_SUB(NOW(), INTERVAL 30 DAY)
+              ORDER BY a.id DESC LIMIT 15"
+        );
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $l) {
+            $assinaturas[] = [
+                'login'      => (string) $l['login'],
+                'status'     => (string) $l['status'],
+                'renova'     => (bool) $l['renova'],
+                'assinatura' => (bool) $l['tem_assinatura'],
+                'vale_ate'   => $l['valido_ate'],
+                'dias_raid'  => (int) $l['dias_raid'],
+                'quando'     => (string) $l['criado_em'],
+            ];
+        }
+    } catch (Throwable $e) { /* sem o SQL 073 */ }
+
+    json_saida([
+        'avisos'        => $avisos,
+        'recusados'     => $recusados,
+        'ultima_recusa' => $ultimaRecusa,
+        'assinaturas'   => $assinaturas,
+        /* A rede existe, mas só vale pendurada. Sem o segredo no config ela
+           está no código e desligada — e uma rede desligada engana mais que
+           rede nenhuma. Só o sim ou não sai daqui, nunca o segredo. */
+        'rede'          => trim((string) (cfg()['cobranca_cron'] ?? '')) !== '',
+    ]);
+}
+
 /* ---------- as estatísticas de uso ----------
 
    ANTES DO GET GERAL, e não depois: o ramo de baixo responde e encerra,

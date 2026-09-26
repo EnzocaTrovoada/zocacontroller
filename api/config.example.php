@@ -74,6 +74,18 @@ return [
        Gere com: php -r "echo bin2hex(random_bytes(16));" */
     'vitrine_cron' => '',
 
+    /* A REDE EMBAIXO DO WEBHOOK DO MERCADO PAGO.
+
+       Aviso de pagamento que se perde deixa quem pagou sem o que comprou,
+       esperando que ela ache o botão de "já paguei e não liberou". Com isto
+       preenchido, o servidor pergunta sozinho ao Mercado Pago o que houve
+       com as cobranças ainda abertas.
+
+       Qualquer texto longo e aleatório serve. No cron da hospedagem, de dez
+       em dez minutos:
+         curl -s "https://api.zocahop.com/checkout.php?cron=SEGREDO" > /dev/null */
+    'cobranca_cron' => '',
+
     // O proprio endereco desta API. A Twitch precisa dele para entregar os
     // avisos do EventSub, e tem que ser https com certificado valido.
     'api_base' => 'https://api.zocahop.com',

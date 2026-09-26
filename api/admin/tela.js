@@ -791,6 +791,132 @@ function blocoErros() {
   return cx;
 }
 
+/* O AVISO DO MERCADO PAGO CHEGOU OU NÃO?
+
+   Nasceu de um pagamento que funcionou e que o site não percebeu: quem
+   comprou teve que clicar em "já paguei e não liberou" pra receber. O
+   dinheiro entrou, o acesso não saiu, e não havia onde perguntar por quê —
+   mesmo com a resposta guardada no banco desde sempre.
+
+   Esta tela dá o VEREDITO, e não a tabela. Saber que existem zero avisos
+   não ajuda ninguém; saber que zero avisos com zero recusas significa "o
+   Mercado Pago não está mandando pra este endereço" é o que diz o que
+   fazer em seguida. */
+function blocoWebhooks() {
+  const cx = h('div', { cls: 'fatia' });
+  const corpo = h('div');
+  const rever = h('button', { cls: 'bt fraco', type: 'button', txt: 'Ver de novo' });
+
+  const quando = (t) => {
+    const d = new Date(String(t).replace(' ', 'T'));
+    const min = Math.round((Date.now() - d) / 60000);
+    if (min < 60) return 'há ' + Math.max(1, min) + ' min';
+    if (min < 1440) return 'há ' + Math.round(min / 60) + 'h';
+    return 'há ' + Math.round(min / 1440) + ' dias';
+  };
+
+  function veredito(d) {
+    const avisos = d.avisos || [];
+    const falhos = avisos.filter((a) => a.erro && !/^tratado|^ignorado/.test(a.erro));
+
+    if (!avisos.length && d.recusados > 0) {
+      return ['ruim', 'O Mercado Pago está mandando, e o site está RECUSANDO.',
+        d.recusados + ' aviso(s) barrados na conferência da assinatura, o último '
+        + quando(d.ultima_recusa) + '. Nada foi processado. Quase sempre é a '
+        + 'Assinatura secreta do webhook diferente da que está no config, ou a '
+        + 'notificação de assinatura vindo sem assinatura nenhuma.'];
+    }
+    if (!avisos.length) {
+      return ['ruim', 'Nenhum aviso chegou.',
+        'O Mercado Pago não está notificando este endereço. Confira em Suas '
+        + 'integrações > sua aplicação > Webhooks se a URL está salva e se os '
+        + 'eventos Pagamentos e Planos e Assinaturas estão marcados.'];
+    }
+    if (falhos.length) {
+      return ['ruim', falhos.length + ' aviso(s) chegaram e falharam processando.',
+        'O texto do erro em cada linha diz onde parou.'];
+    }
+    return ['bom', 'Os avisos estão chegando e sendo processados.',
+      avisos.length + ' nos últimos 30 dias.'];
+  }
+
+  async function carrega() {
+    rever.disabled = true;
+    corpo.innerHTML = '';
+
+    let d;
+    try { d = await api('/admin.php?webhooks=1'); }
+    catch (e) {
+      corpo.appendChild(h('p', { cls: 'd', txt: 'Este servidor ainda não tem esta tela. Suba a pasta api.' }));
+      rever.disabled = false;
+      return;
+    }
+
+    const [cor, titulo, detalhe] = veredito(d);
+    corpo.appendChild(h('p', { style: 'margin:0 0 4px;font-weight:600;color:var('
+      + (cor === 'bom' ? '--verde-forte' : '--perigo') + ')', txt: titulo }));
+    corpo.appendChild(h('p', { cls: 'd', style: 'margin:0 0 12px', txt: detalhe }));
+
+    (d.avisos || []).forEach((a) => {
+      /* 'tratado' e 'ignorado' não são falha: são o webhook dizendo que
+         olhou e não havia o que fazer. Pintar de vermelho faria parecer
+         que o site está quebrado quando está funcionando. */
+      const ok = !a.erro || /^tratado|^ignorado/.test(a.erro);
+      corpo.appendChild(h('div', { cls: 'er-um' }, [
+        h('span', { cls: 'er-quantos', style: ok ? '' : 'color:var(--perigo)', txt: ok ? '✓' : '✗' }),
+        h('div', { style: 'flex:1' }, [
+          h('b', { txt: a.tipo }),
+          h('small', { txt: quando(a.recebido) + (a.erro ? '  ·  ' + a.erro : '  ·  processado') }),
+        ]),
+      ]));
+    });
+
+    /* A rede de segurança, dita mesmo quando os avisos estão chegando: o dia
+       em que pararem é tarde demais pra descobrir que ela nunca foi ligada. */
+    corpo.appendChild(h('p', { cls: 'd', style: 'margin:12px 0 0;color:var('
+      + (d.rede ? '--fraco' : '--perigo') + ')',
+      txt: d.rede
+        ? 'Rede de segurança ligada: o servidor confere sozinho as cobranças abertas.'
+        : 'Rede de segurança DESLIGADA. Preencha cobranca_cron no config e ponha no cron '
+          + 'da hospedagem, de 10 em 10 minutos: checkout.php?cron=SEGREDO' }));
+
+    const ass = d.assinaturas || [];
+    if (ass.length) {
+      corpo.appendChild(h('h4', { cls: 'sub-secao', txt: 'As cobranças abertas' }));
+      ass.forEach((a) => {
+        /* Linha ainda 'pendente' com assinatura criada é o sintoma exato de
+           aviso perdido: o Mercado Pago autorizou e o site não soube. */
+        const preso = a.status === 'pendente';
+        corpo.appendChild(h('div', { cls: 'er-um' }, [
+          h('span', { cls: 'er-quantos', style: preso ? 'color:var(--perigo)' : '',
+            txt: preso ? '!' : '✓' }),
+          h('div', { style: 'flex:1' }, [
+            h('b', { txt: a.login + '  ·  ' + a.status + (a.renova ? '  ·  renova' : '') }),
+            h('small', { txt: (a.assinatura ? 'assinatura' : 'avulso')
+              + (a.vale_ate ? '  ·  vale até ' + String(a.vale_ate).slice(0, 10) : '')
+              + (a.dias_raid ? '  ·  ' + a.dias_raid + ' dias de raid' : '')
+              + '  ·  ' + quando(a.quando) }),
+          ]),
+        ]));
+      });
+    }
+
+    rever.disabled = false;
+  }
+
+  rever.onclick = carrega;
+  cx.append(
+    h('h3', { txt: 'Os avisos do Mercado Pago' }),
+    h('p', { cls: 'd', txt: 'Quando alguém paga, o Mercado Pago avisa aqui e o acesso é liberado '
+      + 'sozinho. Se quem pagou precisou clicar em "já paguei e não liberou", o aviso se perdeu — '
+      + 'e é aqui que dá pra ver onde.' }),
+    corpo,
+    h('p', { style: 'margin:12px 0 0' }, [rever]),
+  );
+  carrega();
+  return cx;
+}
+
 function blocoUso() {
   const cx = h('div', { cls: 'fatia' });
   const lista = h('div');
@@ -858,6 +984,7 @@ function telaAdmin() {
   tela.appendChild(h('p', { cls: 'sub', txt: 'Quem entrou e o que cada um pode. Campo vazio usa o valor do plano.' }));
 
   tela.appendChild(blocoErros());
+  tela.appendChild(blocoWebhooks());
   tela.appendChild(blocoUso());
   tela.appendChild(blocoVitrine());
   tela.appendChild(blocoParceiros());

@@ -49,6 +49,68 @@ if (isset($_GET['publico'])) {
     ]);
 }
 
+/* ---------- a rede embaixo do webhook ----------
+
+   ANTES DO exige_painel(): o cron não tem chave de painel nenhuma.
+
+   POR QUE EXISTE: alguém pagou, o aviso do Mercado Pago não chegou, e o
+   acesso só saiu porque a pessoa clicou em "já paguei e não liberou". Isso
+   aconteceu de verdade, no primeiro pagamento.
+
+   O botão continua valendo, mas ele exige que quem pagou saiba que o botão
+   existe, esteja com paciência e o encontre. Quem não encontrar vai achar
+   que pagou e foi roubado — e vai pedir estorno pelo banco, que tira o
+   acesso, custa taxa e queima a conta no Mercado Pago.
+
+   Entrega de webhook falha: é assim em qualquer provedor. Depender de uma
+   entrega só pra liberar o que já foi pago é o erro de desenho, e não o
+   webhook perdido. Aqui o servidor pergunta sozinho, de tempos em tempos,
+   o que o Mercado Pago sabe das cobranças que ainda estão abertas.
+
+   A pergunta é sempre PRO MERCADO PAGO. Nada aqui confia em banco nosso
+   pra decidir quem pagou.
+
+   No cron da hospedagem, de dez em dez minutos:
+     curl -s "https://api.zocahop.com/checkout.php?cron=SEGREDO" > /dev/null */
+if (isset($_GET['cron'])) {
+    $esperado = (string) (cfg()['cobranca_cron'] ?? '');
+    if ($esperado === '' || !hash_equals($esperado, (string) $_GET['cron'])) {
+        /* 404 e não 403: quem chuta o segredo não merece saber que acertou
+           o endereço. */
+        json_saida(['erro' => 'Não encontrado.'], 404);
+    }
+    if (!$mp['ligado']) json_saida(['ok' => true, 'pulou' => 'cobrança desligada']);
+
+    /* Só quem tem cobrança aberta. Varrer todo mundo seria uma consulta ao
+       Mercado Pago por conta do site, de dez em dez minutos, pra nada. */
+    $donos = [];
+    try {
+        $st = db()->query(
+            "SELECT DISTINCT usuario_id FROM assinaturas
+              WHERE status = 'pendente'
+                AND criado_em > DATE_SUB(NOW(), INTERVAL 30 DAY)
+              LIMIT 200"
+        );
+        $donos = $st->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) { /* sem tabela: não há o que conferir */ }
+
+    $liberados = 0;
+    $olhados = 0;
+    foreach ($donos as $uid) {
+        try {
+            $r = mp_reconciliar((int) $uid);
+            $olhados += (int) $r['pendentes'];
+            $liberados += (int) $r['liberados'];
+        } catch (Throwable $e) {
+            /* Uma conta que deu erro não pode parar as outras: a próxima da
+               fila pode ser justamente quem está sem o que pagou. */
+            erro_anota($e);
+        }
+    }
+
+    json_saida(['ok' => true, 'contas' => count($donos), 'cobrancas' => $olhados, 'liberados' => $liberados]);
+}
+
 $quem = exige_painel();
 trava('checkout', 10, 300);
 
