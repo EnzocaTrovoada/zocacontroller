@@ -84,7 +84,11 @@ if (!$assinaturas) {
     saude_poe($itens, 'Avisos da Twitch', 'parado',
         'Nenhum ligado. Sem eles, follow, raid e resgate de pontos não chegam aqui.', '#/meu');
 } elseif (!$temEvento('channel.channel_points_custom_reward_redemption.add')
-       || !$temEvento('channel.raid')) {
+       || !$temEvento('channel.raid')
+       /* O raid que CHEGA é assinatura própria, e nasceu depois de todo
+          mundo. Quem não religar não vê alerta de raid recebido — e não
+          teria como desconfiar do motivo. */
+       || !$temEvento('channel.raid#recebido')) {
     saude_poe($itens, 'Avisos da Twitch', 'aviso',
         'Os avisos novos não foram ligados. Ligar de novo cria só o que falta.', '#/meu');
 } else {

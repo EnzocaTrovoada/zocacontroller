@@ -16,7 +16,7 @@
   /* Quem dispara o quê. O tipo vem do servidor; sub1/2/3 são os três tiers. */
   var LIGA = {
     sub1: 'asub', sub2: 'asub', sub3: 'asub',
-    follow: 'afollow', bits: 'abits', real: 'areal',
+    follow: 'afollow', bits: 'abits', real: 'areal', raid: 'araid',
   };
 
   /* O evento de mentira de cada aviso, pro botão "Testar".
@@ -28,6 +28,7 @@
     follow:  { id: 9003, tipo: 'follow', quem: 'novato',    quantidade: 1 },
     bits:    { id: 9004, tipo: 'bits',   quem: 'beltrano',  quantidade: 500 },
     real:    { id: 9005, tipo: 'real',   quem: 'madrinha',  quantidade: 25  },
+    raid:    { id: 9006, tipo: 'raid',   quem: 'padrinho',  quantidade: 42  },
   };
 
   function textoDe(cfg, e) {
@@ -35,6 +36,7 @@
         e.tipo === 'follow' ? cfg.atfollow
       : e.tipo === 'bits'   ? cfg.atbits
       : e.tipo === 'real'   ? cfg.atreal
+      : e.tipo === 'raid'   ? cfg.atraid
       : (e.presente ? cfg.atpres : cfg.atsub);
 
     return String(molde || '')

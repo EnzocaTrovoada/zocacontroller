@@ -48,7 +48,9 @@ if ($tipoMsg !== '') {
        desconhecido" e sumiria calado — o recurso não funcionaria e não
        haveria erro nenhum pra seguir. */
     $cond = (array) ($dados['subscription']['condition'] ?? []);
-    $twitch_id = (string) ($cond['broadcaster_user_id'] ?? $cond['from_broadcaster_user_id'] ?? '');
+    $twitch_id = (string) ($cond['broadcaster_user_id']
+        ?? $cond['from_broadcaster_user_id']
+        ?? $cond['to_broadcaster_user_id'] ?? '');
     $st = db()->prepare('SELECT id, es_segredo FROM usuarios WHERE twitch_user_id = ? LIMIT 1');
     $st->execute([$twitch_id]);
     $u = $st->fetch();
@@ -186,10 +188,42 @@ function tratar_evento(int $usuario_id, string $tipo, array $ev): void
        botão do painel. De quebra, raid dado direto pela Twitch, sem passar
        pelo nosso painel, conta igual. */
     if ($tipo === 'channel.raid') {
+        /* O MESMO NOME DE EVENTO CHEGA PELOS DOIS LADOS.
+
+           Quem separa é o próprio corpo: se o destino do raid somos nós, foi
+           um raid que CHEGOU; senão, foi um que saímos dando. Os dois valem
+           coisas diferentes — o que sai vale pontos, o que chega vale um
+           alerta na tela e tempo de subathon.
+
+           Comparar pelo id da Twitch, e não pelo login: login muda. */
+        $meuTwitch = '';
+        try {
+            $st2 = db()->prepare('SELECT twitch_user_id FROM usuarios WHERE id = ?');
+            $st2->execute([$usuario_id]);
+            $meuTwitch = (string) $st2->fetchColumn();
+        } catch (Throwable $e) { /* sem isso, trata como raid que saiu */ }
+
+        $destino = (string) ($ev['to_broadcaster_user_id'] ?? '');
+
+        if ($meuTwitch !== '' && $destino === $meuTwitch) {
+            require_once __DIR__ . '/lib/subathon-somar.php';
+            subathon_somar($usuario_id, [
+                'tipo'  => 'raid',
+                /* A chave impede o evento em dobro quando a Twitch reenvia.
+                   Quem raidou mais o instante: a mesma pessoa pode raidar
+                   você de novo no dia seguinte, e aí é outro evento. */
+                'chave' => 'raid:' . ($ev['from_broadcaster_user_id'] ?? '') . ':' . date('YmdHi'),
+                'quem'  => (string) ($ev['from_broadcaster_user_name'] ?? 'alguém'),
+                'quantidade' => max(0, (int) ($ev['viewers'] ?? 0)),
+                'detalhe' => 'chegou com ' . max(0, (int) ($ev['viewers'] ?? 0)),
+            ]);
+            return;
+        }
+
         require_once __DIR__ . '/lib/raid-pontos.php';
         raid_registrar(
             $usuario_id,
-            (string) ($ev['to_broadcaster_user_id'] ?? ''),
+            $destino,
             (string) ($ev['to_broadcaster_user_login'] ?? ''),
             (int) ($ev['viewers'] ?? 0)
         );
@@ -231,6 +265,15 @@ const TIPOS = [
     // O raid que de fato aconteceu, com quantos espectadores foram. Não
     // pede escopo, e é a única prova que o cliente não tem como forjar.
     'channel.raid'   => ['versao' => '1', 'de' => true],
+    /* O RAID QUE CHEGA É OUTRA ASSINATURA, e não o mesmo evento visto de
+       outro ângulo: a condição é to_broadcaster_user_id.
+
+       A chave daqui leva um sufixo porque este array é indexado pelo nome
+       da Twitch, e 'channel.raid' já está ocupado pelo raid que sai. O
+       sufixo também separa as duas linhas no banco, onde o par
+       (usuario, tipo) é único — e mantém intactas as assinaturas de quem
+       já tinha o raid enviado ligado. */
+    'channel.raid#recebido' => ['versao' => '1', 'tw' => 'channel.raid', 'para' => true],
 ];
 
 $bid = tw_broadcaster_id($quem['usuario_id']);
@@ -302,13 +345,17 @@ foreach (TIPOS as $tipo => $spec) {
        Assinar com a chave errada daria um evento que nunca chega. */
     $condicao = !empty($spec['de'])
         ? ['from_broadcaster_user_id' => $bid]
-        : ['broadcaster_user_id' => $bid];
+        : (!empty($spec['para'])
+            ? ['to_broadcaster_user_id' => $bid]
+            : ['broadcaster_user_id' => $bid]);
     if (!empty($spec['moderador'])) {
         $condicao['moderator_user_id'] = $bid;
     }
 
     [$http, $r] = tw_helix_app('POST', '/eventsub/subscriptions', [], [
-        'type'      => $tipo,
+        /* O nome que vai pra Twitch, que pode diferir da nossa chave quando
+           o mesmo evento é assinado por dois lados. */
+        'type'      => $spec['tw'] ?? $tipo,
         'version'   => $spec['versao'],
         'condition' => $condicao,
         'transport' => ['method' => 'webhook', 'callback' => $callback, 'secret' => $segredo],

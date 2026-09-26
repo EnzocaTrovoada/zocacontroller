@@ -2524,6 +2524,7 @@ function padraoDe(tipo) {
       atfollow: '{quem} seguiu!',
       atbits:   '{quem} mandou {quanto} bits!',
       atreal:   '{quem} doou R$ {quanto}!',
+      atraid:   '{quem} chegou com {quanto}!',
       atempo: 6, aentre: 'descer', anome: '#7CE07C', asom: 'sino', asomid: 0, avol: 60,
     });
   }
@@ -2690,6 +2691,7 @@ const GRUPOS = [
       se: (c) => c.tipo === 'alerta' && c.abits,
       dica: 'numa live cheia, avisar a partir de 1 bit vira alerta em cima de alerta' },
     { k: 'areal',   l: 'Aparecer quando alguém doar', c: 'chave', se: so('alerta') },
+    { k: 'araid',   l: 'Aparecer quando alguém raidar você', c: 'chave', se: so('alerta') },
     { k: 'arealmin', l: 'Ignorar abaixo de', c: 'faixa', min: 1, max: 500,
       u: (n) => n === 1 ? ' real' : ' reais',
       se: (c) => c.tipo === 'alerta' && c.areal },
@@ -2790,6 +2792,7 @@ const GRUPOS = [
     { k: 'atfollow', l: 'Alguém começou a seguir', c: 'frase', ensaio: 'follow', se: (c) => !!c.afollow },
     { k: 'atbits',   l: 'Alguém mandou bits', c: 'frase', ensaio: 'bits', se: (c) => !!c.abits },
     { k: 'atreal',   l: 'Alguém doou', c: 'frase', ensaio: 'real', se: (c) => !!c.areal },
+    { k: 'atraid',   l: 'Raid chegou', c: 'frase', ensaio: 'raid', se: (c) => !!c.araid },
     { k: 'anome', l: 'Cor do nome da pessoa', c: 'cor',
       dica: 'o nome sai nesta cor e o resto da frase na cor da letra, lá embaixo' },
   ] },
