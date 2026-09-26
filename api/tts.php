@@ -203,6 +203,16 @@ if (isset($d['fala'])) {
 
     if ($acao === 'segurar') {
         $liga = !empty($d['valor']) ? 1 : 0;
+
+        /* O GATE É SÓ PRA LIGAR, e não pro ramo inteiro.
+
+           Soltar e descartar têm que funcionar sempre: quem era Pro e venceu
+           pode ter fala segurada na fila, e trancar a tela deixaria essas
+           mensagens presas sem nenhum jeito de tirar. Desligar também passa,
+           pelo mesmo motivo. */
+        if ($liga && !limite($uid, 'tts', 1)) {
+            json_saida(['erro' => 'Segurar a fala vem junto com o TTS, que é do Pro.'], 402);
+        }
         try {
             db()->prepare(
                 'INSERT INTO tts_config (usuario_id, segurar) VALUES (?, ?)
