@@ -76,14 +76,10 @@ return [
 
     /* A REDE EMBAIXO DO WEBHOOK DO MERCADO PAGO.
 
-       Aviso de pagamento que se perde deixa quem pagou sem o que comprou,
-       esperando que ela ache o botão de "já paguei e não liberou". Com isto
-       preenchido, o servidor pergunta sozinho ao Mercado Pago o que houve
-       com as cobranças ainda abertas.
-
-       Qualquer texto longo e aleatório serve. No cron da hospedagem, de dez
-       em dez minutos:
-         curl -s "https://api.zocahop.com/checkout.php?cron=SEGREDO" > /dev/null */
+       PODE DEIXAR VAZIO. Vazio, o servidor sorteia um segredo sozinho e
+       mostra o comando pronto do cron na tela "Os avisos do Mercado Pago".
+       Preencher aqui só serve pra fixar um segredo seu — e aí o comando da
+       tela passa a usar este valor. */
     'cobranca_cron' => '',
 
     // O proprio endereco desta API. A Twitch precisa dele para entregar os

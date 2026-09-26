@@ -70,10 +70,10 @@ if (isset($_GET['publico'])) {
    A pergunta é sempre PRO MERCADO PAGO. Nada aqui confia em banco nosso
    pra decidir quem pagou.
 
-   No cron da hospedagem, de dez em dez minutos:
-     curl -s "https://api.zocahop.com/checkout.php?cron=SEGREDO" > /dev/null */
+   O comando pronto, com o segredo já dentro, fica na tela "Os avisos do
+   Mercado Pago". Não há segredo pra inventar: ele é sorteado. */
 if (isset($_GET['cron'])) {
-    $esperado = (string) (cfg()['cobranca_cron'] ?? '');
+    $esperado = cron_segredo('cobranca');
     if ($esperado === '' || !hash_equals($esperado, (string) $_GET['cron'])) {
         /* 404 e não 403: quem chuta o segredo não merece saber que acertou
            o endereço. */

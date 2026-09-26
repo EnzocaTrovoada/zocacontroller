@@ -111,6 +111,50 @@ function uso_marca(int $uid, string $recurso): void
  * derrubar a resposta por causa da contabilidade seria trocar um defeito
  * escondido por um defeito na cara — pior negócio.
  */
+/**
+ * O segredo de um cron, sorteado em vez de inventado.
+ *
+ * O primeiro desenho pedia pra escrever um segredo no config e repetir ele
+ * no comando do cron. Isso é pedir pra pessoa nomear uma coisa que o
+ * computador sabe sortear melhor — e ainda herdar o risco de escolher algo
+ * curto, ou de errar a cópia entre os dois lugares e descobrir semanas
+ * depois, quando a rede não pegou ninguém.
+ *
+ * O config ainda ganha, quando preenchido: quem já tem um segredo lá não
+ * pode ver o comando mudar debaixo dele. Sem nada no config, sorteia uma
+ * vez e guarda — e a tela mostra o comando pronto pra copiar.
+ */
+function cron_segredo(string $nome): string
+{
+    $doConfig = trim((string) (cfg()[$nome . '_cron'] ?? ''));
+    if ($doConfig !== '') return $doConfig;
+
+    $chave = 'cron_' . $nome;
+
+    try {
+        $st = db()->prepare('SELECT valor FROM ajustes WHERE chave = ?');
+        $st->execute([$chave]);
+        $achado = trim((string) $st->fetchColumn());
+        if ($achado !== '') return $achado;
+
+        $novo = bin2hex(random_bytes(16));
+        db()->prepare(
+            'INSERT INTO ajustes (chave, valor) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE valor = valor'
+        )->execute([$chave, $novo]);
+
+        /* Reler em vez de confiar no que acabei de escrever: com duas
+           chamadas ao mesmo tempo, uma perde a corrida, e o valor que vale
+           é o que ficou no banco — não o que esta chamada sorteou. */
+        $st->execute([$chave]);
+        return trim((string) $st->fetchColumn()) ?: $novo;
+    } catch (Throwable $e) {
+        /* Sem a tabela não há segredo, e sem segredo o cron responde 404.
+           Devolver vazio é o que mantém o portão fechado. */
+        return '';
+    }
+}
+
 function erro_anota(Throwable $e): void
 {
     try {

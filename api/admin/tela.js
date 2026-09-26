@@ -871,14 +871,43 @@ function blocoWebhooks() {
       ]));
     });
 
-    /* A rede de segurança, dita mesmo quando os avisos estão chegando: o dia
-       em que pararem é tarde demais pra descobrir que ela nunca foi ligada. */
-    corpo.appendChild(h('p', { cls: 'd', style: 'margin:12px 0 0;color:var('
-      + (d.rede ? '--fraco' : '--perigo') + ')',
-      txt: d.rede
-        ? 'Rede de segurança ligada: o servidor confere sozinho as cobranças abertas.'
-        : 'Rede de segurança DESLIGADA. Preencha cobranca_cron no config e ponha no cron '
-          + 'da hospedagem, de 10 em 10 minutos: checkout.php?cron=SEGREDO' }));
+    /* A REDE DE SEGURANÇA, COM O COMANDO PRONTO.
+
+       Dita mesmo quando os avisos estão chegando: o dia em que pararem é
+       tarde demais pra descobrir que ela nunca foi pendurada.
+
+       O comando vem inteiro do servidor, com o segredo já dentro. Pedir pra
+       inventar um segredo e repetir em dois lugares era transferir pra
+       pessoa um trabalho que o computador faz melhor — e um erro de cópia
+       só apareceria semanas depois, quando a rede não pegasse ninguém. */
+    if (d.rede_comando) {
+      corpo.appendChild(h('h4', { cls: 'sub-secao', txt: 'A rede embaixo dos avisos' }));
+      corpo.appendChild(h('p', { cls: 'd', style: 'margin:0 0 6px',
+        txt: 'Ponha esta linha no cron da hospedagem, de 10 em 10 minutos. Com ela, '
+          + 'quem pagou recebe sozinho mesmo quando o aviso se perde.' }));
+
+      const linha = h('pre', { cls: 'diag', style: 'margin:0;white-space:pre-wrap;overflow-wrap:anywhere',
+        txt: d.rede_comando });
+      const copiar = h('button', { cls: 'bt fraco', type: 'button', txt: 'Copiar o comando' });
+      copiar.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(d.rede_comando);
+          copiar.textContent = 'copiado';
+          setTimeout(() => { copiar.textContent = 'Copiar o comando'; }, 2000);
+        } catch (e) {
+          /* Sem permissão de área de transferência o texto continua na tela
+             pra selecionar — o botão é atalho, e não o único caminho. */
+          copiar.textContent = 'selecione e copie acima';
+        }
+      };
+      corpo.appendChild(linha);
+      corpo.appendChild(h('p', { style: 'margin:6px 0 0' }, [copiar]));
+    } else {
+      corpo.appendChild(h('p', { cls: 'd', style: 'margin:12px 0 0;color:var(--perigo)',
+        txt: 'Rede de segurança DESLIGADA e não consegui ligar: falta a tabela '
+          + 'ajustes (SQL 031). Sem ela, quem pagar e não receber o aviso depende '
+          + 'de achar o botão "já paguei e não liberou".' }));
+    }
 
     const ass = d.assinaturas || [];
     if (ass.length) {

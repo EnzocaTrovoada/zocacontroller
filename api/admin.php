@@ -177,10 +177,16 @@ if (isset($_GET['webhooks'])) {
         'recusados'     => $recusados,
         'ultima_recusa' => $ultimaRecusa,
         'assinaturas'   => $assinaturas,
-        /* A rede existe, mas só vale pendurada. Sem o segredo no config ela
-           está no código e desligada — e uma rede desligada engana mais que
-           rede nenhuma. Só o sim ou não sai daqui, nunca o segredo. */
-        'rede'          => trim((string) (cfg()['cobranca_cron'] ?? '')) !== '',
+        /* A LINHA PRONTA, E NÃO UM MODELO PRA PREENCHER.
+
+           O segredo é sorteado pelo servidor, então dá pra entregar o comando
+           inteiro: copiar e colar no cron da hospedagem, sem escolher nome
+           nem repetir valor em dois lugares.
+
+           Só admin chega aqui — o portão está no topo do arquivo. */
+        'rede'          => cron_segredo('cobranca') !== '',
+        'rede_comando'  => 'curl -s "' . api_base() . '/checkout.php?cron='
+                           . rawurlencode(cron_segredo('cobranca')) . '" > /dev/null',
     ]);
 }
 
