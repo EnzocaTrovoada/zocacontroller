@@ -122,6 +122,17 @@ function mp_referencia_usuario(string $referencia): ?int
  * linha existir — e o aviso não teria onde encaixar.
  */
 /** Quantos dias de Pro uma pessoa pode gastar por mês. */
+/* O NOME QUE APARECE NA FATURA DO CARTÃO.
+
+   Treze caracteres, teto do Mercado Pago. Sem isto a fatura mostra o nome
+   da conta — o nome de pessoa física do dono — e quem pagou não reconhece
+   a compra trinta dias depois. Fatura irreconhecível é a causa número um de
+   contestação no cartão, que tira o acesso, custa taxa e queima a conta.
+
+   Só vale na cobrança avulsa: /preapproval não tem este campo, e a
+   assinatura usa o que estiver configurado na conta do Mercado Pago. */
+const MP_NA_FATURA = 'ZOCAHUB';
+
 const MP_DIAS_MES = 5;
 
 /**
@@ -219,6 +230,7 @@ function mp_criar_cobranca(int $usuario_id, array $plano, string $codigo = ''): 
             'unit_price'  => $valor,
         ]],
         'external_reference' => $ref,
+        'statement_descriptor' => mb_substr(MP_NA_FATURA, 0, 13),
         'notification_url'   => api_base() . '/webhook-mercadopago.php',
         /* Boleto fica de fora: ele demora dias pra compensar e o streamer
            que pagou fica sem o recurso achando que o site quebrou. */
@@ -732,11 +744,22 @@ function mp_diagnostico(): array
         [$http, $eu] = mp_http('GET', '/users/me');
         $r['users_me_http'] = $http;
         if ($http === 200 && is_array($eu)) {
+            /* O NOME QUE O COMPRADOR VÊ, dito em voz alta.
+
+               O checkout e o recibo mostram o nome da conta, e numa conta de
+               pessoa física esse nome é o nome civil do dono. Dá pra descobrir
+               isso pagando e olhando o recibo, ou dá pra ler aqui. Conta de
+               empresa tem nome fantasia, e ele ganha do nome civil. */
+            $emp = is_array($eu['company'] ?? null) ? $eu['company'] : [];
             $r['conta'] = [
                 'id'       => $eu['id'] ?? null,
                 'apelido'  => $eu['nickname'] ?? null,
                 'site'     => $eu['site_id'] ?? null,
                 'tipo'     => $eu['user_type'] ?? null,
+                'nome'     => trim((string) ($eu['first_name'] ?? '') . ' ' . (string) ($eu['last_name'] ?? '')),
+                'fantasia' => $emp['brand_name'] ?? null,
+                'razao'    => $emp['corporate_name'] ?? null,
+                'na_fatura' => MP_NA_FATURA . '  (avulso; a assinatura usa o da conta)',
             ];
         } else {
             $r['users_me_erro'] = is_array($eu) ? ($eu['message'] ?? json_encode($eu)) : 'sem corpo';
