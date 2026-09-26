@@ -37,6 +37,10 @@
       : e.tipo === 'bits'   ? cfg.atbits
       : e.tipo === 'real'   ? cfg.atreal
       : e.tipo === 'raid'   ? cfg.atraid
+      /* SEM MOLDE CONFIGURÁVEL AQUI, de propósito: o nome do prêmio já foi
+         escrito pelo streamer, na Twitch. Um campo pra reescrever o que ele
+         acabou de escrever seria pedir a mesma coisa duas vezes. */
+      : e.tipo === 'som'    ? ('{quem} resgatou ' + (e.detalhe || 'um prêmio'))
       : (e.presente ? cfg.atpres : cfg.atsub);
 
     return String(molde || '')
@@ -47,6 +51,12 @@
   /* Passa no filtro? O mínimo de bits e de reais existe pra live movimentada
      não virar um alerta a cada dois segundos por causa de 1 bit. */
   function passa(cfg, e) {
+    /* SOM DE PRÊMIO NÃO TEM CHAVE PRÓPRIA: amarrar um som ao prêmio JÁ é
+       dizer que ele deve tocar. Uma segunda chave seria um segundo lugar
+       pra desligar a mesma coisa — e o lugar esquecido é sempre o que
+       alguém encontra. Pra parar, é só soltar a amarra. */
+    if (e.tipo === 'som') return true;
+
     var chave = LIGA[e.tipo];
     if (!chave || !cfg[chave]) return false;
     if (e.id >= 9000) return true;            /* ensaio: o mínimo não vale */
@@ -134,6 +144,47 @@
       try { somProprio.load(); } catch (e) {}
     }
 
+    /* OS SONS AMARRADOS A PRÊMIO.
+
+       O alerta tem um som só, o mesmo pra sub, follow e doação. Um prêmio de
+       pontos é outra coisa: quem resgata "buzina" espera a buzina, e não o
+       sino de sempre.
+
+       Cada um carregado uma vez e guardado: buscar o arquivo no instante do
+       resgate atrasaria o som em relação ao que aparece na tela — e um som
+       atrasado num resgate parece o site travando. */
+    var sonsPremio = {};
+
+    function poeSonsDePremio(mapa) {
+      if (!mapa) return;
+      for (var id in mapa) {
+        if (!Object.prototype.hasOwnProperty.call(mapa, id)) continue;
+        if (sonsPremio[id]) continue;
+        try {
+          var a = new Audio(mapa[id]);
+          a.preload = 'auto';
+          a.load();
+          sonsPremio[id] = a;
+        } catch (e) {}
+      }
+    }
+
+    /* Toca o som daquele id, no volume do alerta. Devolve se tocou: quando
+       não tocou, quem chamou usa o som comum em vez de ficar mudo. */
+    function tocaSomDePremio(id) {
+      var a = sonsPremio[String(id)];
+      if (!a || cfg.avol <= 0) return false;
+      try {
+        a.volume = Math.max(0, Math.min(1, cfg.avol / 100));
+        /* Volta pro começo: dois resgates seguidos do mesmo prêmio, sem
+           isto, o segundo não tocaria — o áudio já estava no fim. */
+        a.currentTime = 0;
+        var p = a.play();
+        if (p && p.catch) p.catch(function () {});
+        return true;
+      } catch (e) { return false; }
+    }
+
     function tocaSom() {
       if (cfg.asom === 'nenhum' || cfg.avol <= 0) return;
 
@@ -217,7 +268,10 @@
       void root.offsetWidth;
       root.classList.add('al--entrando');
 
-      tocaSom();
+      /* O SOM DO PRÊMIO GANHA DO SOM COMUM — e quando ele não tocou (o
+         arquivo não carregou, o volume está em zero), cai no comum em vez
+         de deixar o alerta mudo. */
+      if (!(e.tipo === 'som' && tocaSomDePremio(e.quantidade))) tocaSom();
       trocaEm = Date.now() + cfg.atempo * 1000;
     }
 
@@ -270,6 +324,7 @@
       config: function () { return cfg; },
       feed: eventos,          /* o overlay.html entrega os eventos por aqui */
       som: poeSom,            /* e o endereço do som próprio, por aqui */
+      sons: poeSonsDePremio,  /* e os sons amarrados a prêmio, por aqui */
       ouvir: tocaSom,         /* o botão "Ouvir" do editor */
       /* UM DE CADA VEZ, QUANDO PEDIREM UM.
          Sem o "qual", passam todos em fila — e pra conferir uma frase que

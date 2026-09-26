@@ -9117,6 +9117,111 @@ async function leBot() {
   }
 }
 
+/* ----- SOM POR PRÊMIO DE PONTOS -----
+
+   A biblioteca de sons existia e só tocava no alerta: um som pra tudo que
+   acontecia. Aqui cada prêmio do canal aponta pro seu, e o chat resgata
+   "buzina" pra buzina tocar — sem o streamer encostar em nada.
+
+   Mora na aba Bot, junto do TTS, porque a pergunta é a mesma: o que um
+   resgate de pontos faz acontecer. */
+async function caixaSonsDePremio(cx) {
+  cx.innerHTML = '';
+  cx.appendChild(h('h3', { txt: 'Sons por prêmio de pontos' }));
+  cx.appendChild(h('p', { cls: 'd',
+    txt: 'Escolha um prêmio do seu canal e o som que ele toca. Precisa do overlay de alertas no OBS — '
+       + 'é ele que toca.' }));
+
+  const diz = h('p', { cls: 'd', style: 'margin:0 0 10px' });
+  const corpo = h('div');
+  cx.appendChild(diz);
+  cx.appendChild(corpo);
+
+  let sons = [];
+  let premios = [];
+  let amarras = [];
+
+  function desenha() {
+    corpo.innerHTML = '';
+
+    if (!premios.length) return;
+
+    premios.forEach((p) => {
+      const atual = amarras.find((a) => a.premio_id === p.id);
+
+      const sel = h('select');
+      const vazio = document.createElement('option');
+      vazio.value = '';
+      vazio.textContent = '— nenhum —';
+      sel.appendChild(vazio);
+
+      sons.forEach((s) => {
+        const o = document.createElement('option');
+        o.value = String(s.id);
+        /* TEXTO DE TERCEIRO É TEXTO: o nome do som foi digitado por alguém
+           e vai por textContent, nunca por innerHTML. */
+        o.textContent = s.nome;
+        sel.appendChild(o);
+      });
+      sel.value = atual ? String(atual.som_id) : '';
+
+      sel.onchange = async () => {
+        sel.disabled = true;
+        try {
+          const r = await api('/som.php', { method: 'POST', body: JSON.stringify({
+            acao: 'amarrar', premio_id: p.id, premio_nome: p.nome, som_id: parseInt(sel.value || '0', 10),
+          }) });
+          amarras = r.premios || [];
+          recado(sel.value ? 'Som amarrado ao prêmio.' : 'Som solto do prêmio.', 'bom');
+        } catch (e) {
+          recado(e.message, 'ruim');
+          sel.value = atual ? String(atual.som_id) : '';
+        }
+        sel.disabled = false;
+      };
+
+      const linha = h('div', { cls: 'rot', style: 'margin:0 0 10px' }, [
+        h('label', { txt: p.nome }),
+        sel,
+      ]);
+      corpo.appendChild(linha);
+    });
+  }
+
+  try {
+    /* As duas leituras juntas: uma tela que aparece pela metade enquanto a
+       outra carrega pisca, e piscar parece defeito. */
+    const [dSons, dPremios] = await Promise.all([
+      api('/som.php'),
+      api('/tts.php?premios=1'),
+    ]);
+
+    sons = dSons.sons || [];
+    amarras = dSons.premios || [];
+    premios = dPremios.premios || [];
+
+    if (dPremios.erro) {
+      diz.textContent = dPremios.erro;
+      diz.style.color = 'var(--dourado)';
+      return;
+    }
+    if (!premios.length) {
+      diz.textContent = 'Você ainda não tem prêmio de pontos no canal. Crie um na Twitch e ele aparece aqui.';
+      return;
+    }
+    if (!sons.length) {
+      diz.textContent = 'Você ainda não mandou nenhum som. Mande um no editor do overlay de alertas.';
+      return;
+    }
+
+    diz.textContent = '';
+    desenha();
+  } catch (e) {
+    diz.textContent = e.message;
+    diz.style.color = 'var(--perigo)';
+  }
+}
+
 function telaBot() {
   const tela = el('tela');
   tela.innerHTML = '';
@@ -9262,6 +9367,10 @@ function telaBot() {
   const cxRaid = h('div', { cls: 'fatia' });
   caixaDosRaids(cxRaid);
   tela.appendChild(cxRaid);
+
+  const cxSons = h('div', { cls: 'fatia' });
+  caixaSonsDePremio(cxSons);
+  tela.appendChild(cxSons);
 
   tela.appendChild(h('div', { cls: 'fatia' }, [
     h('h3', { txt: 'O que ele falou' }),

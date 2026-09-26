@@ -121,13 +121,86 @@ function som_lista(int $uid): array
     ], $st->fetchAll());
 }
 
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
-    json_saida(['sons' => som_lista($uid), 'max' => SONS_MAX, 'bytes' => SONS_BYTES]);
+/** As amarras de prêmio → som desta conta. Sem o SQL 075, lista vazia. */
+function som_premios(int $uid): array
+{
+    try {
+        $st = db()->prepare(
+            'SELECT p.premio_id, p.som_id, p.premio_nome, s.nome AS som_nome
+               FROM sons_premio p LEFT JOIN sons s ON s.id = p.som_id
+              WHERE p.usuario_id = ? ORDER BY p.criado_em'
+        );
+        $st->execute([$uid]);
+        return array_map(fn($l) => [
+            'premio_id'   => (string) $l['premio_id'],
+            'premio_nome' => (string) $l['premio_nome'],
+            'som_id'      => (int) $l['som_id'],
+            'som_nome'    => (string) ($l['som_nome'] ?? ''),
+        ], $st->fetchAll());
+    } catch (Throwable $e) {
+        return [];
+    }
 }
 
-/* ---------- apagar ---------- */
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+    json_saida([
+        'sons'    => som_lista($uid),
+        'premios' => som_premios($uid),
+        'max'     => SONS_MAX,
+        'bytes'   => SONS_BYTES,
+    ]);
+}
+
+/* ---------- apagar, e amarrar som a prêmio ---------- */
 if (empty($_FILES['som'])) {
     $d = corpo_json();
+
+    /* AMARRAR UM SOM A UM PRÊMIO DE PONTOS.
+
+       A biblioteca de sons existia e só tocava no alerta — um som pra tudo
+       que acontecia. Aqui cada prêmio aponta pro seu: o chat resgata
+       "buzina" e a buzina toca, sem o streamer encostar em nada.
+
+       Um prêmio toca UM som. Permitir vários faria um resgate disparar
+       três áudios ao mesmo tempo, o que na live é barulho e não recurso. */
+    if (($d['acao'] ?? '') === 'amarrar') {
+        $premio = mb_substr(trim((string) ($d['premio_id'] ?? '')), 0, 64);
+        $somId  = (int) ($d['som_id'] ?? 0);
+        $nome   = mb_substr(trim((string) ($d['premio_nome'] ?? '')), 0, 80);
+
+        if ($premio === '') json_saida(['erro' => 'Qual prêmio?'], 400);
+
+        /* SOLTAR É AMARRAR NO NADA: uma ação só pros dois sentidos evita
+           uma segunda ação que faz quase a mesma coisa. */
+        if ($somId <= 0) {
+            try {
+                db()->prepare('DELETE FROM sons_premio WHERE usuario_id = ? AND premio_id = ?')
+                    ->execute([$uid, $premio]);
+            } catch (Throwable $e) {
+                json_saida(['erro' => 'Falta rodar o 075-som-premio.sql neste servidor.'], 503);
+            }
+            json_saida(['ok' => true, 'premios' => som_premios($uid)]);
+        }
+
+        /* O SOM TEM QUE SER SEU, OU DA CASA. Sem esta conferência, um id
+           chutado amarraria o áudio de outra conta — e ele tocaria na live
+           de quem nem sabe que ele existe. */
+        $ok = db()->prepare('SELECT 1 FROM sons WHERE id = ? AND (usuario_id = ? OR da_casa = 1) LIMIT 1');
+        $ok->execute([$somId, $uid]);
+        if (!$ok->fetchColumn()) json_saida(['erro' => 'Esse som não é seu.'], 404);
+
+        try {
+            db()->prepare(
+                'INSERT INTO sons_premio (usuario_id, premio_id, som_id, premio_nome)
+                 VALUES (?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE som_id = VALUES(som_id), premio_nome = VALUES(premio_nome)'
+            )->execute([$uid, $premio, $somId, $nome]);
+        } catch (Throwable $e) {
+            json_saida(['erro' => 'Falta rodar o 075-som-premio.sql neste servidor.'], 503);
+        }
+
+        json_saida(['ok' => true, 'premios' => som_premios($uid)]);
+    }
     if (($d['acao'] ?? '') !== 'apagar') json_saida(['erro' => 'Ação desconhecida.'], 400);
 
     /* Só o dono apaga. Som da casa não entra aqui: ele não é de quem

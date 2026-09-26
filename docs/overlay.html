@@ -13,12 +13,12 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="clock.css?v=41">
-<link rel="stylesheet" href="chat.css?v=41">
-<link rel="stylesheet" href="musica.css?v=41">
-<link rel="stylesheet" href="alerta.css?v=41">
-<link rel="stylesheet" href="tts.css?v=41">
-<link rel="stylesheet" href="spd.css?v=41">
+<link rel="stylesheet" href="clock.css?v=42">
+<link rel="stylesheet" href="chat.css?v=42">
+<link rel="stylesheet" href="musica.css?v=42">
+<link rel="stylesheet" href="alerta.css?v=42">
+<link rel="stylesheet" href="tts.css?v=42">
+<link rel="stylesheet" href="spd.css?v=42">
 <style>
   /* Fundo transparente: é isso que faz a Fonte de Navegador do OBS mostrar
      só o overlay, sem retângulo preto por trás. */
@@ -32,12 +32,12 @@
 
 <div id="overlay"></div>
 
-<script src="clock.js?v=41"></script>
-<script src="chat.js?v=41"></script>
-<script src="musica.js?v=41"></script>
-<script src="alerta.js?v=41"></script>
-<script src="tts.js?v=41"></script>
-<script src="spd.js?v=41"></script>
+<script src="clock.js?v=42"></script>
+<script src="chat.js?v=42"></script>
+<script src="musica.js?v=42"></script>
+<script src="alerta.js?v=42"></script>
+<script src="tts.js?v=42"></script>
+<script src="spd.js?v=42"></script>
 <script>
 (function () {
   'use strict';
@@ -445,6 +445,7 @@
            toca um de cada vez e só o que ainda não passou. */
 
         if (j.som !== undefined && relogio && relogio.som) relogio.som(j.som);
+        if (j.sons && relogio && relogio.sons) relogio.sons(j.sons);
         if (j.eventos && relogio && relogio.feed) relogio.feed(j.eventos);
         /* A fila do TTS vem na mesma leitura da config: não vale abrir um
            segundo canal só pra isso. */

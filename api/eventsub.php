@@ -132,6 +132,31 @@ function tratar_evento(int $usuario_id, string $tipo, array $ev): void
         $cfg = tts_config($usuario_id);
         $premio = (string) ($ev['reward']['id'] ?? '');
 
+        /* O SOM VEM ANTES E NÃO ATRAPALHA A FALA: são dois recursos
+           diferentes no mesmo resgate, e um prêmio pode ter os dois. */
+        try {
+            $sp = db()->prepare('SELECT som_id FROM sons_premio WHERE usuario_id = ? AND premio_id = ?');
+            $sp->execute([$usuario_id, $premio]);
+            $somId = (int) $sp->fetchColumn();
+
+            if ($somId > 0) {
+                require_once __DIR__ . '/lib/eventos.php';
+                evento_registrar($usuario_id, [
+                    'tipo'  => 'som',
+                    /* O id do resgate é único na Twitch, então reentrega vira
+                       o mesmo evento e não um som tocando duas vezes. */
+                    'chave' => 'som:' . ($ev['id'] ?? ($premio . ':' . time())),
+                    'quem'  => (string) ($ev['user_name'] ?? ''),
+                    /* O id do som cabe em 'quantidade', que é inteiro, e o
+                       nome do prêmio em 'detalhe'. Duas colunas que já
+                       existiam valem mais que uma tabela nova pra dois
+                       campos. */
+                    'quantidade' => $somId,
+                    'detalhe'    => (string) ($ev['reward']['title'] ?? ''),
+                ]);
+            }
+        } catch (Throwable $e) { /* sem o SQL 075: ninguém amarrou som nenhum */ }
+
         /* Prêmio amarrado: só ele fala. Sem amarrar, nenhum fala — senão
            qualquer resgate do canal viraria voz, inclusive os que a pessoa
            criou pra outra coisa. */

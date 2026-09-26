@@ -231,6 +231,28 @@ if ($perfil['tipo'] === 'alerta' && !empty($config['asomid'])) {
          . '&id=' . (int) $config['asomid'];
 }
 
+/* OS SONS AMARRADOS A PRÊMIO, cada um com o endereço pronto.
+
+   O alerta tem UM som pra tudo. Quando o chat resgata um prêmio que tem som
+   próprio, o evento traz o id — e a fonte precisa do endereço daquele id
+   sem saber onde a API mora nem ter a chave do painel.
+
+   São poucos e só os amarrados: mandar a biblioteca inteira faria a fonte
+   baixar áudio que nunca vai tocar. */
+$sonsPremio = null;
+if ($perfil['tipo'] === 'alerta') {
+    try {
+        $st3 = db()->prepare(
+            'SELECT DISTINCT som_id FROM sons_premio WHERE usuario_id = ? LIMIT 30'
+        );
+        $st3->execute([(int) $perfil['usuario_id']]);
+        foreach ($st3->fetchAll(PDO::FETCH_COLUMN) as $sid) {
+            $sonsPremio[(string) (int) $sid] = api_base()
+                . '/som.php?a=tocar&k=' . rawurlencode($chave) . '&id=' . (int) $sid;
+        }
+    } catch (Throwable $e) { /* sem o SQL 075: ninguém amarrou som nenhum */ }
+}
+
 /* O ÍCONE DE CADA TRECHO, COM O ENDEREÇO PRONTO.
 
    Montado aqui pelo mesmo motivo do som: quem sabe onde a API mora é o
@@ -304,5 +326,6 @@ json_saida([
     'contagem' => $contagem,
     'musica'   => $musica,
     'som'      => $som,
+    'sons'     => $sonsPremio,
     'recursos' => $recursos,
 ]);

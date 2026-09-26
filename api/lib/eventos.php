@@ -72,6 +72,9 @@ function evento_recentes(int $usuario_id, int $quantos = 12): array
             'quem'       => $e['quem'] ?: 'alguém',
             'quantidade' => (int) $e['quantidade'],
             'presente'   => $ehPresente,
+            /* O nome do prêmio, pro alerta de som poder dizer o que foi
+               resgatado. Sai como texto e a fonte escreve com textContent. */
+            'detalhe'    => (string) ($e['detalhe'] ?? ''),
             'quando'     => (int) $e['quando'],
         ];
         if (count($saida) >= $quantos) break;
