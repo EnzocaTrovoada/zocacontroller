@@ -10,21 +10,10 @@
  */
 require_once __DIR__ . '/lib/db.php';
 require_once __DIR__ . '/lib/acesso.php';
+require_once __DIR__ . '/lib/fila.php';
 
 cors();
 $quem = quem_chama();
-
-/** O que existe. O que não está aqui não existe — negar por padrão. */
-const PERMITIDAS = [
-    'mute'   => 'audio',
-    'som'    => 'audio',   // muta uma fonte específica pelo nome
-    'panico' => 'audio',
-    'cena'   => 'cena',
-    'fonte'  => 'cena',   // o olhinho: mostra e esconde na transmissão
-    'camera' => 'cena',
-    'replay' => 'cena',
-    'marcar' => 'cena',   // anota o momento para achar no VOD depois
-];
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     trava('comando', 40, 60);
@@ -42,16 +31,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         if ($quem['tipo'] !== 'painel') {
             json_saida(['erro' => 'Só o painel pede isso.'], 403);
         }
-        db()->prepare(
-            'INSERT INTO fila_comandos (usuario_id, acao, argumento, quem) VALUES (?, ?, NULL, ?)'
-        )->execute([$quem['usuario_id'], 'recarregar', $quem['nome']]);
+        fila_poe((int) $quem['usuario_id'], 'recarregar', null, (string) $quem['nome']);
         json_saida(['ok' => true]);
     }
 
-    if (!isset(PERMITIDAS[$acao])) {
+    if (!isset(FILA_PERMITIDAS[$acao])) {
         json_saida(['erro' => 'Esse comando não existe.'], 400);
     }
-    exige_poder($quem, PERMITIDAS[$acao]);
+    exige_poder($quem, FILA_PERMITIDAS[$acao]);
 
     // Sair do pânico é do dono da voz, nunca de quem está assistindo.
     if ($acao === 'panico' && ($d['sair'] ?? false) && $quem['tipo'] !== 'painel') {
@@ -62,9 +49,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         json_saida(['erro' => 'Argumento longo demais.'], 400);
     }
 
-    db()->prepare(
-        'INSERT INTO fila_comandos (usuario_id, acao, argumento, quem) VALUES (?, ?, ?, ?)'
-    )->execute([$quem['usuario_id'], $acao, $arg ?: null, $quem['nome']]);
+    fila_poe((int) $quem['usuario_id'], $acao, $arg, (string) $quem['nome']);
 
     json_saida(['ok' => true]);
 }

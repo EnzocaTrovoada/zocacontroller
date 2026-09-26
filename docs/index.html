@@ -8566,6 +8566,146 @@ function telaPainel() {
        + 'e não mande pra ninguém.' }));
 
   tela.appendChild(cxDocas);
+
+  const cxBotoes = h('div', { cls: 'fatia' });
+  caixaDosBotoes(cxBotoes);
+  tela.appendChild(cxBotoes);
+}
+
+/* ----- O BOTÃO FÍSICO -----
+
+   Stream Deck, teclado de macro, qualquer coisa que consiga abrir um
+   endereço. No Stream Deck é a ação "Website" com a opção de fazer o pedido
+   em segundo plano — senão ele abre o navegador na frente da live.
+
+   O TOKEN NÃO É A CHAVE DO PAINEL, e a tela explica por quê: o Stream Deck
+   manda um GET pelado, sem cabeçalho, então o segredo tem que ir no
+   endereço — e endereço vaza em print, em histórico e em registro de
+   servidor. Este token só deixa pedido na fila. */
+function caixaDosBotoes(cx) {
+  cx.innerHTML = '';
+  cx.appendChild(h('h3', { txt: 'Botão físico' }));
+  cx.appendChild(h('p', { cls: 'd',
+    txt: 'Pra Stream Deck e teclado de macro. Crie um token, e cada ação vira um endereço '
+       + 'pra colar num botão. No Stream Deck use a ação "Website" marcando pra abrir em '
+       + 'segundo plano, senão o navegador pula na frente da live.' }));
+
+  const corpo = h('div');
+  const diz = h('p', { cls: 'd', style: 'margin:8px 0 0' });
+  cx.appendChild(corpo);
+  cx.appendChild(diz);
+
+  let dados = null;
+
+  /* O que cada ação faz, em palavra de gente. O servidor manda só os nomes
+     curtos, e "fonte" sozinho não diz nada pra quem vai montar o botão. */
+  const EXPLICA = {
+    panico: ['Pânico', 'corta som e vídeo na hora'],
+    mute:   ['Microfone', 'liga e desliga'],
+    som:    ['Mutar uma fonte', 'ponha o nome dela em arg'],
+    cena:   ['Trocar de cena', 'ponha o nome da cena em arg'],
+    fonte:  ['Mostrar/esconder fonte', 'ponha o nome dela em arg'],
+    camera: ['Troca por ausência', 'liga e desliga'],
+    replay: ['Salvar o replay', 'os últimos segundos'],
+    marcar: ['Marcar momento', 'pra achar no VOD depois'],
+  };
+
+  function enderecos(token) {
+    const cxU = h('div', { style: 'margin-top:10px' });
+
+    (dados.acoes || []).forEach((a) => {
+      const q = EXPLICA[a] || [a, ''];
+      const url = dados.base + '?t=' + encodeURIComponent(token) + '&a=' + encodeURIComponent(a);
+
+      const campo = h('input', { cls: 'campo', type: 'text', readonly: 'readonly', value: url,
+        style: 'width:100%;font-size:12px' });
+      campo.onclick = () => campo.select();
+
+      const copiar = h('button', { cls: 'bt mini', type: 'button', txt: 'Copiar' });
+      copiar.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(url);
+          copiar.textContent = 'copiado';
+          setTimeout(() => { copiar.textContent = 'Copiar'; }, 1500);
+        } catch (e) { campo.select(); copiar.textContent = 'selecione e copie'; }
+      };
+
+      cxU.appendChild(h('div', { cls: 'rot', style: 'margin:0 0 8px' }, [
+        h('label', { txt: q[0] + (q[1] ? ' — ' + q[1] : '') }),
+        h('div', { cls: 'fila' }, [campo, copiar]),
+      ]));
+    });
+
+    return cxU;
+  }
+
+  function pinta() {
+    corpo.innerHTML = '';
+    const lista = (dados && dados.botoes) || [];
+
+    lista.forEach((b) => {
+      const tirar = h('button', { cls: 'bt mini perigo', type: 'button', txt: 'Revogar' });
+      tirar.onclick = async () => {
+        if (!confirm('Revogar "' + b.nome + '"? Os botões que usam este token param de funcionar na hora.')) return;
+        tirar.disabled = true;
+        try {
+          dados.botoes = (await api('/botao.php', { method: 'POST',
+            body: JSON.stringify({ acao: 'revogar', id: b.id }) })).botoes;
+          recado('Token revogado.', 'bom');
+          pinta();
+        } catch (e) { recado(e.message, 'ruim'); tirar.disabled = false; }
+      };
+
+      corpo.appendChild(h('div', { cls: 'er-um' }, [
+        h('span', { cls: 'er-quantos', txt: String(b.usos) }),
+        h('div', { style: 'flex:1' }, [
+          h('b', { txt: b.nome + (b.panico ? '  ·  pode sair do pânico' : '') }),
+          h('small', { txt: b.usado
+            ? 'usado ' + new Date(b.usado * 1000).toLocaleString('pt-BR')
+            : 'nunca usado' }),
+        ]),
+        tirar,
+      ]));
+    });
+
+    const nome = h('input', { cls: 'campo', type: 'text', placeholder: 'Stream Deck da mesa' });
+    const panico = h('input', { type: 'checkbox' });
+
+    const criar = h('button', { cls: 'bt mini', type: 'button', txt: 'Criar um token' });
+    criar.onclick = async () => {
+      criar.disabled = true;
+      try {
+        const r = await api('/botao.php', { method: 'POST', body: JSON.stringify({
+          acao: 'criar', nome: nome.value.trim(), panico: panico.checked ? 1 : 0,
+        }) });
+        dados.botoes = r.botoes;
+        pinta();
+
+        /* O TOKEN APARECE UMA VEZ SÓ, e a tela diz isso antes de a pessoa
+           fechar. O banco guarda só o hash — nem eu consigo mostrar de novo. */
+        corpo.appendChild(h('p', { cls: 'd', style: 'margin:14px 0 0;color:var(--dourado)',
+          txt: 'Copie agora. Este token não aparece de novo — o servidor guarda só o '
+             + 'resumo dele. Se perder, revogue e crie outro.' }));
+        corpo.appendChild(enderecos(r.token));
+      } catch (e) { recado(e.message, 'ruim'); }
+      criar.disabled = false;
+    };
+
+    corpo.appendChild(h('div', { cls: 'rot', style: 'margin:12px 0 0' }, [
+      h('label', { txt: 'Nome deste token' }),
+      nome,
+    ]));
+    corpo.appendChild(h('label', { cls: 'chave', style: 'margin:0 0 10px' }, [
+      panico, h('span', { txt: 'Este token pode sair do pânico' }),
+    ]));
+    corpo.appendChild(h('p', { cls: 'd', style: 'margin:-6px 0 10px',
+      txt: 'Deixe desmarcado se não for usar. O pânico existe pra proteger de quem não '
+         + 'deveria mandar, e um token no endereço é justamente o que pode vazar num print.' }));
+    corpo.appendChild(criar);
+  }
+
+  api('/botao.php').then((d) => { dados = d; pinta(); })
+    .catch((e) => { diz.textContent = e.message; diz.style.color = 'var(--perigo)'; });
 }
 
 /* ================== OS RAIDS ==================
