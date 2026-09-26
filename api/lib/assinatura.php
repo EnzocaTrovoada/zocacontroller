@@ -50,20 +50,6 @@ function cobranca_aberta(): bool
     return !empty(cfg()['mercadopago']['ligado']);
 }
 
-/**
- * Este usuário pode usar este recurso agora?
- *
- * A porta única. Espalhar "if plano ==" pelo código é como um recurso acaba
- * bloqueado num lugar e liberado noutro — e o lugar esquecido é sempre o que
- * alguém encontra.
- */
-function recurso_liberado(int $usuario_id, string $chave): bool
-{
-    $a = acesso_do_usuario($usuario_id);
-    $r = recursos_do_usuario($usuario_id, $a['ativo'] ? $a['plano'] : 'gratis');
-    return !empty($r[$chave]);
-}
-
 /** Recursos por plano num lugar só. Não espalhar "if plano ==" pelo código. */
 /**
  * O teto deste usuário pra uma coisa contável.
