@@ -1903,21 +1903,34 @@ try {
     <span class="bandeja" id="bandejaOverlays"></span>
   </button>
 
-  <button class="aba" id="abaFerramentas" type="button" aria-expanded="false" aria-haspopup="true">
-    Ferramentas <i></i>
-    <span class="bandeja" id="bandejaFerramentas"></span>
+  <!-- NÃO EXISTE MAIS UMA ABA "FERRAMENTAS".
+
+       Ela virou gaveta: onze itens sem relação entre si, e dois deles
+       (Administração e Painel) com aba própria ao lado — o mesmo destino em
+       dois lugares. Menu com nome genérico atrai tudo que não coube em
+       outro lugar, e aí ninguém acha nada: quem procura "Comandos" não abre
+       um menu chamado Ferramentas.
+
+       Cada item foi pra aba onde dá pra adivinhar que ele está. São três
+       perguntas, e cada aba responde uma:
+         Bot    — o que o chat faz acontecer
+         Painel — o que vai dentro do OBS
+         Meu    — a minha conta -->
+
+  <button class="aba" id="abaBot" type="button" aria-expanded="false" aria-haspopup="true">
+    Bot <i></i>
+    <span class="bandeja" id="bandejaBot"></span>
   </button>
 
-  <!-- O BOT TEM ABA, E NÃO UM BOTÃO ESCONDIDO EM COMANDOS.
-       É metade do produto: quem chega precisa ver que existe sem procurar. -->
-  <button class="aba" id="abaBot" type="button">Bot</button>
+  <button class="aba" id="abaPainel" type="button" aria-expanded="false" aria-haspopup="true">
+    Painel <i></i>
+    <span class="bandeja" id="bandejaPainel"></span>
+  </button>
 
-  <!-- O PAINEL DO OBS TEM ABA PRÓPRIA.
-       Ele é a parte que fica aberta a live inteira, e o que aparece dentro
-       dele era a única coisa do produto que não dava pra escolher. -->
-  <button class="aba" id="abaPainel" type="button">Painel</button>
-
-  <button class="aba" id="abaMeu" type="button">Meu ZocaHub</button>
+  <button class="aba" id="abaMeu" type="button" aria-expanded="false" aria-haspopup="true">
+    Meu ZocaHub <i></i>
+    <span class="bandeja" id="bandejaMeu"></span>
+  </button>
   <!-- Fica visível pra quem não entrou: um artista que chega por um link de
        divulgação não tem conta e não precisa ter. -->
   <button class="aba" id="abaArtistas" type="button">Artistas</button>
@@ -1925,16 +1938,19 @@ try {
   <!-- Só aparece quando o servidor diz que a cobrança está aberta. Em modo
        de teste, só pra admin. -->
   <button class="aba pro escondido" id="abaUpgrade" type="button">Ver planos</button>
-  <!-- As duas só admin vê. A Administração era um item dentro da bandeja
-       Ferramentas, e lá ninguém achava: quem procurava selo ou conquista
-       não abre um menu chamado Ferramentas. Ao lado do "Editar textos",
-       que já é admin, as duas ficam juntas onde se procura. -->
+  <!-- As duas só admin vê, e as duas são abas rasas de propósito.
+
+       "Editar textos" não é uma tela, é um modo: liga, e aí clicar em
+       qualquer texto DO SITE abre a caixa de reescrever. Enfiar num menu ou
+       dentro da Administração quebraria o próprio uso — ligar o modo exige
+       estar na página onde o texto está. -->
   <button class="aba escondido" id="abaAdmin" type="button">Administração</button>
   <!-- Liga o modo em que clicar num texto abre a caixa de reescrever. -->
   <button class="aba escondido" id="abaTextos" type="button">Editar textos</button>
 
-  <!-- Buscar leva direto ao lugar: com dez tipos de overlay e sete telas,
-       procurar no olho já custa mais do que digitar. -->
+  <!-- Buscar leva direto ao lugar. Com onze tipos de overlay e uma dúzia de
+       telas, digitar chega antes do que abrir menu procurando — e é o que
+       permite as abas serem poucas sem esconder nada. -->
   <span class="busca" id="busca">
     <input type="text" id="buscaCampo" placeholder="Buscar…" autocomplete="off">
   </span>
@@ -1944,7 +1960,7 @@ try {
        sumiram, a primeira coisa a saber e se a tela esta olhando pra conta
        certa: uma chave de outra conta mostra uma lista vazia legitima. -->
   <!-- Reaproveita a bandeja das abas: abrir, fechar clicando fora e o Esc
-       já funcionam do mesmo jeito que em Overlays e Ferramentas. -->
+       já funcionam do mesmo jeito que nas outras. -->
   <!-- A medalha não abre bandeja: ela leva direto pra tela das conquistas. -->
   <button class="aba sino medalha escondido" id="abaConquistas" type="button"
           title="Conquistas" aria-label="Conquistas">
@@ -3256,7 +3272,9 @@ function ligaAba(aba) {
   });
 }
 ligaAba(el('abaOverlays'));
-ligaAba(el('abaFerramentas'));
+ligaAba(el('abaBot'));
+ligaAba(el('abaPainel'));
+ligaAba(el('abaMeu'));
 ligaAba(el('abaAvisos'));
 ligaTema();
 document.addEventListener('click', (e) => { if (!e.target.closest('.aba')) fechaBandejas(null); });
@@ -3278,86 +3296,67 @@ function montaBandejas() {
   bo.appendChild(todos);
 
   /* SEM ?chave= NO LINK. */
-  const bf = el('bandejaFerramentas');
-  bf.innerHTML = '';
-  const spot = h('button', { type: 'button' }, [
-    document.createTextNode('Conectar o Spotify'),
-    h('small', { txt: 'pra overlay de música' }),
-  ]);
-  spot.onclick = async () => {
+  /* ---------- as três bandejas ----------
+
+     Cada uma responde UMA pergunta, e é isso que faz dar pra adivinhar onde
+     uma coisa está sem abrir os três menus. Item que não responde a pergunta
+     da aba não entra nela — se não couber em nenhuma, o lugar certo é dentro
+     de uma página, e não um menu novo. */
+
+  const item = (nome, txt, aoClicar) => {
+    const b = h('button', { type: 'button' }, [
+      document.createTextNode(nome), h('small', { txt }),
+    ]);
+    b.onclick = aoClicar;
+    return b;
+  };
+  const vai = (rota) => () => { fechaBandejas(null); vaiPara(rota); };
+
+  /* Ligar uma conta de fora. O padrão é o mesmo nos dois, e a diferença
+     entre Spotify e Kick não justifica dois blocos de código. */
+  const ligaConta = (endereco, nome) => async () => {
     fechaBandejas(null);
     try {
-      const d = await api('/spotify.php');
-      if (d.ligado) { recado('Spotify já está conectado.', 'bom'); return; }
-      /* A permissão é do Spotify, não nossa: abre na aba deles. */
+      const d = await api(endereco);
+      if (d.ligado) {
+        recado(nome + ' já está conectado' + (d.canal ? ' (' + d.canal + ').' : '.'), 'bom');
+        return;
+      }
+      /* A permissão é deles, não nossa: sai do site. */
       location.href = d.entrar;
     } catch (e) { recado(e.message, 'ruim'); }
   };
-  bf.appendChild(spot);
 
-  /* O Kick fica ao lado do Spotify porque a pergunta é a mesma: "ligar uma
-     conta de fora". Quem transmite nos dois lugares liga os dois e pronto. */
-  const kick = h('button', { type: 'button' }, [
-    document.createTextNode('Conectar o Kick'),
-    h('small', { txt: 'pro chat e os alertas valerem lá também' }),
-  ]);
-  kick.onclick = async () => {
-    fechaBandejas(null);
-    try {
-      const d = await api('/kick.php');
-      if (d.ligado) { recado('Kick já está conectado' + (d.canal ? ' (' + d.canal + ').' : '.'), 'bom'); return; }
-      location.href = d.entrar;
-    } catch (e) { recado(e.message, 'ruim'); }
-  };
-  bf.appendChild(kick);
+  /* ----- BOT: o que o chat faz acontecer ----- */
+  const bb = el('bandejaBot');
+  bb.innerHTML = '';
+  bb.appendChild(item('O que o bot faz', 'Respostas, avisos e a voz dele', vai('#/bot')));
+  bb.appendChild(item('Comandos', 'O que o seu chat pode mandar, e criar os seus', vai('#/comandos')));
+  bb.appendChild(item('Subathon', 'Quanto cada sub, bit ou doação soma', vai('#/subathon')));
+  bb.appendChild(item('Luzes', 'O chat muda a cor das suas lâmpadas', vai('#/luzes')));
+  bb.appendChild(h('hr'));
+  bb.appendChild(item('Conectar o Spotify', 'pra overlay de música', ligaConta('/spotify.php', 'Spotify')));
+  bb.appendChild(item('Conectar o Kick', 'pro chat e os alertas valerem lá também', ligaConta('/kick.php', 'Kick')));
 
-  /* Nasce escondido e aparece quando o servidor diz que a conta é admin.
-     Isso é conveniência, não segurança: o admin.php responde 404 pra
-     qualquer outro. */
-  const adm = h('button', { type: 'button', id: 'linkAdmin', cls: 'escondido' }, [
-    document.createTextNode('Administração'),
-    h('small', { txt: 'selos, conquistas, cupons, vitrine e artistas' }),
-  ]);
-  adm.onclick = () => { fechaBandejas(null); vaiPara('#/admin'); };
-  bf.appendChild(adm);
+  /* ----- PAINEL: o que vai dentro do OBS ----- */
+  const bp = el('bandejaPainel');
+  bp.innerHTML = '';
+  bp.appendChild(item('Ajustar o painel', 'O que aparece dentro dele, e os endereços das docas', vai('#/painel')));
+  bp.appendChild(item('Como instalar', 'O passo a passo no OBS', vai('#/tutorial')));
+  bp.appendChild(h('hr'));
+  /* Páginas de verdade, e não rotas: o gerador conversa com o OBS e o painel
+     é feito pra viver dentro dele. As duas precisam da página inteira. */
+  bp.appendChild(h('a', { href: 'painel.html' },
+    [document.createTextNode('Abrir o painel'), h('small', { txt: 'A janelinha de controle dentro do OBS' })]));
+  bp.appendChild(h('a', { href: 'criar.html' },
+    [document.createTextNode('Fonte do OBS'), h('small', { txt: 'Montar o endereço que liga o chat' })]));
 
-  const tut = h('button', { type: 'button' }, [
-    document.createTextNode('Como instalar'),
-    h('small', { txt: 'O passo a passo no OBS' }),
-  ]);
-  tut.onclick = () => { fechaBandejas(null); vaiPara('#/tutorial'); };
-  bf.appendChild(tut);
-
-  const cmd = h('button', { type: 'button' }, [
-    document.createTextNode('Comandos'),
-    h('small', { txt: 'O que o seu chat pode mandar, e criar os seus' }),
-  ]);
-  cmd.onclick = () => { fechaBandejas(null); vaiPara('#/comandos'); };
-  bf.appendChild(cmd);
-
-  /* Estas duas moram aqui dentro agora. */
-  [
-    ['Subathon', 'Quanto cada sub, bit ou doação soma', '#/subathon'],
-    ['Moderadores', 'Criar e revogar o link de cada mod', '#/mods'],
-    ['Luzes', 'O chat muda a cor das suas lâmpadas', '#/luzes'],
-    ['Suporte', 'Fale comigo quando algo não funcionar', '#/suporte'],
-  ].forEach(([n, txt, rota]) => {
-    const b = h('button', { type: 'button' }, [document.createTextNode(n), h('small', { txt })]);
-    b.onclick = () => { fechaBandejas(null); vaiPara(rota); };
-    bf.appendChild(b);
-  });
-
-  bf.appendChild(h('hr'));
-
-  /* Estas duas ainda são páginas separadas. O gerador lê as suas cenas
-     falando com o OBS, e o painel é feito pra viver DENTRO do OBS — os dois
-     precisam de um cuidado que eu não quis fazer às pressas. */
-  [
-    ['Fonte do OBS', 'Montar o endereço que liga o chat', 'criar.html'],
-    ['Painel', 'A janelinha de controle dentro do OBS', 'painel.html'],
-  ].forEach(([n, txt, url]) => {
-    bf.appendChild(h('a', { href: url }, [document.createTextNode(n), h('small', { txt })]));
-  });
+  /* ----- MEU ZOCAHUB: a minha conta ----- */
+  const bm = el('bandejaMeu');
+  bm.innerHTML = '';
+  bm.appendChild(item('Minha conta', 'Sua chave, seus links e o seu plano', vai('#/meu')));
+  bm.appendChild(item('Moderadores', 'Criar e revogar o link de cada mod', vai('#/mods')));
+  bm.appendChild(item('Suporte', 'Fale comigo quando algo não funcionar', vai('#/suporte')));
 }
 
 /* ---------------- ícones, modelos e o arquivo do LiveSplit ---------------- */
@@ -5424,7 +5423,6 @@ function avisaPermissao() {
   }).catch(() => { /* servidor velho: não há o que avisar */ });
 }
 
-el('abaPainel').onclick = () => { fechaBandejas(null); vaiPara('#/painel'); };
 el('abaUpgrade').onclick = () => { fechaBandejas(null); vaiPara('#/planos'); };
 
 /* ---------------- a vitrine da inicial ---------------- */
@@ -6869,7 +6867,7 @@ function telaEditor(perfil, tipoNovo) {
   /* O CRONÔMETRO PARADO E NINGUÉM SABE POR QUÊ.
 
      Criar o overlay de subathon é metade: o que soma tempo é uma configuração
-     que mora em Ferramentas. Quem não sabe disso vê um cronômetro parado e
+     que mora em Bot → Subathon. Quem não sabe disso vê um cronômetro parado e
      conclui que está quebrado. Agora o próprio editor diz em que pé está. */
   if (tipo === 'subathon') {
     const est = h('p', { cls: 'aviso escondido' });
@@ -6963,7 +6961,7 @@ function telaEditor(perfil, tipoNovo) {
       } else if (p2 === 'kick') {
         avisoPlat.textContent = 'O Kick não expõe contagem de seguidores em lugar nenhum da API — '
           + 'por isso ela não aparece na lista. Assinantes e gente assistindo funcionam normalmente, '
-          + 'e você precisa ter conectado o Kick em Ferramentas.';
+          + 'e você precisa ter conectado o Kick em Bot → Conectar o Kick.';
         avisoPlat.classList.remove('escondido');
       } else {
         avisoPlat.classList.add('escondido');
@@ -7099,7 +7097,7 @@ function telaEditor(perfil, tipoNovo) {
              bem diferentes. Pergunta o cru pro Spotify e diz qual é. */
           api('/spotify.php?diag=1').then((g) => {
             if (g.etapa === 'token') {
-              spEstado.textContent = 'O acesso ao Spotify venceu: ' + g.erro + ' Conecte de novo em Ferramentas.';
+              spEstado.textContent = 'O acesso ao Spotify venceu: ' + g.erro + ' Conecte de novo em Bot → Conectar o Spotify.';
               return;
             }
             if (g.etapa !== 'ok') return;
@@ -10655,7 +10653,7 @@ const PASSOS_OBS = [
 ];
 
 const PASSOS_CHAT = [
-  ['Monte o endereço da fonte do OBS', 'Em Ferramentas → Fonte do OBS. Ela lê as suas cenas conversando com o OBS, então deixe o OBS aberto.'],
+  ['Monte o endereço da fonte do OBS', 'Em Painel → Fonte do OBS. Ela lê as suas cenas conversando com o OBS, então deixe o OBS aberto.'],
   ['Ligue o servidor do OBS', 'No OBS: Ferramentas → Configurações do WebSocket → marque "Ativar servidor". É por aí que o chat fala com ele.'],
   ['Cole o endereço numa Fonte de Navegador', 'Igual à de cima, mas essa não aparece na live: pode deixar 100 por 100 e escondida num canto.'],
   ['Essa fonte carrega a sua chave', 'Não mostre ela na tela e não mande pra ninguém. Se aparecer em print ou VOD, troque a chave em Meu ZocaHub.'],
@@ -11449,7 +11447,7 @@ function telaTutorial() {
   /* A música é o único overlay que precisa de um passo FORA do OBS. Sem isso
      ela fica vazia na live sem dizer por quê, e a pessoa culpa o overlay. */
   lista('A overlay de música', 'Só pra quem vai usar o Spotify. Os outros overlays não precisam disto.', [
-    ['Conecte o Spotify', 'Ferramentas → Conectar o Spotify. Abre no site deles, você aprova e volta pra cá.'],
+    ['Conecte o Spotify', 'Bot → Conectar o Spotify. Abre no site deles, você aprova e volta pra cá.'],
     ['Crie a overlay de música', 'Overlays → Música. Os mesmos seis passos do OBS de cima.'],
     ['Ponha o Spotify fora do VOD', 'No painel dentro do OBS, seção "Fora do VOD": escolha a fonte de áudio do Spotify e clique em Tirar do VOD. A live continua com som, o vídeo gravado fica sem — é o que evita o strike.'],
     ['Se quiser, libere os comandos', 'Comandos → o !musica, !pular, !like, !playlist, !adicionar e !fila. O !pular e o !fila precisam de Spotify Premium; os outros funcionam em conta grátis.'],
@@ -11485,7 +11483,7 @@ function telaTutorial() {
     ['Fica um retângulo preto atrás', 'Não é o overlay: é a Fonte de Navegador com "Fundo personalizado". Deixe vazio.'],
     ['Editei e não mudou na live', 'Espere 15 segundos. Se não mudar, clique com o botão direito na fonte → Atualizar.'],
     ['O chat não controla nada', 'O servidor do WebSocket do OBS está desligado, ou a fonte da ponte não está numa cena ativa.'],
-    ['A overlay de música fica vazia', 'Falta conectar o Spotify em Ferramentas, ou não tem nada tocando. Na prévia daqui aparece uma música de mentira mesmo sem conexão — no OBS, não.'],
+    ['A overlay de música fica vazia', 'Falta conectar o Spotify em Bot → Conectar o Spotify, ou não tem nada tocando. Na prévia daqui aparece uma música de mentira mesmo sem conexão — no OBS, não.'],
     ['O alerta aparece mas não toca som', 'Na fonte do alerta no OBS, marque "Controlar áudio pelo OBS". Sem isso o som existe, só não passa pelo OBS.'],
     ['O alerta de follow não dispara', 'Follow chega por fora do chat: ligue o EventSub em Meu ZocaHub. Sub e bits chegam pelo chat e funcionam sem isso.'],
     ['Tirei do VOD e mesmo assim deu strike', 'A trilha separada do VOD só existe no modo Avançado de saída do OBS. Em Configurações → Saída, troque para Avançado e marque "Trilha do VOD da Twitch". O painel avisa quando isso está errado.'],
@@ -11578,8 +11576,6 @@ window.addEventListener('hashchange', rota);
    a porta de entrada — a lista já tem aba própria. */
 el('irInicio').onclick = () => vaiPara('#/inicio');
 el('abaAdmin').onclick = () => { fechaBandejas(null); vaiPara('#/admin'); };
-el('abaBot').onclick = () => { fechaBandejas(null); vaiPara('#/bot'); };
-el('abaMeu').onclick = () => { fechaBandejas(null); vaiPara('#/meu'); };
 el('abaArtistas').onclick = () => { fechaBandejas(null); vaiPara('#/artistas'); };
 el('abaMeusOverlays').onclick = () => { fechaBandejas(null); vaiPara('#/overlays'); };
 
@@ -11638,7 +11634,7 @@ function telaPrecisaEntrar(qual) {
 function ficaOlhando() {
   olhando = true;
   try { localStorage.setItem(OLHADINHA, '1'); } catch (e) {}
-  ['abaOverlays', 'abaFerramentas', 'abaBot', 'abaPainel', 'abaMeu', 'busca'].forEach((id) => {
+  ['abaOverlays', 'abaBot', 'abaPainel', 'abaMeu', 'busca'].forEach((id) => {
     const a = el(id);
     if (a) a.classList.add('escondido');
   });
@@ -11741,7 +11737,7 @@ async function carrega() {
     /* As abas do painel não servem pra quem não entrou: clicar em qualquer
        uma delas só levaria a uma tela que falha. Some com elas e o que resta
        é a vitrine e o botão de entrar. */
-    ['abaOverlays', 'abaFerramentas', 'abaBot', 'abaPainel', 'abaMeu', 'busca', 'abaAdmin'].forEach((id) => {
+    ['abaOverlays', 'abaBot', 'abaPainel', 'abaMeu', 'busca', 'abaAdmin'].forEach((id) => {
       const a = el(id);
       if (a) a.classList.add('escondido');
     });
@@ -11770,7 +11766,7 @@ async function carrega() {
     /* Null-safe: um id que sumisse daqui apagaria os outros junto, porque
        o erro para o forEach no meio — e foi assim que a Administração
        ficaria invisível sem ninguém saber por quê. */
-    ['abaAdmin', 'abaTextos', 'linkAdmin'].forEach((id) => {
+    ['abaAdmin', 'abaTextos'].forEach((id) => {
       const e = el(id);
       if (e) e.classList.remove('escondido');
     });
