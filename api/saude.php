@@ -179,6 +179,8 @@ foreach ([
     ['tts_config', null, 'TTS', '062-tts.sql'],
     ['tts_config', 'calar_em', 'Pular a fala', '062-tts.sql'],
     ['tts_fila', null, 'A fila do TTS', '062-tts.sql'],
+    ['tts_config', 'segurar', 'Segurar a fala antes de sair', '074-tts-segurar.sql'],
+    ['tts_fila', 'aprovado', 'Aprovar fala por fala', '074-tts-segurar.sql'],
     ['raid_lista', null, 'Raids', '063-raids.sql'],
     ['raid_saldo', null, 'Pontos de raid', '063-raids.sql'],
     ['raid_feitos', null, 'Histórico dos raids', '063-raids.sql'],

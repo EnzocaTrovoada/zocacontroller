@@ -124,6 +124,55 @@ if (isset($_GET['checar'])) {
     ]);
 }
 
+/* ---------- a fila esperando aprovação ----------
+
+   ANTES DO RAMO GERAL DE GET: ele responde e encerra.
+
+   O "pular a fala" só existe depois que ela começou, e o estrago de uma
+   frase lida em voz alta acontece na primeira sílaba. Aqui dá pra ler
+   antes — e o que não for aprovado nunca sai.
+
+   Só aparece o que está ESPERANDO. Mensagem já falada não volta pra tela:
+   o painel é pra decidir agora, não é histórico. */
+if (isset($_GET['fila'])) {
+    $espera = [];
+    $temColuna = true;
+    try {
+        $st = db()->prepare(
+            'SELECT id, texto, quem, voz, UNIX_TIMESTAMP(criado_em) AS quando
+               FROM tts_fila
+              WHERE usuario_id = ? AND falado_em IS NULL AND aprovado = 0
+              ORDER BY id LIMIT 30'
+        );
+        $st->execute([$uid]);
+        $linhas = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        /* Sem o SQL 074 não existe fila de espera — e não existe defeito
+           também: o modo segurar simplesmente ainda não dá pra ligar. */
+        $temColuna = false;
+        $linhas = [];
+    }
+
+    foreach ($linhas as $l) {
+        $espera[] = [
+            'id'     => (int) $l['id'],
+            /* TEXTO DE TERCEIRO É TEXTO. Vai cru pro JSON e a tela escreve
+               com textContent — nunca innerHTML, nunca endereço. */
+            'texto'  => (string) $l['texto'],
+            'quem'   => (string) $l['quem'],
+            'voz'    => (string) $l['voz'],
+            'quando' => (int) $l['quando'],
+        ];
+    }
+
+    header('Cache-Control: private, no-store');
+    json_saida([
+        'segurando' => (int) (tts_config($uid)['segurar'] ?? 0),
+        'pode'      => $temColuna,
+        'espera'    => $espera,
+    ]);
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
     $c = tts_config($uid);
     json_saida([
@@ -144,6 +193,58 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
 }
 
 $d = corpo_json();
+
+/* ---------- soltar, descartar, e a chave do modo ----------
+
+   TRÊS AÇÕES NUM RAMO SÓ porque são a mesma decisão: o que fazer com uma
+   fala que ainda não saiu. */
+if (isset($d['fala'])) {
+    $acao = (string) $d['fala'];
+
+    if ($acao === 'segurar') {
+        $liga = !empty($d['valor']) ? 1 : 0;
+        try {
+            db()->prepare(
+                'INSERT INTO tts_config (usuario_id, segurar) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE segurar = VALUES(segurar)'
+            )->execute([$uid, $liga]);
+        } catch (Throwable $e) {
+            json_saida(['erro' => 'Falta rodar o 074-tts-segurar.sql neste servidor.'], 503);
+        }
+
+        /* LIGAR SEGURA SÓ O QUE VIER DEPOIS. O que já está na fila foi
+           aceito sob a regra antiga, e transformar em espera deixaria a
+           pessoa com uma lista pra aprovar que ela nunca pediu. */
+        json_saida(['ok' => true, 'segurando' => $liga]);
+    }
+
+    $id = (int) ($d['id'] ?? 0);
+    if ($id <= 0) json_saida(['erro' => 'Qual fala?'], 400);
+
+    /* O "AND usuario_id" É A TRANCA. Sem ele, um id chutado soltaria a fala
+       segurada de outro canal — e ela sairia na live de quem não aprovou. */
+    if ($acao === 'soltar') {
+        try {
+            db()->prepare(
+                'UPDATE tts_fila SET aprovado = 1, aprovado_em = NOW()
+                  WHERE id = ? AND usuario_id = ? AND falado_em IS NULL'
+            )->execute([$id, $uid]);
+        } catch (Throwable $e) {
+            json_saida(['erro' => 'Falta rodar o 074-tts-segurar.sql neste servidor.'], 503);
+        }
+        json_saida(['ok' => true]);
+    }
+
+    if ($acao === 'descartar') {
+        /* Apagar de verdade: a fila é do agora, e linha marcada como
+           descartada só serviria pra encher a tabela. */
+        db()->prepare('DELETE FROM tts_fila WHERE id = ? AND usuario_id = ? AND falado_em IS NULL')
+            ->execute([$id, $uid]);
+        json_saida(['ok' => true]);
+    }
+
+    json_saida(['erro' => 'Não conheço essa ação.'], 400);
+}
 
 /* ---------- criar o prêmio pela pessoa ---------- */
 if (!empty($d['criar_premio'])) {

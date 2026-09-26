@@ -29,7 +29,7 @@ function tts_config(int $uid): array
 {
     $padrao = ['ligado' => 0, 'voz' => 'padrao', 'vozes' => '', 'aleatorio' => 0,
                'prefixo' => 0, 'max_letras' => 200, 'bloqueadas' => '', 'premio_id' => '',
-               'calar_em' => null];
+               'calar_em' => null, 'segurar' => 0];
     try {
         $st = db()->prepare('SELECT * FROM tts_config WHERE usuario_id = ?');
         $st->execute([$uid]);
@@ -111,9 +111,28 @@ function tts_enfileira(int $uid, string $texto, string $quem, string $vozPedida 
         ? $vozPedida
         : ((int) $cfg['aleatorio'] ? $vozes[random_int(0, count($vozes) - 1)] : $vozes[0]);
 
+    /* COM O MODO SEGURAR, A MENSAGEM NASCE ESPERANDO.
+
+       O "pular a fala" só existe depois que ela começou — e o estrago de
+       uma frase lida em voz alta acontece na primeira sílaba. Segurando,
+       quem transmite lê antes e decide; quem não ligar o modo não muda
+       nada, porque a coluna nasce aprovada. */
+    $aprovado = (int) ($cfg['segurar'] ?? 0) ? 0 : 1;
+
     try {
-        db()->prepare('INSERT INTO tts_fila (usuario_id, texto, voz, quem) VALUES (?, ?, ?, ?)')
-            ->execute([$uid, $limpo, $voz, mb_substr($quem, 0, 40)]);
+        try {
+            db()->prepare('INSERT INTO tts_fila (usuario_id, texto, voz, quem, aprovado) VALUES (?, ?, ?, ?, ?)')
+                ->execute([$uid, $limpo, $voz, mb_substr($quem, 0, 40), $aprovado]);
+        } catch (Throwable $semColuna) {
+            /* SQL 074 NÃO RODADO NÃO PODE MATAR O TTS.
+
+               A coluna é de um recurso novo e opcional. Derrubar por causa
+               dela deixaria o streamer com o TTS mudo e sem nenhuma pista
+               — e ele nem pediu pra segurar nada. Sem a coluna, enfileira
+               como sempre enfileirou; a tela de saúde avisa o que falta. */
+            db()->prepare('INSERT INTO tts_fila (usuario_id, texto, voz, quem) VALUES (?, ?, ?, ?)')
+                ->execute([$uid, $limpo, $voz, mb_substr($quem, 0, 40)]);
+        }
         /* Aqui, e não ao abrir a tela: quem configurou e desistiu não usou
            o recurso, e contar isso inflaria o número justo do jeito que
            faria a gente manter uma coisa que ninguém usa. */
@@ -134,15 +153,33 @@ function tts_pega(int $uid, int $quantas = 5): array
 {
     try {
         $st = db()->prepare(
+            /* A JANELA CONTA DA APROVAÇÃO, e não da chegada.
+
+               Sem o COALESCE, moderar viraria armadilha: a mensagem
+               segurada por quatro minutos já nasceria vencida, e aprovar
+               não falaria nada — sem erro, sem aviso, sem pista. */
             'SELECT id, texto, voz, quem FROM tts_fila
-              WHERE usuario_id = ? AND falado_em IS NULL
-                AND criado_em > DATE_SUB(NOW(), INTERVAL ' . TTS_VALE_SEG . ' SECOND)
+              WHERE usuario_id = ? AND falado_em IS NULL AND aprovado = 1
+                AND COALESCE(aprovado_em, criado_em)
+                    > DATE_SUB(NOW(), INTERVAL ' . TTS_VALE_SEG . ' SECOND)
               ORDER BY id LIMIT ' . max(1, min(10, $quantas))
         );
         $st->execute([$uid]);
         $linhas = $st->fetchAll();
     } catch (Throwable $e) {
-        return [];
+        /* Mesmo motivo do INSERT: sem o SQL 074, fala como falava antes. */
+        try {
+            $st = db()->prepare(
+                'SELECT id, texto, voz, quem FROM tts_fila
+                  WHERE usuario_id = ? AND falado_em IS NULL
+                    AND criado_em > DATE_SUB(NOW(), INTERVAL ' . TTS_VALE_SEG . ' SECOND)
+                  ORDER BY id LIMIT ' . max(1, min(10, $quantas))
+            );
+            $st->execute([$uid]);
+            $linhas = $st->fetchAll();
+        } catch (Throwable $e2) {
+            return [];
+        }
     }
 
     /* A FRASE MONTADA VAI NO 'texto', E NÃO NUM CAMPO NOVO.
