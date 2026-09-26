@@ -187,7 +187,7 @@ if (cfg.hud) el('hud').classList.remove('oculto');
    código velho enquanto o site já mudou — e de fora ninguém vê. A ponte
    conta a versão dela junto do estado, e o painel avisa quando está
    atrasada. Sobe junto com qualquer mudança nesta página. */
-const PONTE_VERSAO = '2026-09-24';
+const PONTE_VERSAO = '2026-09-26';
 
 const estado = {
   obs: false, chat: false,
@@ -923,6 +923,49 @@ ACOES.marcar = {
 };
 
 ACOES.marca = ACOES.marcar;
+
+/* O CONTADOR MEXIDO PELO CHAT.
+
+   Contador de mortes existia e quase ninguém usava, porque mudar o número
+   era parar o jogo e editar um campo no site. Com !mais no chat, quem
+   assiste conta pelo streamer — que é o que já acontece na prática, só que
+   gritando no chat sem ninguém anotar.
+
+   O ARGUMENTO É OPCIONAL E TEM DOIS SENTIDOS: número muda o passo (!mais 3),
+   palavra escolhe qual contador (!mais mortes). Adivinhar pelo formato evita
+   duas sintaxes pra uma coisa só. */
+async function mexeContador(passo, quem, arg) {
+  if (!cfg.chave) {
+    return recado('O contador precisa da chave do ZocaHub no link.', 15000);
+  }
+
+  const cru = String(arg || '').trim();
+  const ehNumero = /^\d+$/.test(cru);
+  const quanto = ehNumero ? Math.max(1, Math.min(100, parseInt(cru, 10))) : 1;
+
+  try {
+    const d = await apiRele('/perfil.php', {
+      acao: 'contar',
+      passo: passo * quanto,
+      nome: ehNumero ? '' : cru,
+    });
+    const c = (d.contadores || [])[0];
+    recado(c ? (c.nome || 'contador') + ': ' + c.valor + ' — ' + quem
+             : 'Contador mexido — ' + quem, 12000);
+  } catch (e) { recado('Contador: ' + e.message, 12000); }
+}
+
+ACOES.mais = {
+  minimo: 'mod', espera: 2000,
+  async fazer(quem, arg) { await mexeContador(1, quem, arg); },
+};
+
+ACOES.menos = {
+  minimo: 'mod', espera: 2000,
+  async fazer(quem, arg) { await mexeContador(-1, quem, arg); },
+};
+
+
 
 /* RESPONDER NO CHAT: só existe como passo de um comando seu.
 

@@ -96,6 +96,63 @@ function perfil_nome(array $d): string
     return mb_substr($n, 0, 64) ?: 'Sem nome';
 }
 
+/* ---------- mexer no número do contador ----------
+
+   O chat manda !mais quando o streamer morre, e o número sobe sozinho. Sem
+   isto, contador de mortes é o streamer parando o jogo pra editar um campo
+   no site — e por isso quase ninguém usa o que já tem.
+
+   A CONTA SAI DAQUI, e nunca do navegador. O que chega é "pra que lado" e
+   "de quanto"; o valor novo é lido, somado e gravado pelo servidor. Número
+   vindo do cliente é número que se troca.
+
+   Mexe em TODOS os contadores da conta. Quem tem dois contadores e quer
+   mexer só num deles nomeia qual — mas o caso comum é um só, e exigir o
+   nome ali faria o !mais não funcionar pra quase todo mundo. */
+if ($acao === 'contar') {
+    $passo = (int) ($d['passo'] ?? 1);
+    /* Um teto pequeno: isto é contador de mortes, não calculadora. Assim um
+       comando repetido por engano não deixa o número irreconhecível. */
+    if ($passo === 0 || abs($passo) > 100) $passo = $passo < 0 ? -1 : 1;
+
+    $alvo = mb_substr(trim((string) ($d['nome'] ?? '')), 0, 64);
+
+    $st = db()->prepare(
+        "SELECT id, nome, config FROM perfis
+          WHERE usuario_id = ? AND tipo = 'contador'"
+    );
+    $st->execute([(int) $quem['usuario_id']]);
+    $linhas = $st->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!$linhas) json_saida(['erro' => 'Você não tem overlay de contador.'], 404);
+
+    $up = db()->prepare('UPDATE perfis SET config = ? WHERE id = ? AND usuario_id = ?');
+    $mexidos = [];
+
+    foreach ($linhas as $l) {
+        if ($alvo !== '' && mb_strtolower((string) $l['nome']) !== mb_strtolower($alvo)) continue;
+
+        $cfg = json_decode((string) $l['config'], true);
+        if (!is_array($cfg)) $cfg = [];
+
+        /* Nunca negativo: contador de mortes em -1 não quer dizer nada, e o
+           !menos apertado duas vezes a mais é o caminho normal pra chegar lá. */
+        $novo = max(0, (int) round((float) ($cfg['valor'] ?? 0)) + $passo);
+        $cfg['valor'] = $novo;
+
+        $json = json_encode($cfg, JSON_UNESCAPED_UNICODE);
+        if ($json === false || strlen($json) > PERFIL_CFG_MAX) continue;
+
+        $up->execute([$json, (int) $l['id'], (int) $quem['usuario_id']]);
+        $mexidos[] = ['nome' => (string) $l['nome'], 'valor' => $novo];
+    }
+
+    if (!$mexidos) json_saida(['erro' => 'Não achei contador com esse nome.'], 404);
+
+    uso_marca((int) $quem['usuario_id'], 'contador-chat');
+    json_saida(['ok' => true, 'contadores' => $mexidos]);
+}
+
 if ($acao === 'criar') {
     $tipo = (string) ($d['tipo'] ?? '');
     if (!in_array($tipo, PERFIL_TIPOS, true)) {

@@ -7706,6 +7706,8 @@ const DE_FABRICA = [
   ['cancelar',  'mod',   'Cancela e devolve os pontos'],
   ['ganhou',    'dono',  'Paga a aposta — !ganhou 1'],
   ['marcar',    'mod',   'Marca um momento pra achar depois'],
+  ['mais',      'mod',   'Sobe o contador — !mais, ou !mais 3'],
+  ['menos',     'mod',   'Desce o contador — !menos, ou !menos 2'],
   ['titulo',    'mod',   'Troca o título da live'],
   ['categoria', 'mod',   'Troca a categoria'],
   ['pular',     'mod',   'Pula a música — precisa de Spotify Premium'],
@@ -8169,7 +8171,7 @@ function ajudaVariaveis() {
 /* A versão que a fonte do OBS deveria estar rodando. Quando ela publica
    outra, é cache do OBS — e a tela diz isso em vez de deixar a pessoa
    adivinhando. Sobe junto com o PONTE_VERSAO do ponte.html. */
-const PONTE_VERSAO = '2026-09-24';
+const PONTE_VERSAO = '2026-09-26';
 
 const resumoTexto = (s) => {
   const t = String(s || '').replace(/\s+/g, ' ').trim();
