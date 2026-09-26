@@ -104,9 +104,24 @@ function mp_webhook_valido(string $x_signature, string $x_request_id, string $da
         return false;                      // notificação velha: alguém reenviando
     }
 
-    /* O id em minúsculo é regra deles para id alfanumérico; em id numérico não
-       muda nada, então vale sempre. */
-    $modelo = 'id:' . strtolower($data_id) . ';request-id:' . $x_request_id . ';ts:' . $ts . ';';
+    /* O QUE FALTA SAI DO MOLDE, E NÃO ENTRA VAZIO.
 
-    return hash_equals(hash_hmac('sha256', $modelo, cfg()['mercadopago']['webhook_secret']), $v1);
+       Estava escrito 'request-id:' . $x_request_id mesmo com o cabeçalho
+       ausente, o que produz 'request-id:;' no meio do texto. A regra deles é
+       outra: "se algum dos valores (data.id, x-request-id) não estiver
+       presente, remova-o do manifesto antes de calcular o HMAC".
+
+       Um pedaço a mais muda o HMAC inteiro, e o resultado é recusa de
+       notificação legítima. Aviso de pagamento traz os dois e passava; aviso
+       de assinatura não traz, e era recusado — com o dinheiro já na conta e
+       quem pagou sem o que comprou.
+
+       O id em minúsculo é regra deles para id alfanumérico; em id numérico
+       não muda nada, então vale sempre. */
+    $partes = '';
+    if ($data_id !== '')      $partes .= 'id:' . strtolower($data_id) . ';';
+    if ($x_request_id !== '') $partes .= 'request-id:' . $x_request_id . ';';
+    $partes .= 'ts:' . $ts . ';';
+
+    return hash_equals(hash_hmac('sha256', $partes, cfg()['mercadopago']['webhook_secret']), $v1);
 }

@@ -216,5 +216,77 @@ $DB->d['dias_na_conta'] = 0;
 $devolve(10, 1);
 confere('o segundo aviso do mesmo estorno não devolve de novo', $DB->escreveu, []);
 
+/* ------------------------------------------------------------------ *
+ *  A assinatura do webhook do Mercado Pago
+ * ------------------------------------------------------------------ */
+echo "\n--- a conferência da assinatura do webhook ---\n";
+
+/* POR QUE ISTO EXISTE: o primeiro pagamento de assinatura real entrou na
+   conta e o site recusou o aviso. O molde do HMAC levava 'request-id:;'
+   quando o cabeçalho não vinha, e levava o id do corpo no lugar do id da
+   URL. Aviso de pagamento traz os dois e passava; aviso de assinatura não
+   traz, e era recusado — com o dinheiro já recebido.
+
+   É um erro que não aparece em lugar nenhum até alguém pagar. */
+
+const SEGREDO_FALSO = 'segredo-de-mentira-pro-ensaio';
+function cfg(): array { return ['mercadopago' => ['webhook_secret' => SEGREDO_FALSO]]; }
+
+preg_match('/function mp_webhook_valido.*?\n}/s', file_get_contents(__DIR__ . '/../api/lib/seguranca.php'), $mw);
+eval($mw[0]);
+
+/* O molde escrito do jeito que a documentação deles manda, pra comparar
+   contra o que a função monta por dentro. */
+$assina = function (string $molde) {
+    return hash_hmac('sha256', $molde, SEGREDO_FALSO);
+};
+$cabecalho = fn(int $ts, string $v1) => 'ts=' . $ts . ',v1=' . $v1;
+
+$ts = time() * 1000;   /* eles mandam em milissegundos */
+
+/* ---- aviso de pagamento: traz id na URL e request-id ---- */
+$molde = 'id:123456;request-id:abc-def;ts:' . $ts . ';';
+confere('aviso completo é aceito',
+    mp_webhook_valido($cabecalho($ts, $assina($molde)), 'abc-def', '123456'), true);
+
+/* ---- AVISO DE ASSINATURA: sem request-id.
+
+       O pedaço tem que sair do molde, e não entrar vazio. Era exatamente
+       este caso que estava sendo recusado. ---- */
+$molde = 'id:2c93808;ts:' . $ts . ';';
+confere('sem request-id, o pedaço sai do molde',
+    mp_webhook_valido($cabecalho($ts, $assina($molde)), '', '2c93808'), true);
+
+/* ---- sem id na URL: mesma regra ---- */
+$molde = 'request-id:abc-def;ts:' . $ts . ';';
+confere('sem id na URL, o pedaço sai do molde',
+    mp_webhook_valido($cabecalho($ts, $assina($molde)), 'abc-def', ''), true);
+
+/* ---- o id alfanumérico vai em minúsculo ---- */
+$molde = 'id:ord01jq4s;request-id:r1;ts:' . $ts . ';';
+confere('id alfanumérico é comparado em minúsculo',
+    mp_webhook_valido($cabecalho($ts, $assina($molde)), 'r1', 'ORD01JQ4S'), true);
+
+/* ---- E O PORTÃO CONTINUA FECHADO PRO RESTO ---- */
+confere('assinatura de outro segredo é recusada',
+    mp_webhook_valido($cabecalho($ts, hash_hmac('sha256', 'id:1;ts:' . $ts . ';', 'outro')), '', '1'), false);
+
+confere('o molde velho, com request-id vazio, não passa mais',
+    mp_webhook_valido($cabecalho($ts, $assina('id:1;request-id:;ts:' . $ts . ';')), '', '1'), false);
+
+confere('cabeçalho sem v1 é recusado', mp_webhook_valido('ts=' . $ts, '', '1'), false);
+confere('cabeçalho vazio é recusado', mp_webhook_valido('', '', '1'), false);
+
+/* ---- AVISO VELHO É AVISO REENVIADO. A janela de frescor impede que
+        alguém guarde uma notificação boa e reenvie depois. ---- */
+$velho = (time() - 3600) * 1000;
+confere('aviso de uma hora atrás é recusado',
+    mp_webhook_valido($cabecalho($velho, $assina('id:1;ts:' . $velho . ';')), '', '1'), false);
+
+/* ---- O ts em SEGUNDOS também vale: eles já mandaram dos dois jeitos. ---- */
+$seg = time();
+confere('ts em segundos também é aceito',
+    mp_webhook_valido($cabecalho($seg, $assina('id:1;ts:' . $seg . ';')), '', '1'), true);
+
 echo "\n" . ($falhas ? "$falhas FALHA(S)\n" : "tudo certo\n");
 exit($falhas ? 1 : 0);

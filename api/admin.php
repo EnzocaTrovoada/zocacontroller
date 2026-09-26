@@ -152,7 +152,7 @@ if (isset($_GET['webhooks'])) {
     $assinaturas = [];
     try {
         $st = db()->query(
-            "SELECT u.login, a.status, a.renova, a.valido_ate, a.dias_raid,
+            "SELECT a.id, u.login, a.status, a.renova, a.valido_ate, a.dias_raid,
                     a.assinatura_externa IS NOT NULL AS tem_assinatura,
                     a.criado_em
                FROM assinaturas a JOIN usuarios u ON u.id = a.usuario_id
@@ -161,6 +161,7 @@ if (isset($_GET['webhooks'])) {
         );
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $l) {
             $assinaturas[] = [
+                'id'         => (int) $l['id'],
                 'login'      => (string) $l['login'],
                 'status'     => (string) $l['status'],
                 'renova'     => (bool) $l['renova'],
@@ -328,6 +329,80 @@ if ($acao === 'parceiro_salvar') {
         $id = (int) db()->lastInsertId();
     }
     json_saida(['ok' => true, 'id' => $id]);
+}
+
+/* Tirar da frente uma cobrança que ficou aberta e não vai se resolver.
+
+   Checkout abandonado, teste que virou lixo, assinatura criada duas vezes
+   pela mesma pessoa. Elas nunca liberam nada sozinhas, mas ficam na lista
+   e na varredura do cron, e a lista suja esconde a cobrança que É problema
+   de verdade.
+
+   SÓ PENDENTE. Cobrança ativa é acesso que alguém pagou, e apagar linha de
+   acesso pago é o único jeito de transformar um cliente feliz em estorno.
+
+   E A ASSINATURA É CANCELADA NO MERCADO PAGO ANTES. Sumir com a linha do
+   nosso lado e deixar a assinatura viva lá seria o pior dos mundos: o
+   cartão da pessoa continuaria sendo debitado todo mês por um acesso que
+   este servidor não sabe mais que existe. */
+if ($acao === 'apagar_cobranca') {
+    require_once __DIR__ . '/lib/mercadopago.php';
+
+    $id = (int) ($d['id'] ?? 0);
+    if ($id <= 0) json_saida(['erro' => 'Qual cobrança?'], 400);
+
+    $st = db()->prepare(
+        "SELECT a.id, a.status, a.assinatura_externa, u.login
+           FROM assinaturas a JOIN usuarios u ON u.id = a.usuario_id
+          WHERE a.id = ? LIMIT 1"
+    );
+    $st->execute([$id]);
+    $linha = $st->fetch(PDO::FETCH_ASSOC);
+
+    if (!$linha) json_saida(['erro' => 'Essa cobrança não existe.'], 404);
+    if ((string) $linha['status'] !== 'pendente') {
+        json_saida(['erro' => 'Só dá pra tirar cobrança pendente. Esta está "'
+            . $linha['status'] . '" — se for pra cancelar um acesso pago, '
+            . 'cancele a assinatura em vez de apagar a linha.'], 400);
+    }
+
+    /* O aviso de que o Mercado Pago não colaborou vai junto na resposta: a
+       linha some da lista de qualquer jeito, e quem apagou precisa saber se
+       ficou assinatura viva do outro lado. */
+    $recado = 'Cobrança pendente removida.';
+    $externa = (string) ($linha['assinatura_externa'] ?? '');
+
+    if ($externa !== '') {
+        try {
+            [$http, $r] = mp_http('PUT', '/preapproval/' . rawurlencode($externa),
+                                  ['status' => 'cancelled']);
+            if ($http === 200) {
+                $recado = 'Cobrança removida e assinatura cancelada no Mercado Pago.';
+            } else {
+                /* 404 é assinatura que nunca chegou a existir do lado deles
+                   — checkout aberto e nunca autorizado. Não é falha. */
+                $recado = $http === 404
+                    ? 'Cobrança removida. Ela nunca virou assinatura no Mercado Pago.'
+                    : 'Cobrança removida daqui, MAS o Mercado Pago recusou o cancelamento ('
+                      . $http . '). Cancele à mão no painel deles, ou o cartão continua sendo debitado.';
+                error_log('[zc] cancelamento recusado na limpeza (' . $http . '): '
+                    . (is_array($r) ? json_encode($r, JSON_UNESCAPED_UNICODE) : ''));
+            }
+        } catch (Throwable $e) {
+            $recado = 'Cobrança removida daqui, MAS não consegui falar com o Mercado Pago. '
+                . 'Confira no painel deles se ficou assinatura ativa.';
+            erro_anota($e);
+        }
+    }
+
+    /* Marcada, e não apagada: a linha guarda quanto foi cobrado, qual cupom
+       entrou e quantos dias de raid estavam reservados. Some da lista de
+       pendentes, que é o que se queria, sem apagar o rastro do dinheiro. */
+    db()->prepare("UPDATE assinaturas SET status = 'cancelada', renova = 0,
+                          cancelada_em = COALESCE(cancelada_em, NOW())
+                    WHERE id = ? AND status = 'pendente'")->execute([$id]);
+
+    json_saida(['ok' => true, 'recado' => $recado]);
 }
 
 if ($acao === 'cupom_salvar') {

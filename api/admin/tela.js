@@ -916,7 +916,8 @@ function blocoWebhooks() {
         /* Linha ainda 'pendente' com assinatura criada é o sintoma exato de
            aviso perdido: o Mercado Pago autorizou e o site não soube. */
         const preso = a.status === 'pendente';
-        corpo.appendChild(h('div', { cls: 'er-um' }, [
+
+        const linha = h('div', { cls: 'er-um' }, [
           h('span', { cls: 'er-quantos', style: preso ? 'color:var(--perigo)' : '',
             txt: preso ? '!' : '✓' }),
           h('div', { style: 'flex:1' }, [
@@ -926,7 +927,33 @@ function blocoWebhooks() {
               + (a.dias_raid ? '  ·  ' + a.dias_raid + ' dias de raid' : '')
               + '  ·  ' + quando(a.quando) }),
           ]),
-        ]));
+        ]);
+
+        /* TIRAR SÓ O QUE ESTÁ PENDENTE.
+
+           Linha ativa é acesso que alguém pagou; botão de apagar ao lado dela
+           é um clique errado de distância de virar estorno. Por isso o botão
+           nem aparece — o servidor também recusa, mas não oferecer é melhor
+           que recusar depois. */
+        if (preso) {
+          const tirar = h('button', { cls: 'bt fraco', type: 'button', txt: 'Tirar' });
+          tirar.onclick = async () => {
+            if (!confirm('Tirar esta cobrança pendente de ' + a.login + '? Se ela virou assinatura no Mercado Pago, ela é cancelada lá também.')) return;
+            tirar.disabled = true;
+            try {
+              const r = await api('/admin.php', { method: 'POST',
+                body: JSON.stringify({ acao: 'apagar_cobranca', id: a.id }) });
+              recado(r.recado, 'bom');
+              carrega();
+            } catch (e) {
+              recado(e.message, 'ruim');
+              tirar.disabled = false;
+            }
+          };
+          linha.appendChild(tirar);
+        }
+
+        corpo.appendChild(linha);
       });
     }
 

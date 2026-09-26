@@ -15,10 +15,20 @@ $dados = json_decode($corpo, true) ?: [];
 
 $sig        = $_SERVER['HTTP_X_SIGNATURE']  ?? '';
 $request_id = $_SERVER['HTTP_X_REQUEST_ID'] ?? '';
-$data_id    = (string) ($dados['data']['id'] ?? ($_GET['data.id'] ?? ''));
+/* SÃO DOIS IDS, E NÃO UM.
+
+   O que assina é o da URL: a regra deles diz, com todas as letras, que o
+   molde leva "o valor do parâmetro data.id recebido nos query params da
+   URL". O que processa é o do corpo, que é quem sempre vem.
+
+   Aqui estava só um, com o corpo na frente da URL. Em aviso de pagamento
+   os dois são iguais e ninguém percebia; em aviso de assinatura não são, e
+   o HMAC calculado nunca batia. */
+$id_url  = (string) ($_GET['data.id'] ?? '');
+$data_id = (string) ($dados['data']['id'] ?? ($dados['id'] ?? $id_url));
 
 // 1. Autenticidade antes de qualquer coisa.
-if ($data_id === '' || !mp_webhook_valido($sig, $request_id, $data_id)) {
+if ($data_id === '' || !mp_webhook_valido($sig, $request_id, $id_url)) {
     /* RECUSAR CALADO ERA O PIOR DOS DOIS MUNDOS.
 
        Nada daqui é processado — aviso sem assinatura válida não libera nada,
@@ -30,8 +40,18 @@ if ($data_id === '' || !mp_webhook_valido($sig, $request_id, $data_id)) {
 
        Só o motivo é anotado. A tabela de erros junta por arquivo e linha, então
        quem insistir vira uma linha só com o contador subindo. */
+    /* O FORMATO DO AVISO, e nunca o conteúdo dele.
+
+       "assinatura inválida" sozinho não diz onde consertar: pode ser segredo
+       errado, pode ser pedaço faltando no molde. Saber QUAIS pedaços vieram
+       separa as duas em uma olhada — e nada disso é segredo nem dado de
+       ninguém, só quais campos a notificação trouxe. */
     erro_anota(new RuntimeException(
         'webhook recusado: ' . ($data_id === '' ? 'sem id' : 'assinatura inválida')
+        . ' (tipo=' . mb_substr((string) ($dados['type'] ?? $_GET['topic'] ?? '?'), 0, 40)
+        . ', id na url=' . ($id_url !== '' ? 'sim' : 'não')
+        . ', request-id=' . ($request_id !== '' ? 'sim' : 'não')
+        . ', x-signature=' . ($sig !== '' ? 'sim' : 'não') . ')'
     ));
     http_response_code(401);
     exit;
